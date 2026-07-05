@@ -42,7 +42,7 @@ export const ResetPinScreen = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface px-7 pb-8 pt-12">
+    <div className="flex min-h-screen flex-col bg-surface px-7 pb-8 pt-12 sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center text-center">
         <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Set a new PIN</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">

@@ -17,12 +17,12 @@ export const NewPatientStep1Screen = () => {
         onBack={() => navigate(-1)}
         right={
           <div className="flex items-center gap-2">
-            <StatusPill status="pending">Offline</StatusPill>
+            <StatusPill status="offline" />
             <span className="font-mono text-[11px] text-ink-muted">Step 1 of 2</span>
           </div>
         }
       />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 space-y-4 px-5 py-3">
           <TextField label="Full name" placeholder="e.g. Amaka Okoro" name="patient_name" />
 

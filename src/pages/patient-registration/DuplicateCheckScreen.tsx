@@ -12,7 +12,7 @@ export const DuplicateCheckScreen = () => {
   return (
     <div className="relative flex min-h-screen flex-col bg-surface">
       <div className="flex justify-end px-5 pt-4">
-        <StatusPill status="pending">Offline</StatusPill>
+        <StatusPill status="offline" />
       </div>
 
       {/* Blurred form behind the sheet */}
@@ -24,8 +24,8 @@ export const DuplicateCheckScreen = () => {
       </div>
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md rounded-t-[26px] bg-white px-5 pb-7 pt-6 shadow-sheet md:max-w-lg">
-        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-outline-hair" />
+      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md rounded-t-[26px] bg-white px-5 pb-7 pt-6 shadow-sheet md:max-w-lg sm:inset-0 sm:h-fit sm:max-h-[92vh] sm:overflow-auto sm:rounded-[26px] sm:m-auto">
+        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-outline-hair sm:hidden" />
         <div className="flex items-center gap-2.5">
           <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-amber-bg font-extrabold text-amber-text">
             !
@@ -63,8 +63,14 @@ export const DuplicateCheckScreen = () => {
           </Button>
         </div>
         <div className="pt-1">
+          <Button variant="outlined" onClick={() => navigate('/home')}>
+            No — register as a new person
+          </Button>
+        </div>
+        {/* Not every match is clear-cut; don't force a guess between the two. */}
+        <div className="pt-1">
           <Button variant="ghost" onClick={() => navigate('/home')}>
-            No — this is a different person
+            Not sure — compare details
           </Button>
         </div>
       </div>

@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Button, StatusPill } from '@/ui';
+import { AppBar, Avatar, Button, ChoiceChip, StatusPill, useToast } from '@/ui';
 
 const UNITS = ['Injection Room', 'Pharmacy', 'Antenatal Care', 'Family Planning'];
+
+// Common hand-off instructions — one tap inserts the phrase, so staff rarely
+// type from scratch (and never send a stale prefilled instruction).
+const QUICK_INSTRUCTIONS = [
+  'Give TT injection',
+  'Dispense prescribed drugs',
+  'Dress wound',
+  'Take vitals',
+];
 
 /**
  * 4.6 Send patient to another unit — an instruction travels with the patient,
@@ -10,12 +19,22 @@ const UNITS = ['Injection Room', 'Pharmacy', 'Antenatal Care', 'Family Planning'
  */
 export const SendToUnitScreen = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [unit, setUnit] = useState('Injection Room');
+  const [instruction, setInstruction] = useState('');
+
+  const addQuick = (phrase: string) =>
+    setInstruction((prev) => (prev.trim() ? `${prev.trim()}. ${phrase}` : phrase));
+
+  const send = () => {
+    toast(`Sent to ${unit}`);
+    navigate('/home');
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 px-5 py-3">
           {/* Patient */}
           <div className="mb-4 flex items-center gap-3 rounded-[13px] bg-brand-tint px-3.5 py-3">
@@ -49,16 +68,25 @@ export const SendToUnitScreen = () => {
           </div>
           <textarea
             rows={3}
-            defaultValue="Give tetanus toxoid injection (TT1). Patient has confirmed malaria — already on ACT."
-            className="w-full rounded-field border-2 border-brand bg-white p-4 text-base text-ink outline-none"
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            placeholder="e.g. Give tetanus toxoid injection (TT1)"
+            className="w-full rounded-field border-2 border-brand bg-white p-4 text-base text-ink outline-none placeholder:text-ink-muted"
           />
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {QUICK_INSTRUCTIONS.map((q) => (
+              <ChoiceChip key={q} selected={false} onClick={() => addQuick(q)}>
+                + {q}
+              </ChoiceChip>
+            ))}
+          </div>
           <p className="mt-2.5 text-[13px] leading-relaxed text-ink-muted">
             The {unit} sees this the moment the patient walks in — no need to explain again.
           </p>
         </div>
 
         <footer className="px-5 pb-6 pt-4">
-          <Button variant="primary" onClick={() => navigate('/home')}>
+          <Button variant="primary" disabled={!instruction.trim()} onClick={send}>
             Send to {unit}
           </Button>
         </footer>

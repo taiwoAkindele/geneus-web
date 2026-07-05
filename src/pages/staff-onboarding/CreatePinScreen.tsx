@@ -36,7 +36,7 @@ export const CreatePinScreen = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface px-7 pb-8 pt-12">
+    <div className="flex min-h-screen flex-col bg-surface px-7 pb-8 pt-12 sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center text-center">
         {/* Logo — brand square with a mint plus */}
         <div className="relative mb-5 h-[52px] w-[52px] flex-none rounded-[15px] bg-brand">

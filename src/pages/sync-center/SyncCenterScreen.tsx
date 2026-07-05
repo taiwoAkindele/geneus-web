@@ -10,8 +10,8 @@ export const SyncCenterScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Sync & device" onBack={() => navigate(-1)} right={<StatusPill status="syncing" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
-        <div className="flex-1 space-y-5 px-5 py-3">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:max-w-3xl">
+        <div className="flex-1 space-y-5 px-5 py-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
           {/* Sync status */}
           <div>
             <div className="rounded-[18px] border border-outline-soft bg-white p-4">
@@ -61,7 +61,7 @@ export const SyncCenterScreen = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 px-1">
+          <div className="flex items-center gap-2.5 px-1 lg:col-span-2">
             <span className="h-2 w-2 rounded-full bg-brand-strong" />
             <span className="text-[13px] text-ink-soft">Roster attendance recorded automatically</span>
           </div>

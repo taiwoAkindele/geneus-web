@@ -11,7 +11,7 @@ export const ForgotPinScreen = () => {
   const [contact, setContact] = useState('');
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface">
+    <div className="flex min-h-screen flex-col bg-surface sm:min-h-0">
       <AppBar title="Forgot your PIN?" onBack={() => navigate(-1)} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
         <form

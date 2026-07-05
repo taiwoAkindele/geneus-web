@@ -15,7 +15,7 @@ export const ResetLinkSentScreen = () => {
   const target = contact || 'your email or phone';
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-12 text-white">
+    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-12 text-white sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="rounded-[22px] bg-white p-6 text-ink">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-tint text-2xl font-extrabold text-brand">

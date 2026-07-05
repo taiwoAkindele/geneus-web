@@ -1,38 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Stat, StatusPill, Tag } from '@/ui';
-
-const NAV = [
-  { key: 'home', label: 'Home', to: '/home' },
-  { key: 'patients', label: 'Patients', to: '/patients/search' },
-  { key: 'registers', label: 'Registers', to: '/registers/malaria' },
-  { key: 'stock', label: 'Stock', to: '/home' },
-];
-
-const BottomNav = ({ active }: { active: string }) => {
-  const navigate = useNavigate();
-  return (
-    <nav className="flex justify-around border-t border-outline-soft bg-white px-2 pb-5 pt-2.5">
-      {NAV.map((n) => {
-        const on = n.key === active;
-        return (
-          <button
-            key={n.key}
-            type="button"
-            onClick={() => navigate(n.to)}
-            className="flex min-h-0 flex-col items-center gap-1"
-          >
-            <span className={`h-[22px] w-[22px] rounded-md ${on ? 'bg-brand' : 'bg-outline'}`} />
-            <span
-              className={`text-[11px] ${on ? 'font-bold text-brand' : 'font-semibold text-ink-muted'}`}
-            >
-              {n.label}
-            </span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-};
+import { Icon, type IconName, Stat, StatusPill, Tag } from '@/ui';
 
 const ReferralRow = ({
   name,
@@ -77,7 +44,7 @@ const QuickAction = ({
   onClick,
 }: {
   label: string;
-  icon: string;
+  icon: IconName;
   primary?: boolean;
   tall?: boolean;
   onClick: () => void;
@@ -90,11 +57,11 @@ const QuickAction = ({
     } ${primary ? 'bg-brand text-white' : 'border border-outline-soft bg-white text-ink'}`}
   >
     <span
-      className={`flex h-[34px] w-[34px] items-center justify-center rounded-[10px] text-xl ${
+      className={`flex h-[34px] w-[34px] items-center justify-center rounded-[10px] ${
         primary ? 'bg-white/15 text-white' : 'bg-surface-container text-ink-soft'
       }`}
     >
-      {icon}
+      <Icon name={icon} className="h-5 w-5" />
     </span>
     <span className="text-[15px] font-bold md:text-base">{label}</span>
   </button>
@@ -108,8 +75,9 @@ export const FacilityHomeScreen = () => {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-surface">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl">
-        <div className="flex justify-end px-5 pt-4">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
+        {/* Phone shows its own sync pill (no top header on mobile); sm+ uses the AppHeader. */}
+        <div className="flex justify-end px-5 pt-4 sm:hidden">
           <StatusPill status="synced" />
         </div>
         <header className="flex items-center justify-between px-5 pb-3 pt-2">
@@ -120,7 +88,7 @@ export const FacilityHomeScreen = () => {
           <Tag tone="amber">Shift ends 15:00</Tag>
         </header>
 
-        <main className="flex-1 space-y-4 px-5 pb-24">
+        <main className="flex-1 space-y-4 px-5 pb-24 lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-5 lg:space-y-0">
           {/* Incoming referrals */}
           <div className="rounded-[20px] bg-slate p-4 text-white">
             <div className="mb-3 flex items-center justify-between">
@@ -151,29 +119,30 @@ export const FacilityHomeScreen = () => {
             </div>
           </div>
 
+          <div className="space-y-4">
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-3">
             <QuickAction
               label="New patient"
-              icon="+"
+              icon="plus"
               primary
               tall
               onClick={() => navigate('/patients/new')}
             />
             <QuickAction
               label="Find patient"
-              icon="⌕"
+              icon="search"
               tall
               onClick={() => navigate('/patients/search')}
             />
             <QuickAction
               label="Register books"
-              icon="▤"
+              icon="registers"
               onClick={() => navigate('/registers/malaria')}
             />
             <QuickAction
               label="This month"
-              icon="▧"
+              icon="month"
               onClick={() => navigate('/reports/month')}
             />
           </div>
@@ -184,9 +153,8 @@ export const FacilityHomeScreen = () => {
             <Stat value="5" label="Waiting" />
             <Stat value="4" label="To sync" tone="amber" />
           </div>
+          </div>
         </main>
-
-        <BottomNav active="home" />
       </div>
     </div>
   );

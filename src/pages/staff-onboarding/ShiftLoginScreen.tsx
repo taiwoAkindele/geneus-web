@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
 
+// Mock correct PIN — the real check evaluates the local roster offline (PLAN
+// FE-M1). Kept here so the prototype gives honest right/wrong feedback instead
+// of signing in on any four digits.
+const MOCK_PIN = '1234';
+
 /**
  * 3.2 Shift login (PIN) — the app's login. Roster-linked: no shift, no access,
  * on any device. The staff member enters their PIN to start the shift.
@@ -9,17 +14,32 @@ import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
 export const ShiftLoginScreen = () => {
   const navigate = useNavigate();
   const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
 
   const onDigit = (d: string) => {
     if (pin.length >= 4) return;
+    setError(false);
     const next = pin + d;
     setPin(next);
-    // On the 4th digit, sign in — land on the facility home.
-    if (next.length === 4) navigate('/home');
+    // On the 4th digit, verify — sign in only if the PIN is correct; otherwise
+    // show a clear error and let them retry (no silent wrong-navigation).
+    if (next.length === 4) {
+      if (next === MOCK_PIN) {
+        navigate('/home');
+      } else {
+        setError(true);
+        setPin('');
+      }
+    }
+  };
+
+  const onDelete = () => {
+    setError(false);
+    setPin((p) => p.slice(0, -1));
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-6 text-white">
+    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-6 text-white sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="flex justify-end">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-on-dark">
@@ -54,13 +74,18 @@ export const ShiftLoginScreen = () => {
             </div>
             <div className="my-4 h-px bg-outline-soft" />
             <div className="mb-3 text-[13px] font-semibold text-ink-soft">Enter your PIN</div>
-            <PinDots filled={pin.length} />
+            <PinDots filled={pin.length} className={error ? 'animate-shake' : ''} />
+            {error ? (
+              <div className="mt-3 text-center text-[13px] font-semibold text-danger">
+                Wrong PIN — try again
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-5 w-full max-w-[300px]">
             <PinKeypad
               onDigit={onDigit}
-              action={{ label: 'Clear', onPress: () => setPin('') }}
+              action={{ label: 'Delete', onPress: onDelete }}
               tone="dark"
             />
           </div>

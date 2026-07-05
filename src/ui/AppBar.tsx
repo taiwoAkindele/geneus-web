@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon } from './Icon';
 
 type Props = {
   title: string;
@@ -21,7 +22,7 @@ export const AppBar = ({ title, onBack, right, variant = 'surface' }: Props) => 
   const brand = variant === 'brand';
   return (
     <header
-      className={`sticky top-0 z-10 flex items-center gap-2 px-5 py-3 ${
+      className={`sticky top-[var(--app-header-h,0px)] z-10 flex items-center gap-2 px-5 py-3 ${
         brand ? 'bg-brand text-white' : 'bg-surface text-ink'
       }`}
     >
@@ -30,9 +31,9 @@ export const AppBar = ({ title, onBack, right, variant = 'surface' }: Props) => 
           type="button"
           onClick={onBack}
           aria-label="Back"
-          className="-ml-2 flex h-11 w-11 min-h-0 flex-none items-center justify-center text-2xl leading-none text-current"
+          className="-ml-2 flex h-11 w-11 min-h-0 flex-none items-center justify-center text-current"
         >
-          ‹
+          <Icon name="back" className="h-6 w-6" />
         </button>
       ) : null}
       <span className="flex-1 truncate text-xl font-extrabold tracking-[-0.02em]">{title}</span>

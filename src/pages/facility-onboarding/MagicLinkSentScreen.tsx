@@ -12,7 +12,7 @@ export const MagicLinkSentScreen = () => {
   const target = contact || (isEmail ? "your email" : "your phone");
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-12 text-white">
+    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-12 text-white sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         {/* Logo — mint square with a green plus */}
         <div className="relative mb-7 h-14 w-14 flex-none rounded-2xl bg-brand-accent-soft">

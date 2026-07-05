@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, PatientIdToken, StatusPill } from '@/ui';
+import { AppBar, Avatar, Icon, PatientIdToken, StatusPill } from '@/ui';
 
 const MATCHES = [
   { initials: 'AO', name: 'Amaka Okoro', detail: 'F · 32 · Odo-Ona area', id: 'OOE-PHC-000047-K2', last: 'Last: 12 Jun' },
@@ -12,23 +12,30 @@ export const PatientSearchScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Find patient" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-2 md:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-2 md:max-w-lg lg:max-w-3xl">
         {/* Search */}
         <div className="flex items-center gap-2.5 rounded-[14px] border-2 border-brand bg-white px-4 py-3.5">
-          <span className="text-ink-muted">⌕</span>
+          <Icon name="search" className="h-5 w-5 text-ink-muted" />
           <input
             className="min-h-0 flex-1 border-0 p-0 text-base text-ink outline-none placeholder:text-ink-muted"
             placeholder="Name, phone, or Patient ID"
             aria-label="Search patients"
           />
-          <span className="font-mono text-xs font-semibold text-brand-strong">Scan ID</span>
+          <button
+            type="button"
+            className="flex min-h-0 items-center gap-1.5 rounded-full bg-brand-tint px-2.5 py-1.5 text-xs font-bold text-brand"
+            aria-label="Scan patient ID"
+          >
+            <Icon name="scan" className="h-4 w-4" />
+            Scan ID
+          </button>
         </div>
         <p className="mt-2.5 text-xs text-ink-muted">Search by name, phone, or Patient ID</p>
 
         <div className="mt-5 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">
           2 matches
         </div>
-        <div className="mt-3 space-y-2.5">
+        <div className="mt-3 space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0">
           {MATCHES.map((m) => (
             <button
               key={m.id}
