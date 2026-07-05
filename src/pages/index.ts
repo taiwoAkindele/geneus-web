@@ -11,3 +11,4 @@
 export * from './facility-onboarding';
 export * from './foundations';
 export * from './register-patient';
+export * from './staff-onboarding';
