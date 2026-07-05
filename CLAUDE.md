@@ -118,6 +118,26 @@ Every async surface must handle all of its states; never render only the happy p
 
 ---
 
+## Responsive layout
+
+Mobile is the **canonical** design and never changes to accommodate a larger
+screen. Make a screen responsive by **reflowing the same UI with Tailwind `md:`
+(and `lg:`) utilities** — resize, rearrange, or remodel the *existing* elements
+(widen the container, turn a column into a grid, bump type/spacing). Same DOM,
+same components, same content at every width.
+
+- Keep the **mobile classes as the unprefixed base** so the phone layout stays
+  byte-for-byte stable; every wider-screen change is a `md:`/`lg:` variant. When
+  adding a variant, don't alter the base class it builds on.
+- **Do not** add, remove, or swap components/content for larger screens, and do
+  not build a separate desktop structure (no `md:hidden` / `hidden md:block` twin
+  layouts). If a screen genuinely needs different content on desktop, that is a
+  **product decision the user makes** — ask; don't invent it.
+- The design's `380×800` rounded frames are mockup bezels, not app chrome — never
+  reproduce them.
+
+---
+
 ## TypeScript
 
 - Strict typing. Avoid `any` and unnecessary assertions; prefer explicit types.

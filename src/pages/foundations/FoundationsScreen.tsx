@@ -45,7 +45,9 @@ export function FoundationsScreen() {
     <div className="min-h-screen bg-surface-container">
       <AppBar title="Geneus Health — Foundations" right={<StatusPill status="synced" />} />
 
-      <main className="mx-auto max-w-md space-y-10 p-5 pb-24">
+      {/* Same UI at every width — Tailwind md: utilities reflow the single
+          mobile column into a multi-column masonry on wider screens. */}
+      <main className="mx-auto max-w-md space-y-10 p-5 pb-24 md:max-w-5xl md:columns-2 md:gap-6 md:space-y-0 md:p-10 md:[&>section]:mb-6 md:[&>section]:break-inside-avoid lg:max-w-6xl lg:columns-3">
         {/* Type */}
         <section>
           <SectionLabel>Typography</SectionLabel>
