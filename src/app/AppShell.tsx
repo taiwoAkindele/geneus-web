@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar } from '@/ui';
+import { Avatar, Icon, type IconName } from '@/ui';
+import { AppHeader, ShiftBanner } from './AppHeader';
 
 /**
  * Responsive app shell for the signed-in daily-use screens (design "Responsive
@@ -7,17 +9,19 @@ import { Avatar } from '@/ui';
  *   ≤640  bottom tab bar (home only, matching the phone design)
  *   641–1024  rail sidebar (icon + tiny label)
  *   ≥1025  full sidebar (icon + label, wordmark, user card)
- * Auth and admin screens live outside this shell.
+ * Auth and admin screens live outside this shell. A persistent AppHeader +
+ * ShiftBanner sit above every screen; screen AppBars stick just beneath the
+ * header via the `--app-header-h` offset set on the content column.
  */
-type NavItem = { key: string; label: string; to: string; match: string; bottom?: boolean };
+type NavItem = { key: string; label: string; to: string; match: string; icon: IconName; bottom?: boolean };
 
 const NAV: NavItem[] = [
-  { key: 'home', label: 'Home', to: '/home', match: '/home', bottom: true },
-  { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', bottom: true },
-  { key: 'registers', label: 'Registers', to: '/registers/malaria', match: '/registers', bottom: true },
-  { key: 'referrals', label: 'Referrals', to: '/referrals/track', match: '/referrals' },
-  { key: 'month', label: 'This month', to: '/reports/month', match: '/reports' },
-  { key: 'stock', label: 'Stock', to: '/home', match: '__stock__', bottom: true },
+  { key: 'home', label: 'Home', to: '/home', match: '/home', icon: 'home', bottom: true },
+  { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', icon: 'patients', bottom: true },
+  { key: 'registers', label: 'Registers', to: '/registers/malaria', match: '/registers', icon: 'registers', bottom: true },
+  { key: 'referrals', label: 'Referrals', to: '/referrals/track', match: '/referrals', icon: 'referrals' },
+  { key: 'month', label: 'This month', to: '/reports/month', match: '/reports', icon: 'month' },
+  { key: 'stock', label: 'Stock', to: '/stock', match: '/stock', icon: 'stock', bottom: true },
 ];
 
 const Logo = () => (
@@ -28,7 +32,7 @@ const Logo = () => (
 );
 
 const isActive = (pathname: string, match: string) =>
-  match !== '__stock__' && (pathname === match || pathname.startsWith(`${match}/`));
+  pathname === match || pathname.startsWith(`${match}/`);
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -54,10 +58,9 @@ const Sidebar = () => {
                 active ? 'bg-white/15' : ''
               }`}
             >
-              <span
-                className={`h-5 w-5 flex-none rounded-md ${
-                  active ? 'bg-brand-accent-soft' : 'bg-white/25'
-                }`}
+              <Icon
+                name={item.icon}
+                className={`h-[22px] w-[22px] ${active ? 'text-brand-accent-soft' : 'text-white/80'}`}
               />
               <span
                 className={`text-[10px] lg:whitespace-nowrap lg:text-sm ${
@@ -99,7 +102,7 @@ const BottomBar = () => {
             onClick={() => navigate(item.to)}
             className="flex min-h-0 flex-col items-center gap-1"
           >
-            <span className={`h-[22px] w-[22px] rounded-md ${active ? 'bg-brand' : 'bg-outline'}`} />
+            <Icon name={item.icon} className={`h-[22px] w-[22px] ${active ? 'text-brand' : 'text-ink-muted'}`} />
             <span
               className={`text-[11px] ${active ? 'font-bold text-brand' : 'font-semibold text-ink-muted'}`}
             >
@@ -121,7 +124,12 @@ export const AppShell = () => {
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div
+        className="flex min-h-screen min-w-0 flex-1 flex-col"
+        style={{ '--app-header-h': '46px' } as CSSProperties}
+      >
+        <AppHeader />
+        <ShiftBanner />
         <div className="flex-1">
           <Outlet />
         </div>

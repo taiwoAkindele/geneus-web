@@ -17,7 +17,7 @@ export const NewPatientStep2Screen = () => {
         onBack={() => navigate(-1)}
         right={
           <div className="flex items-center gap-2">
-            <StatusPill status="pending">Offline</StatusPill>
+            <StatusPill status="offline" />
             <span className="font-mono text-[11px] text-ink-muted">Step 2 of 2</span>
           </div>
         }

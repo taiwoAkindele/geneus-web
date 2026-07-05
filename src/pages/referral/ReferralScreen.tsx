@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, StatusPill, Tag } from '@/ui';
+import { AppBar, Button, Icon, StatusPill, Tag, useToast } from '@/ui';
 
 const TRAVELS = ['Name, age, sex', 'Allergies', 'Current meds', 'Reason'];
 
@@ -109,14 +109,20 @@ const STATUS_TONE = { Arrived: 'green', Seen: 'amber', Closed: 'neutral' } as co
  */
 export const ReferralScreen = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [selectedId, setSelectedId] = useState('r1');
   const selected = REFERRALS.find((r) => r.id === selectedId) ?? REFERRALS[0];
+
+  const refer = () => {
+    toast('Referral sent · note printed');
+    navigate('/home');
+  };
 
   return (
     <>
       {/* ---- Phone / tablet: single referral tracker ---- */}
       <div className="flex min-h-screen flex-col bg-surface lg:hidden">
-        <AppBar title="Referral" onBack={() => navigate(-1)} right={<StatusPill status="pending">Offline</StatusPill>} />
+        <AppBar title="Referral" onBack={() => navigate(-1)} right={<StatusPill status="offline" />} />
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
           <div className="flex-1 space-y-4 px-5 py-3">
             <div className="rounded-card border border-outline-soft bg-white p-4">
@@ -156,12 +162,12 @@ export const ReferralScreen = () => {
           <footer className="flex gap-2.5 px-5 pb-6 pt-4">
             <button
               type="button"
-              className="flex w-14 flex-none items-center justify-center rounded-field border-[1.5px] border-outline bg-white text-xl text-ink-soft"
+              className="flex w-14 flex-none items-center justify-center rounded-field border-[1.5px] border-outline bg-white text-ink-soft"
               aria-label="Print referral note"
             >
-              🖶
+              <Icon name="print" className="h-6 w-6" />
             </button>
-            <Button variant="primary" onClick={() => navigate('/home')}>
+            <Button variant="primary" onClick={refer}>
               Refer &amp; print note
             </Button>
           </footer>

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Stat, StatusPill, Tag } from '@/ui';
+import { Icon, type IconName, Stat, Tag } from '@/ui';
 
 const ReferralRow = ({
   name,
@@ -44,7 +44,7 @@ const QuickAction = ({
   onClick,
 }: {
   label: string;
-  icon: string;
+  icon: IconName;
   primary?: boolean;
   tall?: boolean;
   onClick: () => void;
@@ -57,11 +57,11 @@ const QuickAction = ({
     } ${primary ? 'bg-brand text-white' : 'border border-outline-soft bg-white text-ink'}`}
   >
     <span
-      className={`flex h-[34px] w-[34px] items-center justify-center rounded-[10px] text-xl ${
+      className={`flex h-[34px] w-[34px] items-center justify-center rounded-[10px] ${
         primary ? 'bg-white/15 text-white' : 'bg-surface-container text-ink-soft'
       }`}
     >
-      {icon}
+      <Icon name={icon} className="h-5 w-5" />
     </span>
     <span className="text-[15px] font-bold md:text-base">{label}</span>
   </button>
@@ -76,10 +76,7 @@ export const FacilityHomeScreen = () => {
   return (
     <div className="min-h-screen bg-surface">
       <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
-        <div className="flex justify-end px-5 pt-4">
-          <StatusPill status="synced" />
-        </div>
-        <header className="flex items-center justify-between px-5 pb-3 pt-2">
+        <header className="flex items-center justify-between px-5 pb-3 pt-4">
           <div>
             <div className="text-[13px] text-ink-muted">Good morning,</div>
             <div className="text-[22px] font-extrabold tracking-[-0.02em]">Amaka</div>
@@ -123,25 +120,25 @@ export const FacilityHomeScreen = () => {
           <div className="grid grid-cols-2 gap-3">
             <QuickAction
               label="New patient"
-              icon="+"
+              icon="plus"
               primary
               tall
               onClick={() => navigate('/patients/new')}
             />
             <QuickAction
               label="Find patient"
-              icon="⌕"
+              icon="search"
               tall
               onClick={() => navigate('/patients/search')}
             />
             <QuickAction
               label="Register books"
-              icon="▤"
+              icon="registers"
               onClick={() => navigate('/registers/malaria')}
             />
             <QuickAction
               label="This month"
-              icon="▧"
+              icon="month"
               onClick={() => navigate('/reports/month')}
             />
           </div>

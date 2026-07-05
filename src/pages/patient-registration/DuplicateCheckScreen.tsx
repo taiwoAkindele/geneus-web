@@ -12,7 +12,7 @@ export const DuplicateCheckScreen = () => {
   return (
     <div className="relative flex min-h-screen flex-col bg-surface">
       <div className="flex justify-end px-5 pt-4">
-        <StatusPill status="pending">Offline</StatusPill>
+        <StatusPill status="offline" />
       </div>
 
       {/* Blurred form behind the sheet */}
@@ -63,8 +63,14 @@ export const DuplicateCheckScreen = () => {
           </Button>
         </div>
         <div className="pt-1">
+          <Button variant="outlined" onClick={() => navigate('/home')}>
+            No — register as a new person
+          </Button>
+        </div>
+        {/* Not every match is clear-cut; don't force a guess between the two. */}
+        <div className="pt-1">
           <Button variant="ghost" onClick={() => navigate('/home')}>
-            No — this is a different person
+            Not sure — compare details
           </Button>
         </div>
       </div>

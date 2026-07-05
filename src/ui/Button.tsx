@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from 'react';
+import { Loader2 } from 'lucide-react';
 
 type Variant =
   | 'primary' // filled green — the one primary action
@@ -21,6 +22,12 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   /** Full-width by default (the design's primary actions span the footer). */
   fullWidth?: boolean;
+  /**
+   * Show a pending spinner and disable the button while a write/mutation runs.
+   * Required by the offline-first UX rule: actions never allow double-submit and
+   * always show progress (CLAUDE.md · PRD §13).
+   */
+  loading?: boolean;
 };
 
 /**
@@ -31,17 +38,25 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 export const Button = ({
   variant = 'primary',
   fullWidth = true,
+  loading = false,
   className = '',
   type = 'button',
+  children,
+  disabled,
   ...props
 }: Props) => {
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center rounded-field px-5 py-4 text-base font-bold leading-none disabled:opacity-50 ${
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`inline-flex items-center justify-center gap-2 rounded-field px-5 py-4 text-base font-bold leading-none disabled:opacity-50 ${
         fullWidth ? 'w-full' : ''
       } ${VARIANTS[variant]} ${className}`}
       {...props}
-    />
+    >
+      {loading ? <Loader2 aria-hidden className="h-5 w-5 flex-none animate-spin" /> : null}
+      {children}
+    </button>
   );
 }

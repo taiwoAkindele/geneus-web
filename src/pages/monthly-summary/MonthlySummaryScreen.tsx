@@ -1,16 +1,22 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, StatusPill } from '@/ui';
+import { AppBar, Button, Icon, type IconName, StatusPill } from '@/ui';
+
+type Trend = 'up-bad' | 'down-good' | 'flat';
+
+const TREND_ICON: Record<Trend, IconName> = {
+  'up-bad': 'trend-up',
+  'down-good': 'trend-down',
+  flat: 'trend-flat',
+};
 
 const Metric = ({
   label,
   value,
-  trend,
   trendTone,
 }: {
   label: string;
   value: string;
-  trend?: string;
-  trendTone?: 'up-bad' | 'down-good' | 'flat';
+  trendTone?: Trend;
 }) => {
   const color =
     trendTone === 'up-bad' ? 'text-danger' : trendTone === 'down-good' ? 'text-brand-strong' : 'text-ink-muted';
@@ -19,7 +25,9 @@ const Metric = ({
       <div className="text-xs text-ink-muted">{label}</div>
       <div className="flex items-baseline gap-1.5">
         <span className="font-mono text-[26px] font-semibold text-ink">{value}</span>
-        {trend ? <span className={`text-xs font-bold ${color}`}>{trend}</span> : null}
+        {trendTone ? (
+          <Icon name={TREND_ICON[trendTone]} className={`h-4 w-4 self-center ${color}`} />
+        ) : null}
       </div>
     </div>
   );
@@ -53,9 +61,9 @@ export const MonthlySummaryScreen = () => {
 
           {/* Metrics */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Metric label="Malaria positivity" value="38%" trend="▲" trendTone="up-bad" />
-            <Metric label="Immunisation dropout" value="6%" trend="▼" trendTone="down-good" />
-            <Metric label="ANC 4th visit" value="72%" trend="▬" trendTone="flat" />
+            <Metric label="Malaria positivity" value="38%" trendTone="up-bad" />
+            <Metric label="Immunisation dropout" value="6%" trendTone="down-good" />
+            <Metric label="ANC 4th visit" value="72%" trendTone="flat" />
             <Metric label="Referrals made" value="14" />
           </div>
 

@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ToastProvider } from '@/ui';
+import { SessionProvider } from '@/session';
 import { AdminShell } from './AdminShell';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
@@ -108,6 +110,9 @@ const ReferralScreen = lazy(() =>
 const SyncCenterScreen = lazy(() =>
   import('@/pages/sync-center/SyncCenterScreen').then((m) => ({ default: m.SyncCenterScreen })),
 );
+const StockScreen = lazy(() =>
+  import('@/pages/stock/StockScreen').then((m) => ({ default: m.StockScreen })),
+);
 
 const ScreenFallback = () => {
   return (
@@ -119,8 +124,10 @@ const ScreenFallback = () => {
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<ScreenFallback />}>
+    <SessionProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <Suspense fallback={<ScreenFallback />}>
         <Routes>
           {/* Default screen is the staff shift-login. */}
           <Route path="/" element={<Navigate to="/login" replace />} />
@@ -147,6 +154,7 @@ const App = () => {
             <Route path="/registers/malaria" element={<MalariaRegisterScreen />} />
             <Route path="/reports/month" element={<MonthlySummaryScreen />} />
             <Route path="/referrals/track" element={<ReferralScreen />} />
+            <Route path="/stock" element={<StockScreen />} />
             <Route path="/sync" element={<SyncCenterScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
@@ -165,8 +173,10 @@ const App = () => {
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </Suspense>
-    </BrowserRouter>
+          </Suspense>
+        </BrowserRouter>
+      </ToastProvider>
+    </SessionProvider>
   );
 };
 

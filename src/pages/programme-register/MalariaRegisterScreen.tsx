@@ -47,7 +47,7 @@ export const MalariaRegisterScreen = () => {
           onBack={() => navigate(-1)}
           right={
             <div className="flex items-center gap-2">
-              <StatusPill status="pending">Offline · 5 pending</StatusPill>
+              <StatusPill status="offline">Offline · 5 waiting</StatusPill>
               <Tag tone="neutral">Facility</Tag>
             </div>
           }

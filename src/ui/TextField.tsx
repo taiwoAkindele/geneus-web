@@ -21,7 +21,10 @@ export const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
   const inputId = id ?? props.name;
   return (
     <label htmlFor={inputId} className="block">
-      <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">{label}</span>
+      <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
+        {label}
+        {props.required ? <span className="text-danger" aria-hidden> *</span> : null}
+      </span>
       <input
         ref={ref}
         id={inputId}
