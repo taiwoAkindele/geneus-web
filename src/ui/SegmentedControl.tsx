@@ -16,13 +16,13 @@ type Props<T extends string> = {
  * Religion). The selected segment fills primary green; the rest are hairline
  * outlines. For 2–3 short options shown inline.
  */
-export function SegmentedControl<T extends string>({
+export const SegmentedControl = <T extends string,>({
   options,
   value,
   onChange,
   ariaLabel,
   className = '',
-}: Props<T>) {
+}: Props<T>) => {
   return (
     <div role="radiogroup" aria-label={ariaLabel} className={`flex gap-2 ${className}`}>
       {options.map((o) => {

@@ -11,10 +11,10 @@ import { PatientForm, type PatientFormValues } from '@/features/registration';
  * STEP 1: UI only. The submit handler is a demo; persistence via a repository +
  * the shared contract is wired in the integration step.
  */
-export function RegisterPatientScreen() {
+export const RegisterPatientScreen = () => {
   const [savedName, setSavedName] = useState<string | null>(null);
 
-  function handleSubmit(values: PatientFormValues) {
+  const handleSubmit = (values: PatientFormValues) => {
     setSavedName(values.fullName || 'patient');
   }
 

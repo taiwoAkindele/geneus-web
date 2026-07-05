@@ -8,5 +8,6 @@
  * index. When the router lands, route-level code splitting should lazy-import
  * the individual page file (per-screen chunks for cheap phones), not this barrel.
  */
+export * from './facility-onboarding';
 export * from './foundations';
 export * from './register-patient';

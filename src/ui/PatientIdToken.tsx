@@ -15,7 +15,7 @@ type Props = {
  * shows the dashed token with an optional segment breakdown; the inline variant
  * is the compact chip used in search results and headers.
  */
-export function PatientIdToken({ id, parts, variant = 'card', className = '' }: Props) {
+export const PatientIdToken = ({ id, parts, variant = 'card', className = '' }: Props) => {
   if (variant === 'inline') {
     return (
       <span

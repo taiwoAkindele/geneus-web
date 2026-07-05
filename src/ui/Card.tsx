@@ -11,7 +11,7 @@ type Props = {
  * Surface card — white on a hairline outline, 16px radius (design Foundations).
  * No shadow by default; the design leans on the border, not elevation.
  */
-export function Card({ children, className = '', padded = true }: Props) {
+export const Card = ({ children, className = '', padded = true }: Props) => {
   return (
     <div
       className={`rounded-card border border-outline-soft bg-white ${padded ? 'p-4' : ''} ${className}`}

@@ -29,7 +29,7 @@ const COLORS: { name: string; hex: string; text?: string }[] = [
   { name: 'Surface', hex: '#f8f9fa', text: '#191c1d' },
 ];
 
-function SectionLabel({ children }: { children: string }) {
+const SectionLabel = ({ children }: { children: string }) => {
   return (
     <h3 className="mb-4 text-[13px] font-bold uppercase tracking-[0.14em] text-ink-muted">
       {children}
@@ -37,7 +37,7 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-export function FoundationsScreen() {
+export const FoundationsScreen = () => {
   const [sex, setSex] = useState<'F' | 'M'>('F');
   const [role, setRole] = useState('CHEW');
 

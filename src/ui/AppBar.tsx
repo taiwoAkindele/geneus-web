@@ -17,7 +17,7 @@ type Props = {
  * Screen app bar. The design uses two treatments: a plain surface bar with an
  * optional back chevron, and a green context bar on clinical screens.
  */
-export function AppBar({ title, onBack, right, variant = 'surface' }: Props) {
+export const AppBar = ({ title, onBack, right, variant = 'surface' }: Props) => {
   const brand = variant === 'brand';
   return (
     <header

@@ -21,7 +21,7 @@ type Props = {
  * Sync / connection pill. Connection state is never hidden in this product, so
  * this is used in most app bars. Compact (opts out of the 52px control rule).
  */
-export function StatusPill({ status, children, className = '' }: Props) {
+export const StatusPill = ({ status, children, className = '' }: Props) => {
   const s = MAP[status];
   return (
     <span

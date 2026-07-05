@@ -101,6 +101,11 @@ optional polish; they are the product.
   contract** via `@hookform/resolvers/zod`. Input strings are normalized to the
   document shape at the persistence boundary, not stored raw.
 - Use the `@/` path alias for `src/` imports and `@shared` for the data contract.
+- **Functions are arrow expressions assigned to `const`** — components and inner
+  helpers alike (`export const Screen = () => { … }`, `const handleSubmit = () =>
+  { … }`). Do not use `function` declarations. The only exception is a
+  `forwardRef`/`memo` wrapper, which keeps a named inner function so the component
+  has a devtools display name.
 
 ---
 

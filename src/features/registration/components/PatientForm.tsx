@@ -18,7 +18,7 @@ type Props = {
  * values. Zod validation from the shared contract replaces the inline rules in
  * the integration step.
  */
-export function PatientForm({ onSubmit, submitting = false }: Props) {
+export const PatientForm = ({ onSubmit, submitting = false }: Props) => {
   const {
     register,
     handleSubmit,
