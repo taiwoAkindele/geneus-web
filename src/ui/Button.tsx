@@ -28,13 +28,13 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
  * (index.css); radius, weight and size come from the Foundations spec:
  * radius 12px, weight 700, size 16px.
  */
-export function Button({
+export const Button = ({
   variant = 'primary',
   fullWidth = true,
   className = '',
   type = 'button',
   ...props
-}: Props) {
+}: Props) => {
   return (
     <button
       type={type}

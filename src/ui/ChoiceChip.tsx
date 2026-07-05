@@ -10,7 +10,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
  * the 52px control rule via `min-h-0`. Callers append a "✓" to the label when
  * selected if they want the design's checkmark.
  */
-export function ChoiceChip({ selected = false, className = '', children, ...props }: Props) {
+export const ChoiceChip = ({ selected = false, className = '', children, ...props }: Props) => {
   return (
     <button
       type="button"

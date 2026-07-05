@@ -23,7 +23,7 @@ type Props = {
  * everything is saved on this device"). Amber by default; `info`/`success` reuse
  * the same shape for other tones.
  */
-export function Banner({ tone = 'amber', title, children, icon = '!', className = '' }: Props) {
+export const Banner = ({ tone = 'amber', title, children, icon = '!', className = '' }: Props) => {
   const t = TONES[tone];
   return (
     <div className={`flex items-start gap-3.5 rounded-card border p-4 ${t.box} ${className}`}>
