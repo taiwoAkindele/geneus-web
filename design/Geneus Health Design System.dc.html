@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  ::selection { background: #9df5bd; color: #002110; }
+</style>
+</helmet>
+
+<div style="font-family: 'Hanken Grotesk', system-ui, sans-serif; background: #eceeef; color: #191c1d; -webkit-font-smoothing: antialiased; padding-bottom: 120px; min-height: 100vh;">
+
+  <!-- ===== COVER ===== -->
+  <div style="background: #00502e; color: #fff; padding: 72px 40px 64px; position: relative; overflow: hidden;">
+    <div style="max-width: 1160px; margin: 0 auto; position: relative; z-index: 2;">
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 56px;">
+        <div style="width: 40px; height: 40px; border-radius: 11px; background: #9df5bd; position: relative; flex: none;">
+          <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 18px; height: 5.5px; border-radius: 3px; background: #00502e;"></div>
+          <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 5.5px; height: 18px; border-radius: 3px; background: #00502e;"></div>
+        </div>
+        <span style="font-weight: 800; font-size: 21px; letter-spacing: -0.02em;">Geneus Health</span>
+        <span style="margin-left: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(255,255,255,0.14); padding: 5px 9px; border-radius: 999px; letter-spacing: 0.02em;">EMR / EHR</span>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: #81d9a2; margin-bottom: 20px;">Design System &amp; Screen Library — v3.0</div>
+      <h1 style="font-size: clamp(40px, 6vw, 72px); line-height: 1.02; letter-spacing: -0.03em; font-weight: 800; margin: 0 0 24px; max-width: 15ch;">One patient. One record. Every level of care.</h1>
+      <p style="font-size: clamp(16px, 2vw, 19px); line-height: 1.55; color: #c8e9d5; max-width: 60ch; margin: 0;">An offline-first health record system built for the Community Health Centre first — simple enough for one nurse and unreliable power, and it grows upward into hospitals and the national health system.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px;">
+        <span style="font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.16); padding: 8px 14px; border-radius: 999px;">Mobile-first · responsive</span>
+        <span style="font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.16); padding: 8px 14px; border-radius: 999px;">Offline-first · PWA</span>
+        <span style="font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.16); padding: 8px 14px; border-radius: 999px;">Phase 1 — CHC / PHC</span>
+      </div>
+    </div>
+    <div style="position: absolute; right: -80px; bottom: -160px; width: 480px; height: 480px; border-radius: 50%; border: 60px solid rgba(129,217,162,0.10); z-index: 1;"></div>
+  </div>
+
+  <!-- ===== FOUNDATIONS ===== -->
+  <div style="max-width: 1160px; margin: 0 auto; padding: 0 40px;">
+
+    <!-- section header -->
+    <div style="display: flex; align-items: baseline; gap: 16px; margin: 72px 0 8px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: #006b3f;">01</span>
+      <h2 style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">Foundations</h2>
+    </div>
+    <p style="color: #3f4941; font-size: 16px; line-height: 1.55; margin: 0 0 40px; max-width: 62ch;">The system is built for bright sunlight and low-cost screens: high contrast, generous touch targets (52px minimum), and one calm green as the single point of brand emphasis. Nothing decorative competes with the patient's data.</p>
+
+    <!-- COLOR -->
+    <h3 style="font-size: 14px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7a71; margin: 0 0 18px;">Color tokens</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px;">
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #00502e;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Primary</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#00502e</div></div>
+      </div>
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #006b3f;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Primary container</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#006b3f</div></div>
+      </div>
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #8af5b4;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Secondary container</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#8af5b4</div></div>
+      </div>
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #394750;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Tertiary / slate</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#394750</div></div>
+      </div>
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #8a5a00;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Warning / pending</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#8a5a00</div></div>
+      </div>
+      <div style="border-radius: 14px; overflow: hidden; border: 1px solid #d9dadb; background: #fff;">
+        <div style="height: 88px; background: #ba1a1a;"></div>
+        <div style="padding: 12px 14px;"><div style="font-weight: 700; font-size: 14px;">Error</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f7a71;">#ba1a1a</div></div>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 0; border-radius: 12px; overflow: hidden; border: 1px solid #d9dadb; margin-bottom: 56px;">
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #ffffff; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f7a71;">#ffffff</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #f8f9fa; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f7a71;">surface</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #edeeef; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f7a71;">container</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #e1e3e4; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f7a71;">highest</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #bec9bf; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #3f4941;">outline-var</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #3f4941; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #e1e3e4;">on-surf-var</div>
+      <div style="flex: 1; min-width: 90px; height: 56px; background: #191c1d; display: flex; align-items: flex-end; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #e1e3e4;">on-surface</div>
+    </div>
+
+    <!-- TYPE -->
+    <h3 style="font-size: 14px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7a71; margin: 0 0 18px;">Typography</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 56px;">
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 28px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #006b3f; letter-spacing: 0.08em; margin-bottom: 16px;">HANKEN GROTESK — interface &amp; content</div>
+        <div style="font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;">Display 40 / 800</div>
+        <div style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-top: 14px;">Heading 26 / 700</div>
+        <div style="font-size: 18px; font-weight: 600; margin-top: 12px;">Title 18 / 600</div>
+        <div style="font-size: 16px; font-weight: 400; margin-top: 10px; color: #3f4941; line-height: 1.5;">Body 16 / 400 — the minimum input and body size, chosen so it never triggers zoom and stays legible in the sun.</div>
+        <div style="font-size: 13px; font-weight: 600; margin-top: 10px; color: #6f7a71; letter-spacing: 0.04em;">Label 13 / 600</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 28px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #006b3f; letter-spacing: 0.08em; margin-bottom: 16px;">JETBRAINS MONO — IDs, codes &amp; counts</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; letter-spacing: -0.01em;">OOE-PHC-000047-K2</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; margin-top: 18px; color: #3f4941;">Patient IDs, register counts, and any figure a health worker reads back aloud use the monospaced face — every digit the same width, impossible to misread.</div>
+        <div style="display: flex; gap: 20px; margin-top: 22px;">
+          <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 600; color: #00502e;">142</div><div style="font-size: 12px; color: #6f7a71;">OPD this month</div></div>
+          <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 600; color: #00502e;">38%</div><div style="font-size: 12px; color: #6f7a71;">Malaria positivity</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPONENTS -->
+    <h3 style="font-size: 14px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7a71; margin: 0 0 18px;">Core components</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 24px;">
+
+      <!-- buttons -->
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 26px;">
+        <div style="font-size: 13px; font-weight: 700; color: #6f7a71; margin-bottom: 18px;">Buttons — 52px min height</div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="background: #00502e; color: #fff; text-align: center; padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px;">Save &amp; continue</div>
+          <div style="background: #dcefe2; color: #00502e; text-align: center; padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px;">Secondary action</div>
+          <div style="background: #fff; color: #00502e; border: 1.5px solid #bec9bf; text-align: center; padding: 15px; border-radius: 12px; font-weight: 700; font-size: 16px;">Outlined</div>
+          <div style="color: #ba1a1a; text-align: center; padding: 14px; font-weight: 700; font-size: 15px;">Destructive / text</div>
+        </div>
+      </div>
+
+      <!-- fields -->
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 26px;">
+        <div style="font-size: 13px; font-weight: 700; color: #6f7a71; margin-bottom: 18px;">Inputs</div>
+        <label style="font-size: 13px; font-weight: 600; color: #3f4941; display: block; margin-bottom: 7px;">Full name</label>
+        <div style="border: 1.5px solid #bec9bf; border-radius: 12px; padding: 15px; font-size: 16px; color: #191c1d; margin-bottom: 16px;">Amaka Okoro</div>
+        <label style="font-size: 13px; font-weight: 600; color: #3f4941; display: block; margin-bottom: 7px;">Phone number</label>
+        <div style="border: 2px solid #00502e; border-radius: 12px; padding: 14px 15px; font-size: 16px; color: #191c1d; display: flex; justify-content: space-between; align-items: center;">0803 —<span style="width:2px;height:20px;background:#00502e;"></span></div>
+        <div style="font-size: 12px; color: #6f7a71; margin-top: 7px;">Focused state · 2px primary ring</div>
+      </div>
+
+      <!-- status pills -->
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 26px;">
+        <div style="font-size: 13px; font-weight: 700; color: #6f7a71; margin-bottom: 18px;">Sync &amp; status pills</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <span style="display: inline-flex; align-items: center; gap: 7px; background: #dcefe2; color: #00502e; font-weight: 700; font-size: 13px; padding: 7px 13px; border-radius: 999px;"><span style="width:8px;height:8px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+          <span style="display: inline-flex; align-items: center; gap: 7px; background: #fdeecb; color: #7a4f00; font-weight: 700; font-size: 13px; padding: 7px 13px; border-radius: 999px;"><span style="width:8px;height:8px;border-radius:50%;background:#8a5a00;"></span>Offline — 4 pending</span>
+          <span style="display: inline-flex; align-items: center; gap: 7px; background: #dde3f0; color: #2c3b52; font-weight: 700; font-size: 13px; padding: 7px 13px; border-radius: 999px;"><span style="width:8px;height:8px;border-radius:50%;background:#394750;"></span>Syncing…</span>
+          <span style="display: inline-flex; align-items: center; gap: 7px; background: #ffdad6; color: #93000a; font-weight: 700; font-size: 13px; padding: 7px 13px; border-radius: 999px;"><span style="width:8px;height:8px;border-radius:50%;background:#ba1a1a;"></span>Not yet arrived</span>
+        </div>
+        <div style="font-size: 12px; color: #6f7a71; margin-top: 18px; line-height: 1.5;">Connection state is never hidden. Amber means "safe, saved on this device, will sync" — never an error.</div>
+      </div>
+
+      <!-- patient id -->
+      <div style="background: #fff; border: 1px solid #d9dadb; border-radius: 16px; padding: 26px;">
+        <div style="font-size: 13px; font-weight: 700; color: #6f7a71; margin-bottom: 18px;">Patient ID token</div>
+        <div style="background: #f3f4f5; border: 1px dashed #bec9bf; border-radius: 12px; padding: 16px 18px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600; color: #00502e; letter-spacing: -0.01em;">OOE-PHC-000047-K2</div>
+          <div style="display: flex; gap: 14px; margin-top: 12px; font-size: 12px; color: #6f7a71;">
+            <span><b style="color:#3f4941;">OOE-PHC</b> facility</span>
+            <span><b style="color:#3f4941;">000047</b> patient #</span>
+            <span><b style="color:#3f4941;">K2</b> safety code</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #6f7a71; margin-top: 14px; line-height: 1.5;">Staff simply say "patient 47." The safety code prevents two offline desks minting the same ID.</div>
+      </div>
+    </div>
+
+    <!-- offline banner component -->
+    <div style="background: #fdeecb; border: 1px solid #f0d79a; border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; margin-bottom: 56px;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: #8a5a00; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 18px;">!</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 700; font-size: 15px; color: #7a4f00;">Working offline — everything is saved on this device</div>
+        <div style="font-size: 13px; color: #7a4f00; opacity: 0.85;">4 records will sync automatically the moment a connection returns. Nothing is lost.</div>
+      </div>
+    </div>
+
+    <!-- ===== SEC 02 FACILITY ONBOARDING ===== -->
+    <div style="display: flex; align-items: baseline; gap: 16px; margin: 72px 0 8px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: #006b3f;">02</span>
+      <h2 style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">Facility onboarding &amp; admin setup</h2>
+    </div>
+    <p style="color: #3f4941; font-size: 16px; line-height: 1.55; margin: 0 0 44px; max-width: 62ch;">How a health facility joins Geneus Health and gets running — a magic link, a short registration, then the admin builds their team: inviting staff, assigning roles and read / write permissions, and managing who has access.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, 380px); justify-content:center; gap:56px 44px;"><!-- SCREEN: Magic link entry -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.1</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Get started — magic link</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">No password to create or forget.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#00502e; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#c8e9d5;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:02</span>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; padding:40px 30px 30px;">
+      <div style="width:56px; height:56px; border-radius:16px; background:#9df5bd; position:relative; flex:none; margin-bottom:26px;">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:24px; height:7px; border-radius:4px; background:#00502e;"></div>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:7px; height:24px; border-radius:4px; background:#00502e;"></div>
+      </div>
+      <div style="font-size:28px; font-weight:800; color:#fff; letter-spacing:-0.02em; line-height:1.1;">Set up your facility</div>
+      <div style="font-size:15px; color:#c8e9d5; margin-top:12px; line-height:1.5;">Enter an email or phone number. We'll send a secure link to begin — no password to remember.</div>
+
+      <div style="background:#fff; border-radius:22px; padding:22px 20px; margin-top:34px;">
+        <div style="display:flex; background:#edeeef; border-radius:11px; padding:4px; margin-bottom:18px;">
+          <div style="flex:1; text-align:center; padding:10px; border-radius:8px; background:#fff; font-weight:700; font-size:14px; color:#00502e; box-shadow:0 1px 3px rgba(0,0,0,0.08);">Email</div>
+          <div style="flex:1; text-align:center; padding:10px; font-weight:600; font-size:14px; color:#6f7a71;">Phone</div>
+        </div>
+        <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Work email</label>
+        <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; color:#191c1d;">admin@odoona-phc.ng</div>
+        <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px; margin-top:18px;">Send magic link</div>
+      </div>
+      <div style="margin-top:auto; text-align:center; font-size:14px; color:#c8e9d5;">Already set up? <b style="color:#fff;">Sign in</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Facility registration -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.2</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Register facility</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Opened from the magic link. Email pre-filled.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:05</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px;">
+      <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em;">Register your facility</div>
+      <div style="font-size:13px; color:#6f7a71; margin-top:2px;">This creates your facility code &amp; admin account.</div>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Facility name</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:14px;">Odo-Ona Elewe PHC</div>
+      <div style="display:flex; gap:12px; margin-bottom:14px;">
+        <div style="flex:1;">
+          <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Location (State / LGA)</label>
+          <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:15px; background:#fff;">Oyo · Ibadan SW</div>
+        </div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Community</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:14px;">Odo-Ona Elewe</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Level of care</label>
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#00502e; color:#fff; font-weight:700; font-size:13px;">Primary</div>
+        <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:13px;">Secondary</div>
+        <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:13px;">Tertiary</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Email <span style="color:#6f7a71; font-weight:400;">— one of email / phone required</span></label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:15px; background:#f3f4f5; display:flex; justify-content:space-between; align-items:center;"><span>admin@odoona-phc.ng</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#006b3f; font-weight:600; background:#dcefe2; padding:3px 7px; border-radius:6px;">from link</span></div>
+    </div>
+    <div style="flex:none; padding:14px 20px 22px; background:#f8f9fa; border-top:1px solid #ececec;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Create facility</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Admin dashboard -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.3</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Admin dashboard</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">First thing an admin sees — set up the team.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:12</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; padding:8px 20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:13px; color:#6f7a71;">Facility admin</div>
+          <div style="font-size:21px; font-weight:800; letter-spacing:-0.02em;">Odo-Ona Elewe PHC</div>
+        </div>
+        <span style="font-size:11px; font-weight:700; color:#7a4f00; background:#fdeecb; padding:6px 10px; border-radius:999px;">ADMIN</span>
+      </div>
+      <div style="background:#00502e; border-radius:18px; padding:16px 18px; margin-top:16px; color:#fff; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:12px; color:#9df5bd;">Your facility code</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; margin-top:2px;">OOE-PHC</div>
+        </div>
+        <span style="font-size:11px; background:rgba(255,255,255,0.16); padding:5px 9px; border-radius:999px;">Primary · Oyo</span>
+      </div>
+
+      <div style="background:#fdeecb; border:1px solid #f0d79a; border-radius:16px; padding:15px; margin-top:14px;">
+        <div style="font-weight:700; font-size:14px; color:#7a4f00;">Finish setting up your facility</div>
+        <div style="display:flex; align-items:center; gap:9px; margin-top:11px; font-size:13px; color:#7a4f00;"><span style="width:18px;height:18px;border-radius:50%;background:#8a5a00;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;">✓</span> Facility registered</div>
+        <div style="display:flex; align-items:center; gap:9px; margin-top:8px; font-size:13px; color:#7a4f00;"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #c9a24a;box-sizing:border-box;"></span> Invite your staff</div>
+        <div style="display:flex; align-items:center; gap:9px; margin-top:8px; font-size:13px; color:#7a4f00;"><span style="width:18px;height:18px;border-radius:50%;border:2px solid #c9a24a;box-sizing:border-box;"></span> Upload this week's roster</div>
+      </div>
+
+      <div style="display:flex; gap:20px; padding:18px 4px 14px;">
+        <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">3</div><div style="font-size:12px; color:#6f7a71;">Staff</div></div>
+        <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#8a5a00;">1</div><div style="font-size:12px; color:#6f7a71;">Pending invite</div></div>
+        <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">2</div><div style="font-size:12px; color:#6f7a71;">On shift now</div></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:auto; padding-bottom:6px;">
+        <div style="background:#00502e; color:#fff; border-radius:16px; padding:16px; font-weight:700; font-size:15px;">＋ Invite staff</div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:16px; font-weight:700; font-size:15px;">Manage staff</div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:16px; font-weight:700; font-size:15px;">Roster &amp; shifts</div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:16px; font-weight:700; font-size:15px;">Units &amp; rooms</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Invite staff -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.4</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Invite a staff member</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Sends them their own magic link.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:16</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Invite staff</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Full name</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:14px;">Amaka Okoro</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Email or phone</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:14px;">0803 555 0147</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Role</label>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        <span style="font-size:14px; font-weight:600; background:#00502e; color:#fff; padding:9px 13px; border-radius:999px;">CHEW ✓</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:9px 13px; border-radius:999px;">Nurse</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:9px 13px; border-radius:999px;">Doctor</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:9px 13px; border-radius:999px;">Records</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:9px 13px; border-radius:999px;">Admin</span>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Permission</label>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1; border:1.5px solid #bec9bf; border-radius:13px; padding:13px 14px;">
+          <div style="font-weight:700; font-size:15px; color:#3f4941;">Read only</div>
+          <div style="font-size:12px; color:#6f7a71; margin-top:2px;">View records</div>
+        </div>
+        <div style="flex:1; border:2px solid #00502e; background:#f0faf3; border-radius:13px; padding:13px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:15px; color:#00502e;">Read &amp; write</span><span style="width:18px;height:18px;border-radius:50%;background:#00502e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;">✓</span></div>
+          <div style="font-size:12px; color:#006b3f; margin-top:2px;">View &amp; record care</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Send invite</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Roles and permissions -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.5</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Roles &amp; permissions</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Everyone sees only what their job needs.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:20</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 10px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Amaka's access</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <div style="display:flex; align-items:center; gap:13px; background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:14px; margin-bottom:16px;">
+        <div style="width:44px; height:44px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px;">AO</div>
+        <div style="flex:1;"><div style="font-weight:700; font-size:16px;">Amaka Okoro</div><div style="font-size:13px; color:#6f7a71;">CHEW · Read &amp; write</div></div>
+      </div>
+      <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px;">What she can do</div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:15px 16px; border-bottom:1px solid #edeeef;"><span style="font-size:15px; font-weight:600;">View patient records</span><span style="width:44px; height:26px; border-radius:999px; background:#00502e; position:relative;"><span style="position:absolute; right:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff;"></span></span></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:15px 16px; border-bottom:1px solid #edeeef;"><span style="font-size:15px; font-weight:600;">Create &amp; edit records</span><span style="width:44px; height:26px; border-radius:999px; background:#00502e; position:relative;"><span style="position:absolute; right:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff;"></span></span></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:15px 16px; border-bottom:1px solid #edeeef;"><span style="font-size:15px; font-weight:600;">Refer to other facilities</span><span style="width:44px; height:26px; border-radius:999px; background:#00502e; position:relative;"><span style="position:absolute; right:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff;"></span></span></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:15px 16px; border-bottom:1px solid #edeeef;"><span style="font-size:15px; font-weight:600; color:#6f7a71;">Manage medicine stock</span><span style="width:44px; height:26px; border-radius:999px; background:#cfd4d0; position:relative;"><span style="position:absolute; left:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff;"></span></span></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:15px 16px;"><span style="font-size:15px; font-weight:600; color:#6f7a71;">Invite / manage staff</span><span style="width:44px; height:26px; border-radius:999px; background:#cfd4d0; position:relative;"><span style="position:absolute; left:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff;"></span></span></div>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; margin-top:12px; line-height:1.5;">Staff-management &amp; stock toggles are reserved for the admin and records roles.</div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Save permissions</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Manage staff -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">2.6</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Manage staff</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Who's on the team, on shift, and pending.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:24</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:24px; color:#3f4941;">‹</span><span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Staff</span></div>
+      <span style="font-size:13px; font-weight:700; color:#00502e; background:#dcefe2; padding:7px 12px; border-radius:999px;">＋ Invite</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <div style="font-size:12px; font-weight:700; color:#006b3f; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px;">On shift now · 2</div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; overflow:hidden; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 15px; border-bottom:1px solid #edeeef;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;">AO</div>
+          <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Amaka Okoro</div><div style="font-size:12px; color:#6f7a71;">CHEW · Read &amp; write</div></div>
+          <span style="font-size:11px; font-weight:700; color:#00502e; background:#dcefe2; padding:4px 8px; border-radius:999px;">07–15</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 15px;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#dde3f0; color:#2c3b52; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;">TB</div>
+          <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Dr. Tunde Bello</div><div style="font-size:12px; color:#6f7a71;">Doctor · Read &amp; write</div></div>
+          <span style="font-size:11px; font-weight:700; color:#00502e; background:#dcefe2; padding:4px 8px; border-radius:999px;">07–15</span>
+        </div>
+      </div>
+      <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px;">Off shift &amp; pending</div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 15px; border-bottom:1px solid #edeeef;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#e7e8e9; color:#6f7a71; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;">GN</div>
+          <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Grace Nwosu</div><div style="font-size:12px; color:#6f7a71;">Records · Read only</div></div>
+          <span style="font-size:11px; font-weight:600; color:#6f7a71;">Off</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 15px;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#fdeecb; color:#7a4f00; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px;">?</div>
+          <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Ngozi Ali</div><div style="font-size:12px; color:#6f7a71;">Nurse · invite sent</div></div>
+          <span style="font-size:11px; font-weight:700; color:#7a4f00; background:#fdeecb; padding:4px 8px; border-radius:999px;">Pending</span>
+        </div>
+      </div>
+      <div style="font-size:13px; color:#ba1a1a; font-weight:700; margin-top:16px; padding-left:2px;">Remove a staff member</div>
+      <div style="font-size:12px; color:#6f7a71; margin-top:4px; line-height:1.5;">Removing revokes access immediately, on every device — their past records stay intact.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+    <!-- ===== SEC 03 STAFF ONBOARDING ===== -->
+    <div style="display: flex; align-items: baseline; gap: 16px; margin: 72px 0 8px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: #006b3f;">03</span>
+      <h2 style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">Staff onboarding &amp; access</h2>
+    </div>
+    <p style="color: #3f4941; font-size: 16px; line-height: 1.55; margin: 0 0 44px; max-width: 62ch;">An invited staff member sets a PIN once, then signs in with it at the start of every shift. Access is tied to the duty roster — and a PIN can always be recovered without an administrator unlocking a device.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, 380px); justify-content:center; gap:56px 44px;"><!-- SCREEN: Accept invite create PIN -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">3.1</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Accept invite · create PIN</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Opened from the staff invite link.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:30</span>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; padding:32px 30px 26px;">
+      <div style="width:52px; height:52px; border-radius:15px; background:#00502e; position:relative; flex:none; margin-bottom:18px;">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:22px; height:6.5px; border-radius:4px; background:#9df5bd;"></div>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:6.5px; height:22px; border-radius:4px; background:#9df5bd;"></div>
+      </div>
+      <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em; text-align:center;">Welcome, Amaka</div>
+      <div style="font-size:14px; color:#6f7a71; text-align:center; margin-top:8px; line-height:1.5;">Odo-Ona Elewe PHC invited you as a <b style="color:#00502e;">CHEW</b>. Create a 4-digit PIN — you'll use it to sign in at the start of every shift.</div>
+
+      <div style="display:flex; gap:14px; justify-content:center; margin:34px 0 4px;">
+        <span style="width:15px; height:15px; border-radius:50%; background:#00502e;"></span>
+        <span style="width:15px; height:15px; border-radius:50%; background:#00502e;"></span>
+        <span style="width:15px; height:15px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></span>
+        <span style="width:15px; height:15px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></span>
+      </div>
+      <div style="font-size:13px; color:#6f7a71; margin-bottom:8px;">Choose your PIN</div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:100%; margin-top:12px;">
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">1</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">2</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">3</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">4</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">5</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">6</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">7</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">8</div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">9</div>
+        <div></div>
+        <div style="background:#edeeef; border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:600; font-family:'JetBrains Mono',monospace;">0</div>
+        <div style="border-radius:14px; height:56px; display:flex; align-items:center; justify-content:center; color:#6f7a71; font-size:13px; font-weight:600;">Delete</div>
+      </div>
+      <div style="margin-top:auto; font-size:12px; color:#6f7a71; text-align:center; padding-top:16px;">You'll confirm it once more on the next step.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Shift login -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">3.2</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Shift login (PIN)</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Roster-linked. No shift, no access — any device.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#00502e; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#c8e9d5;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:41</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:#8af5b4;"></span>Synced</span>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; padding:30px 30px 24px;">
+      <div style="width:56px; height:56px; border-radius:16px; background:#9df5bd; position:relative; flex:none; margin-bottom:16px;">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:24px; height:7px; border-radius:4px; background:#00502e;"></div>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:7px; height:24px; border-radius:4px; background:#00502e;"></div>
+      </div>
+      <div style="font-weight:800; font-size:20px; color:#fff; letter-spacing:-0.02em;">Geneus Health</div>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+        <span style="font-size:13px; color:#c8e9d5;">Odo-Ona Elewe PHC</span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:11px; background:rgba(255,255,255,0.16); color:#fff; padding:3px 8px; border-radius:999px;">OOE-PHC</span>
+      </div>
+      <div style="background:#fff; border-radius:22px; width:100%; padding:20px; margin-top:24px;">
+        <div style="display:flex; align-items:center; gap:13px;">
+          <div style="width:44px; height:44px; border-radius:50%; background:#8af5b4; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px;">AO</div>
+          <div style="flex:1;"><div style="font-weight:700; font-size:16px;">Amaka Okoro</div><div style="font-size:13px; color:#6f7a71;">CHEW · Morning shift</div></div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600; background:#dcefe2; padding:5px 8px; border-radius:8px;">07–15</div>
+        </div>
+        <div style="height:1px; background:#e1e3e4; margin:16px 0;"></div>
+        <div style="font-size:13px; font-weight:600; color:#3f4941; margin-bottom:12px;">Enter your PIN</div>
+        <div style="display:flex; gap:12px; justify-content:center;">
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></span>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:11px; width:100%; margin-top:16px;">
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">1</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">2</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">3</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">4</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">5</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">6</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">7</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">8</div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">9</div>
+        <div></div>
+        <div style="background:rgba(255,255,255,0.12); border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">0</div>
+        <div style="border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#c8e9d5; font-size:13px; font-weight:600;">Clear</div>
+      </div>
+      <div style="margin-top:16px; font-size:13px; color:#9df5bd; font-weight:600;">Forgot PIN?</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Forgot PIN -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">3.3</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Forgot PIN</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Recover it yourself — no waiting on the admin.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:44</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Forgot your PIN?</span>
+    </div>
+    <div style="flex:1; padding:8px 24px;">
+      <div style="width:52px; height:52px; border-radius:15px; background:#dcefe2; display:flex; align-items:center; justify-content:center; margin:16px 0 20px;"><span style="width:20px; height:24px; border:3px solid #00502e; border-radius:6px 6px 0 0; border-bottom:none; position:relative; display:inline-block;"></span></div>
+      <div style="font-size:15px; color:#3f4941; line-height:1.55; margin-bottom:26px;">Enter the email or phone number on your staff account. We'll send a secure link to set a new PIN — the same way you first joined.</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Email or phone</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:15px; font-size:16px; background:#fff;">0803 555 0147</div>
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px; margin-top:20px;">Send reset link</div>
+      <div style="background:#f3f4f5; border-radius:14px; padding:15px; margin-top:22px; display:flex; gap:12px; align-items:flex-start;">
+        <div style="width:26px; height:26px; border-radius:8px; background:#394750; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex:none;">i</div>
+        <div style="font-size:13px; color:#3f4941; line-height:1.5;">Your facility admin can also reset your PIN from Manage staff if you can't access your email or phone.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Reset PIN -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">3.4</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Reset PIN</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Opened from the reset link. Set a new PIN.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">08:47</span>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; padding:28px 30px 26px;">
+      <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em; text-align:center;">Set a new PIN</div>
+      <div style="font-size:14px; color:#6f7a71; text-align:center; margin-top:8px; line-height:1.5;">Choose a new 4-digit PIN, then confirm it. Your old PIN stops working right away.</div>
+
+      <div style="width:100%; background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:18px; margin-top:24px;">
+        <div style="font-size:13px; font-weight:600; color:#3f4941; margin-bottom:11px;">New PIN</div>
+        <div style="display:flex; gap:12px; justify-content:center; margin-bottom:18px;">
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+        </div>
+        <div style="font-size:13px; font-weight:600; color:#3f4941; margin-bottom:11px;">Confirm new PIN</div>
+        <div style="display:flex; gap:12px; justify-content:center;">
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; background:#00502e;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></span>
+          <span style="width:14px; height:14px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></span>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:11px; width:100%; margin-top:18px;">
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">1</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">2</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">3</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">4</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">5</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">6</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">7</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">8</div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">9</div>
+        <div></div>
+        <div style="background:#edeeef; border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; font-family:'JetBrains Mono',monospace;">0</div>
+        <div style="border-radius:14px; height:52px; display:flex; align-items:center; justify-content:center; color:#6f7a71; font-size:13px; font-weight:600;">Delete</div>
+      </div>
+      <div style="width:100%; background:#00502e; color:#fff; text-align:center; padding:15px; border-radius:13px; font-weight:700; font-size:16px; margin-top:auto;">Save new PIN &amp; sign in</div>
+    </div>
+  </div>
+</div>
+</div>
+
+    <!-- ===== SCREEN LIBRARY ===== -->
+    <div style="display: flex; align-items: baseline; gap: 16px; margin: 72px 0 8px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: #006b3f;">04</span>
+      <h2 style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">Daily use — patient lifecycle, programmes &amp; referral</h2>
+    </div>
+    <p style="color: #3f4941; font-size: 16px; line-height: 1.55; margin: 0 0 44px; max-width: 62ch;">The minimum a Community Health Centre needs to fully replace paper — a complete, standalone system from day one. Shown at phone scale; every layout reflows to tablet and desktop.</p>
+
+    <div id="screens" style="display: grid; grid-template-columns: repeat(auto-fill, 380px); justify-content: center; gap: 56px 44px;">
+<!-- SCREEN: Facility home -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.1</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Facility home</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Incoming referrals sit at the top — impossible to miss.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#191c1d;">
+      <span style="font-family:'JetBrains Mono',monospace;">09:12</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <!-- app bar -->
+      <div style="padding:8px 22px 16px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:13px; color:#6f7a71;">Good morning,</div>
+          <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em;">Amaka</div>
+        </div>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#7a4f00; background:#fdeecb; padding:7px 11px; border-radius:999px;">Shift ends 15:00</span>
+      </div>
+
+      <div style="flex:1; overflow:hidden; padding:0 18px;">
+        <!-- incoming referrals -->
+        <div style="background:#394750; border-radius:20px; padding:16px 16px 14px; color:#fff;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:8px;"><span style="width:9px;height:9px;border-radius:50%;background:#8af5b4;"></span>Incoming referrals</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:12px; background:#8af5b4; color:#00323f; font-weight:700; padding:3px 9px; border-radius:999px;">2</span>
+          </div>
+          <div style="background:rgba(255,255,255,0.08); border-radius:13px; padding:13px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div style="font-weight:700; font-size:15px;">Ibrahim Musa · 34 · M</div>
+              <span style="font-size:11px; font-weight:700; background:#8af5b4; color:#00323f; padding:3px 8px; border-radius:999px;">Arrived</span>
+            </div>
+            <div style="font-size:13px; color:#cad9e3; margin-top:5px;">Suspected severe malaria — needs admission</div>
+            <div style="font-size:12px; color:#bac9d3; margin-top:8px;">From Alafia CHC · 12 min ago</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.08); border-radius:13px; padding:13px; margin-top:9px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div style="font-weight:700; font-size:15px;">Grace Eze · 28 · F</div>
+              <span style="font-size:11px; font-weight:700; background:rgba(255,255,255,0.2); color:#fff; padding:3px 8px; border-radius:999px;">New · Seen</span>
+            </div>
+            <div style="font-size:13px; color:#cad9e3; margin-top:5px;">Obstructed labour — referred for C-section</div>
+            <div style="font-size:12px; color:#bac9d3; margin-top:8px;">From Alafia CHC · just now</div>
+          </div>
+        </div>
+
+        <!-- quick actions -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
+          <div style="background:#00502e; color:#fff; border-radius:18px; padding:18px; height:104px; display:flex; flex-direction:column; justify-content:space-between;">
+            <div style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:400;line-height:1;">+</div>
+            <div style="font-weight:700; font-size:16px;">New patient</div>
+          </div>
+          <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:18px; height:104px; display:flex; flex-direction:column; justify-content:space-between;">
+            <div style="width:34px;height:34px;border-radius:10px;background:#edeeef;display:flex;align-items:center;justify-content:center;"><span style="width:13px;height:13px;border:2.4px solid #3f4941;border-radius:50%;display:inline-block;position:relative;"></span></div>
+            <div style="font-weight:700; font-size:16px;">Find patient</div>
+          </div>
+          <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:16px; display:flex; align-items:center; gap:12px;">
+            <div style="width:34px;height:34px;border-radius:10px;background:#edeeef;flex:none;"></div>
+            <div style="font-weight:700; font-size:15px;">Register books</div>
+          </div>
+          <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:16px; display:flex; align-items:center; gap:12px;">
+            <div style="width:34px;height:34px;border-radius:10px;background:#edeeef;flex:none;"></div>
+            <div style="font-weight:700; font-size:15px;">This month</div>
+          </div>
+        </div>
+
+        <!-- today -->
+        <div style="display:flex; gap:20px; padding:18px 6px 0;">
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">18</div><div style="font-size:12px; color:#6f7a71;">Seen today</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">5</div><div style="font-size:12px; color:#6f7a71;">Waiting</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#8a5a00;">4</div><div style="font-size:12px; color:#6f7a71;">To sync</div></div>
+        </div>
+      </div>
+
+      <!-- bottom nav -->
+      <div style="flex:none; background:#fff; border-top:1px solid #e1e3e4; display:flex; justify-content:space-around; padding:10px 0 20px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#00502e;"><div style="width:22px;height:22px;border-radius:6px;background:#00502e;"></div><span style="font-size:11px; font-weight:700;">Home</span></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#6f7a71;"><div style="width:22px;height:22px;border-radius:6px;background:#bec9bf;"></div><span style="font-size:11px; font-weight:600;">Patients</span></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#6f7a71;"><div style="width:22px;height:22px;border-radius:6px;background:#bec9bf;"></div><span style="font-size:11px; font-weight:600;">Registers</span></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#6f7a71;"><div style="width:22px;height:22px;border-radius:6px;background:#bec9bf;"></div><span style="font-size:11px; font-weight:600;">Stock</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCREEN: Patient search -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.2</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Patient search</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Find a returning patient in seconds.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">09:20</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; padding:8px 20px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <span style="font-size:24px; color:#3f4941;">‹</span>
+        <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Find patient</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; border:2px solid #00502e; border-radius:14px; padding:14px 15px; background:#fff;">
+        <span style="width:15px;height:15px;border:2.4px solid #6f7a71;border-radius:50%;position:relative;display:inline-block;flex:none;"></span>
+        <span style="font-size:16px; color:#191c1d; flex:1;"> Amaka</span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">Scan ID</span>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; margin-top:10px;">Search by name, phone, or Patient ID</div>
+
+      <div style="margin-top:20px; font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase;">2 matches</div>
+      <div style="margin-top:12px; display:flex; flex-direction:column; gap:11px;">
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:15px;">
+          <div style="display:flex; align-items:center; gap:13px;">
+            <div style="width:44px; height:44px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; flex:none;">AO</div>
+            <div style="flex:1;">
+              <div style="font-weight:700; font-size:16px;">Amaka Okoro</div>
+              <div style="font-size:13px; color:#6f7a71;">F · 32 · Odo-Ona area</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#00502e; background:#f3f4f5; padding:4px 8px; border-radius:7px;">OOE-PHC-000047-K2</span>
+            <span style="font-size:12px; color:#6f7a71;">Last: 12 Jun</span>
+          </div>
+        </div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:15px;">
+          <div style="display:flex; align-items:center; gap:13px;">
+            <div style="width:44px; height:44px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; flex:none;">AE</div>
+            <div style="flex:1;">
+              <div style="font-weight:700; font-size:16px;">Amaka Eze</div>
+              <div style="font-size:13px; color:#6f7a71;">F · 29 · Ring Road</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#00502e; background:#f3f4f5; padding:4px 8px; border-radius:7px;">OOE-PHC-000112-R7</span>
+            <span style="font-size:12px; color:#6f7a71;">Last: 3 May</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:auto; padding-top:16px;">
+        <div style="border:1.5px dashed #bec9bf; border-radius:14px; padding:14px; text-align:center; color:#00502e; font-weight:700; font-size:15px;">+ Not here — register new patient</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: New patient registration -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.3</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">New patient — step 1</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Only the fields Nigerian facilities already use.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">09:24</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fdeecb;color:#7a4f00;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#8a5a00;"></span>Offline</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 14px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em; flex:1;">New patient</span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#6f7a71;">Step 1 of 2</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:0 20px;">
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Full name</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:15px;">Amaka Okoro</div>
+      <div style="display:flex; gap:12px; margin-bottom:15px;">
+        <div style="flex:1;">
+          <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Sex</label>
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; text-align:center; padding:13px 0; border-radius:11px; background:#00502e; color:#fff; font-weight:700; font-size:15px;">F</div>
+            <div style="flex:1; text-align:center; padding:13px 0; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:15px;">M</div>
+          </div>
+        </div>
+        <div style="width:120px;">
+          <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Age</label>
+          <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:13px; font-size:16px; background:#fff; text-align:center;">32</div>
+        </div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Date of birth <span style="color:#6f7a71; font-weight:400;">— approx. is fine</span></label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff; color:#6f7a71; margin-bottom:15px;">— / — / 1994</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Phone <span style="color:#006b3f; font-weight:600;">— best way to find them again</span></label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:15px;">0803 555 0147</div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Address</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff;">14 Odo-Ona Elewe, Ibadan</div>
+    </div>
+    <div style="flex:none; padding:14px 20px 22px; background:#f8f9fa; border-top:1px solid #ececec;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Continue — Occupation &amp; Religion</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Occupation and religion -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.4</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">New patient — step 2</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Occupation, religion &amp; old folder number.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">09:26</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fdeecb;color:#7a4f00;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#8a5a00;"></span>Offline</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 14px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em; flex:1;">New patient</span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#6f7a71;">Step 2 of 2</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:0 20px;">
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Occupation</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; background:#fff; margin-bottom:10px;">Trader</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
+        <span style="font-size:13px; font-weight:600; background:#00502e; color:#fff; padding:8px 13px; border-radius:999px;">Trader ✓</span>
+        <span style="font-size:13px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Farmer</span>
+        <span style="font-size:13px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Student</span>
+        <span style="font-size:13px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Civil servant</span>
+        <span style="font-size:13px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Artisan</span>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Religion</label>
+      <div style="display:flex; gap:8px; margin-bottom:18px;">
+        <div style="flex:1; text-align:center; padding:13px 4px; border-radius:11px; background:#00502e; color:#fff; font-weight:700; font-size:14px;">Christianity</div>
+        <div style="flex:1; text-align:center; padding:13px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:14px;">Islam</div>
+        <div style="flex:1; text-align:center; padding:13px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:14px;">Other</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Old folder / card number <span style="color:#6f7a71; font-weight:400;">— optional</span></label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:16px; background:#fff; color:#6f7a71;">e.g. paper file 2023/1187</div>
+      <div style="font-size:12px; color:#006b3f; font-weight:600; margin-top:8px;">Kept as a reference so nothing from the paper file is lost.</div>
+
+      <div style="background:#dcefe2; border-radius:14px; padding:14px 16px; margin-top:18px;">
+        <div style="font-size:12px; color:#006b3f;">A Patient ID will be created</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:600; color:#00502e; margin-top:3px;">OOE-PHC-000048-<span style="opacity:0.5;">••</span></div>
+      </div>
+    </div>
+    <div style="flex:none; padding:14px 20px 22px; background:#f8f9fa; border-top:1px solid #ececec;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Register patient</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Duplicate match -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.5</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Duplicate check</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">One tap: "Is this the same person?"</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#3f4941;">
+      <span style="font-family:'JetBrains Mono',monospace;">09:25</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fdeecb;color:#7a4f00;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#8a5a00;"></span>Offline</span>
+    </div>
+    <!-- dimmed content -->
+    <div style="flex:1; position:relative; overflow:hidden;">
+      <div style="filter:blur(2px); opacity:0.5; padding:20px;">
+        <div style="height:20px; width:60%; background:#e1e3e4; border-radius:6px; margin-bottom:16px;"></div>
+        <div style="height:52px; background:#e7e8e9; border-radius:12px; margin-bottom:14px;"></div>
+        <div style="height:52px; background:#e7e8e9; border-radius:12px; margin-bottom:14px;"></div>
+        <div style="height:52px; background:#e7e8e9; border-radius:12px;"></div>
+      </div>
+      <!-- sheet -->
+      <div style="position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:26px 26px 0 0; padding:24px 22px 26px; box-shadow:0 -12px 40px rgba(0,0,0,0.16);">
+        <div style="width:40px; height:5px; border-radius:999px; background:#d9dadb; margin:0 auto 20px;"></div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <div style="width:30px; height:30px; border-radius:9px; background:#fdeecb; color:#7a4f00; display:flex; align-items:center; justify-content:center; font-weight:800;">!</div>
+          <div style="font-size:19px; font-weight:800; letter-spacing:-0.02em;">Is this the same person?</div>
+        </div>
+        <div style="font-size:14px; color:#6f7a71; margin-bottom:18px; line-height:1.45;">We found someone already registered here who looks like a close match.</div>
+        <div style="background:#f3f4f5; border-radius:16px; padding:16px;">
+          <div style="display:flex; align-items:center; gap:13px;">
+            <div style="width:48px; height:48px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:none;">AO</div>
+            <div style="flex:1;">
+              <div style="font-weight:700; font-size:17px;">Amaka Okoro</div>
+              <div style="font-size:13px; color:#6f7a71;">F · 32 · 0803 555 0147</div>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:13px;">
+            <span style="font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:4px 9px; border-radius:999px;">✓ Name matches</span>
+            <span style="font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:4px 9px; border-radius:999px;">✓ Phone matches</span>
+            <span style="font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:4px 9px; border-radius:999px;">✓ Age matches</span>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#00502e; margin-top:12px;">OOE-PHC-000047-K2 · reg. 12 Jun</div>
+        </div>
+        <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px; margin-top:16px;">Yes — open this record</div>
+        <div style="text-align:center; padding:15px; color:#3f4941; font-weight:700; font-size:15px;">No — this is a different person</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCREEN: Send to unit -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.6</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Send to another unit</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">An instruction travels with the patient.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">10:05</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 14px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Send patient to…</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:0 20px;">
+      <div style="background:#dcefe2; border-radius:13px; padding:12px 14px; display:flex; align-items:center; gap:11px; margin-bottom:18px;">
+        <div style="width:36px; height:36px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex:none;">AO</div>
+        <div style="font-weight:700; font-size:15px; color:#00502e;">Amaka Okoro · patient 47</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:10px;">Which unit?</label>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+        <div style="padding:16px 14px; border:2px solid #00502e; background:#f0faf3; border-radius:13px; font-weight:700; font-size:15px; color:#00502e;">Injection Room</div>
+        <div style="padding:16px 14px; border:1.5px solid #bec9bf; background:#fff; border-radius:13px; font-weight:600; font-size:15px; color:#3f4941;">Pharmacy</div>
+        <div style="padding:16px 14px; border:1.5px solid #bec9bf; background:#fff; border-radius:13px; font-weight:600; font-size:15px; color:#3f4941;">Antenatal Care</div>
+        <div style="padding:16px 14px; border:1.5px solid #bec9bf; background:#fff; border-radius:13px; font-weight:600; font-size:15px; color:#3f4941;">Family Planning</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Instruction for the receiving unit</label>
+      <div style="border:2px solid #00502e; border-radius:12px; padding:14px; background:#fff; font-size:16px; min-height:88px; color:#191c1d;">Give tetanus toxoid injection (TT1). Patient has confirmed malaria — already on ACT.</div>
+      <div style="font-size:13px; color:#6f7a71; margin-top:10px; line-height:1.45;">The Injection Room sees this the moment the patient walks in — no need to explain again.</div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Send to Injection Room</div>
+    </div>
+  </div>
+</div>
+<!-- SCREEN: Programme register (Malaria) -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.7</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Programme register — Malaria</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Replaces the paper book. Counts itself.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">10:12</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fdeecb;color:#7a4f00;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#8a5a00;"></span>Offline · 5 pending</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em; flex:1;">Malaria register</span>
+      <span style="font-size:11px; font-weight:700; background:#e7e8e9; color:#3f4941; padding:5px 9px; border-radius:999px;">Facility</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:10px;">Test done</label>
+      <div style="display:flex; gap:8px; margin-bottom:18px;">
+        <div style="flex:1; text-align:center; padding:14px 0; border-radius:12px; background:#00502e; color:#fff; font-weight:700; font-size:15px;">RDT</div>
+        <div style="flex:1; text-align:center; padding:14px 0; border-radius:12px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:15px;">Microscopy</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:10px;">Result</label>
+      <div style="display:flex; gap:8px; margin-bottom:18px;">
+        <div style="flex:1; text-align:center; padding:14px 0; border-radius:12px; background:#ffdad6; border:2px solid #ba1a1a; color:#93000a; font-weight:800; font-size:15px;">Positive</div>
+        <div style="flex:1; text-align:center; padding:14px 0; border-radius:12px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:15px;">Negative</div>
+      </div>
+      <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:10px;">Treated with</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; background:#fff; font-size:16px; display:flex; justify-content:space-between; align-items:center;">
+        <span>Artemether-Lumefantrine (ACT)</span><span style="color:#6f7a71;">▾</span>
+      </div>
+
+      <div style="background:#f3f4f5; border-radius:16px; padding:16px; margin-top:20px;">
+        <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">This month · counts itself</div>
+        <div style="display:flex; justify-content:space-between; text-align:center;">
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#191c1d;">96</div><div style="font-size:11px; color:#6f7a71;">Tested</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#ba1a1a;">37</div><div style="font-size:11px; color:#6f7a71;">Positive</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#00502e;">37</div><div style="font-size:11px; color:#6f7a71;">Treated</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#8a5a00;">38%</div><div style="font-size:11px; color:#6f7a71;">Positivity</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Save entry</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: This month at a glance -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.8</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">This month at a glance</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">The facility's own numbers — ready for an LGA request.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">14:40</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:24px; color:#3f4941;">‹</span>
+        <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">This month</span>
+      </div>
+      <div style="font-size:13px; color:#6f7a71; margin-left:36px;">July 2026 · Odo-Ona Elewe PHC</div>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 18px;">
+      <!-- headline -->
+      <div style="background:#00502e; border-radius:18px; padding:18px 18px 16px; color:#fff; margin-bottom:12px;">
+        <div style="font-size:13px; color:#9df5bd;">Total attendance</div>
+        <div style="display:flex; align-items:flex-end; gap:10px; margin-top:2px;">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:40px; font-weight:600; line-height:1;">1,204</span>
+          <span style="font-size:13px; color:#8af5b4; padding-bottom:6px;">▲ 8% vs June</span>
+        </div>
+      </div>
+      <!-- metric grid -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:14px;">
+          <div style="font-size:12px; color:#6f7a71;">Malaria positivity</div>
+          <div style="display:flex; align-items:baseline; gap:6px;"><span style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#191c1d;">38%</span><span style="font-size:12px; color:#ba1a1a; font-weight:700;">▲</span></div>
+        </div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:14px;">
+          <div style="font-size:12px; color:#6f7a71;">Immunisation dropout</div>
+          <div style="display:flex; align-items:baseline; gap:6px;"><span style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#191c1d;">6%</span><span style="font-size:12px; color:#006b3f; font-weight:700;">▼</span></div>
+        </div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:14px;">
+          <div style="font-size:12px; color:#6f7a71;">ANC 4th visit</div>
+          <div style="display:flex; align-items:baseline; gap:6px;"><span style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#191c1d;">72%</span><span style="font-size:12px; color:#6f7a71; font-weight:700;">▬</span></div>
+        </div>
+        <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:14px;">
+          <div style="font-size:12px; color:#6f7a71;">Referrals made</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#191c1d;">14</div>
+        </div>
+      </div>
+      <!-- supply request -->
+      <div style="background:#fdeecb; border:1px solid #f0d79a; border-radius:16px; padding:15px; margin-top:14px;">
+        <div style="font-weight:700; font-size:14px; color:#7a4f00; margin-bottom:6px;">Ready for your LGA supply request</div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#7a4f00; padding:3px 0;"><span>RDTs used</span><b style="font-family:'JetBrains Mono',monospace;">96</b></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#7a4f00; padding:3px 0;"><span>TB samples tested</span><b style="font-family:'JetBrains Mono',monospace;">11</b></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#7a4f00; padding:3px 0;"><span>FP implants dispensed</span><b style="font-family:'JetBrains Mono',monospace;">23</b></div>
+      </div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px; display:flex; gap:10px;">
+      <div style="flex:1; border:1.5px solid #bec9bf; background:#fff; color:#00502e; text-align:center; padding:15px; border-radius:13px; font-weight:700; font-size:15px;">Print</div>
+      <div style="flex:1; background:#00502e; color:#fff; text-align:center; padding:15px; border-radius:13px; font-weight:700; font-size:15px;">Submit to LGA</div>
+    </div>
+  </div>
+</div>
+<!-- SCREEN: Referral lifecycle -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.9</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Refer &amp; track</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">A one-way message becomes a safety net.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">11:30</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fdeecb;color:#7a4f00;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#8a5a00;"></span>Offline</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Referral</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:0 20px;">
+      <!-- destination -->
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:15px; margin-bottom:14px;">
+        <div style="font-size:12px; color:#6f7a71;">Refer Ibrahim Musa · 34 · M · to</div>
+        <div style="font-weight:700; font-size:16px; margin-top:3px;">Adeoyo General Hospital</div>
+        <div style="font-size:13px; color:#00502e; font-weight:600; margin-top:2px;">Suspected severe malaria — needs admission</div>
+      </div>
+
+      <!-- what travels -->
+      <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:9px;">Travels automatically</div>
+      <div style="display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px;">
+        <span style="font-size:13px; font-weight:600; background:#dcefe2; color:#00502e; padding:6px 11px; border-radius:999px;">Name, age, sex</span>
+        <span style="font-size:13px; font-weight:600; background:#dcefe2; color:#00502e; padding:6px 11px; border-radius:999px;">Allergies</span>
+        <span style="font-size:13px; font-weight:600; background:#dcefe2; color:#00502e; padding:6px 11px; border-radius:999px;">Current meds</span>
+        <span style="font-size:13px; font-weight:600; background:#dcefe2; color:#00502e; padding:6px 11px; border-radius:999px;">Reason</span>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; margin-bottom:16px; line-height:1.45;">Full history &amp; sensitive categories are <b>not</b> shared automatically in V1.</div>
+
+      <!-- lifecycle tracker -->
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:16px 16px 6px;">
+        <div style="display:flex; gap:12px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <div style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</div>
+            <div style="width:2px; flex:1; background:#00502e;"></div>
+          </div>
+          <div style="padding-bottom:16px;"><div style="font-weight:700; font-size:15px;">Sent</div><div style="font-size:12px; color:#6f7a71;">Alert pending — will send once connected</div></div>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <div style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</div>
+            <div style="width:2px; flex:1; background:#bec9bf;"></div>
+          </div>
+          <div style="padding-bottom:16px;"><div style="font-weight:700; font-size:15px;">Seen</div><div style="font-size:12px; color:#6f7a71;">Opened at receiving facility</div></div>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <div style="width:22px; height:22px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></div>
+            <div style="width:2px; flex:1; background:#bec9bf;"></div>
+          </div>
+          <div style="padding-bottom:16px;"><div style="font-weight:700; font-size:15px; color:#6f7a71;">Arrived</div><div style="font-size:12px; color:#6f7a71;">Auto-matched by Patient ID</div></div>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div><div style="width:22px; height:22px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></div></div>
+          <div style="padding-bottom:12px;"><div style="font-weight:700; font-size:15px; color:#6f7a71;">Closed</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px; display:flex; gap:10px;">
+      <div style="flex:none; width:56px; border:1.5px solid #bec9bf; border-radius:13px; display:flex; align-items:center; justify-content:center; background:#fff; color:#3f4941; font-size:20px;">🖶</div>
+      <div style="flex:1; background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Refer &amp; print note</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Sync / offline center + shift warning -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">4.10</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Sync center &amp; shift warning</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">The system closes access on time — fairly.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700;">
+      <span style="font-family:'JetBrains Mono',monospace;">14:30</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dde3f0;color:#2c3b52;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#394750;"></span>Syncing…</span>
+    </div>
+    <div style="flex:none; padding:8px 20px 12px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px; color:#3f4941;">‹</span>
+      <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Sync &amp; device</span>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:4px 20px;">
+      <!-- sync status -->
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span style="font-weight:700; font-size:16px;">Syncing to cloud</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#2c3b52;">3 of 12</span>
+        </div>
+        <div style="height:8px; background:#e1e3e4; border-radius:999px; overflow:hidden;"><div style="width:25%; height:100%; background:#394750;"></div></div>
+        <div style="display:flex; justify-content:space-between; margin-top:16px; text-align:center;">
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; color:#00502e;">184</div><div style="font-size:11px; color:#6f7a71;">Saved on device</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; color:#8a5a00;">9</div><div style="font-size:11px; color:#6f7a71;">Waiting</div></div>
+          <div><div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; color:#00502e;">0</div><div style="font-size:11px; color:#6f7a71;">Lost</div></div>
+        </div>
+      </div>
+      <div style="font-size:13px; color:#6f7a71; margin:14px 4px 0; line-height:1.5;">Everything is safe on this device. Nothing is ever lost because the internet dropped.</div>
+
+      <!-- shift warning -->
+      <div style="background:#fdeecb; border:1px solid #f0d79a; border-radius:18px; padding:18px; margin-top:22px;">
+        <div style="display:flex; align-items:center; gap:11px; margin-bottom:10px;">
+          <div style="width:38px; height:38px; border-radius:11px; background:#8a5a00; color:#fff; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; flex:none;">30</div>
+          <div style="font-weight:800; font-size:17px; color:#7a4f00;">Your shift ends in 30 min</div>
+        </div>
+        <div style="font-size:14px; color:#7a4f00; line-height:1.5;">Please finish and tidy up any open records. At 15:00 you'll be logged out automatically, on every device.</div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <div style="flex:1; background:#fff; border:1px solid #f0d79a; color:#7a4f00; text-align:center; padding:13px; border-radius:12px; font-weight:700; font-size:14px;">Ask supervisor to extend</div>
+          <div style="flex:none; background:#8a5a00; color:#fff; text-align:center; padding:13px 18px; border-radius:12px; font-weight:700; font-size:14px;">OK</div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-top:20px; padding:0 4px;">
+        <div style="width:8px; height:8px; border-radius:50%; background:#006b3f;"></div>
+        <div style="font-size:13px; color:#3f4941;">Roster attendance recorded automatically</div>
+      </div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px;">
+      <div style="border:1.5px solid #ba1a1a; color:#ba1a1a; text-align:center; padding:15px; border-radius:13px; font-weight:700; font-size:15px;">End shift now</div>
+    </div>
+  </div>
+</div>
+    </div>
+
+    <!-- ===== PHASE 2: DOCTOR HISTORY ===== -->
+    <div style="display:flex; align-items:baseline; gap:16px; margin:72px 0 8px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">05</span>
+      <h2 style="font-size:30px; font-weight:800; letter-spacing:-0.02em; margin:0;">Clinical records — history, new record &amp; follow-up</h2>
+    </div>
+    <p style="color:#3f4941; font-size:16px; line-height:1.55; margin:0 0 20px; max-width:62ch;">When a referred patient reaches the doctor, their earlier visits are already there. The doctor reads the history, then either continues an existing episode as a <b>follow-up</b> — filed under the earlier visit — or starts a fresh <b>new visit</b>. The history screen (5.1) is live — tap a visit to expand it, and use the Tweaks panel to reshape the view; “New record” opens the picker that leads to the two record forms (5.2, 5.3), where complaints, the doctor's diagnosis, an auto-stamped date &amp; time, treatment and prescription are all captured. <span style="color:#6f7a71;">This replaces the old standalone visit-note screen.</span></p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, 380px); justify-content:center; gap:56px 44px; margin-bottom:8px;">
+      <div style="display:flex; flex-direction:column;">
+        <div style="margin-bottom:18px;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">5.1</div>
+          <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Doctor · patient history</div>
+          <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Read the past, then follow-up or start new.</div>
+        </div>
+        <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+          <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#191c1d;">
+            <span style="font-family:'JetBrains Mono',monospace;">11:48</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+          </div>
+
+          <!-- patient context -->
+          <div style="flex:none; background:#00502e; color:#fff; padding:12px 20px 15px;">
+            <div style="display:flex; align-items:center; gap:11px;">
+              <span style="font-size:22px;">‹</span>
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:16px;">Amaka Okoro · 32 · F</div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9df5bd;">OOE-PHC-000047-K2 · referred from Alafia CHC</div>
+              </div>
+              <div style="width:40px; height:40px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex:none;">AO</div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:12px;">
+              <span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:5px 10px; border-radius:999px;">⚠ Allergy: Penicillin</span>
+              <span style="font-size:12px; font-weight:600; background:rgba(255,255,255,0.16); color:#fff; padding:5px 10px; border-radius:999px;">On: ACT (completed)</span>
+            </div>
+          </div>
+
+          <!-- history body -->
+          <div style="flex:1; overflow:hidden; padding:14px 18px 8px; display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+              <span style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase;">Previous visits</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#6f7a71;">4 records</span>
+            </div>
+            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; gap:9px;">
+              <sc-for list="{{ rows }}" as="row" hint-placeholder-count="4">
+                <sc-if value="{{ row.isHeader }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11px; font-weight:700; color:#00502e; letter-spacing:0.06em; text-transform:uppercase; margin-top:6px;">{{ row.name }}</div>
+                </sc-if>
+                <sc-if value="{{ row.isVisit }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; gap:9px;">
+                    <sc-if value="{{ row.indent }}" hint-placeholder-val="{{ false }}">
+                      <div style="width:16px; flex:none; display:flex; justify-content:center;"><div style="width:2px; background:#bec9bf; margin-top:-9px; border-radius:2px;"></div></div>
+                    </sc-if>
+                    <div style="flex:1; background:#fff; border:1px solid #e1e3e4; border-radius:15px; overflow:hidden;">
+                      <div onClick="{{ row.onToggle }}" style="padding:13px 14px; cursor:pointer;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                          <div style="flex:1;">
+                            <div style="font-weight:700; font-size:15px; line-height:1.25;">{{ row.dx }}</div>
+                            <div style="font-size:12px; color:#6f7a71; margin-top:3px;">{{ row.date }} · {{ row.facility }}</div>
+                          </div>
+                          <span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:4px 9px; border-radius:999px; white-space:nowrap;">{{ row.programme }}</span>
+                        </div>
+                        <sc-if value="{{ row.hasFollowLabel }}" hint-placeholder-val="{{ false }}">
+                          <div style="font-size:12px; color:#2c3b52; font-weight:600; margin-top:6px;">↳ {{ row.followLabel }}</div>
+                        </sc-if>
+                        <sc-if value="{{ row.showVitals }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex; gap:7px; margin-top:11px;">
+                            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; background:#f3f4f5; color:#3f4941; padding:4px 8px; border-radius:7px;">{{ row.temp }}</span>
+                            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; background:#f3f4f5; color:#3f4941; padding:4px 8px; border-radius:7px;">{{ row.bp }}</span>
+                            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; background:#f3f4f5; color:#3f4941; padding:4px 8px; border-radius:7px;">{{ row.wt }}</span>
+                          </div>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ row.expanded }}" hint-placeholder-val="{{ false }}">
+                        <div style="border-top:1px solid #edeeef; padding:13px 14px; background:#f8faf8;">
+                          <div style="font-size:12px; color:#6f7a71; font-weight:600;">Symptoms</div>
+                          <div style="font-size:14px; color:#191c1d; margin:2px 0 10px;">{{ row.symptoms }}</div>
+                          <div style="font-size:12px; color:#6f7a71; font-weight:600;">Treatment given</div>
+                          <div style="font-size:14px; color:#191c1d; margin:2px 0 10px;">{{ row.tx }}</div>
+                          <sc-if value="{{ row.hasNote }}" hint-placeholder-val="{{ true }}">
+                            <div style="font-size:12px; color:#6f7a71; font-weight:600;">Note</div>
+                            <div style="font-size:14px; color:#191c1d; margin:2px 0 12px;">{{ row.note }}</div>
+                          </sc-if>
+                          <div onClick="{{ row.onAddFollow }}" style="text-align:center; border:1.5px solid #00502e; color:#00502e; font-weight:700; font-size:14px; padding:11px; border-radius:11px; cursor:pointer;">＋ Add follow-up to this visit</div>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- footer -->
+          <div style="flex:none; padding:12px 20px 22px; background:#f8f9fa; border-top:1px solid #ececec;">
+            <div onClick="{{ openNew }}" style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px; cursor:pointer;">＋ New record</div>
+          </div>
+
+          <!-- toast -->
+          <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ dismissToast }}" style="position:absolute; left:16px; right:16px; bottom:88px; background:#191c1d; color:#fff; border-radius:14px; padding:13px 15px; display:flex; gap:11px; align-items:center; box-shadow:0 12px 30px rgba(0,0,0,0.3); cursor:pointer;">
+              <span style="width:22px; height:22px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none;">✓</span>
+              <div style="flex:1; font-size:13px; line-height:1.35;">{{ toastMsg }}</div>
+              <span style="font-size:12px; color:#9df5bd; font-weight:700;">Undo</span>
+            </div>
+          </sc-if>
+
+          <!-- record-type sheet -->
+          <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute; inset:0;">
+              <div onClick="{{ closeSheet }}" style="position:absolute; inset:0; background:rgba(15,30,25,0.42);"></div>
+              <div style="position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:26px 26px 0 0; padding:22px 20px 24px; box-shadow:0 -12px 40px rgba(0,0,0,0.18);">
+                <div style="width:40px; height:5px; border-radius:999px; background:#d9dadb; margin:0 auto 18px;"></div>
+                <div style="font-size:19px; font-weight:800; letter-spacing:-0.02em;">Add a record for Amaka</div>
+                <div style="font-size:13px; color:#6f7a71; margin:4px 0 16px; line-height:1.4;">Is this continuing an earlier episode of care, or something new?</div>
+                <div style="display:flex; gap:10px;">
+                  <div onClick="{{ pickNew }}" style="flex:1; border:1.5px solid #bec9bf; border-radius:14px; padding:14px; cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-weight:700; font-size:15px;">New visit</span>
+                      <sc-if value="{{ recordTypeIsNew }}" hint-placeholder-val="{{ true }}"><span style="width:20px; height:20px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</span></sc-if>
+                    </div>
+                    <div style="font-size:12px; color:#6f7a71; margin-top:4px;">A fresh, unrelated record</div>
+                  </div>
+                  <div onClick="{{ pickFollow }}" style="flex:1; border:1.5px solid #bec9bf; border-radius:14px; padding:14px; cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-weight:700; font-size:15px;">Follow-up</span>
+                      <sc-if value="{{ recordTypeIsFollow }}" hint-placeholder-val="{{ false }}"><span style="width:20px; height:20px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</span></sc-if>
+                    </div>
+                    <div style="font-size:12px; color:#6f7a71; margin-top:4px;">Continues an earlier visit</div>
+                  </div>
+                </div>
+                <sc-if value="{{ recordTypeIsFollow }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:16px;">
+                    <div style="font-size:13px; font-weight:600; color:#3f4941; margin-bottom:9px;">File under which earlier visit?</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                      <sc-for list="{{ parentChoices }}" as="pc" hint-placeholder-count="3">
+                        <div onClick="{{ pc.onPick }}" style="display:flex; align-items:center; gap:10px; border:1.5px solid #e1e3e4; border-radius:12px; padding:12px 13px; cursor:pointer;">
+                          <div style="flex:1;">
+                            <div style="font-weight:700; font-size:14px;">{{ pc.dx }}</div>
+                            <div style="font-size:12px; color:#6f7a71;">{{ pc.date }}</div>
+                          </div>
+                          <sc-if value="{{ pc.selected }}" hint-placeholder-val="{{ false }}"><span style="width:20px; height:20px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</span></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+                <div onClick="{{ confirm }}" style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px; margin-top:18px; cursor:pointer;">{{ confirmLabel }}</div>
+                <div onClick="{{ closeSheet }}" style="text-align:center; padding:14px; color:#3f4941; font-weight:700; font-size:15px; cursor:pointer;">Cancel</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, 380px); justify-content:center; gap:56px 44px; margin-top:44px;"><!-- SCREEN: New record -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">5.2</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">New record</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Complaints, diagnosis, treatment &amp; prescription.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#191c1d;">
+      <span style="font-family:'JetBrains Mono',monospace;">11:52</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; background:#00502e; color:#fff; padding:12px 20px 14px;">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <span style="font-size:22px;">‹</span>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:16px;">Amaka Okoro · 32 · F</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9df5bd;">OOE-PHC-000047-K2</div>
+        </div>
+        <span style="font-size:11px; font-weight:700; background:#9df5bd; color:#00323f; padding:5px 10px; border-radius:999px;">New visit</span>
+      </div>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:14px 20px;">
+      <div style="display:inline-flex; align-items:center; gap:7px; background:#f3f4f5; border-radius:9px; padding:7px 11px; margin-bottom:16px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#00502e;"></span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#3f4941;">5 Jul 2026 · 11:52</span>
+        <span style="font-size:11px; color:#6f7a71;">· auto-stamped</span>
+      </div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Patient's complaints</label>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <span style="font-size:14px; font-weight:600; background:#00502e; color:#fff; padding:8px 13px; border-radius:999px;">Fever ✓</span>
+        <span style="font-size:14px; font-weight:600; background:#00502e; color:#fff; padding:8px 13px; border-radius:999px;">Headache ✓</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Body pain</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #6f7a71; color:#6f7a71; padding:8px 13px; border-radius:999px;">+ add</span>
+      </div>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:13px; background:#fff; font-size:15px; color:#191c1d; margin-bottom:16px;">"Fever and headache for 3 days, worse at night."</div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Doctor's diagnosis</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; background:#fff; font-size:16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;"><span>Malaria (confirmed by RDT)</span><span style="color:#6f7a71;">▾</span></div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Treatment</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:13px; background:#fff; font-size:15px; margin-bottom:16px;">Oral ACT started in clinic; advised rest &amp; fluids.</div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Prescription</label>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:14px; overflow:hidden; margin-bottom:10px;">
+        <div style="padding:12px 14px; border-bottom:1px solid #edeeef;">
+          <div style="font-weight:700; font-size:15px;">Artemether-Lumefantrine</div>
+          <div style="font-size:13px; color:#6f7a71; margin-top:2px;">1 tab · twice daily · 3 days</div>
+        </div>
+        <div style="padding:12px 14px;">
+          <div style="font-weight:700; font-size:15px;">Paracetamol 500mg</div>
+          <div style="font-size:13px; color:#6f7a71; margin-top:2px;">1 tab · as needed · 5 days</div>
+        </div>
+      </div>
+      <div style="border:1.5px dashed #bec9bf; border-radius:12px; padding:12px; text-align:center; color:#00502e; font-weight:700; font-size:14px;">＋ Add medication</div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px; display:flex; gap:10px; background:#f8f9fa; border-top:1px solid #ececec;">
+      <div style="flex:none; width:56px; border:1.5px solid #bec9bf; border-radius:13px; display:flex; align-items:center; justify-content:center; background:#fff; color:#3f4941; font-size:20px;">⤳</div>
+      <div style="flex:1; background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Save record</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Add follow-up -->
+<div style="display:flex; flex-direction:column;">
+  <div style="margin-bottom:18px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">5.3</div>
+    <div style="font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-top:2px;">Add follow-up to a visit</div>
+    <div style="font-size:13px; color:#6f7a71; margin-top:4px; line-height:1.45;">Filed under the earlier visit, with its context.</div>
+  </div>
+  <div style="width:380px; height:800px; background:#f8f9fa; border-radius:42px; border:1px solid #d4d7d5; box-shadow:0 24px 48px -20px rgba(0,40,20,0.28); overflow:hidden; position:relative; display:flex; flex-direction:column;">
+    <div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px 0 28px; font-size:13px; font-weight:700; color:#191c1d;">
+      <span style="font-family:'JetBrains Mono',monospace;">10:18</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#dcefe2;color:#00502e;padding:4px 9px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    </div>
+    <div style="flex:none; background:#00502e; color:#fff; padding:12px 20px 14px;">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <span style="font-size:22px;">‹</span>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:16px;">Amaka Okoro · 32 · F</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9df5bd;">OOE-PHC-000047-K2</div>
+        </div>
+        <span style="font-size:11px; font-weight:700; background:rgba(255,255,255,0.16); color:#fff; padding:5px 10px; border-radius:999px;">Follow-up</span>
+      </div>
+    </div>
+    <div style="flex:1; overflow:hidden; padding:14px 20px;">
+      <!-- linked earlier visit -->
+      <div style="background:#dde3f0; border-radius:13px; padding:12px 14px; margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; color:#2c3b52; letter-spacing:0.04em; text-transform:uppercase;">Following up on</div>
+        <div style="font-weight:700; font-size:15px; color:#2c3b52; margin-top:3px;">Malaria (RDT positive)</div>
+        <div style="font-size:12px; color:#3b4951; margin-top:2px;">12 Jun 2026 · treated with ACT, 3 days</div>
+      </div>
+
+      <div style="display:inline-flex; align-items:center; gap:7px; background:#f3f4f5; border-radius:9px; padding:7px 11px; margin-bottom:16px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#00502e;"></span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#3f4941;">15 Jun 2026 · 10:18</span>
+        <span style="font-size:11px; color:#6f7a71;">· auto-stamped</span>
+      </div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Complaints today</label>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        <span style="font-size:14px; font-weight:600; background:#00502e; color:#fff; padding:8px 13px; border-radius:999px;">Improving ✓</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; padding:8px 13px; border-radius:999px;">Mild fatigue</span>
+        <span style="font-size:14px; font-weight:600; background:#fff; border:1.5px solid #6f7a71; color:#6f7a71; padding:8px 13px; border-radius:999px;">+ add</span>
+      </div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Progress / diagnosis</label>
+      <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:13px; background:#fff; font-size:15px; margin-bottom:16px;">Responding well to treatment. Fever resolved. No danger signs.</div>
+
+      <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Treatment &amp; prescription</label>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:12px 14px; margin-bottom:10px;">
+        <div style="font-weight:700; font-size:15px;">Complete current ACT course</div>
+        <div style="font-size:13px; color:#6f7a71; margin-top:2px;">No new medication · review if symptoms return</div>
+      </div>
+      <div style="border:1.5px dashed #bec9bf; border-radius:12px; padding:12px; text-align:center; color:#00502e; font-weight:700; font-size:14px;">＋ Add medication</div>
+    </div>
+    <div style="flex:none; padding:12px 20px 22px; background:#f8f9fa; border-top:1px solid #ececec;">
+      <div style="background:#00502e; color:#fff; text-align:center; padding:16px; border-radius:13px; font-weight:700; font-size:16px;">Save follow-up</div>
+    </div>
+  </div>
+</div>
+</div>
+
+    <!-- roadmap note -->
+    <div style="background:#fff; border:1px solid #d9dadb; border-radius:20px; padding:28px 30px; margin-top:56px; display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
+      <div style="flex:1; min-width:280px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600; margin-bottom:6px;">WHAT COMES NEXT</div>
+        <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em; margin-bottom:8px;">The same simple experience, growing upward</div>
+        <p style="font-size:15px; color:#3f4941; line-height:1.55; margin:0;">Phase 2 adds hospital lookup, wards, labs and discharge summaries that flow back to the CHC. Phase 3 rolls facility data up into live, anonymised Ministry dashboards — replacing manual monthly paper reporting. Every screen reuses the tokens and components above.</p>
+      </div>
+      <div style="display:flex; gap:12px; flex:none;">
+        <div style="text-align:center; background:#f3f4f5; border-radius:14px; padding:18px 20px;"><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#00502e;">2</div><div style="font-size:12px; color:#6f7a71; margin-top:2px;">Hospitals</div></div>
+        <div style="text-align:center; background:#f3f4f5; border-radius:14px; padding:18px 20px;"><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#00502e;">3</div><div style="font-size:12px; color:#6f7a71; margin-top:2px;">National</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;historyView&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Timeline&quot;, &quot;Grouped by programme&quot;], &quot;default&quot;: &quot;Timeline&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Doctor · patient history&quot; },
+  &quot;linkFollowUps&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Doctor · patient history&quot; },
+  &quot;showVitals&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Doctor · patient history&quot; },
+  &quot;defaultRecordType&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;New visit&quot;, &quot;Follow-up&quot;], &quot;default&quot;: &quot;New visit&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Doctor · patient history&quot; }
+}">
+class Component extends DCLogic {
+  state = { expandedId: 'C', sheetOpen: false, recordType: 'new', parentId: 'C', toastOpen: false, toastMsg: '' };
+
+  get visitsData() {
+    return [
+      { id:'D', seq:4, date:'14 Jun 2026', facility:'Adeoyo General Hospital', programme:'Malaria', dx:'Malaria — recovery review', symptoms:'Much improved, mild fatigue', tx:'ACT course completed', temp:'37.2°C', bp:'116/74', wt:'62 kg', note:'Recovering well. No further treatment required.', followUpTo:'C' },
+      { id:'C', seq:3, date:'12 Jun 2026', facility:'Odo-Ona Elewe PHC', programme:'Malaria', dx:'Malaria (RDT positive)', symptoms:'Fever, headache, chills', tx:'Artemether-Lumefantrine, 3 days', temp:'38.9°C', bp:'118/76', wt:'62 kg', note:'Advised to return in 3 days if no improvement.', followUpTo:null },
+      { id:'B', seq:2, date:'03 May 2026', facility:'Odo-Ona Elewe PHC', programme:'Antenatal', dx:'2nd ANC visit — normal', symptoms:'Routine antenatal check', tx:'Iron & folate supplements', temp:'36.8°C', bp:'110/70', wt:'60 kg', note:'Next ANC visit due in 4 weeks.', followUpTo:null },
+      { id:'A', seq:1, date:'02 Feb 2026', facility:'Odo-Ona Elewe PHC', programme:'Outpatient', dx:'Upper respiratory infection', symptoms:'Cough, sore throat', tx:'Symptomatic care, rest', temp:'37.6°C', bp:'114/72', wt:'61 kg', note:'', followUpTo:null },
+    ];
+  }
+
+  _mk(v, indent) {
+    const showVitals = this.props.showVitals ?? true;
+    return {
+      isHeader: false, isVisit: true, indent: !!indent,
+      id: v.id, date: v.date, facility: v.facility, programme: v.programme,
+      dx: v.dx, symptoms: v.symptoms, tx: v.tx, temp: v.temp, bp: v.bp, wt: v.wt,
+      note: v.note, hasNote: !!v.note, showVitals,
+      hasFollowLabel: false, followLabel: '',
+      expanded: this.state.expandedId === v.id,
+      onToggle: () => this.setState(s => ({ expandedId: s.expandedId === v.id ? null : v.id })),
+      onAddFollow: () => this.setState({ sheetOpen: true, recordType: 'follow', parentId: v.id }),
+    };
+  }
+
+  _buildRows() {
+    const data = this.visitsData;
+    const grouped = (this.props.historyView ?? 'Timeline') === 'Grouped by programme';
+    const link = this.props.linkFollowUps ?? true;
+
+    if (grouped) {
+      const order = [];
+      const map = {};
+      data.forEach(v => { if (!map[v.programme]) { map[v.programme] = []; order.push(v.programme); } map[v.programme].push(v); });
+      const rows = [];
+      order.forEach(name => {
+        rows.push({ isHeader: true, isVisit: false, name });
+        map[name].slice().sort((a, b) => a.seq - b.seq).forEach(v => {
+          const r = this._mk(v, false);
+          if (v.followUpTo) { const p = data.find(x => x.id === v.followUpTo); r.hasFollowLabel = true; r.followLabel = 'Follow-up of ' + (p ? p.date : ''); }
+          rows.push(r);
+        });
+      });
+      return rows;
+    }
+
+    if (link) {
+      const kids = {};
+      data.forEach(v => { if (v.followUpTo) { (kids[v.followUpTo] = kids[v.followUpTo] || []).push(v); } });
+      const rows = [];
+      data.filter(v => !v.followUpTo).forEach(p => {
+        rows.push(this._mk(p, false));
+        (kids[p.id] || []).sort((a, b) => a.seq - b.seq).forEach(k => rows.push(this._mk(k, true)));
+      });
+      return rows;
+    }
+
+    return data.map(v => {
+      const r = this._mk(v, false);
+      if (v.followUpTo) { const p = data.find(x => x.id === v.followUpTo); r.hasFollowLabel = true; r.followLabel = 'Follow-up of ' + (p ? p.date : ''); }
+      return r;
+    });
+  }
+
+  renderVals() {
+    const data = this.visitsData;
+    const parent = data.find(v => v.id === this.state.parentId);
+    const parentDate = parent ? parent.date : '';
+    const isFollow = this.state.recordType === 'follow';
+    return {
+      rows: this._buildRows(),
+      sheetOpen: this.state.sheetOpen,
+      recordTypeIsNew: !isFollow,
+      recordTypeIsFollow: isFollow,
+      confirmLabel: isFollow ? 'Create follow-up record' : 'Start new visit record',
+      parentChoices: data.filter(v => !v.followUpTo).map(v => ({
+        id: v.id, dx: v.dx, date: v.date + ' · ' + v.facility,
+        selected: this.state.parentId === v.id,
+        onPick: () => this.setState({ parentId: v.id }),
+      })),
+      toastOpen: this.state.toastOpen,
+      toastMsg: this.state.toastMsg,
+      openNew: () => this.setState({ sheetOpen: true, recordType: (this.props.defaultRecordType ?? 'New visit') === 'Follow-up' ? 'follow' : 'new', parentId: 'C' }),
+      pickNew: () => this.setState({ recordType: 'new' }),
+      pickFollow: () => this.setState({ recordType: 'follow' }),
+      closeSheet: () => this.setState({ sheetOpen: false }),
+      dismissToast: () => this.setState({ toastOpen: false }),
+      confirm: () => this.setState({
+        sheetOpen: false, toastOpen: true,
+        toastMsg: isFollow ? ('Follow-up record created under ' + parentDate) : 'New visit record started for Amaka',
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>
