@@ -1,39 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Stat, StatusPill, Tag } from '@/ui';
 
-const NAV = [
-  { key: 'home', label: 'Home', to: '/home' },
-  { key: 'patients', label: 'Patients', to: '/patients/search' },
-  { key: 'registers', label: 'Registers', to: '/registers/malaria' },
-  { key: 'stock', label: 'Stock', to: '/home' },
-];
-
-const BottomNav = ({ active }: { active: string }) => {
-  const navigate = useNavigate();
-  return (
-    <nav className="flex justify-around border-t border-outline-soft bg-white px-2 pb-5 pt-2.5">
-      {NAV.map((n) => {
-        const on = n.key === active;
-        return (
-          <button
-            key={n.key}
-            type="button"
-            onClick={() => navigate(n.to)}
-            className="flex min-h-0 flex-col items-center gap-1"
-          >
-            <span className={`h-[22px] w-[22px] rounded-md ${on ? 'bg-brand' : 'bg-outline'}`} />
-            <span
-              className={`text-[11px] ${on ? 'font-bold text-brand' : 'font-semibold text-ink-muted'}`}
-            >
-              {n.label}
-            </span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-};
-
 const ReferralRow = ({
   name,
   reason,
@@ -185,8 +152,6 @@ export const FacilityHomeScreen = () => {
             <Stat value="4" label="To sync" tone="amber" />
           </div>
         </main>
-
-        <BottomNav active="home" />
       </div>
     </div>
   );

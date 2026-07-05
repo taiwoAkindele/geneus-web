@@ -19,7 +19,7 @@ export const ShiftLoginScreen = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-6 text-white">
+    <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-6 text-white sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="flex justify-end">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-on-dark">

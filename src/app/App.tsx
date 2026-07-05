@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AppShell } from './AppShell';
+import { AuthShell } from './AuthShell';
 import { RouteIndex } from './RouteIndex';
 
 /**
@@ -121,30 +123,35 @@ const App = () => {
         <Routes>
           {/* Default screen is the staff shift-login. */}
           <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<ShiftLoginScreen />} />
 
-          {/* Daily use */}
-          <Route path="/home" element={<FacilityHomeScreen />} />
-          <Route path="/patients/search" element={<PatientSearchScreen />} />
-          <Route path="/patients/new" element={<NewPatientStep1Screen />} />
-          <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
+          {/* Auth & onboarding — brand-split card on tablet/desktop */}
+          <Route element={<AuthShell />}>
+            <Route path="/login" element={<ShiftLoginScreen />} />
+            <Route path="/onboarding/start" element={<MagicLinkScreen />} />
+            <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
+            <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
+            <Route path="/onboarding/accept" element={<CreatePinScreen />} />
+            <Route path="/forgot-pin" element={<ForgotPinScreen />} />
+            <Route path="/forgot-pin/sent" element={<ResetLinkSentScreen />} />
+            <Route path="/reset-pin" element={<ResetPinScreen />} />
+          </Route>
+
+          {/* Daily use — inside the responsive app shell (sidebar / bottom nav) */}
+          <Route element={<AppShell />}>
+            <Route path="/home" element={<FacilityHomeScreen />} />
+            <Route path="/patients/search" element={<PatientSearchScreen />} />
+            <Route path="/patients/new" element={<NewPatientStep1Screen />} />
+            <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
+            <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
+            <Route path="/registers/malaria" element={<MalariaRegisterScreen />} />
+            <Route path="/reports/month" element={<MonthlySummaryScreen />} />
+            <Route path="/referrals/track" element={<ReferralScreen />} />
+            <Route path="/sync" element={<SyncCenterScreen />} />
+          </Route>
+          {/* Duplicate check is a modal-style screen — outside the shell for now */}
           <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
-          <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
-          <Route path="/registers/malaria" element={<MalariaRegisterScreen />} />
-          <Route path="/reports/month" element={<MonthlySummaryScreen />} />
-          <Route path="/referrals/track" element={<ReferralScreen />} />
-          <Route path="/sync" element={<SyncCenterScreen />} />
 
-          {/* Staff onboarding & access */}
-          <Route path="/onboarding/accept" element={<CreatePinScreen />} />
-          <Route path="/forgot-pin" element={<ForgotPinScreen />} />
-          <Route path="/forgot-pin/sent" element={<ResetLinkSentScreen />} />
-          <Route path="/reset-pin" element={<ResetPinScreen />} />
-
-          {/* Facility onboarding & admin */}
-          <Route path="/onboarding/start" element={<MagicLinkScreen />} />
-          <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
-          <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
+          {/* Facility admin */}
           <Route path="/admin" element={<AdminDashboardScreen />} />
           <Route path="/admin/staff" element={<ManageStaffScreen />} />
           <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />

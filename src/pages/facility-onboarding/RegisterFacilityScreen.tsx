@@ -9,7 +9,7 @@ export const RegisterFacilityScreen = () => {
   const [level, setLevel] = useState<Level>("primary");
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface">
+    <div className="flex min-h-screen flex-col bg-surface sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
         <header className="px-5 pb-3 pt-5">
           <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">

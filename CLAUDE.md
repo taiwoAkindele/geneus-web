@@ -140,6 +140,13 @@ same components, same content at every width.
   **product decision the user makes** — ask; don't invent it.
 - The design's `380×800` rounded frames are mockup bezels, not app chrome — never
   reproduce them.
+- Tablet/desktop are now **explicitly designed** in `design/Responsive Views.dc.html`
+  (breakpoints: ≤640 phone · 641–1024 tablet · ≥1025 desktop). The signed-in
+  daily-use screens render inside `src/app/AppShell.tsx` — one nav that becomes a
+  bottom bar → rail → full sidebar. Auth/onboarding screens stay outside the shell
+  (they get a brand-split card treatment). Drill-downs become master–detail, and
+  the programme register becomes a data table, on desktop. Implement those from the
+  responsive design; mobile still stays byte-for-byte the phone design.
 
 ---
 
