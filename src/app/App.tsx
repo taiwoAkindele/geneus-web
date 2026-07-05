@@ -43,6 +43,69 @@ const ManageStaffScreen = lazy(() =>
   })),
 );
 
+// Staff onboarding & access
+const CreatePinScreen = lazy(() =>
+  import('@/pages/staff-onboarding/CreatePinScreen').then((m) => ({ default: m.CreatePinScreen })),
+);
+const ShiftLoginScreen = lazy(() =>
+  import('@/pages/staff-onboarding/ShiftLoginScreen').then((m) => ({ default: m.ShiftLoginScreen })),
+);
+const ForgotPinScreen = lazy(() =>
+  import('@/pages/staff-onboarding/ForgotPinScreen').then((m) => ({ default: m.ForgotPinScreen })),
+);
+const ResetLinkSentScreen = lazy(() =>
+  import('@/pages/staff-onboarding/ResetLinkSentScreen').then((m) => ({
+    default: m.ResetLinkSentScreen,
+  })),
+);
+const ResetPinScreen = lazy(() =>
+  import('@/pages/staff-onboarding/ResetPinScreen').then((m) => ({ default: m.ResetPinScreen })),
+);
+
+// Daily use
+const FacilityHomeScreen = lazy(() =>
+  import('@/pages/facility-home/FacilityHomeScreen').then((m) => ({ default: m.FacilityHomeScreen })),
+);
+const PatientSearchScreen = lazy(() =>
+  import('@/pages/patient-search/PatientSearchScreen').then((m) => ({
+    default: m.PatientSearchScreen,
+  })),
+);
+const NewPatientStep1Screen = lazy(() =>
+  import('@/pages/patient-registration/NewPatientStep1Screen').then((m) => ({
+    default: m.NewPatientStep1Screen,
+  })),
+);
+const NewPatientStep2Screen = lazy(() =>
+  import('@/pages/patient-registration/NewPatientStep2Screen').then((m) => ({
+    default: m.NewPatientStep2Screen,
+  })),
+);
+const DuplicateCheckScreen = lazy(() =>
+  import('@/pages/patient-registration/DuplicateCheckScreen').then((m) => ({
+    default: m.DuplicateCheckScreen,
+  })),
+);
+const SendToUnitScreen = lazy(() =>
+  import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
+);
+const MalariaRegisterScreen = lazy(() =>
+  import('@/pages/programme-register/MalariaRegisterScreen').then((m) => ({
+    default: m.MalariaRegisterScreen,
+  })),
+);
+const MonthlySummaryScreen = lazy(() =>
+  import('@/pages/monthly-summary/MonthlySummaryScreen').then((m) => ({
+    default: m.MonthlySummaryScreen,
+  })),
+);
+const ReferralScreen = lazy(() =>
+  import('@/pages/referral/ReferralScreen').then((m) => ({ default: m.ReferralScreen })),
+);
+const SyncCenterScreen = lazy(() =>
+  import('@/pages/sync-center/SyncCenterScreen').then((m) => ({ default: m.SyncCenterScreen })),
+);
+
 const ScreenFallback = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface text-ink-muted">
@@ -56,7 +119,27 @@ const App = () => {
     <BrowserRouter>
       <Suspense fallback={<ScreenFallback />}>
         <Routes>
-          <Route path="/" element={<RouteIndex />} />
+          {/* Default screen is the staff shift-login. */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<ShiftLoginScreen />} />
+
+          {/* Daily use */}
+          <Route path="/home" element={<FacilityHomeScreen />} />
+          <Route path="/patients/search" element={<PatientSearchScreen />} />
+          <Route path="/patients/new" element={<NewPatientStep1Screen />} />
+          <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
+          <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
+          <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
+          <Route path="/registers/malaria" element={<MalariaRegisterScreen />} />
+          <Route path="/reports/month" element={<MonthlySummaryScreen />} />
+          <Route path="/referrals/track" element={<ReferralScreen />} />
+          <Route path="/sync" element={<SyncCenterScreen />} />
+
+          {/* Staff onboarding & access */}
+          <Route path="/onboarding/accept" element={<CreatePinScreen />} />
+          <Route path="/forgot-pin" element={<ForgotPinScreen />} />
+          <Route path="/forgot-pin/sent" element={<ResetLinkSentScreen />} />
+          <Route path="/reset-pin" element={<ResetPinScreen />} />
 
           {/* Facility onboarding & admin */}
           <Route path="/onboarding/start" element={<MagicLinkScreen />} />
@@ -67,7 +150,10 @@ const App = () => {
           <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
           <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Dev screen index (temporary) */}
+          <Route path="/menu" element={<RouteIndex />} />
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

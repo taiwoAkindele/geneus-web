@@ -7,6 +7,8 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { ChoiceChip } from './ChoiceChip';
 export { PatientIdToken } from './PatientIdToken';
+export { PinDots } from './PinDots';
+export { PinKeypad } from './PinKeypad';
 export { SegmentedControl } from './SegmentedControl';
 export { SelectField } from './SelectField';
 export { Stat } from './Stat';
