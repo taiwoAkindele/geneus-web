@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Self-hosted variable fonts, bundled so the app renders fully offline.
+   The Google Fonts CDN the prototype used would simply fail to load with no
+   connection (and cost latency on 2G) — a non-starter for an offline-first
+   product. One woff2 per family covers the whole weight axis (latin subset). */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/hanken-grotesk.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-surface text-ink antialiased;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+
+::selection {
+  background: #9df5bd;
+  color: #002110;
+}
+
+/* Large-touch, high-contrast controls for modest phones in bright sun
+   (PRD §13 / design Foundations). The design specifies a 52px minimum tap
+   target, and a 16px minimum font size so inputs never trigger mobile zoom.
+   Compact elements (chips, status pills) opt out with `min-h-0`. */
+button,
+[role='button'],
+input,
+select,
+textarea {
+  min-height: 3.25rem; /* 52px */
+  font-size: 1rem; /* 16px */
+}
