@@ -75,7 +75,7 @@ export const FacilityHomeScreen = () => {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-surface">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
         <div className="flex justify-end px-5 pt-4">
           <StatusPill status="synced" />
         </div>
@@ -87,7 +87,7 @@ export const FacilityHomeScreen = () => {
           <Tag tone="amber">Shift ends 15:00</Tag>
         </header>
 
-        <main className="flex-1 space-y-4 px-5 pb-24">
+        <main className="flex-1 space-y-4 px-5 pb-24 lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-5 lg:space-y-0">
           {/* Incoming referrals */}
           <div className="rounded-[20px] bg-slate p-4 text-white">
             <div className="mb-3 flex items-center justify-between">
@@ -118,6 +118,7 @@ export const FacilityHomeScreen = () => {
             </div>
           </div>
 
+          <div className="space-y-4">
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-3">
             <QuickAction
@@ -150,6 +151,7 @@ export const FacilityHomeScreen = () => {
             <Stat value="18" label="Seen today" />
             <Stat value="5" label="Waiting" />
             <Stat value="4" label="To sync" tone="amber" />
+          </div>
           </div>
         </main>
       </div>

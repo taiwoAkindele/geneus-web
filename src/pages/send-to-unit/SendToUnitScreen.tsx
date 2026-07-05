@@ -15,7 +15,7 @@ export const SendToUnitScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 px-5 py-3">
           {/* Patient */}
           <div className="mb-4 flex items-center gap-3 rounded-[13px] bg-brand-tint px-3.5 py-3">

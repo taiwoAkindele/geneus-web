@@ -134,10 +134,12 @@ same components, same content at every width.
 - Keep the **mobile classes as the unprefixed base** so the phone layout stays
   byte-for-byte stable; every wider-screen change is a `md:`/`lg:` variant. When
   adding a variant, don't alter the base class it builds on.
-- **Do not** add, remove, or swap components/content for larger screens, and do
-  not build a separate desktop structure (no `md:hidden` / `hidden md:block` twin
-  layouts). If a screen genuinely needs different content on desktop, that is a
-  **product decision the user makes** — ask; don't invent it.
+- **Don't invent** desktop layouts. Reflow with `md:`/`lg:` utilities by default,
+  and never add/remove/swap content on your own initiative. **Exception:** where
+  `design/Responsive Views.dc.html` specifies a structurally different desktop
+  (data table, master–detail, inbox, rail), implement exactly that — a
+  breakpoint-gated layout (`lg:hidden` phone view + `hidden lg:flex` desktop view)
+  is correct there because it's the user's design, not an invention.
 - The design's `380×800` rounded frames are mockup bezels, not app chrome — never
   reproduce them.
 - Tablet/desktop are now **explicitly designed** in `design/Responsive Views.dc.html`

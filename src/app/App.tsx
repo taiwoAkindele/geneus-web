@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AdminShell } from './AdminShell';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
 import { RouteIndex } from './RouteIndex';
@@ -151,11 +152,13 @@ const App = () => {
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
           <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
 
-          {/* Facility admin */}
-          <Route path="/admin" element={<AdminDashboardScreen />} />
-          <Route path="/admin/staff" element={<ManageStaffScreen />} />
-          <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
-          <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
+          {/* Facility admin — inside the admin rail shell */}
+          <Route element={<AdminShell />}>
+            <Route path="/admin" element={<AdminDashboardScreen />} />
+            <Route path="/admin/staff" element={<ManageStaffScreen />} />
+            <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
+            <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
+          </Route>
 
           {/* Dev screen index (temporary) */}
           <Route path="/menu" element={<RouteIndex />} />

@@ -38,7 +38,7 @@ export const MonthlySummaryScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="This month" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-2xl">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-2xl lg:max-w-3xl">
         <div className="px-5 pb-1 text-[13px] text-ink-muted">July 2026 · Odo-Ona Elewe PHC</div>
 
         <div className="flex-1 space-y-3 px-5 py-2">
@@ -52,7 +52,7 @@ export const MonthlySummaryScreen = () => {
           </div>
 
           {/* Metrics */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Metric label="Malaria positivity" value="38%" trend="▲" trendTone="up-bad" />
             <Metric label="Immunisation dropout" value="6%" trend="▼" trendTone="down-good" />
             <Metric label="ANC 4th visit" value="72%" trend="▬" trendTone="flat" />

@@ -12,7 +12,7 @@ export const PatientSearchScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Find patient" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-2 md:max-w-lg">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-2 md:max-w-lg lg:max-w-3xl">
         {/* Search */}
         <div className="flex items-center gap-2.5 rounded-[14px] border-2 border-brand bg-white px-4 py-3.5">
           <span className="text-ink-muted">⌕</span>
@@ -28,7 +28,7 @@ export const PatientSearchScreen = () => {
         <div className="mt-5 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">
           2 matches
         </div>
-        <div className="mt-3 space-y-2.5">
+        <div className="mt-3 space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0">
           {MATCHES.map((m) => (
             <button
               key={m.id}

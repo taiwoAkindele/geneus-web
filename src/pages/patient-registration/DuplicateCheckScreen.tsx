@@ -24,8 +24,8 @@ export const DuplicateCheckScreen = () => {
       </div>
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md rounded-t-[26px] bg-white px-5 pb-7 pt-6 shadow-sheet md:max-w-lg">
-        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-outline-hair" />
+      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md rounded-t-[26px] bg-white px-5 pb-7 pt-6 shadow-sheet md:max-w-lg sm:inset-0 sm:h-fit sm:max-h-[92vh] sm:overflow-auto sm:rounded-[26px] sm:m-auto">
+        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-outline-hair sm:hidden" />
         <div className="flex items-center gap-2.5">
           <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-amber-bg font-extrabold text-amber-text">
             !
