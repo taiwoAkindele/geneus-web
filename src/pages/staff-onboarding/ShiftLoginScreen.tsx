@@ -14,9 +14,8 @@ export const ShiftLoginScreen = () => {
     if (pin.length >= 4) return;
     const next = pin + d;
     setPin(next);
-    // On the 4th digit, sign in. (Facility home lands in a later section; for
-    // now the admin dashboard stands in as the signed-in destination.)
-    if (next.length === 4) navigate('/admin');
+    // On the 4th digit, sign in — land on the facility home.
+    if (next.length === 4) navigate('/home');
   };
 
   return (

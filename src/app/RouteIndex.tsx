@@ -9,6 +9,21 @@ type Item = { to: string; label: string; note: string };
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   {
+    title: 'Daily use',
+    items: [
+      { to: '/home', label: 'Facility home', note: 'Signed-in hub' },
+      { to: '/patients/search', label: 'Patient search', note: '' },
+      { to: '/patients/new', label: 'New patient · step 1', note: '' },
+      { to: '/patients/new/details', label: 'New patient · step 2', note: '' },
+      { to: '/patients/duplicate', label: 'Duplicate check', note: 'Bottom sheet' },
+      { to: '/patients/send-to-unit', label: 'Send to another unit', note: '' },
+      { to: '/registers/malaria', label: 'Programme register — Malaria', note: '' },
+      { to: '/reports/month', label: 'This month at a glance', note: '' },
+      { to: '/referrals/track', label: 'Refer & track', note: '' },
+      { to: '/sync', label: 'Sync center & shift warning', note: '' },
+    ],
+  },
+  {
     title: 'Staff onboarding & access',
     items: [
       { to: '/login', label: 'Shift login (PIN)', note: 'Default screen' },
