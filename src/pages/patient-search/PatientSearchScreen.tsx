@@ -21,25 +21,25 @@ export const PatientSearchScreen = () => {
             placeholder="Name, phone, or Patient ID"
             aria-label="Search patients"
           />
-          <button
-            type="button"
-            className="flex min-h-0 items-center gap-1.5 rounded-full bg-brand-tint px-2.5 py-1.5 text-xs font-bold text-brand"
-            aria-label="Scan patient ID"
-          >
-            <Icon name="scan" className="h-4 w-4" />
-            Scan ID
-          </button>
         </div>
         <p className="mt-2.5 text-xs text-ink-muted">Search by name, phone, or Patient ID</p>
 
-        <div className="mt-5 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">
-          2 matches
+        <div className="mt-5 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">2 matches</span>
+          <button
+            type="button"
+            onClick={() => navigate('/appointments')}
+            className="min-h-0 text-[13px] font-bold text-brand"
+          >
+            Today's appointments →
+          </button>
         </div>
         <div className="mt-3 space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0">
           {MATCHES.map((m) => (
             <button
               key={m.id}
               type="button"
+              onClick={() => navigate('/patients/profile')}
               className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
             >
               <div className="flex items-center gap-3">

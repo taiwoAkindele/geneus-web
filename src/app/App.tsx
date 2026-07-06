@@ -113,6 +113,15 @@ const SyncCenterScreen = lazy(() =>
 const StockScreen = lazy(() =>
   import('@/pages/stock/StockScreen').then((m) => ({ default: m.StockScreen })),
 );
+const PatientProfileScreen = lazy(() =>
+  import('@/pages/patient/PatientProfileScreen').then((m) => ({ default: m.PatientProfileScreen })),
+);
+const EncounterScreen = lazy(() =>
+  import('@/pages/encounter/EncounterScreen').then((m) => ({ default: m.EncounterScreen })),
+);
+const AppointmentsScreen = lazy(() =>
+  import('@/pages/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
+);
 
 const ScreenFallback = () => {
   return (
@@ -148,6 +157,9 @@ const App = () => {
           <Route element={<AppShell />}>
             <Route path="/home" element={<FacilityHomeScreen />} />
             <Route path="/patients/search" element={<PatientSearchScreen />} />
+            <Route path="/patients/profile" element={<PatientProfileScreen />} />
+            <Route path="/encounter" element={<EncounterScreen />} />
+            <Route path="/appointments" element={<AppointmentsScreen />} />
             <Route path="/patients/new" element={<NewPatientStep1Screen />} />
             <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
             <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
