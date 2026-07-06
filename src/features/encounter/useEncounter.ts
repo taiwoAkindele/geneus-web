@@ -1,0 +1,153 @@
+import { useCallback, useMemo, useState } from 'react';
+import { AUDIT_LABEL, STEPS } from './steps';
+import type { Actor, EncounterData, EncounterState, StepKey } from './types';
+
+const stamp = () => {
+  const d = new Date();
+  return {
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+  };
+};
+
+/** A fresh encounter, pre-filled with plausible values so the flow is quick to walk. */
+const seed = (patientId: string, patientName: string): EncounterState => ({
+  id: 'OOE-ENC-000318',
+  patientId,
+  patientName,
+  openedDate: stamp().date,
+  stage: 0,
+  closed: false,
+  sig: {},
+  amend: {},
+  audit: [{ ...stamp(), actor: '—', role: '—', action: 'Encounter opened' }],
+  data: {
+    vitals: { temp: '38.9', bp: '118/76', pulse: '98', weight: '63', spo2: '98' },
+    complaint: { complaints: ['Fever', 'Headache'], note: 'Fever and headache for 3 days, worse at night. Poor appetite.' },
+    laborder: { tests: ['Malaria RDT', 'FBC'] },
+    labresults: { 'Malaria RDT': 'Positive (P. falciparum)', FBC: 'WBC 11.2 · Hb 11.4 · Plt 180' },
+    diagnosis: {
+      dx: 'Malaria (confirmed by RDT)',
+      rx: [
+        { name: 'Artemether-Lumefantrine', dose: '1 tab · twice daily · 3 days' },
+        { name: 'Paracetamol 500mg', dose: '1 tab · as needed · 5 days' },
+      ],
+    },
+    dispense: { done: {} },
+    followup: { when: '1 week · 14 Jul 2026', reason: 'Malaria recovery review' },
+  },
+});
+
+/** Plain-text summary rows for a step — used by both the Review sheet and the locked view. */
+export const summarize = (data: EncounterData, key: StepKey): { label: string; value: string }[] => {
+  switch (key) {
+    case 'vitals':
+      return [
+        { label: 'Temperature', value: `${data.vitals.temp || '—'} °C` },
+        { label: 'Blood pressure', value: `${data.vitals.bp || '—'} mmHg` },
+        { label: 'Pulse', value: `${data.vitals.pulse || '—'} bpm` },
+        { label: 'Weight', value: `${data.vitals.weight || '—'} kg` },
+        { label: 'SpO₂', value: `${data.vitals.spo2 || '—'} %` },
+      ];
+    case 'complaint':
+      return [
+        { label: 'Complaints', value: data.complaint.complaints.join(', ') || '—' },
+        { label: 'Clinical note', value: data.complaint.note || '—' },
+      ];
+    case 'laborder':
+      return [{ label: 'Investigations', value: data.laborder.tests.join(', ') || 'None' }];
+    case 'labresults':
+      return data.laborder.tests.map((t) => ({ label: t, value: data.labresults[t] || '—' }));
+    case 'diagnosis':
+      return [
+        { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
+        { label: 'Prescription', value: data.diagnosis.rx.map((m) => `${m.name} — ${m.dose}`).join('; ') || 'None' },
+      ];
+    case 'dispense': {
+      const { rx } = data.diagnosis;
+      const { done } = data.dispense;
+      return [
+        { label: 'Dispensed', value: rx.filter((_, i) => done[i]).map((m) => m.name).join(', ') || 'None ticked' },
+        { label: 'Not dispensed', value: rx.filter((_, i) => !done[i]).map((m) => m.name).join(', ') || '—' },
+      ];
+    }
+    case 'followup':
+      return [
+        { label: 'Follow-up', value: data.followup.when || '—' },
+        { label: 'Reason', value: data.followup.reason || '—' },
+      ];
+    default:
+      return [];
+  }
+};
+
+export const useEncounter = (patientId: string, patientName: string) => {
+  const [enc, setEnc] = useState<EncounterState>(() => seed(patientId, patientName));
+
+  const setField = useCallback(<K extends StepKey, F extends keyof EncounterData[K]>(step: K, field: F, value: EncounterData[K][F]) => {
+    setEnc((e) => ({ ...e, data: { ...e.data, [step]: { ...e.data[step], [field]: value } } }));
+  }, []);
+
+  const toggleIn = useCallback((step: 'complaint' | 'laborder', field: 'complaints' | 'tests', value: string) => {
+    setEnc((e) => {
+      const arr = [...((e.data[step] as Record<string, string[]>)[field] || [])];
+      const i = arr.indexOf(value);
+      if (i < 0) arr.push(value);
+      else arr.splice(i, 1);
+      return { ...e, data: { ...e.data, [step]: { ...e.data[step], [field]: arr } } };
+    });
+  }, []);
+
+  const setResult = useCallback((test: string, value: string) => {
+    setEnc((e) => ({ ...e, data: { ...e.data, labresults: { ...e.data.labresults, [test]: value } } }));
+  }, []);
+
+  const addRx = useCallback(() => {
+    setEnc((e) => ({
+      ...e,
+      data: { ...e.data, diagnosis: { ...e.data.diagnosis, rx: [...e.data.diagnosis.rx, { name: 'New medication', dose: 'dose · frequency · duration' }] } },
+    }));
+  }, []);
+
+  const removeRx = useCallback((idx: number) => {
+    setEnc((e) => ({ ...e, data: { ...e.data, diagnosis: { ...e.data.diagnosis, rx: e.data.diagnosis.rx.filter((_, i) => i !== idx) } } }));
+  }, []);
+
+  const toggleDispense = useCallback((idx: number) => {
+    setEnc((e) => ({ ...e, data: { ...e.data, dispense: { done: { ...e.data.dispense.done, [idx]: !e.data.dispense.done[idx] } } } }));
+  }, []);
+
+  /** Lock a step to the actor, stamp it, log it, and advance. Closes on follow-up. */
+  const lockStep = useCallback((key: StepKey, actor: Actor) => {
+    const at = stamp();
+    setEnc((e) => {
+      const idx = STEPS.findIndex((s) => s.key === key);
+      const closed = key === 'followup';
+      return {
+        ...e,
+        stage: idx + 1,
+        closed,
+        sig: { ...e.sig, [key]: { actor: actor.name, role: actor.role, ...at } },
+        audit: [...e.audit, { ...at, actor: actor.name, role: actor.role, action: AUDIT_LABEL[key] }],
+      };
+    });
+  }, []);
+
+  const amendStep = useCallback((key: StepKey, actor: Actor, note: string) => {
+    const at = stamp();
+    setEnc((e) => ({
+      ...e,
+      amend: { ...e.amend, [key]: [...(e.amend[key] || []), { by: actor.name, role: actor.role, note, ...at }] },
+      audit: [...e.audit, { ...at, actor: actor.name, role: actor.role, action: `Amendment added to ${STEPS.find((s) => s.key === key)?.title}` }],
+    }));
+  }, []);
+
+  const actions = useMemo(
+    () => ({ setField, toggleIn, setResult, addRx, removeRx, toggleDispense, lockStep, amendStep }),
+    [setField, toggleIn, setResult, addRx, removeRx, toggleDispense, lockStep, amendStep],
+  );
+
+  return { enc, ...actions };
+};
+
+export type EncounterController = ReturnType<typeof useEncounter>;

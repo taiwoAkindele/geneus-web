@@ -14,6 +14,7 @@ export { PinDots } from './PinDots';
 export { PinKeypad } from './PinKeypad';
 export { SegmentedControl } from './SegmentedControl';
 export { SelectField } from './SelectField';
+export { Sheet } from './Sheet';
 export { Stat } from './Stat';
 export { StatusPill } from './StatusPill';
 export type { SyncStatus } from './StatusPill';
