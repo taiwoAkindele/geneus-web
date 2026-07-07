@@ -46,10 +46,10 @@ export const MonthlySummaryScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="This month" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-2xl lg:max-w-3xl">
-        <div className="px-5 pb-1 text-[13px] text-ink-muted">July 2026 · Odo-Ona Elewe PHC</div>
+      <div className="flex w-full flex-1 flex-col">
+        <div className="px-5 pb-1 text-[13px] text-ink-muted md:px-8">July 2026 · Odo-Ona Elewe PHC</div>
 
-        <div className="flex-1 space-y-3 px-5 py-2">
+        <div className="flex-1 space-y-3 px-5 py-2 md:px-8">
           {/* Headline */}
           <div className="rounded-[18px] bg-brand px-5 py-4 text-white">
             <div className="text-[13px] text-brand-accent-soft">Total attendance</div>
@@ -78,7 +78,7 @@ export const MonthlySummaryScreen = () => {
           </div>
         </div>
 
-        <footer className="flex gap-2.5 px-5 pb-6 pt-4">
+        <footer className="flex gap-2.5 px-5 pb-6 pt-4 md:px-8">
           <Button variant="outlined">Print</Button>
           <Button variant="primary">Submit to LGA</Button>
         </footer>

@@ -21,7 +21,7 @@ export const AppointmentsScreen = () => {
   return (
     <div className="min-h-screen bg-surface">
       <AppBar title="Appointments" onBack={() => navigate('/patients/search')} right={<StatusPill status="synced" />} />
-      <div className="mx-auto max-w-2xl px-5 py-2 lg:max-w-4xl">
+      <div className="w-full px-5 py-2 md:px-8">
         <div className="pb-1 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-strong">Monday · 14 Jul 2026</div>
         <h1 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em]">Appointments today</h1>
 

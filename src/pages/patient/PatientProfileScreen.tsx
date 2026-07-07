@@ -52,7 +52,7 @@ export const PatientProfileScreen = () => {
   return (
     <div className="min-h-screen bg-surface">
       <AppBar title="Patient profile" onBack={() => navigate('/patients/search')} right={<StatusPill status="synced" />} />
-      <div className="mx-auto max-w-2xl px-5 py-2 lg:max-w-3xl">
+      <div className="w-full px-5 py-2 md:px-8">
         {/* profile header */}
         <div className="rounded-card bg-brand p-5 text-white">
           <div className="flex flex-wrap items-center gap-4">

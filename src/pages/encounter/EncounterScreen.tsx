@@ -64,7 +64,7 @@ export const EncounterScreen = () => {
     <div className="min-h-screen bg-surface">
       {/* patient context bar */}
       <header className="sticky top-[var(--app-header-h,0px)] z-10 bg-brand text-white">
-        <div className="mx-auto max-w-2xl px-5 py-3">
+        <div className="px-5 py-3 md:px-8">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => navigate('/patients/profile')} aria-label="Back to patient profile" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
               <Icon name="back" className="h-6 w-6" />
@@ -93,11 +93,11 @@ export const EncounterScreen = () => {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl">
+      <div>
         <EncounterSpine enc={enc} />
 
         {enc.closed ? (
-          <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-brand-tint p-4">
+          <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-brand-tint p-4 md:mx-8">
             <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand text-white">
               <Icon name="check" className="h-4 w-4" />
             </span>
@@ -110,7 +110,7 @@ export const EncounterScreen = () => {
           </div>
         ) : null}
 
-        <div className="space-y-3 px-5 py-3 pb-24">
+        <div className="space-y-3 px-5 py-3 pb-24 md:px-8">
           {STEPS.map((s, i) => {
             const locked = Boolean(enc.sig[s.key]);
             const active = i === enc.stage && !enc.closed && !locked;
