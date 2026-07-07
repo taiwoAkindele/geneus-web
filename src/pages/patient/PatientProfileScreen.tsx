@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Button, StatusPill, Tag, useToast } from '@/ui';
+import { AppBar, Avatar, Button, StatusPill, Tag } from '@/ui';
 
 const PATIENT = {
   name: 'Amaka Okoro',
@@ -16,22 +16,37 @@ const PATIENT = {
   ],
 };
 
-type EncItem = { title: string; date: string; facility: string; status: 'Open' | 'Closed'; chips: string[] };
+// The patient's current details, shaped for the registration form so "Edit
+// patient details" opens that form pre-filled.
+const EDIT_FIELDS = {
+  fullName: 'Amaka Okoro',
+  sex: 'F' as const,
+  age: '32',
+  phone: '0803 555 0147',
+  address: 'Odo-Ona Elewe, Ibadan',
+  occupation: 'Trader',
+  religion: 'christianity' as const,
+  folder: '',
+};
+
+const PATIENT_REF = { id: PATIENT.id, name: PATIENT.name, initials: PATIENT.initials, allergy: PATIENT.allergy };
+
+type EncItem = { id: string; title: string; date: string; facility: string; status: 'Open' | 'Closed'; chips: string[] };
 
 const ENCOUNTERS: EncItem[] = [
-  { title: 'Encounter in progress', date: '07 Jul 2026', facility: 'Odo-Ona Elewe PHC', status: 'Open', chips: ['38.9°C', '118/76', '2 tests'] },
-  { title: 'Malaria — recovery review', date: '14 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['Follow-up', '37.1°C', 'Improving'] },
-  { title: 'Malaria (RDT positive)', date: '12 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['38.9°C', '118/76', 'ACT · 3 days'] },
+  { id: 'OOE-ENC-000318', title: 'Encounter in progress', date: '07 Jul 2026', facility: 'Odo-Ona Elewe PHC', status: 'Open', chips: ['38.9°C', '118/76', '2 tests'] },
+  { id: 'OOE-ENC-000291', title: 'Malaria — recovery review', date: '14 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['Follow-up', '37.1°C', 'Improving'] },
+  { id: 'OOE-ENC-000276', title: 'Malaria (RDT positive)', date: '12 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['38.9°C', '118/76', 'ACT · 3 days'] },
 ];
 
 /** Patient profile — details + every encounter on record (PRD §9.8 / §10). */
 export const PatientProfileScreen = () => {
   const navigate = useNavigate();
-  const toast = useToast();
 
   const openEncounter = (e: EncItem) => {
-    if (e.status === 'Open') navigate('/encounter');
-    else toast('This encounter is closed and locked — opening read-only history');
+    navigate('/encounter', {
+      state: { patient: PATIENT_REF, init: { encId: e.id, date: e.date, closed: e.status === 'Closed' } },
+    });
   };
 
   return (
@@ -59,10 +74,20 @@ export const PatientProfileScreen = () => {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2.5">
-            <Button variant="secondary" fullWidth={false} className="bg-brand-accent-soft px-5 text-brand" onClick={() => navigate('/encounter')}>
+            <Button
+              variant="secondary"
+              fullWidth={false}
+              className="bg-brand-accent-soft px-5 text-brand"
+              onClick={() => navigate('/encounter', { state: { patient: PATIENT_REF } })}
+            >
               ＋ Create encounter
             </Button>
-            <Button variant="ghost" fullWidth={false} className="bg-white/15 px-5 text-white" onClick={() => toast('Patient details are editable — encounter records stay locked')}>
+            <Button
+              variant="ghost"
+              fullWidth={false}
+              className="bg-white/15 px-5 text-white"
+              onClick={() => navigate('/patients/new', { state: { patient: EDIT_FIELDS, mode: 'edit' } })}
+            >
               Edit patient details
             </Button>
           </div>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, Sheet, useToast } from '@/ui';
 import { useSession } from '@/session';
 import {
   AmendSheet,
+  type EncounterInit,
   EncounterSpine,
   ReviewSaveSheet,
   SectionCard,
@@ -14,20 +15,27 @@ import {
   type StepKey,
 } from '@/features/encounter';
 
-// Mock patient in context. Registration already exists elsewhere; this flow
-// picks up once a patient record exists (PRD §9.8.1).
-const PATIENT = { id: 'OOE-PHC-000047-K2', name: 'Amaka Okoro', initials: 'AO', allergy: 'Penicillin' };
+type EncounterPatient = { id: string; name: string; initials: string; allergy: string };
+type EncounterNavState = { patient?: EncounterPatient; init?: EncounterInit } | null;
+
+// Default patient when the screen is reached directly. Normally the patient and
+// the encounter to open are passed in navigation state from the profile.
+const DEFAULT_PATIENT: EncounterPatient = { id: 'OOE-PHC-000047-K2', name: 'Amaka Okoro', initials: 'AO', allergy: 'Penicillin' };
 
 /**
  * 9.8 The Patient Encounter. One record, seven lockable sections. Any on-duty
  * staff records the active step; saving passes through a deliberate review, then
  * locks the section to the signed-in staff member — immutable, amend-only.
+ * Opened from the patient profile with the patient + the encounter to load; a
+ * closed encounter opens read-only (every section already locked).
  */
 export const EncounterScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useSession();
-  const ctl = useEncounter(PATIENT.id, PATIENT.name);
+  const nav = (useLocation().state as EncounterNavState) ?? {};
+  const PATIENT = nav.patient ?? DEFAULT_PATIENT;
+  const ctl = useEncounter(PATIENT.id, PATIENT.name, nav.init);
   const { enc } = ctl;
 
   const actor = { name: user.name, role: user.role };

@@ -1,6 +1,6 @@
 export { STEPS } from './steps';
 export { summarize, useEncounter } from './useEncounter';
-export type { EncounterController } from './useEncounter';
+export type { EncounterController, EncounterInit } from './useEncounter';
 export { EncounterSpine } from './components/EncounterSpine';
 export { SectionCard } from './components/SectionCard';
 export { StepForm } from './components/StepForm';
