@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, Sheet, useToast } from '@/ui';
 import { useSession } from '@/session';
 import {
   AmendSheet,
+  type EncounterInit,
   EncounterSpine,
   ReviewSaveSheet,
   SectionCard,
@@ -14,20 +15,27 @@ import {
   type StepKey,
 } from '@/features/encounter';
 
-// Mock patient in context. Registration already exists elsewhere; this flow
-// picks up once a patient record exists (PRD §9.8.1).
-const PATIENT = { id: 'OOE-PHC-000047-K2', name: 'Amaka Okoro', initials: 'AO', allergy: 'Penicillin' };
+type EncounterPatient = { id: string; name: string; initials: string; allergy: string };
+type EncounterNavState = { patient?: EncounterPatient; init?: EncounterInit } | null;
+
+// Default patient when the screen is reached directly. Normally the patient and
+// the encounter to open are passed in navigation state from the profile.
+const DEFAULT_PATIENT: EncounterPatient = { id: 'OOE-PHC-000047-K2', name: 'Amaka Okoro', initials: 'AO', allergy: 'Penicillin' };
 
 /**
  * 9.8 The Patient Encounter. One record, seven lockable sections. Any on-duty
  * staff records the active step; saving passes through a deliberate review, then
  * locks the section to the signed-in staff member — immutable, amend-only.
+ * Opened from the patient profile with the patient + the encounter to load; a
+ * closed encounter opens read-only (every section already locked).
  */
 export const EncounterScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useSession();
-  const ctl = useEncounter(PATIENT.id, PATIENT.name);
+  const nav = (useLocation().state as EncounterNavState) ?? {};
+  const PATIENT = nav.patient ?? DEFAULT_PATIENT;
+  const ctl = useEncounter(PATIENT.id, PATIENT.name, nav.init);
   const { enc } = ctl;
 
   const actor = { name: user.name, role: user.role };
@@ -56,7 +64,7 @@ export const EncounterScreen = () => {
     <div className="min-h-screen bg-surface">
       {/* patient context bar */}
       <header className="sticky top-[var(--app-header-h,0px)] z-10 bg-brand text-white">
-        <div className="mx-auto max-w-2xl px-5 py-3">
+        <div className="px-5 py-3 md:px-8">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => navigate('/patients/profile')} aria-label="Back to patient profile" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
               <Icon name="back" className="h-6 w-6" />
@@ -85,11 +93,11 @@ export const EncounterScreen = () => {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl">
+      <div>
         <EncounterSpine enc={enc} />
 
         {enc.closed ? (
-          <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-brand-tint p-4">
+          <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-brand-tint p-4 md:mx-8">
             <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand text-white">
               <Icon name="check" className="h-4 w-4" />
             </span>
@@ -102,7 +110,7 @@ export const EncounterScreen = () => {
           </div>
         ) : null}
 
-        <div className="space-y-3 px-5 py-3 pb-24">
+        <div className="space-y-3 px-5 py-3 pb-24 md:px-8">
           {STEPS.map((s, i) => {
             const locked = Boolean(enc.sig[s.key]);
             const active = i === enc.stage && !enc.closed && !locked;

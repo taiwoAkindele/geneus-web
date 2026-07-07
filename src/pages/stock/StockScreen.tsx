@@ -31,13 +31,13 @@ export const StockScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Medicine & stock" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-2xl lg:max-w-3xl">
-        <div className="flex items-center justify-between px-5 pb-1 pt-1">
+      <div className="flex w-full flex-1 flex-col">
+        <div className="flex items-center justify-between px-5 pb-1 pt-1 md:px-8">
           <p className="text-[13px] text-ink-muted">Odo-Ona Elewe PHC</p>
           {lowCount > 0 ? <Tag tone="amber">{lowCount} need reordering</Tag> : null}
         </div>
 
-        <div className="flex-1 space-y-2.5 px-5 py-2 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0">
+        <div className="flex-1 space-y-2.5 px-5 py-2 md:px-8 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0">
           {ITEMS.map((item) => {
             const l = level(item);
             return (
@@ -58,7 +58,7 @@ export const StockScreen = () => {
           })}
         </div>
 
-        <footer className="px-5 pb-6 pt-4">
+        <footer className="px-5 pb-6 pt-4 md:px-8">
           <Button variant="primary">Update stock counts</Button>
         </footer>
       </div>

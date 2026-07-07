@@ -7,7 +7,7 @@ import type { EncounterState } from '../types';
  * rest are muted. Gives anyone a one-glance read of how far the visit has got.
  */
 export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
-  <div className="flex gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  <div className="flex gap-2 overflow-x-auto px-5 py-3 md:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     {STEPS.map((s, i) => {
       const locked = Boolean(enc.sig[s.key]);
       const active = i === enc.stage && !enc.closed;

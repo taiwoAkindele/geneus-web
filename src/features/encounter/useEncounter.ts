@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { AUDIT_LABEL, STEPS } from './steps';
-import type { Actor, EncounterData, EncounterState, StepKey } from './types';
+import type { Actor, AuditRow, EncounterData, EncounterState, StepKey } from './types';
 
 const stamp = () => {
   const d = new Date();
@@ -10,33 +10,49 @@ const stamp = () => {
   };
 };
 
-/** A fresh encounter, pre-filled with plausible values so the flow is quick to walk. */
-const seed = (patientId: string, patientName: string): EncounterState => ({
-  id: 'OOE-ENC-000318',
-  patientId,
-  patientName,
-  openedDate: stamp().date,
-  stage: 0,
-  closed: false,
-  sig: {},
-  amend: {},
-  audit: [{ ...stamp(), actor: '—', role: '—', action: 'Encounter opened' }],
-  data: {
-    vitals: { temp: '38.9', bp: '118/76', pulse: '98', weight: '63', spo2: '98' },
-    complaint: { complaints: ['Fever', 'Headache'], note: 'Fever and headache for 3 days, worse at night. Poor appetite.' },
-    laborder: { tests: ['Malaria RDT', 'FBC'] },
-    labresults: { 'Malaria RDT': 'Positive (P. falciparum)', FBC: 'WBC 11.2 · Hb 11.4 · Plt 180' },
-    diagnosis: {
-      dx: 'Malaria (confirmed by RDT)',
-      rx: [
-        { name: 'Artemether-Lumefantrine', dose: '1 tab · twice daily · 3 days' },
-        { name: 'Paracetamol 500mg', dose: '1 tab · as needed · 5 days' },
-      ],
-    },
-    dispense: { done: {} },
-    followup: { when: '1 week · 14 Jul 2026', reason: 'Malaria recovery review' },
+/** Plausible values so the flow is quick to walk (and closed encounters read well). */
+const DEFAULT_DATA: EncounterData = {
+  vitals: { temp: '38.9', bp: '118/76', pulse: '98', weight: '63', spo2: '98' },
+  complaint: { complaints: ['Fever', 'Headache'], note: 'Fever and headache for 3 days, worse at night. Poor appetite.' },
+  laborder: { tests: ['Malaria RDT', 'FBC'] },
+  labresults: { 'Malaria RDT': 'Positive (P. falciparum)', FBC: 'WBC 11.2 · Hb 11.4 · Plt 180' },
+  diagnosis: {
+    dx: 'Malaria (confirmed by RDT)',
+    rx: [
+      { name: 'Artemether-Lumefantrine', dose: '1 tab · twice daily · 3 days' },
+      { name: 'Paracetamol 500mg', dose: '1 tab · as needed · 5 days' },
+    ],
   },
-});
+  dispense: { done: {} },
+  followup: { when: '1 week · 14 Jul 2026', reason: 'Malaria recovery review' },
+};
+
+const HISTORIC_TIMES = ['09:14', '09:31', '09:36', '10:05', '10:22', '10:38', '10:46'];
+
+/** How to open an encounter: a fresh in-progress one, or an existing/closed one to view. */
+export type EncounterInit = { encId?: string; date?: string; closed?: boolean; signedBy?: Actor; data?: EncounterData };
+
+const seed = (patientId: string, patientName: string, init?: EncounterInit): EncounterState => {
+  const data = init?.data ?? DEFAULT_DATA;
+  const id = init?.encId ?? 'OOE-ENC-000318';
+
+  // A closed encounter opens read-only: every section already locked & signed.
+  if (init?.closed) {
+    const date = init.date ?? stamp().date;
+    const by = init.signedBy ?? { name: 'Dr. Tunde Bello', role: 'Medical officer' };
+    const sig: EncounterState['sig'] = {};
+    const audit: AuditRow[] = [{ time: HISTORIC_TIMES[0], date, actor: by.name, role: by.role, action: 'Encounter opened' }];
+    STEPS.forEach((s, i) => {
+      const time = HISTORIC_TIMES[i] ?? '—';
+      sig[s.key] = { actor: by.name, role: by.role, time, date };
+      audit.push({ time, date, actor: by.name, role: by.role, action: AUDIT_LABEL[s.key] });
+    });
+    return { id, patientId, patientName, openedDate: date, stage: STEPS.length, closed: true, data, sig, amend: {}, audit };
+  }
+
+  const at = stamp();
+  return { id, patientId, patientName, openedDate: at.date, stage: 0, closed: false, sig: {}, amend: {}, data, audit: [{ ...at, actor: '—', role: '—', action: 'Encounter opened' }] };
+};
 
 /** Plain-text summary rows for a step — used by both the Review sheet and the locked view. */
 export const summarize = (data: EncounterData, key: StepKey): { label: string; value: string }[] => {
@@ -81,8 +97,8 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
   }
 };
 
-export const useEncounter = (patientId: string, patientName: string) => {
-  const [enc, setEnc] = useState<EncounterState>(() => seed(patientId, patientName));
+export const useEncounter = (patientId: string, patientName: string, init?: EncounterInit) => {
+  const [enc, setEnc] = useState<EncounterState>(() => seed(patientId, patientName, init));
 
   const setField = useCallback(<K extends StepKey, F extends keyof EncounterData[K]>(step: K, field: F, value: EncounterData[K][F]) => {
     setEnc((e) => ({ ...e, data: { ...e.data, [step]: { ...e.data[step], [field]: value } } }));
