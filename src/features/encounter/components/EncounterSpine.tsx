@@ -1,14 +1,14 @@
-import { STEPS } from '../steps';
+import { stepsFor } from '../steps';
 import type { EncounterState } from '../types';
 
 /**
- * The encounter "spine" — the seven sections as a horizontal, scrollable row of
- * step chips. Locked steps show a check, the current step is filled green, the
- * rest are muted. Gives anyone a one-glance read of how far the visit has got.
+ * The encounter "spine" — its sections as a horizontal, scrollable row of step
+ * chips. The section list is dynamic (the tail depends on the diagnosis plan).
+ * Locked steps show a check, the current step is filled green, the rest muted.
  */
 export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
   <div className="flex gap-2 overflow-x-auto px-5 py-3 md:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-    {STEPS.map((s, i) => {
+    {stepsFor(enc.data).map((s, i) => {
       const locked = Boolean(enc.sig[s.key]);
       const active = i === enc.stage && !enc.closed;
       return (

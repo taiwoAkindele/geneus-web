@@ -9,7 +9,9 @@ export type StepKey =
   | 'laborder'
   | 'labresults'
   | 'diagnosis'
+  | 'injection'
   | 'dispense'
+  | 'admission'
   | 'followup';
 
 export type RxLine = { name: string; dose: string };
@@ -19,8 +21,12 @@ export type EncounterData = {
   complaint: { complaints: string[]; note: string };
   laborder: { tests: string[] };
   labresults: Record<string, string>;
-  diagnosis: { dx: string; rx: RxLine[] };
+  // `injection` / `admit` are the doctor's disposition — they decide which tail
+  // sections the encounter grows (see stepsFor). `rx` presence adds the pharmacy step.
+  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean };
+  injection: { drug: string; dose: string; route: string; site: string; note: string };
   dispense: { done: Record<number, boolean> };
+  admission: { ward: string; bed: string; note: string };
   followup: { when: string; reason: string };
 };
 
@@ -40,6 +46,8 @@ export type EncounterState = {
   /** Index of the section currently being recorded. */
   stage: number;
   closed: boolean;
+  /** Closed as an inpatient episode (admission) rather than with a follow-up. */
+  admitted?: boolean;
   data: EncounterData;
   sig: Partial<Record<StepKey, Signature>>;
   amend: Partial<Record<StepKey, Amendment[]>>;
