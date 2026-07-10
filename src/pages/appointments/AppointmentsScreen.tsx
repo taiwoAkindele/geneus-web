@@ -1,70 +1,74 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, StatusPill, Tag } from '@/ui';
+import { AppBar, Avatar, StatusPill, Tag } from '@/ui';
+import { useAppointments, type BookedAppointment } from '@/features/appointments';
 
-const UNASSIGNED = [
-  { name: 'Amaka Okoro', reason: 'Malaria recovery review', when: '1 week · 14 Jul', from: 'From today’s encounter', isNew: true },
-  { name: 'Yusuf Bala', reason: 'Hypertension review', when: '14 Jul 2026', from: 'Booked 28 Jun', isNew: false },
-];
+const AppointmentRow = ({ appt, onOpen }: { appt: BookedAppointment; onOpen: () => void }) => (
+  <button type="button" onClick={onOpen} className="w-full rounded-card border border-outline-soft bg-white p-4 text-left">
+    <div className="flex items-center gap-3">
+      <Avatar tone="green" size="sm">{appt.patient.initials}</Avatar>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[15px] font-bold text-ink">{appt.patient.name}</div>
+        <div className="text-[13px] text-ink-muted">{appt.reason}</div>
+      </div>
+      <Tag tone={appt.status === 'pending' ? 'amber' : 'slate'}>{appt.status === 'pending' ? 'Pending' : 'Upcoming'}</Tag>
+    </div>
+    <div className="mt-2.5 font-mono text-[11px] text-ink-muted">{appt.when} · {appt.day}</div>
+  </button>
+);
 
-const BOOKED = [
-  { name: 'Ngozi Umeh', reason: 'ANC · 3rd visit', time: '11:00' },
-  { name: 'Segun Adio', reason: 'BP check', time: '11:40' },
-];
+const EmptyState = ({ label }: { label: string }) => (
+  <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">{label}</div>
+);
 
 /**
- * Appointments (PRD §9.8). A follow-up booked when an encounter is closed drops
- * into the unassigned list for its day; whichever doctor is free picks it up.
- * Each doctor also keeps their own booked list.
+ * Appointments (PRD §9.8). Booked from a patient's profile — "Now" bookings are
+ * pending today, scheduled ones are upcoming. Same shared store the encounters
+ * hub and each profile read from, so it always reflects what's been booked.
  */
 export const AppointmentsScreen = () => {
   const navigate = useNavigate();
+  const { appointments } = useAppointments();
+
+  const today = appointments.filter((a) => a.status === 'pending');
+  const upcoming = appointments.filter((a) => a.status === 'upcoming');
+
+  // The patient has arrived → start their encounter.
+  const start = (appt: BookedAppointment) => navigate('/encounters/record', { state: { patient: appt.patient } });
+
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Appointments" onBack={() => navigate('/patients/search')} right={<StatusPill status="synced" />} />
+      <AppBar title="Appointments" onBack={() => navigate('/encounters')} right={<StatusPill status="synced" />} />
       <div className="w-full px-5 py-2 md:px-8">
-        <div className="pb-1 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-strong">Monday · 14 Jul 2026</div>
-        <h1 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em]">Appointments today</h1>
+        <div className="pb-1 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-strong">Appointments</div>
+        <h1 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em]">Today &amp; upcoming</h1>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          {/* Unassigned follow-ups */}
+        <div className="grid gap-5 pb-24 lg:grid-cols-2">
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Follow-ups — unassigned</span>
-              <Tag tone="amber">Any free doctor</Tag>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Today · pending</span>
+              <Tag tone="amber">To be seen</Tag>
             </div>
             <div className="space-y-2.5">
-              {UNASSIGNED.map((a, i) => (
-                <div key={i} className={`rounded-card border bg-white p-4 ${a.isNew ? 'border-brand-accent shadow-card' : 'border-outline-soft'}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-base font-bold text-ink">{a.name}</div>
-                      <div className="text-[13px] text-ink-muted">{a.reason}</div>
-                    </div>
-                    {a.isNew ? <Tag tone="green">Just booked</Tag> : null}
-                  </div>
-                  <div className="mt-2 font-mono text-[11px] text-ink-muted">{a.when} · {a.from}</div>
-                </div>
-              ))}
+              {today.length > 0 ? (
+                today.map((a) => <AppointmentRow key={a.id} appt={a} onOpen={() => start(a)} />)
+              ) : (
+                <EmptyState label="No patients waiting today." />
+              )}
             </div>
           </section>
 
-          {/* Doctor's booked list */}
           <section>
-            <div className="mb-3 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Dr. Tunde Bello · booked</div>
+            <div className="mb-3 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Upcoming</div>
             <div className="space-y-2.5">
-              {BOOKED.map((a, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 rounded-card border border-outline-soft bg-white p-3.5">
-                  <div>
-                    <div className="text-[15px] font-bold text-ink">{a.name}</div>
-                    <div className="text-[13px] text-ink-muted">{a.reason}</div>
-                  </div>
-                  <Tag tone="neutral">{a.time}</Tag>
-                </div>
-              ))}
+              {upcoming.length > 0 ? (
+                upcoming.map((a) => <AppointmentRow key={a.id} appt={a} onOpen={() => start(a)} />)
+              ) : (
+                <EmptyState label="No upcoming appointments booked." />
+              )}
             </div>
             <p className="mt-4 text-xs leading-relaxed text-ink-muted">
-              A follow-up booked when an encounter is closed drops into the unassigned list for the chosen day. Whichever
-              doctor is free that day picks it up.
+              An appointment booked from a patient's profile drops onto this list for its day, and onto the encounters
+              list, ready to be started when the patient arrives.
             </p>
           </section>
         </div>

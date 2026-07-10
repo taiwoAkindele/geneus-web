@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Avatar, Button, StatusPill, Tag } from '@/ui';
+import { BookAppointmentSheet, useAppointments } from '@/features/appointments';
 
 const PATIENT = {
   name: 'Amaka Okoro',
   initials: 'AO',
   id: 'OOE-PHC-000047-K2',
   allergy: 'Penicillin',
+  // Set when the patient was registered as "unknown/brought in" and identity is
+  // not yet confirmed (PRD §9.8 / §10). Confirmed patients hide the badge & note.
+  unknown: false,
   facts: [
     { label: 'Age / Sex', value: '32 · F' },
     { label: 'Phone', value: '0803 555 0147' },
@@ -31,7 +36,16 @@ const EDIT_FIELDS = {
 
 const PATIENT_REF = { id: PATIENT.id, name: PATIENT.name, initials: PATIENT.initials, allergy: PATIENT.allergy };
 
-type EncItem = { id: string; title: string; date: string; facility: string; status: 'Open' | 'Closed'; chips: string[] };
+type EncStatus = 'Open' | 'Closed' | 'Admitted';
+type EncItem = { id: string; title: string; date: string; facility: string; status: EncStatus; chips: string[] };
+
+// Colour-code the encounter state (PRD §9.8): in-progress amber, closed neutral,
+// admitted (inpatient) slate.
+const STATUS_TONE: Record<EncStatus, 'amber' | 'neutral' | 'slate'> = {
+  Open: 'amber',
+  Closed: 'neutral',
+  Admitted: 'slate',
+};
 
 const ENCOUNTERS: EncItem[] = [
   { id: 'OOE-ENC-000318', title: 'Encounter in progress', date: '07 Jul 2026', facility: 'Odo-Ona Elewe PHC', status: 'Open', chips: ['38.9°C', '118/76', '2 tests'] },
@@ -39,15 +53,21 @@ const ENCOUNTERS: EncItem[] = [
   { id: 'OOE-ENC-000276', title: 'Malaria (RDT positive)', date: '12 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['38.9°C', '118/76', 'ACT · 3 days'] },
 ];
 
-/** Patient profile — details + every encounter on record (PRD §9.8 / §10). */
+/** Patient profile — details, upcoming appointments, and every encounter on record (PRD §9.8 / §10). */
 export const PatientProfileScreen = () => {
   const navigate = useNavigate();
+  const { forPatient } = useAppointments();
+  const [booking, setBooking] = useState(false);
+  const appointments = forPatient(PATIENT.id);
 
   const openEncounter = (e: EncItem) => {
-    navigate('/encounter', {
-      state: { patient: PATIENT_REF, init: { encId: e.id, date: e.date, closed: e.status === 'Closed' } },
+    navigate('/encounters/record', {
+      state: { patient: PATIENT_REF, init: { encId: e.id, date: e.date, closed: e.status !== 'Open' } },
     });
   };
+
+  // The patient has arrived for their appointment — start their encounter.
+  const startEncounter = () => navigate('/encounters/record', { state: { patient: PATIENT_REF } });
 
   return (
     <div className="min-h-screen bg-surface">
@@ -61,10 +81,15 @@ export const PatientProfileScreen = () => {
               <div className="text-[22px] font-extrabold tracking-[-0.02em]">{PATIENT.name}</div>
               <div className="font-mono text-[13px] text-brand-accent-soft">{PATIENT.id}</div>
             </div>
-            <span className="rounded-full bg-danger-bg px-3 py-1.5 text-[12px] font-bold text-danger-strong">⚠ Allergy: {PATIENT.allergy}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {PATIENT.unknown ? (
+                <span className="rounded-full bg-amber-bg px-3 py-1.5 text-[12px] font-bold text-amber-text">Identity unconfirmed</span>
+              ) : null}
+              <span className="rounded-full bg-danger-bg px-3 py-1.5 text-[12px] font-bold text-danger-strong">⚠ Allergy: {PATIENT.allergy}</span>
+            </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-3">
+          <div className="mt-5 flex flex-wrap gap-x-8 gap-y-4">
             {PATIENT.facts.map((f) => (
               <div key={f.label}>
                 <div className="text-[11px] uppercase tracking-[0.04em] text-brand-accent-soft">{f.label}</div>
@@ -78,9 +103,9 @@ export const PatientProfileScreen = () => {
               variant="secondary"
               fullWidth={false}
               className="bg-brand-accent-soft px-5 text-brand"
-              onClick={() => navigate('/encounter', { state: { patient: PATIENT_REF } })}
+              onClick={() => setBooking(true)}
             >
-              ＋ Create encounter
+              ＋ Book appointment
             </Button>
             <Button
               variant="ghost"
@@ -91,7 +116,46 @@ export const PatientProfileScreen = () => {
               Edit patient details
             </Button>
           </div>
+
+          {PATIENT.unknown ? (
+            <p className="mt-3.5 max-w-[70ch] text-[12px] leading-relaxed text-brand-on-dark">
+              Patient details can be edited later once identity is confirmed. Encounter records already saved stay
+              locked and unchanged.
+            </p>
+          ) : null}
         </div>
+
+        {/* appointments — this patient's upcoming / pending bookings */}
+        <div className="mb-3 mt-6 flex items-center justify-between">
+          <span className="text-[15px] font-extrabold tracking-[-0.01em]">Appointments</span>
+          <span className="font-mono text-xs text-ink-muted">{appointments.length} upcoming</span>
+        </div>
+        {appointments.length > 0 ? (
+          <div className="space-y-3">
+            {appointments.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={startEncounter}
+                className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[15px] font-bold text-ink">{a.reason}</div>
+                    <div className="text-[13px] text-ink-muted">{a.when} · {a.day}</div>
+                  </div>
+                  <Tag tone={a.status === 'pending' ? 'amber' : 'slate'}>
+                    {a.status === 'pending' ? 'Pending today' : 'Upcoming'}
+                  </Tag>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">
+            No upcoming appointments — book one above.
+          </div>
+        )}
 
         {/* encounters */}
         <div className="mb-3 mt-6 flex items-center justify-between">
@@ -111,7 +175,7 @@ export const PatientProfileScreen = () => {
                   <div className="text-[17px] font-bold text-ink">{e.title}</div>
                   <div className="text-[13px] text-ink-muted">{e.date} · {e.facility}</div>
                 </div>
-                <Tag tone={e.status === 'Open' ? 'amber' : 'neutral'}>{e.status}</Tag>
+                <Tag tone={STATUS_TONE[e.status]}>{e.status}</Tag>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {e.chips.map((c) => (
@@ -122,6 +186,8 @@ export const PatientProfileScreen = () => {
           ))}
         </div>
       </div>
+
+      {booking ? <BookAppointmentSheet patient={PATIENT_REF} onClose={() => setBooking(false)} /> : null}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { AUDIT_LABEL, STEPS } from './steps';
+import { AUDIT_LABEL, STEP_DEFS, stepsFor } from './steps';
 import type { Actor, AuditRow, EncounterData, EncounterState, StepKey } from './types';
 
 const stamp = () => {
@@ -22,12 +22,16 @@ const DEFAULT_DATA: EncounterData = {
       { name: 'Artemether-Lumefantrine', dose: '1 tab · twice daily · 3 days' },
       { name: 'Paracetamol 500mg', dose: '1 tab · as needed · 5 days' },
     ],
+    injection: false,
+    admit: false,
   },
+  injection: { drug: 'Artemether 80mg', dose: '80 mg', route: 'IM', site: 'Left gluteus', note: '' },
   dispense: { done: {} },
-  followup: { when: '1 week · 14 Jul 2026', reason: 'Malaria recovery review' },
+  admission: { ward: 'General ward', bed: 'Bed 4', note: 'Admit for IV fluids and observation — malaria with persistent vomiting.' },
+  followup: { when: '1 week · 16 Jul 2026', reason: 'Malaria recovery review' },
 };
 
-const HISTORIC_TIMES = ['09:14', '09:31', '09:36', '10:05', '10:22', '10:38', '10:46'];
+const HISTORIC_TIMES = ['09:14', '09:31', '09:36', '10:05', '10:22', '10:38', '10:46', '10:52', '10:58'];
 
 /** How to open an encounter: a fresh in-progress one, or an existing/closed one to view. */
 export type EncounterInit = { encId?: string; date?: string; closed?: boolean; signedBy?: Actor; data?: EncounterData };
@@ -40,14 +44,16 @@ const seed = (patientId: string, patientName: string, init?: EncounterInit): Enc
   if (init?.closed) {
     const date = init.date ?? stamp().date;
     const by = init.signedBy ?? { name: 'Dr. Tunde Bello', role: 'Medical officer' };
+    const steps = stepsFor(data);
     const sig: EncounterState['sig'] = {};
     const audit: AuditRow[] = [{ time: HISTORIC_TIMES[0], date, actor: by.name, role: by.role, action: 'Encounter opened' }];
-    STEPS.forEach((s, i) => {
+    steps.forEach((s, i) => {
       const time = HISTORIC_TIMES[i] ?? '—';
       sig[s.key] = { actor: by.name, role: by.role, time, date };
       audit.push({ time, date, actor: by.name, role: by.role, action: AUDIT_LABEL[s.key] });
     });
-    return { id, patientId, patientName, openedDate: date, stage: STEPS.length, closed: true, data, sig, amend: {}, audit };
+    const admitted = steps.some((s) => s.key === 'admission');
+    return { id, patientId, patientName, openedDate: date, stage: steps.length, closed: true, admitted, data, sig, amend: {}, audit };
   }
 
   const at = stamp();
@@ -74,10 +80,32 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
       return [{ label: 'Investigations', value: data.laborder.tests.join(', ') || 'None' }];
     case 'labresults':
       return data.laborder.tests.map((t) => ({ label: t, value: data.labresults[t] || '—' }));
-    case 'diagnosis':
+    case 'diagnosis': {
+      const plan: string[] = [];
+      if (data.diagnosis.injection) plan.push('Give injection');
+      if (data.diagnosis.rx.length) plan.push('Prescribe medication');
+      if (data.diagnosis.admit) plan.push('Admit patient');
+      else plan.push('Send home + follow-up');
       return [
         { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
         { label: 'Prescription', value: data.diagnosis.rx.map((m) => `${m.name} — ${m.dose}`).join('; ') || 'None' },
+        { label: 'Plan', value: plan.join(' · ') },
+      ];
+    }
+    case 'injection':
+      return [
+        { label: 'Drug', value: data.injection.drug || '—' },
+        { label: 'Dose', value: data.injection.dose || '—' },
+        { label: 'Route', value: data.injection.route || '—' },
+        { label: 'Site', value: data.injection.site || '—' },
+        { label: 'Note', value: data.injection.note || '—' },
+      ];
+    case 'admission':
+      return [
+        { label: 'Ward', value: data.admission.ward || '—' },
+        { label: 'Bed', value: data.admission.bed || '—' },
+        { label: 'Admitting diagnosis', value: data.diagnosis.dx || '—' },
+        { label: 'Admitting note', value: data.admission.note || '—' },
       ];
     case 'dispense': {
       const { rx } = data.diagnosis;
@@ -133,16 +161,20 @@ export const useEncounter = (patientId: string, patientName: string, init?: Enco
     setEnc((e) => ({ ...e, data: { ...e.data, dispense: { done: { ...e.data.dispense.done, [idx]: !e.data.dispense.done[idx] } } } }));
   }, []);
 
-  /** Lock a step to the actor, stamp it, log it, and advance. Closes on follow-up. */
+  /**
+   * Lock a step to the actor, stamp it, log it, and advance. Follow-up closes the
+   * encounter; admission closes it AND marks the patient an inpatient (no follow-up).
+   */
   const lockStep = useCallback((key: StepKey, actor: Actor) => {
     const at = stamp();
     setEnc((e) => {
-      const idx = STEPS.findIndex((s) => s.key === key);
-      const closed = key === 'followup';
+      const idx = stepsFor(e.data).findIndex((s) => s.key === key);
+      const closed = key === 'followup' || key === 'admission';
       return {
         ...e,
         stage: idx + 1,
         closed,
+        admitted: key === 'admission' ? true : e.admitted,
         sig: { ...e.sig, [key]: { actor: actor.name, role: actor.role, ...at } },
         audit: [...e.audit, { ...at, actor: actor.name, role: actor.role, action: AUDIT_LABEL[key] }],
       };
@@ -154,7 +186,7 @@ export const useEncounter = (patientId: string, patientName: string, init?: Enco
     setEnc((e) => ({
       ...e,
       amend: { ...e.amend, [key]: [...(e.amend[key] || []), { by: actor.name, role: actor.role, note, ...at }] },
-      audit: [...e.audit, { ...at, actor: actor.name, role: actor.role, action: `Amendment added to ${STEPS.find((s) => s.key === key)?.title}` }],
+      audit: [...e.audit, { ...at, actor: actor.name, role: actor.role, action: `Amendment added to ${STEP_DEFS[key].title}` }],
     }));
   }, []);
 

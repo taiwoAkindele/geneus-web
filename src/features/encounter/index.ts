@@ -1,4 +1,5 @@
-export { STEPS } from './steps';
+export { STEP_DEFS, stepsFor } from './steps';
+export type { StepDef } from './steps';
 export { summarize, useEncounter } from './useEncounter';
 export type { EncounterController, EncounterInit } from './useEncounter';
 export { EncounterSpine } from './components/EncounterSpine';

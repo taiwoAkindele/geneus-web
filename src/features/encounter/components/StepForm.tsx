@@ -1,5 +1,5 @@
 import { Button, ChoiceChip, Icon, TextField } from '@/ui';
-import { COMPLAINT_OPTIONS, FOLLOWUP_OPTIONS, TEST_OPTIONS } from '../steps';
+import { COMPLAINT_OPTIONS, FOLLOWUP_OPTIONS, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 
@@ -104,6 +104,78 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
         </div>
         <div className="mt-2">
           <Button variant="outlined" onClick={addRx}>＋ Add medication</Button>
+        </div>
+
+        <div className="mb-2 mt-5 text-[13px] font-semibold text-ink-soft">Plan / disposition</div>
+        <div className="flex flex-wrap gap-2">
+          <ChoiceChip selected={d.diagnosis.injection} onClick={() => setField('diagnosis', 'injection', !d.diagnosis.injection)}>
+            Give injection{d.diagnosis.injection ? ' ✓' : ''}
+          </ChoiceChip>
+          <ChoiceChip selected={d.diagnosis.admit} onClick={() => setField('diagnosis', 'admit', !d.diagnosis.admit)}>
+            Admit patient{d.diagnosis.admit ? ' ✓' : ''}
+          </ChoiceChip>
+        </div>
+        <p className="mt-2.5 text-xs leading-relaxed text-ink-muted">
+          Prescribing adds a pharmacy step. Injection adds a nurse-administered step. Admitting keeps the patient as an
+          inpatient instead of closing with a follow-up — the matching sections appear below once you lock this step.
+        </p>
+      </>
+    );
+  }
+
+  if (stepKey === 'injection') {
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <TextField label="Drug" name="inj_drug" value={d.injection.drug} onChange={(e) => setField('injection', 'drug', e.target.value)} />
+          <TextField label="Dose" name="inj_dose" value={d.injection.dose} onChange={(e) => setField('injection', 'dose', e.target.value)} />
+          <TextField label="Site" name="inj_site" value={d.injection.site} onChange={(e) => setField('injection', 'site', e.target.value)} />
+        </div>
+        <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Route</div>
+        <div className="flex flex-wrap gap-2">
+          {INJECTION_ROUTES.map((r) => (
+            <ChoiceChip key={r} selected={d.injection.route === r} onClick={() => setField('injection', 'route', r)}>
+              {r}
+            </ChoiceChip>
+          ))}
+        </div>
+        <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Note (optional)</div>
+        <textarea
+          rows={2}
+          value={d.injection.note}
+          placeholder="Reaction, batch number, patient tolerance…"
+          onChange={(e) => setField('injection', 'note', e.target.value)}
+          className="w-full rounded-field border-[1.5px] border-outline bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand placeholder:text-ink-muted"
+        />
+        <p className="mt-3 text-xs leading-relaxed text-ink-muted">The nurse who administers the injection signs this step.</p>
+      </>
+    );
+  }
+
+  if (stepKey === 'admission') {
+    return (
+      <>
+        <div className="mb-2 text-[13px] font-semibold text-ink-soft">Ward</div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {WARD_OPTIONS.map((w) => (
+            <ChoiceChip key={w} selected={d.admission.ward === w} onClick={() => setField('admission', 'ward', w)}>
+              {w}
+            </ChoiceChip>
+          ))}
+        </div>
+        <TextField label="Bed" name="ad_bed" value={d.admission.bed} onChange={(e) => setField('admission', 'bed', e.target.value)} />
+        <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Admitting diagnosis</div>
+        <div className="rounded-field bg-surface-muted px-3.5 py-3 text-[15px] font-semibold text-ink">{d.diagnosis.dx || '—'}</div>
+        <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Admitting note</div>
+        <textarea
+          rows={3}
+          value={d.admission.note}
+          onChange={(e) => setField('admission', 'note', e.target.value)}
+          className="w-full rounded-field border-[1.5px] border-outline bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand"
+        />
+        <div className="mt-4 rounded-card border border-slate-bg bg-slate-bg p-3.5 text-[13px] leading-relaxed text-slate-text">
+          Saving this step <b>admits the patient</b> and locks the encounter as an inpatient episode — no follow-up is
+          booked. The patient shows as admitted on their profile.
         </div>
       </>
     );

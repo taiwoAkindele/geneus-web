@@ -8,14 +8,15 @@ import {
   EncounterSpine,
   ReviewSaveSheet,
   SectionCard,
-  STEPS,
+  STEP_DEFS,
   StepForm,
+  stepsFor,
   summarize,
   useEncounter,
   type StepKey,
 } from '@/features/encounter';
 
-type EncounterPatient = { id: string; name: string; initials: string; allergy: string };
+type EncounterPatient = { id: string; name: string; initials: string; allergy: string; unknown?: boolean };
 type EncounterNavState = { patient?: EncounterPatient; init?: EncounterInit } | null;
 
 // Default patient when the screen is reached directly. Normally the patient and
@@ -39,15 +40,20 @@ export const EncounterScreen = () => {
   const { enc } = ctl;
 
   const actor = { name: user.name, role: user.role };
+  const steps = stepsFor(enc.data);
   const [reviewKey, setReviewKey] = useState<StepKey | null>(null);
   const [amendKey, setAmendKey] = useState<StepKey | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
 
+  const reviewLabelFor = (key: StepKey) =>
+    key === 'followup' ? 'Review & close encounter' : key === 'admission' ? 'Review & admit patient' : 'Review & save';
+
   const confirmSave = () => {
     if (!reviewKey) return;
-    const isClose = reviewKey === 'followup';
     ctl.lockStep(reviewKey, actor);
-    toast(isClose ? `Encounter closed & locked · follow-up booked` : `Saved & locked — signed by ${user.name}`);
+    if (reviewKey === 'followup') toast('Encounter closed & locked · follow-up booked');
+    else if (reviewKey === 'admission') toast('Patient admitted · encounter locked as inpatient');
+    else toast(`Saved & locked — signed by ${user.name}`);
     setReviewKey(null);
   };
 
@@ -58,7 +64,11 @@ export const EncounterScreen = () => {
     setAmendKey(null);
   };
 
-  const statusLabel = enc.closed ? 'Closed' : `In progress · ${STEPS[enc.stage]?.short ?? '—'}`;
+  const statusLabel = enc.admitted
+    ? 'Admitted · inpatient'
+    : enc.closed
+      ? 'Closed'
+      : `In progress · ${steps[enc.stage]?.short ?? '—'}`;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -66,7 +76,7 @@ export const EncounterScreen = () => {
       <header className="sticky top-[var(--app-header-h,0px)] z-10 bg-brand text-white">
         <div className="px-5 py-3 md:px-8">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => navigate('/patients/profile')} aria-label="Back to patient profile" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
+            <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
               <Icon name="back" className="h-6 w-6" />
             </button>
             <Avatar tone="mint" size="sm">{PATIENT.initials}</Avatar>
@@ -81,6 +91,9 @@ export const EncounterScreen = () => {
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-danger-bg px-2.5 py-1 text-[11px] font-bold text-danger-strong">⚠ Allergy: {PATIENT.allergy}</span>
+            {PATIENT.unknown ? (
+              <span className="rounded-full bg-amber-bg px-2.5 py-1 text-[11px] font-bold text-amber-text">Identity unconfirmed</span>
+            ) : null}
             <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Opened {enc.openedDate}</span>
             <button
               type="button"
@@ -96,7 +109,17 @@ export const EncounterScreen = () => {
       <div>
         <EncounterSpine enc={enc} />
 
-        {enc.closed ? (
+        {enc.admitted ? (
+          <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-slate-bg p-4 md:mx-8">
+            <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate text-white">
+              <Icon name="check" className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1 text-sm font-semibold text-slate-text">
+              {PATIENT.name} admitted as an inpatient — {enc.data.admission.ward} · {enc.data.admission.bed}. Encounter
+              locked; care continues on the ward.
+            </div>
+          </div>
+        ) : enc.closed ? (
           <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-brand-tint p-4 md:mx-8">
             <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand text-white">
               <Icon name="check" className="h-4 w-4" />
@@ -111,7 +134,7 @@ export const EncounterScreen = () => {
         ) : null}
 
         <div className="space-y-3 px-5 py-3 pb-24 md:px-8">
-          {STEPS.map((s, i) => {
+          {steps.map((s, i) => {
             const locked = Boolean(enc.sig[s.key]);
             const active = i === enc.stage && !enc.closed && !locked;
             const state = locked ? 'locked' : active ? 'active' : 'pending';
@@ -125,7 +148,7 @@ export const EncounterScreen = () => {
                 summary={summarize(enc.data, s.key)}
                 signature={enc.sig[s.key]}
                 amendments={enc.amend[s.key]}
-                reviewLabel={s.key === 'followup' ? 'Review & close encounter' : 'Review & save'}
+                reviewLabel={reviewLabelFor(s.key)}
                 onReview={() => setReviewKey(s.key)}
                 onAmend={() => setAmendKey(s.key)}
               >
@@ -138,10 +161,12 @@ export const EncounterScreen = () => {
 
       {reviewKey ? (
         <ReviewSaveSheet
-          title={STEPS.find((s) => s.key === reviewKey)?.title ?? ''}
+          title={STEP_DEFS[reviewKey].title}
           rows={summarize(enc.data, reviewKey)}
           actor={actor}
-          confirmLabel={reviewKey === 'followup' ? 'Confirm & close encounter' : 'Confirm & lock'}
+          confirmLabel={
+            reviewKey === 'followup' ? 'Confirm & close encounter' : reviewKey === 'admission' ? 'Confirm & admit' : 'Confirm & lock'
+          }
           onConfirm={confirmSave}
           onClose={() => setReviewKey(null)}
         />

@@ -16,6 +16,7 @@ import {
   RefreshCw,
   ScanLine,
   Search,
+  Stethoscope,
   TrendingDown,
   TrendingUp,
   TriangleAlert,
@@ -36,6 +37,7 @@ import {
 export type IconName =
   | 'home'
   | 'patients'
+  | 'encounter'
   | 'registers'
   | 'referrals'
   | 'month'
@@ -59,6 +61,7 @@ export type IconName =
 const ICONS: Record<IconName, LucideIcon> = {
   home: Home,
   patients: Users,
+  encounter: Stethoscope,
   registers: BookText,
   referrals: ArrowLeftRight,
   month: BarChart3,
