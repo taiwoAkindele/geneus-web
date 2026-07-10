@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
   { key: 'home', label: 'Home', to: '/home', match: '/home', icon: 'home', bottom: true },
   { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', icon: 'patients', bottom: true },
   { key: 'encounters', label: 'Encounters', to: '/encounters', match: '/encounters', icon: 'encounter', bottom: true },
-  { key: 'registers', label: 'Registers', to: '/registers/malaria', match: '/registers', icon: 'registers', bottom: true },
+  { key: 'registers', label: 'Registers', to: '/registers', match: '/registers', icon: 'registers', bottom: true },
   { key: 'referrals', label: 'Referrals', to: '/referrals/track', match: '/referrals', icon: 'referrals' },
   { key: 'month', label: 'This month', to: '/reports/month', match: '/reports', icon: 'month' },
   { key: 'stock', label: 'Stock', to: '/stock', match: '/stock', icon: 'stock' },

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   Home,
+  Lock,
   type LucideIcon,
   Minus,
   Package,
@@ -54,6 +55,7 @@ export type IconName =
   | 'check'
   | 'close'
   | 'clock'
+  | 'lock'
   | 'trend-up'
   | 'trend-down'
   | 'trend-flat';
@@ -78,6 +80,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   check: Check,
   close: X,
   clock: Clock,
+  lock: Lock,
   'trend-up': TrendingUp,
   'trend-down': TrendingDown,
   'trend-flat': Minus,
