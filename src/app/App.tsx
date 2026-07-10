@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
 import { AppointmentsProvider } from '@/features/appointments';
+import { RegistersProvider } from '@/features/registers';
 import { AdminShell } from './AdminShell';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
@@ -95,10 +96,14 @@ const DuplicateCheckScreen = lazy(() =>
 const SendToUnitScreen = lazy(() =>
   import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
-const MalariaRegisterScreen = lazy(() =>
-  import('@/pages/programme-register/MalariaRegisterScreen').then((m) => ({
-    default: m.MalariaRegisterScreen,
-  })),
+const RegistersListScreen = lazy(() =>
+  import('@/pages/registers/RegistersListScreen').then((m) => ({ default: m.RegistersListScreen })),
+);
+const RegisterEntriesScreen = lazy(() =>
+  import('@/pages/registers/RegisterEntriesScreen').then((m) => ({ default: m.RegisterEntriesScreen })),
+);
+const RegisterBuilderScreen = lazy(() =>
+  import('@/pages/registers/RegisterBuilderScreen').then((m) => ({ default: m.RegisterBuilderScreen })),
 );
 const MonthlySummaryScreen = lazy(() =>
   import('@/pages/monthly-summary/MonthlySummaryScreen').then((m) => ({
@@ -140,6 +145,7 @@ const App = () => {
     <SessionProvider>
       <ToastProvider>
         <AppointmentsProvider>
+        <RegistersProvider>
         <BrowserRouter>
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
@@ -169,7 +175,10 @@ const App = () => {
             <Route path="/patients/new" element={<NewPatientStep1Screen />} />
             <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
             <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
-            <Route path="/registers/malaria" element={<MalariaRegisterScreen />} />
+            <Route path="/registers" element={<RegistersListScreen />} />
+            <Route path="/registers/new" element={<RegisterBuilderScreen />} />
+            <Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} />
+            <Route path="/registers/:id" element={<RegisterEntriesScreen />} />
             <Route path="/reports/month" element={<MonthlySummaryScreen />} />
             <Route path="/referrals/track" element={<ReferralScreen />} />
             <Route path="/stock" element={<StockScreen />} />
@@ -193,6 +202,7 @@ const App = () => {
         </Routes>
           </Suspense>
         </BrowserRouter>
+        </RegistersProvider>
         </AppointmentsProvider>
       </ToastProvider>
     </SessionProvider>

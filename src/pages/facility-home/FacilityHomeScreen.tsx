@@ -138,7 +138,7 @@ export const FacilityHomeScreen = () => {
             <QuickAction
               label="Register books"
               icon="registers"
-              onClick={() => navigate('/registers/malaria')}
+              onClick={() => navigate('/registers')}
             />
             <QuickAction
               label="This month"
