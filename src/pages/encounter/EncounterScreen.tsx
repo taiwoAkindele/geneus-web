@@ -16,7 +16,7 @@ import {
   type StepKey,
 } from '@/features/encounter';
 
-type EncounterPatient = { id: string; name: string; initials: string; allergy: string };
+type EncounterPatient = { id: string; name: string; initials: string; allergy: string; unknown?: boolean };
 type EncounterNavState = { patient?: EncounterPatient; init?: EncounterInit } | null;
 
 // Default patient when the screen is reached directly. Normally the patient and
@@ -76,7 +76,7 @@ export const EncounterScreen = () => {
       <header className="sticky top-[var(--app-header-h,0px)] z-10 bg-brand text-white">
         <div className="px-5 py-3 md:px-8">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => navigate('/patients/profile')} aria-label="Back to patient profile" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
+            <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center">
               <Icon name="back" className="h-6 w-6" />
             </button>
             <Avatar tone="mint" size="sm">{PATIENT.initials}</Avatar>
@@ -91,6 +91,9 @@ export const EncounterScreen = () => {
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-danger-bg px-2.5 py-1 text-[11px] font-bold text-danger-strong">⚠ Allergy: {PATIENT.allergy}</span>
+            {PATIENT.unknown ? (
+              <span className="rounded-full bg-amber-bg px-2.5 py-1 text-[11px] font-bold text-amber-text">Identity unconfirmed</span>
+            ) : null}
             <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Opened {enc.openedDate}</span>
             <button
               type="button"

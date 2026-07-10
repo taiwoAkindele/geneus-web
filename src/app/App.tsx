@@ -113,6 +113,9 @@ const SyncCenterScreen = lazy(() =>
 const StockScreen = lazy(() =>
   import('@/pages/stock/StockScreen').then((m) => ({ default: m.StockScreen })),
 );
+const EncountersScreen = lazy(() =>
+  import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
+);
 const PatientProfileScreen = lazy(() =>
   import('@/pages/patient/PatientProfileScreen').then((m) => ({ default: m.PatientProfileScreen })),
 );
@@ -158,7 +161,8 @@ const App = () => {
             <Route path="/home" element={<FacilityHomeScreen />} />
             <Route path="/patients/search" element={<PatientSearchScreen />} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
-            <Route path="/encounter" element={<EncounterScreen />} />
+            <Route path="/encounters" element={<EncountersScreen />} />
+            <Route path="/encounters/record" element={<EncounterScreen />} />
             <Route path="/appointments" element={<AppointmentsScreen />} />
             <Route path="/patients/new" element={<NewPatientStep1Screen />} />
             <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />

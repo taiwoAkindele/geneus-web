@@ -56,7 +56,7 @@ export const PatientProfileScreen = () => {
   const navigate = useNavigate();
 
   const openEncounter = (e: EncItem) => {
-    navigate('/encounter', {
+    navigate('/encounters/record', {
       state: { patient: PATIENT_REF, init: { encId: e.id, date: e.date, closed: e.status !== 'Open' } },
     });
   };
@@ -95,7 +95,7 @@ export const PatientProfileScreen = () => {
               variant="secondary"
               fullWidth={false}
               className="bg-brand-accent-soft px-5 text-brand"
-              onClick={() => navigate('/encounter', { state: { patient: PATIENT_REF } })}
+              onClick={() => navigate('/encounters/record', { state: { patient: PATIENT_REF } })}
             >
               ＋ Create encounter
             </Button>

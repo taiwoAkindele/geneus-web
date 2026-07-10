@@ -44,11 +44,8 @@ export const PatientSearchScreen = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <Button variant="outlined" fullWidth={false} className="px-4" onClick={() => navigate('/appointments')}>
-              Today's appointments
-            </Button>
             <Button variant="primary" fullWidth={false} className="px-4" onClick={() => navigate('/patients/new')}>
-              ＋ Unknown patient
+              ＋ Add patient
             </Button>
           </div>
         </div>
