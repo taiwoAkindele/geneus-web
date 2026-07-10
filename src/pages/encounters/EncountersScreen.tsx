@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, Tag, useToast } from '@/ui';
 import type { EncounterInit } from '@/features/encounter';
+import { useAppointments } from '@/features/appointments';
 
 type EncPatient = { id: string; name: string; initials: string; allergy: string; unknown?: boolean };
 type EncCard = {
@@ -62,9 +63,14 @@ const EncounterCard = ({ card, onOpen }: { card: EncCard; onOpen: () => void }) 
 export const EncountersScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const { appointments } = useAppointments();
 
   const open = (card: EncCard) =>
     navigate('/encounters/record', { state: { patient: card.patient, init: card.init } });
+
+  // A patient with a booked appointment arrives → start their encounter.
+  const startFromAppointment = (patient: EncPatient) =>
+    navigate('/encounters/record', { state: { patient } });
 
   const createUnknown = () => {
     const patient: EncPatient = {
@@ -103,7 +109,35 @@ export const EncountersScreen = () => {
           </div>
         </div>
 
+        {/* Pending & upcoming — patients booked from a profile land here. */}
         <div className="mt-5 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Pending &amp; upcoming</span>
+          <span className="font-mono text-xs text-ink-muted">{appointments.length} booked</span>
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {appointments.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => startFromAppointment(a.patient)}
+              className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar tone="green">{a.patient.initials}</Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-base font-bold">{a.patient.name}</div>
+                  <div className="text-[13px] text-ink-muted">{a.reason}</div>
+                </div>
+                <Tag tone={a.status === 'pending' ? 'amber' : 'slate'}>
+                  {a.status === 'pending' ? 'Pending' : 'Upcoming'}
+                </Tag>
+              </div>
+              <div className="mt-3 text-[13px] text-ink-muted">{a.when} · {a.day}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">In progress</span>
           <span className="font-mono text-xs text-ink-muted">{IN_PROGRESS.length} open</span>
         </div>

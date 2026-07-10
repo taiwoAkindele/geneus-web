@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
+import { AppointmentsProvider } from '@/features/appointments';
 import { AdminShell } from './AdminShell';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
@@ -138,6 +139,7 @@ const App = () => {
   return (
     <SessionProvider>
       <ToastProvider>
+        <AppointmentsProvider>
         <BrowserRouter>
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
@@ -191,6 +193,7 @@ const App = () => {
         </Routes>
           </Suspense>
         </BrowserRouter>
+        </AppointmentsProvider>
       </ToastProvider>
     </SessionProvider>
   );

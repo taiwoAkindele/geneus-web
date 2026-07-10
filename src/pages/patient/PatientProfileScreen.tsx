@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Avatar, Button, StatusPill, Tag } from '@/ui';
+import { BookAppointmentSheet, useAppointments } from '@/features/appointments';
 
 const PATIENT = {
   name: 'Amaka Okoro',
@@ -51,15 +53,21 @@ const ENCOUNTERS: EncItem[] = [
   { id: 'OOE-ENC-000276', title: 'Malaria (RDT positive)', date: '12 Jun 2026', facility: 'Odo-Ona Elewe PHC', status: 'Closed', chips: ['38.9°C', '118/76', 'ACT · 3 days'] },
 ];
 
-/** Patient profile — details + every encounter on record (PRD §9.8 / §10). */
+/** Patient profile — details, upcoming appointments, and every encounter on record (PRD §9.8 / §10). */
 export const PatientProfileScreen = () => {
   const navigate = useNavigate();
+  const { forPatient } = useAppointments();
+  const [booking, setBooking] = useState(false);
+  const appointments = forPatient(PATIENT.id);
 
   const openEncounter = (e: EncItem) => {
     navigate('/encounters/record', {
       state: { patient: PATIENT_REF, init: { encId: e.id, date: e.date, closed: e.status !== 'Open' } },
     });
   };
+
+  // The patient has arrived for their appointment — start their encounter.
+  const startEncounter = () => navigate('/encounters/record', { state: { patient: PATIENT_REF } });
 
   return (
     <div className="min-h-screen bg-surface">
@@ -95,9 +103,9 @@ export const PatientProfileScreen = () => {
               variant="secondary"
               fullWidth={false}
               className="bg-brand-accent-soft px-5 text-brand"
-              onClick={() => navigate('/encounters/record', { state: { patient: PATIENT_REF } })}
+              onClick={() => setBooking(true)}
             >
-              ＋ Create encounter
+              ＋ Book appointment
             </Button>
             <Button
               variant="ghost"
@@ -116,6 +124,38 @@ export const PatientProfileScreen = () => {
             </p>
           ) : null}
         </div>
+
+        {/* appointments — this patient's upcoming / pending bookings */}
+        <div className="mb-3 mt-6 flex items-center justify-between">
+          <span className="text-[15px] font-extrabold tracking-[-0.01em]">Appointments</span>
+          <span className="font-mono text-xs text-ink-muted">{appointments.length} upcoming</span>
+        </div>
+        {appointments.length > 0 ? (
+          <div className="space-y-3">
+            {appointments.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={startEncounter}
+                className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[15px] font-bold text-ink">{a.reason}</div>
+                    <div className="text-[13px] text-ink-muted">{a.when} · {a.day}</div>
+                  </div>
+                  <Tag tone={a.status === 'pending' ? 'amber' : 'slate'}>
+                    {a.status === 'pending' ? 'Pending today' : 'Upcoming'}
+                  </Tag>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">
+            No upcoming appointments — book one above.
+          </div>
+        )}
 
         {/* encounters */}
         <div className="mb-3 mt-6 flex items-center justify-between">
@@ -146,6 +186,8 @@ export const PatientProfileScreen = () => {
           ))}
         </div>
       </div>
+
+      {booking ? <BookAppointmentSheet patient={PATIENT_REF} onClose={() => setBooking(false)} /> : null}
     </div>
   );
 };
