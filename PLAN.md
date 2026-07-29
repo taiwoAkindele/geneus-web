@@ -109,7 +109,7 @@ geneus-web/
     features/
       registration/ # NASADOR form, dedup prompt, Patient ID display
       visit/        # guided visit notes, unit handoff
-      registers/    # OPD, Immunisation, FP, ANC, TB, Malaria forms
+      registers/    # data-driven register builder, logbook & entry forms (PRD §9.4)
       search/       # patient search + duplicate check
       referral/     # outbound referral, incoming panel, lifecycle, printable note
       dashboard/    # "This Month at a Glance", commodity request
@@ -150,8 +150,17 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
   day; clean next-morning sync.
 
 ### FE-M2 — Registers + facility dashboard
-- Six guided register forms (OPD, Immunisation, FP, ANC, TB, Malaria), **derived from the
-  visit** where possible (no double entry, PRD §9.4).
+- **Data-driven register builder** (PRD §9.4): a facility configures each register at
+  runtime — typed fields, live preview, publish — and staff record append-only entries in
+  the resulting logbook. The six statutory programme registers (OPD, Immunisation, FP, ANC,
+  TB, Malaria) ship as **seeded definitions**, not hard-coded forms.
+  - **No migration on register creation.** A register is a `register_definition` document;
+    an entry is a `register_entry` with `values` keyed by field id (shared contract §9).
+    Field ids are stable; a published edit writes a **new version** (old entries stay pinned
+    to the version they used); per-field rules are enforced by definition-driven
+    `validateRegisterEntry` before write, not a static schema per register.
+  - **Reporting** (in `geneus-server`) stores entry `values` as **JSONB** so new registers
+    and fields need no downstream Postgres migration either.
 - **Facility vs Outreach/Mobile** tag on entries (PRD §9.5).
 - Maternal & child health tracking (ANC visits, immunisation schedule + reminders).
 - **"This Month at a Glance"** + commodity-request view + printable monthly summary (PRD §9.6).
