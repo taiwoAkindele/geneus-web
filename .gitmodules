@@ -1,3 +1,3 @@
 [submodule "src/shared"]
-	path = src/shared
+	path = shared
 	url = ../geneus-shared.git
