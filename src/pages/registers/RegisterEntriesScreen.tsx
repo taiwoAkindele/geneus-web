@@ -4,8 +4,6 @@ import { Button, Icon, Sheet, useToast } from '@/ui';
 import { useSession } from '@/session';
 import { RegisterField, useRegisters, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
 
-const stampNow = () => `Today · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
-
 const fmtCell = (v: EntryValue | undefined): string => {
   if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
   if (v === true) return 'Yes';
@@ -28,7 +26,11 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
   });
 
   const save = () => {
-    addEntry(register.id, { by: user.name, when: stampNow(), values: draft });
+    const issues = addEntry(register.id, { by: user.name, values: draft });
+    if (issues.length > 0) {
+      toast(issues[0]);
+      return;
+    }
     toast(`Entry saved & locked — recorded by ${user.name}`);
     onClose();
   };
@@ -110,7 +112,7 @@ export const RegisterEntriesScreen = () => {
           </div>
           <div className="rounded-[14px] border border-outline-soft bg-white px-4 py-3.5">
             <div className="text-[12px] font-semibold text-ink-muted">Status</div>
-            <div className="mt-2 text-[20px] font-extrabold tracking-[-0.02em]">{register.status}</div>
+            <div className="mt-2 text-[20px] font-extrabold tracking-[-0.02em]">{register.status === 'published' ? 'Published' : 'Draft'}</div>
           </div>
         </div>
 

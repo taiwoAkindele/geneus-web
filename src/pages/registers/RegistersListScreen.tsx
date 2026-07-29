@@ -17,7 +17,7 @@ export const RegistersListScreen = () => {
   const navigate = useNavigate();
   const { registers } = useRegisters();
 
-  const published = registers.filter((r) => r.status === 'Published').length;
+  const published = registers.filter((r) => r.status === 'published').length;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -73,7 +73,7 @@ export const RegistersListScreen = () => {
                       <div className="text-[12px] text-ink-muted">{r.category}</div>
                     </div>
                   </div>
-                  <Tag tone={r.status === 'Published' ? 'green' : 'amber'}>{r.status}</Tag>
+                  <Tag tone={r.status === 'published' ? 'green' : 'amber'}>{r.status === 'published' ? 'Published' : 'Draft'}</Tag>
                 </div>
                 <p className="text-[13px] leading-relaxed text-ink-soft">{r.description}</p>
                 <div className="flex items-center gap-3.5 border-t border-outline-soft pt-2.5">

@@ -15,6 +15,9 @@ type Props = {
 };
 
 const Req = ({ on }: { on?: boolean }) => (on ? <span className="text-danger"> *</span> : null);
+/** Contract values may be numbers (e.g. from synced docs); inputs need text. */
+const asText = (v: EntryValue | undefined): string =>
+  typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
 const Help = ({ text }: { text?: string }) =>
   text && text.trim() ? <div className="mt-1.5 text-[12px] text-ink-muted">{text}</div> : null;
 
@@ -82,7 +85,7 @@ export const RegisterField = ({ field, value, onChange, preview }: Props) => {
         ) : (
           <textarea
             rows={3}
-            value={typeof value === 'string' ? value : ''}
+            value={asText(value)}
             onChange={(e) => onChange?.(e.target.value)}
             placeholder={PLACEHOLDERS.textarea}
             className="w-full rounded-field border-[1.5px] border-outline bg-white p-3 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand placeholder:text-ink-muted"
@@ -111,7 +114,7 @@ export const RegisterField = ({ field, value, onChange, preview }: Props) => {
       required={field.required}
       name={field.id}
       type={INPUT_TYPE[field.type] ?? 'text'}
-      value={typeof value === 'string' ? value : ''}
+      value={asText(value)}
       placeholder={PLACEHOLDERS[field.type]}
       hint={field.help}
       onChange={(e) => onChange?.(e.target.value)}

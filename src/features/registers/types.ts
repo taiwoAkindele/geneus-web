@@ -1,46 +1,48 @@
 /**
- * Register builder (PRD §9.4). A facility configures the registers it keeps:
- * each is a form definition of typed fields; staff record append-only entries
- * against the published version. Mock/local state for the prototype.
+ * Register feature types — thin aliases over the shared contract (@shared,
+ * SCHEMA.md §9). The contract owns the document shapes; this file only maps
+ * them to the feature's local names and adds the UI-only view/draft models.
  */
-export type FieldType =
-  | 'text'
-  | 'textarea'
-  | 'number'
-  | 'date'
-  | 'phone'
-  | 'select'
-  | 'multiselect'
-  | 'checkbox'
-  | 'section';
+import type {
+  RegisterDefinition,
+  RegisterEntry,
+  RegisterEntryValue,
+  RegisterFieldDef,
+  RegisterFieldType,
+  RegisterStatus,
+} from '@shared';
 
-export type RegisterField = {
+export type FieldType = RegisterFieldType;
+export type RegisterField = RegisterFieldDef;
+export type EntryValue = RegisterEntryValue;
+export type EntryValues = Record<string, EntryValue>;
+export type { RegisterDefinition, RegisterEntry, RegisterStatus };
+
+/** One entry projected for display — derived from a `register_entry` document. */
+export type RegisterRow = {
   id: string;
-  type: FieldType;
-  label: string;
-  required?: boolean;
-  help?: string;
-  options?: string[];
+  by: string;
+  when: string;
+  /** The definition version this entry was recorded against (pinned, never migrated). */
+  registerVersion: number;
+  values: EntryValues;
 };
 
-/** One value per non-section field, keyed by field id. */
-export type EntryValue = string | string[] | boolean;
-export type EntryValues = Record<string, EntryValue>;
-
-/** An append-only entry, locked to its recorder and time (PRD §9.8.3). */
-export type RegisterRow = { id: string; by: string; when: string; values: EntryValues };
-
-export type RegisterStatus = 'Published' | 'Draft';
-
+/**
+ * A register as the screens see it: the CURRENT (highest-version) definition
+ * plus its entries. Projected from contract documents in RegistersProvider.
+ */
 export type RegisterDef = {
+  /** Stable registerId — constant across versions. */
   id: string;
   name: string;
   category: string;
-  status: RegisterStatus;
   description: string;
+  status: RegisterStatus;
+  version: number;
   fields: RegisterField[];
   rows: RegisterRow[];
 };
 
-/** The editable shape while building — no id/status/rows until published. */
+/** The editable shape while building — becomes a NEW definition version on publish. */
 export type RegisterDraft = Pick<RegisterDef, 'name' | 'category' | 'description' | 'fields'>;
