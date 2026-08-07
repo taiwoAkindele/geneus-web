@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
+import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/features/appointments';
 import { RegistersProvider } from '@/features/registers';
 import { AdminShell } from './AdminShell';
@@ -144,6 +145,7 @@ const App = () => {
   return (
     <SessionProvider>
       <ToastProvider>
+        <DataProvider>
         <AppointmentsProvider>
         <RegistersProvider>
         <BrowserRouter>
@@ -204,6 +206,7 @@ const App = () => {
         </BrowserRouter>
         </RegistersProvider>
         </AppointmentsProvider>
+        </DataProvider>
       </ToastProvider>
     </SessionProvider>
   );

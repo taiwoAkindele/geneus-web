@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
  * When the real offline roster/auth lands (PLAN FE-M1), this provider is where
  * it plugs in; consumers don't change.
  */
-export type SessionUser = { name: string; initials: string; role: string };
+export type SessionUser = { staffId: string; name: string; initials: string; role: string };
 export type Facility = { name: string; code: string };
 export type Shift = { label: string; endsAtLabel: string; minutesLeft: number };
 
@@ -75,7 +75,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<SessionValue>(
     () => ({
-      user: { name: 'Amaka Okoro', initials: 'AO', role: 'CHEW' },
+      user: { staffId: 'staff-demo-1', name: 'Amaka Okoro', initials: 'AO', role: 'CHEW' },
       facility: { name: 'Odo-Ona Elewe PHC', code: 'OOE-PHC' },
       shift: { label: '07–15', endsAtLabel: '15:00', minutesLeft },
       notifications,

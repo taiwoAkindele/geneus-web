@@ -25,14 +25,24 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
     return seed;
   });
 
-  const save = () => {
-    const issues = addEntry(register.id, { by: user.name, values: draft });
-    if (issues.length > 0) {
-      toast(issues[0]);
-      return;
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const issues = await addEntry(register.id, { values: draft });
+      if (issues.length > 0) {
+        toast(issues[0]);
+        setSaving(false);
+        return;
+      }
+      toast(`Entry saved & locked — recorded by ${user.name}`);
+      onClose();
+    } catch {
+      toast('Could not save the entry — please try again');
+      setSaving(false);
     }
-    toast(`Entry saved & locked — recorded by ${user.name}`);
-    onClose();
   };
 
   return (
@@ -48,7 +58,7 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
         ))}
       </div>
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <Button variant="primary" fullWidth={false} className="flex-1" onClick={save}>
+        <Button variant="primary" fullWidth={false} className="flex-1" loading={saving} onClick={save}>
           Save entry
         </Button>
         <Button variant="outlined" fullWidth={false} className="px-6" onClick={onClose}>
@@ -63,9 +73,18 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
 export const RegisterEntriesScreen = () => {
   const navigate = useNavigate();
   const { id = '' } = useParams();
-  const { getById } = useRegisters();
+  const { getById, loading } = useRegisters();
   const register = getById(id);
   const [adding, setAdding] = useState(false);
+
+  if (loading && !register) {
+    return (
+      <div className="min-h-screen bg-surface px-5 py-8 md:px-8">
+        <div className="h-8 w-48 animate-pulse rounded-md bg-surface-muted" />
+        <div className="mt-5 h-40 animate-pulse rounded-card bg-surface-muted" />
+      </div>
+    );
+  }
 
   if (!register) {
     return (
