@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon, Tag } from '@/ui';
+import { Banner, Button, Icon, Tag } from '@/ui';
 import { CATEGORY_COLORS, monogram, useRegisters } from '@/features/registers';
 
 const StatCard = ({ label, value, dot }: { label: string; value: number | string; dot: string }) => (
@@ -15,9 +15,9 @@ const StatCard = ({ label, value, dot }: { label: string; value: number | string
 /** Registers index — the facility's configured registers, with a builder entry point (PRD §9.4). */
 export const RegistersListScreen = () => {
   const navigate = useNavigate();
-  const { registers } = useRegisters();
+  const { registers, loading, error } = useRegisters();
 
-  const published = registers.filter((r) => r.status === 'Published').length;
+  const published = registers.filter((r) => r.status === 'published').length;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -52,6 +52,32 @@ export const RegistersListScreen = () => {
 
         {/* Cards */}
         <div className="mt-6 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Configured registers</div>
+        {error ? (
+          <Banner tone="amber" title="Could not read this device's registers" className="mt-3">
+            {error.message}
+          </Banner>
+        ) : null}
+
+        {loading && registers.length === 0 ? (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="h-[132px] animate-pulse rounded-card border border-outline-soft bg-surface-muted" />
+            ))}
+          </div>
+        ) : null}
+
+        {!loading && registers.length === 0 ? (
+          <div className="mt-3 rounded-card border border-dashed border-outline p-10 text-center">
+            <div className="text-[15px] font-bold text-ink-soft">No registers yet</div>
+            <div className="mt-1.5 text-[13px] text-ink-muted">Create the first register this facility keeps.</div>
+            <div className="mt-4">
+              <Button variant="primary" fullWidth={false} className="px-5" onClick={() => navigate('/registers/new')}>
+                ＋ Create register
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-3 grid grid-cols-1 gap-3 pb-24 sm:grid-cols-2 lg:grid-cols-3">
           {registers.map((r) => {
             const [bg, fg] = CATEGORY_COLORS[r.category] ?? ['#dcefe2', '#00502e'];
@@ -73,7 +99,7 @@ export const RegistersListScreen = () => {
                       <div className="text-[12px] text-ink-muted">{r.category}</div>
                     </div>
                   </div>
-                  <Tag tone={r.status === 'Published' ? 'green' : 'amber'}>{r.status}</Tag>
+                  <Tag tone={r.status === 'published' ? 'green' : 'amber'}>{r.status === 'published' ? 'Published' : 'Draft'}</Tag>
                 </div>
                 <p className="text-[13px] leading-relaxed text-ink-soft">{r.description}</p>
                 <div className="flex items-center gap-3.5 border-t border-outline-soft pt-2.5">

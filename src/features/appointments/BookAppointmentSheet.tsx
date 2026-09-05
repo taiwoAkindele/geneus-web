@@ -5,8 +5,6 @@ import type { AppointmentPatient } from './types';
 
 const fmtDay = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-const fmtShort = (iso: string) =>
-  iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
 
 /**
  * Book an appointment for a patient — for now (they join today's list as
@@ -20,19 +18,26 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [reason, setReason] = useState('Consultation');
+  const [booking, setBooking] = useState(false);
 
   const canBook = mode === 'now' || Boolean(date && time);
 
-  const submit = () => {
-    if (!canBook) return;
-    if (mode === 'now') {
-      book({ patient, reason: reason || 'Consultation', day: 'Today', when: 'Now', status: 'pending' });
-      toast('Appointment booked for now — added to today’s encounters list');
-    } else {
-      book({ patient, reason: reason || 'Consultation', day: fmtDay(date), when: `${fmtShort(date)} · ${time}`, status: 'upcoming' });
-      toast(`Appointment booked for ${fmtDay(date)} — added to the encounters list`);
+  const submit = async () => {
+    if (!canBook || booking) return;
+    setBooking(true);
+    const scheduledFor = mode === 'scheduled' ? new Date(`${date}T${time}`).toISOString() : undefined;
+    try {
+      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor });
+      toast(
+        scheduledFor
+          ? `Appointment booked for ${fmtDay(date)} — added to the encounters list`
+          : 'Appointment booked for now — added to today’s encounters list',
+      );
+      onClose();
+    } catch {
+      toast('Could not save the appointment — please try again');
+      setBooking(false);
     }
-    onClose();
   };
 
   return (
@@ -67,7 +72,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
       </div>
 
       <div className="mt-5">
-        <Button variant="primary" disabled={!canBook} onClick={submit}>
+        <Button variant="primary" disabled={!canBook || booking} loading={booking} onClick={submit}>
           Book appointment
         </Button>
       </div>

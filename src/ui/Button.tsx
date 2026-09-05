@@ -25,7 +25,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   /**
    * Show a pending spinner and disable the button while a write/mutation runs.
    * Required by the offline-first UX rule: actions never allow double-submit and
-   * always show progress (CLAUDE.md · PRD §13).
+   * always show progress (docs/ENGINEERING.md · PRD §13).
    */
   loading?: boolean;
 };

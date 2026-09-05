@@ -30,7 +30,7 @@ export const AppointmentsScreen = () => {
   const { appointments } = useAppointments();
 
   const today = appointments.filter((a) => a.status === 'pending');
-  const upcoming = appointments.filter((a) => a.status === 'upcoming');
+  const upcoming = appointments.filter((a) => a.status === 'scheduled');
 
   // The patient has arrived → start their encounter.
   const start = (appt: BookedAppointment) => navigate('/encounters/record', { state: { patient: appt.patient } });

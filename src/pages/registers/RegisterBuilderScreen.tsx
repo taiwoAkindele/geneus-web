@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, ChoiceChip, Icon, Sheet, ToggleSwitch, useToast } from "@/ui";
 import {
@@ -25,21 +25,29 @@ export const RegisterBuilderScreen = () => {
   const editingId = id ?? null;
   const { getById, publish } = useRegisters();
 
-  const [draft, setDraft] = useState<RegisterDraft>(() => {
-    if (id) {
-      const r = getById(id);
-      if (r)
-        return {
-          name: r.name,
-          category: r.category,
-          description: r.description,
-          fields: r.fields.map((f) => ({ ...f, options: f.options ?? [] })),
-        };
-    }
-    return { name: "", category: "General", description: "", fields: [] };
+  const [draft, setDraft] = useState<RegisterDraft>({
+    name: "",
+    category: "General",
+    description: "",
+    fields: [],
   });
 
+  // The register being edited arrives from the local replica after first paint.
+  const editing = editingId ? getById(editingId) : undefined;
+  const loaded = useRef(!editingId);
+  useEffect(() => {
+    if (loaded.current || !editing) return;
+    loaded.current = true;
+    setDraft({
+      name: editing.name,
+      category: editing.category,
+      description: editing.description,
+      fields: editing.fields.map((f) => ({ ...f, options: f.options ?? [] })),
+    });
+  }, [editing]);
+
   const [publishing, setPublishing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const setFields = (fields: RegisterFieldType[]) =>
     setDraft((d) => ({ ...d, fields }));
@@ -101,11 +109,18 @@ export const RegisterBuilderScreen = () => {
     }
     setPublishing(true);
   };
-  const confirmPublish = () => {
-    publish(draft, editingId);
-    setPublishing(false);
-    toast(`“${previewName}” published — staff can now record entries`);
-    navigate("/registers");
+  const confirmPublish = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await publish(draft, editingId);
+      setPublishing(false);
+      toast(`“${previewName}” published — staff can now record entries`);
+      navigate("/registers");
+    } catch {
+      toast("Could not publish the register — please try again");
+      setSaving(false);
+    }
   };
 
   const MoveButtons = ({ f }: { f: RegisterFieldType }) => (
@@ -444,6 +459,7 @@ export const RegisterBuilderScreen = () => {
               variant="primary"
               fullWidth={false}
               className="flex-1"
+              loading={saving}
               onClick={confirmPublish}
             >
               Publish register

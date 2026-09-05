@@ -1,61 +1,93 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { BookedAppointment } from './types';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import type { Appointment, Patient } from '@shared';
+import { useLiveQuery, useWriteContext } from '@/data';
+import { useCanWrite, useOptionalStaffId } from '@/session';
+import { book, listAppointments } from '@/data/repos/appointments';
+import { findPatient, listPatients } from '@/data/repos/patients';
+import type { BookedAppointment, NewAppointment } from './types';
 
 /**
- * Shared appointments state so a booking on a patient's profile appears on the
- * encounters list (and in that patient's own Appointments section). When the
- * real data layer lands this becomes a repository; the API stays the same.
+ * Bookings made on a patient's profile, joined to that patient so the
+ * encounters list can show who is coming. Appointment documents carry only the
+ * patientId — the contract never duplicates patient details.
  */
-type NewAppointment = Omit<BookedAppointment, 'id'>;
-
 type Value = {
   appointments: BookedAppointment[];
-  book: (appointment: NewAppointment) => void;
-  /** Just this patient's appointments, newest first. */
+  loading: boolean;
+  error: Error | undefined;
+  book: (appointment: NewAppointment) => Promise<void>;
   forPatient: (patientId: string) => BookedAppointment[];
 };
 
 const AppointmentsContext = createContext<Value | null>(null);
 
-const SEED: BookedAppointment[] = [
-  {
-    id: 'ap-seed-1',
-    patient: { id: 'OOE-PHC-000047-K2', name: 'Amaka Okoro', initials: 'AO', allergy: 'Penicillin' },
-    reason: 'Malaria recovery review',
-    day: '16 Jul 2026',
-    when: '16 Jul · 10:00',
-    status: 'upcoming',
-  },
-  {
-    id: 'ap-seed-2',
-    patient: { id: 'OOE-PHC-000051-B7', name: 'Ibrahim Musa', initials: 'IM', allergy: 'Sulfa drugs' },
-    reason: 'BP check',
-    day: 'Today',
-    when: '11:00',
-    status: 'pending',
-  },
-];
+const initialsOf = (fullName: string): string =>
+  fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+
+const isToday = (iso: string): boolean => iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
+
+const project = (appointments: Appointment[], patients: Patient[]): BookedAppointment[] =>
+  [...appointments]
+    .sort((a, b) => (b.scheduledFor ?? b.createdOn).localeCompare(a.scheduledFor ?? a.createdOn))
+    .map((appointment) => {
+      const patient = findPatient(patients, appointment.patientId);
+      const at = appointment.scheduledFor ?? appointment.createdOn;
+      const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return {
+        id: appointment._id,
+        patient: {
+          id: appointment.patientId,
+          name: patient?.fullName ?? 'Unknown patient',
+          initials: patient ? initialsOf(patient.fullName) : '??',
+          allergy: patient?.allergies[0] ?? 'None recorded',
+        },
+        reason: appointment.reason,
+        day: isToday(at)
+          ? 'Today'
+          : new Date(at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        when: appointment.status === 'pending' ? 'Now' : `${new Date(at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${time}`,
+        status: appointment.status,
+      };
+    });
 
 export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
-  const [appointments, setAppointments] = useState<BookedAppointment[]>(SEED);
-  const nextId = useRef(0);
+  const context = useWriteContext(useOptionalStaffId(), useCanWrite());
 
-  const book = useCallback((appointment: NewAppointment) => {
-    setAppointments((list) => [{ ...appointment, id: `ap-${nextId.current++}` }, ...list]);
+  const load = useCallback(async () => {
+    const [appointments, patients] = await Promise.all([listAppointments(), listPatients()]);
+    return project(appointments, patients);
   }, []);
 
+  const { data, loading, error } = useLiveQuery(load);
+  const appointments = useMemo(() => data ?? [], [data]);
+
+  const bookAppointment = useCallback(
+    async (appointment: NewAppointment) => {
+      await book(appointment, context);
+    },
+    [context],
+  );
+
   const forPatient = useCallback(
-    (patientId: string) => appointments.filter((a) => a.patient.id === patientId),
+    (patientId: string) => appointments.filter((appointment) => appointment.patient.id === patientId),
     [appointments],
   );
 
-  const value = useMemo<Value>(() => ({ appointments, book, forPatient }), [appointments, book, forPatient]);
+  const value = useMemo<Value>(
+    () => ({ appointments, loading, error, book: bookAppointment, forPatient }),
+    [appointments, loading, error, bookAppointment, forPatient],
+  );
 
   return <AppointmentsContext.Provider value={value}>{children}</AppointmentsContext.Provider>;
 };
 
 export const useAppointments = (): Value => {
-  const ctx = useContext(AppointmentsContext);
-  if (!ctx) throw new Error('useAppointments must be used within an AppointmentsProvider');
-  return ctx;
+  const context = useContext(AppointmentsContext);
+  if (!context) throw new Error('useAppointments must be used within an AppointmentsProvider');
+  return context;
 };

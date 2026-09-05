@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon, type IconName, Stat, StatusPill, Tag } from '@/ui';
+import { useSession } from '@/session';
 
 const ReferralRow = ({
   name,
@@ -73,6 +74,7 @@ const QuickAction = ({
  */
 export const FacilityHomeScreen = () => {
   const navigate = useNavigate();
+  const { user, shift } = useSession();
   return (
     <div className="min-h-screen bg-surface">
       <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
@@ -83,9 +85,9 @@ export const FacilityHomeScreen = () => {
         <header className="flex items-center justify-between px-5 pb-3 pt-2">
           <div>
             <div className="text-[13px] text-ink-muted">Good morning,</div>
-            <div className="text-[22px] font-extrabold tracking-[-0.02em]">Amaka</div>
+            <div className="text-[22px] font-extrabold tracking-[-0.02em]">{user.name.split(' ')[0]}</div>
           </div>
-          <Tag tone="amber">Shift ends 15:00</Tag>
+          <Tag tone="amber">Shift ends {shift.endsAtLabel}</Tag>
         </header>
 
         <main className="flex-1 space-y-4 px-5 pb-24 lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-5 lg:space-y-0">

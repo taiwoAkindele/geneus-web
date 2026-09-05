@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Button, Stat, StatusPill } from '@/ui';
+import { useAuth } from '@/session';
 
 /**
  * 4.10 Sync center & shift warning. Sync state is honest — nothing is lost when
@@ -7,6 +8,7 @@ import { AppBar, Button, Stat, StatusPill } from '@/ui';
  */
 export const SyncCenterScreen = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar title="Sync & device" onBack={() => navigate(-1)} right={<StatusPill status="syncing" />} />
@@ -68,7 +70,7 @@ export const SyncCenterScreen = () => {
         </div>
 
         <footer className="px-5 pb-6 pt-4">
-          <Button variant="danger-outline" onClick={() => navigate('/login')}>
+          <Button variant="danger-outline" onClick={signOut}>
             End shift now
           </Button>
         </footer>

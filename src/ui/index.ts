@@ -1,4 +1,4 @@
-// Shared UI primitives — reuse these before writing new markup (CLAUDE.md).
+// Shared UI primitives — reuse these before writing new markup (docs/ENGINEERING.md).
 // All are large-touch, high-contrast, and token-driven from the Geneus design.
 export { AppBar } from './AppBar';
 export { Avatar } from './Avatar';

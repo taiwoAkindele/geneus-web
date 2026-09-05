@@ -1,38 +1,46 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PinDots, PinKeypad } from '@/ui';
+import { setPin as storePin } from '@/session';
+
+type AcceptState = { staffId?: string; fullName?: string; role?: string };
 
 /**
- * 3.1 Accept invite · create PIN. Opened from the staff invite link. The staff
- * member sets a 4-digit PIN in two passes (choose, then confirm) that they'll
- * use to sign in at the start of every shift.
+ * 3.1 Accept invite · create PIN. The staff member sets a 4-digit PIN in two
+ * passes (choose, then confirm) that they'll use to sign in at the start of
+ * every shift. The PIN stays on this device and never enters the replica.
  */
 export const CreatePinScreen = () => {
   const navigate = useNavigate();
+  const { staffId, fullName, role } = (useLocation().state ?? {}) as AcceptState;
   const [phase, setPhase] = useState<'choose' | 'confirm'>('choose');
   const [firstPin, setFirstPin] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
 
-  const onDigit = (d: string) => {
+  if (!staffId) return <Navigate to="/login" replace />;
+
+  const onDigit = async (digit: string) => {
     if (pin.length >= 4) return;
-    const next = pin + d;
+    const next = pin + digit;
     if (next.length < 4) {
       setPin(next);
       return;
     }
-    // 4th digit entered — advance the flow.
     if (phase === 'choose') {
       setFirstPin(next);
       setPhase('confirm');
       setPin('');
       setError(false);
-    } else if (next === firstPin) {
-      navigate('/login');
-    } else {
+      return;
+    }
+    if (next !== firstPin) {
       setError(true);
       setPin('');
+      return;
     }
+    await storePin(staffId, next);
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -44,10 +52,12 @@ export const CreatePinScreen = () => {
           <div className="absolute left-1/2 top-1/2 h-[22px] w-[6.5px] -translate-x-1/2 -translate-y-1/2 rounded bg-brand-accent-soft" />
         </div>
 
-        <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Welcome, Amaka</h1>
+        <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">
+          Welcome, {fullName?.split(' ')[0] ?? 'there'}
+        </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Odo-Ona Elewe PHC invited you as a <b className="text-brand">CHEW</b>. Create a 4-digit
-          PIN — you&rsquo;ll use it to sign in at the start of every shift.
+          You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a 4-digit PIN — you&rsquo;ll
+          use it to sign in at the start of every shift.
         </p>
 
         <PinDots filled={pin.length} className="mb-2 mt-9" />
@@ -64,7 +74,7 @@ export const CreatePinScreen = () => {
         <div className="mt-6 w-full max-w-[300px]">
           <PinKeypad
             onDigit={onDigit}
-            action={{ label: 'Delete', onPress: () => setPin((p) => p.slice(0, -1)) }}
+            action={{ label: 'Delete', onPress: () => setPin((current) => current.slice(0, -1)) }}
             tone="light"
           />
         </div>
