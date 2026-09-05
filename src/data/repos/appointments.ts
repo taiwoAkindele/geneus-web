@@ -1,5 +1,5 @@
 import { Appointment } from '@shared';
-import { allOfType, envelope, newId, put, type WriteContext } from '../db';
+import { allOfType, assertCanWrite, envelope, newId, put, type WriteContext } from '../db';
 
 export const listAppointments = () => allOfType<Appointment>('appointment');
 
@@ -10,8 +10,9 @@ export type AppointmentDraft = {
   scheduledFor?: string;
 };
 
-export const book = (draft: AppointmentDraft, context: WriteContext, createdOn?: string) =>
-  put(
+export const book = (draft: AppointmentDraft, context: WriteContext, createdOn?: string) => {
+  assertCanWrite(context);
+  return put(
     Appointment.parse({
       ...envelope(context, createdOn),
       _id: newId('appointment'),
@@ -22,3 +23,4 @@ export const book = (draft: AppointmentDraft, context: WriteContext, createdOn?:
       status: draft.scheduledFor ? 'scheduled' : 'pending',
     }),
   );
+};

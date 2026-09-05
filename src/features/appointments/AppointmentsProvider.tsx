@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import type { Appointment, Patient } from '@shared';
 import { useLiveQuery, useWriteContext } from '@/data';
+import { useCanWrite, useOptionalStaffId } from '@/session';
 import { book, listAppointments } from '@/data/repos/appointments';
 import { findPatient, listPatients } from '@/data/repos/patients';
 import type { BookedAppointment, NewAppointment } from './types';
@@ -31,7 +32,7 @@ const initialsOf = (fullName: string): string =>
 const isToday = (iso: string): boolean => iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
 
 const project = (appointments: Appointment[], patients: Patient[]): BookedAppointment[] =>
-  appointments
+  [...appointments]
     .sort((a, b) => (b.scheduledFor ?? b.createdOn).localeCompare(a.scheduledFor ?? a.createdOn))
     .map((appointment) => {
       const patient = findPatient(patients, appointment.patientId);
@@ -55,7 +56,7 @@ const project = (appointments: Appointment[], patients: Patient[]): BookedAppoin
     });
 
 export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
-  const context = useWriteContext();
+  const context = useWriteContext(useOptionalStaffId(), useCanWrite());
 
   const load = useCallback(async () => {
     const [appointments, patients] = await Promise.all([listAppointments(), listPatients()]);

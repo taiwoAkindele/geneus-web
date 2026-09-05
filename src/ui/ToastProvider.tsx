@@ -4,7 +4,7 @@ import { Icon, type IconName } from './Icon';
 /**
  * Lightweight toast system. Toasts confirm a *user action / mutation* — a write
  * that succeeded ("Sent to Injection Room"), so staff get honest feedback that
- * their offline-first write landed. Never used for reads (CLAUDE.md). No
+ * their offline-first write landed. Never used for reads (docs/ENGINEERING.md). No
  * dependency: a small context + auto-dismissing stack.
  */
 type ToastTone = 'success' | 'info' | 'error';

@@ -15,6 +15,24 @@ export type WriteContext = {
   facilityId: string;
   deviceId: string;
   staffId: string;
+  /** False for read-only staff, who may look at records but not record care. */
+  canWrite: boolean;
+};
+
+export class PermissionError extends Error {
+  constructor() {
+    super('Your access is read-only — ask a facility admin to change it');
+    this.name = 'PermissionError';
+  }
+}
+
+/**
+ * Read-only access is enforced here rather than only in the UI, so a hidden
+ * button is a courtesy and this is the actual rule — the same way shift access
+ * is enforced on the device (root §4.3).
+ */
+export const assertCanWrite = (context: WriteContext): void => {
+  if (!context.canWrite) throw new PermissionError();
 };
 
 /** Thrown when a document fails the shared contract; never write past this. */
@@ -61,9 +79,27 @@ export const put = async <T extends AnyDocument>(doc: T): Promise<T> => {
  * would silently miss documents. The replica is deliberately bounded, so a scan
  * is fast enough; revisit if a real facility's data outgrows it.
  */
+/**
+ * Applies the contract's defaults to a stored document, so one written before a
+ * field existed behaves like one written today (SCHEMA.md §7) — without this, a
+ * new optional field reads back as `undefined` and silently changes behaviour.
+ *
+ * Unknown keys are kept rather than stripped: a document may have been written
+ * by a device running a newer contract, and reading must never quietly discard
+ * what it does not recognise.
+ */
+const upMigrate = <T extends AnyDocument>(doc: AnyDocument): T => {
+  const parsed = parseDocument(doc);
+  if (!parsed.success) {
+    console.warn(`document ${doc._id} does not match the contract`, parsed.error.issues);
+    return doc as T;
+  }
+  return { ...doc, ...(parsed.data as object) } as T;
+};
+
 export const allOfType = async <T extends AnyDocument>(type: DocType): Promise<T[]> => {
   const result = await db.allDocs<AnyDocument>({ include_docs: true });
-  return result.rows.flatMap((row) => (row.doc?.type === type ? [row.doc as T] : []));
+  return result.rows.flatMap((row) => (row.doc?.type === type ? [upMigrate<T>(row.doc)] : []));
 };
 
 /** Fires whenever local data changes, including changes pulled in by sync. */

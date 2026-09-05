@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import type { RegisterDefinition, RegisterEntry } from '@shared';
 import { useLiveQuery, useWriteContext } from '@/data';
+import { useCanWrite, useOptionalStaffId } from '@/session';
 import { addEntry, listDefinitions, listEntries, publishDefinition } from '@/data/repos/registers';
 import type { EntryValues, RegisterDef, RegisterDraft, RegisterRow } from './types';
 
@@ -62,7 +63,7 @@ const project = (definitions: RegisterDefinition[], entries: RegisterEntry[]): R
 };
 
 export const RegistersProvider = ({ children }: { children: ReactNode }) => {
-  const context = useWriteContext();
+  const context = useWriteContext(useOptionalStaffId(), useCanWrite());
 
   const load = useCallback(async () => {
     const [definitions, entries] = await Promise.all([listDefinitions(), listEntries()]);

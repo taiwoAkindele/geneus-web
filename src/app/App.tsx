@@ -5,9 +5,10 @@ import { SessionProvider } from '@/session';
 import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/features/appointments';
 import { RegistersProvider } from '@/features/registers';
-import { AdminShell } from './AdminShell';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
+import { RequireFacility } from './RequireFacility';
+import { RequireShift } from './RequireShift';
 import { RouteIndex } from './RouteIndex';
 
 /**
@@ -143,9 +144,9 @@ const ScreenFallback = () => {
 
 const App = () => {
   return (
-    <SessionProvider>
-      <ToastProvider>
-        <DataProvider>
+    <ToastProvider>
+      <DataProvider>
+        <SessionProvider>
         <AppointmentsProvider>
         <RegistersProvider>
         <BrowserRouter>
@@ -156,7 +157,10 @@ const App = () => {
 
           {/* Auth & onboarding — brand-split card on tablet/desktop */}
           <Route element={<AuthShell />}>
-            <Route path="/login" element={<ShiftLoginScreen />} />
+            {/* A device with no facility can only register one. */}
+            <Route element={<RequireFacility />}>
+              <Route path="/login" element={<ShiftLoginScreen />} />
+            </Route>
             <Route path="/onboarding/start" element={<MagicLinkScreen />} />
             <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
             <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
@@ -166,7 +170,9 @@ const App = () => {
             <Route path="/reset-pin" element={<ResetPinScreen />} />
           </Route>
 
-          {/* Daily use — inside the responsive app shell (sidebar / bottom nav) */}
+          {/* Daily use — behind the facility and shift guards */}
+          <Route element={<RequireFacility />}>
+          <Route element={<RequireShift />}>
           <Route element={<AppShell />}>
             <Route path="/home" element={<FacilityHomeScreen />} />
             <Route path="/patients/search" element={<PatientSearchScreen />} />
@@ -185,16 +191,17 @@ const App = () => {
             <Route path="/referrals/track" element={<ReferralScreen />} />
             <Route path="/stock" element={<StockScreen />} />
             <Route path="/sync" element={<SyncCenterScreen />} />
-          </Route>
-          {/* Duplicate check is a modal-style screen — outside the shell for now */}
-          <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
 
-          {/* Facility admin — inside the admin rail shell */}
-          <Route element={<AdminShell />}>
+            {/* Facility admin — the same shell as daily use, reached from the
+                Admin nav entry; each screen deep-links to the next. */}
             <Route path="/admin" element={<AdminDashboardScreen />} />
             <Route path="/admin/staff" element={<ManageStaffScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
+          </Route>
+          {/* Duplicate check is a modal-style screen — outside the shell for now */}
+          <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
+          </Route>
           </Route>
 
           {/* Dev screen index (temporary) */}
@@ -206,9 +213,9 @@ const App = () => {
         </BrowserRouter>
         </RegistersProvider>
         </AppointmentsProvider>
-        </DataProvider>
-      </ToastProvider>
-    </SessionProvider>
+        </SessionProvider>
+      </DataProvider>
+    </ToastProvider>
   );
 };
 

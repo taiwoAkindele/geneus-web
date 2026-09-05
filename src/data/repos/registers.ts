@@ -5,7 +5,7 @@ import {
   type RegisterEntryValue,
   type RegisterFieldDef,
 } from '@shared';
-import { allOfType, envelope, newId, put, todayIso, type WriteContext } from '../db';
+import { allOfType, assertCanWrite, envelope, newId, put, todayIso, type WriteContext } from '../db';
 
 export type RegisterDraft = {
   name: string;
@@ -43,6 +43,7 @@ export const publishDefinition = async (
   registerId: string | null,
   context: WriteContext,
 ): Promise<RegisterDefinition> => {
+  assertCanWrite(context);
   const definitions = await listDefinitions();
   const id = registerId ?? newId('register_definition');
   const version = highestVersion(definitions, id) + 1;
@@ -74,6 +75,7 @@ export type AddEntryResult = { saved: true } | { saved: false; issues: string[] 
  * here rather than by a static schema (SCHEMA.md §9.3).
  */
 export const addEntry = async (draft: EntryDraft, context: WriteContext): Promise<AddEntryResult> => {
+  assertCanWrite(context);
   const definition = currentPublished(await listDefinitions(), draft.registerId);
   if (!definition) return { saved: false, issues: ['Publish this register before recording entries'] };
 

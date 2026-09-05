@@ -1,30 +1,23 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useSession } from '@/session';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import type { Facility } from '@shared';
 import { deviceId } from './device';
-import { seedIfEmpty } from './seed';
-import type { WriteContext } from './db';
-
-const WriteContextContext = createContext<WriteContext | null>(null);
+import { getFacility } from './repos/facility';
+import { useLiveQuery } from './hooks/useLiveQuery';
 
 /**
- * Supplies the facility/device/staff identity stamped on every document, and
- * makes sure the prototype's demo content exists before any screen reads.
+ * What this device is, and which facility it belongs to. The replica holds one
+ * facility document, written when the facility is registered — until then there
+ * is nothing to stamp documents with, and the app routes to onboarding.
  */
+export type DeviceContext = { deviceId: string; facility: Facility | undefined };
+
+const DeviceContextContext = createContext<DeviceContext | null>(null);
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const { user, facility } = useSession();
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<Error>();
+  const load = useCallback(() => getFacility(), []);
+  const { data, loading, error } = useLiveQuery(load);
 
-  const context = useMemo<WriteContext>(
-    () => ({ facilityId: facility.code, deviceId: deviceId(), staffId: user.staffId }),
-    [facility.code, user.staffId],
-  );
-
-  useEffect(() => {
-    seedIfEmpty(context)
-      .catch((cause) => setError(cause instanceof Error ? cause : new Error(String(cause))))
-      .finally(() => setReady(true));
-  }, [context]);
+  const value = useMemo<DeviceContext>(() => ({ deviceId: deviceId(), facility: data }), [data]);
 
   if (error) {
     return (
@@ -37,15 +30,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  if (!ready) {
+  if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-surface text-ink-muted">Loading…</div>;
   }
 
-  return <WriteContextContext.Provider value={context}>{children}</WriteContextContext.Provider>;
+  return <DeviceContextContext.Provider value={value}>{children}</DeviceContextContext.Provider>;
 };
 
-export const useWriteContext = (): WriteContext => {
-  const context = useContext(WriteContextContext);
-  if (!context) throw new Error('useWriteContext must be used within a DataProvider');
-  return context;
+export const useDeviceContext = (): DeviceContext => {
+  const device = useContext(DeviceContextContext);
+  if (!device) throw new Error('useDeviceContext must be used within a DataProvider');
+  return device;
+};
+
+/**
+ * The identity stamped on documents written here. Only valid once a facility
+ * exists; screens that write are all behind the facility and shift guards.
+ */
+export const useWriteContext = (staffId: string, canWrite: boolean) => {
+  const { deviceId: id, facility } = useDeviceContext();
+  return useMemo(
+    () => ({ facilityId: facility?.code ?? '', deviceId: id, staffId, canWrite }),
+    [facility?.code, id, staffId, canWrite],
+  );
 };
