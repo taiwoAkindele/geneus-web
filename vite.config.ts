@@ -11,4 +11,12 @@ export default defineConfig({
     },
   },
   plugins: [react()],
+  optimizeDeps: {
+    // The PowerSync client ships web workers and WASM that Vite's dependency
+    // pre-bundling would break (its own guidance for Vite projects).
+    exclude: ['@powersync/web'],
+  },
+  worker: {
+    format: 'es',
+  },
 });

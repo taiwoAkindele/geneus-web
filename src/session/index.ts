@@ -1,4 +1,4 @@
-export { SessionProvider, useAuth, useCanWrite, useOptionalStaffId, useSession } from './SessionProvider';
+export { SessionProvider, useAuth, useAuthorizationContext, useSession } from './SessionProvider';
 export type {
   AppNotification,
   Facility,

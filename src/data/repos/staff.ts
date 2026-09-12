@@ -1,44 +1,36 @@
-import { RosterShift, Staff, type Role, type StaffPermission } from '@shared';
-import { allOfType, assertCanWrite, db, envelope, newId, put, type WriteContext } from '../db';
+import type { AuthorizationContext, Role, RosterShift, Staff, StaffPermission } from '@shared';
+import { allOfType, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 
 export const listStaff = () => allOfType<Staff>('staff');
 export const listShifts = () => allOfType<RosterShift>('roster_shift');
 
-/**
- * Shifts are always written on the device; geneus-server signs them by sweep once they
- * replicate up (server PLAN §4.1), so a shift is unsigned until its first sync and
- * grants access either way. The contract requires the field, so an unsigned shift must
- * carry a marker that is visibly not-a-signature rather than plausible-looking.
- */
-export const UNSIGNED_ROSTER = 'unsigned:local-development';
-
 export const createStaff = (
   staff: { fullName: string; role: Role; permission: StaffPermission },
-  context: WriteContext,
+  context: AuthorizationContext,
 ): Promise<Staff> => {
-  assertCanWrite(context);
   const staffId = newId('staff');
-  return put(
-    Staff.parse({
-      ...envelope(context),
-      _id: staffId,
-      type: 'staff',
-      staffId,
-      fullName: staff.fullName,
-      role: staff.role,
-      permission: staff.permission,
-      active: true,
-    }),
-  );
+  return insertRecord<Staff>(context, 'staff:manage', 'staff', {
+    ...envelope(context),
+    id: staffId,
+    type: 'staff',
+    staffId,
+    fullName: staff.fullName,
+    role: staff.role,
+    permission: staff.permission,
+    active: true,
+  });
 };
 
 export const setPermission = async (
   staff: Staff,
   permission: StaffPermission,
-  context: WriteContext,
+  context: AuthorizationContext,
 ): Promise<void> => {
-  assertCanWrite(context);
-  await put(Staff.parse({ ...staff, permission }));
+  await updateRecord<Staff>(context, 'staff:permission', 'staff', staff.id, { permission });
+};
+
+export const removeStaff = async (staff: Staff, context: AuthorizationContext): Promise<void> => {
+  await updateRecord<Staff>(context, 'staff:deactivate', 'staff', staff.id, { active: false });
 };
 
 export const today = (): string => new Date().toISOString().slice(0, 10);
@@ -46,36 +38,37 @@ export const today = (): string => new Date().toISOString().slice(0, 10);
 const shiftId = (staffId: string, day: string) => `roster_shift:${staffId}:${day}`;
 
 export const findShift = (shifts: RosterShift[], staffId: string, day = today()): RosterShift | undefined =>
-  shifts.find((shift) => shift._id === shiftId(staffId, day));
+  shifts.find((shift) => shift.id === shiftId(staffId, day));
 
-/** Replaces any existing window for that staff member on that day. */
+/**
+ * Sets the staff member's window for that day, replacing an existing one.
+ * Shifts are written unsigned; geneus-server signs them once they sync up
+ * (server PLAN §4.1), and a shift grants access either way.
+ */
 export const assignShift = async (
   shift: { staffId: string; day: string; startsAt: string; endsAt: string },
-  context: WriteContext,
+  context: AuthorizationContext,
 ): Promise<void> => {
-  assertCanWrite(context);
   const id = shiftId(shift.staffId, shift.day);
-  const existing = await db.get(id).catch(() => undefined);
-  await put(
-    RosterShift.parse({
-      ...envelope(context),
-      ...(existing ? { _rev: existing._rev } : {}),
-      _id: id,
-      type: 'roster_shift',
-      staffId: shift.staffId,
+  const existing = await findRecord<RosterShift>('roster_shift', id);
+  if (existing) {
+    await updateRecord<RosterShift>(context, 'roster:assign', 'roster_shift', id, {
       startsAt: shift.startsAt,
       endsAt: shift.endsAt,
-      signature: UNSIGNED_ROSTER,
-    }),
-  );
+    });
+    return;
+  }
+  await insertRecord<RosterShift>(context, 'roster:assign', 'roster_shift', {
+    ...envelope(context),
+    id,
+    type: 'roster_shift',
+    staffId: shift.staffId,
+    startsAt: shift.startsAt,
+    endsAt: shift.endsAt,
+  });
 };
 
 /** Supervisor "extend for the day" (PRD §14.1) — a logged, single-staff override. */
-export const extendShift = async (shift: RosterShift, until: string): Promise<void> => {
-  await put(RosterShift.parse({ ...shift, extendedUntil: until }));
-};
-
-export const removeStaff = async (staff: Staff, context: WriteContext): Promise<void> => {
-  assertCanWrite(context);
-  await put(Staff.parse({ ...staff, active: false }));
+export const extendShift = async (shift: RosterShift, until: string, context: AuthorizationContext): Promise<void> => {
+  await updateRecord<RosterShift>(context, 'roster:extend', 'roster_shift', shift.id, { extendedUntil: until });
 };

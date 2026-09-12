@@ -13,12 +13,14 @@
 
 - **Is:** the installable Progressive Web App — a *full offline replica app*, not a thin
   client. Core clinical flows (register, visit, registers, search, handoff, shift login)
-  run entirely against a **local PouchDB** that replicates directly with the facility's
-  CouchDB. There is no custom backend in the core write path.
-- **Is not:** the API server, the change-feed consumer, or the Postgres/reporting layer —
-  those live in `geneus-server`. `geneus-web` calls `geneus-server` only for the handful of
-  things CouchDB can't do alone: roster/auth issuance, referral routing, device
-  enrollment/wipe, exports, and reading government dashboards.
+  run entirely against a **local SQLite database** (PowerSync's client) that PowerSync
+  keeps in sync with the facility's slice of PostgreSQL. Local writes are authorised and
+  validated on the device before they are stored; PowerSync uploads them to
+  `geneus-server`, which authorises them again before PostgreSQL.
+- **Is not:** the API server or the PostgreSQL/reporting layer — those live in
+  `geneus-server`. `geneus-web` calls `geneus-server` directly only for what must happen
+  online: facility registration, device enrollment/revocation, the sync token, and the
+  upload of queued writes (both made by the PowerSync connector, not by screens).
 - **Shared contract:** document shapes, referral payload, roster schema, enrollment record,
   and API types come from the shared package (per root plan §9) — **never redefined here.**
 
@@ -26,7 +28,7 @@
 
 1. **Cheapest Android is the floor** — sub-$100, ~1–2 GB RAM, 2G/3G, shared between staff.
    Every dependency and screen is judged on the *actual worst phone*, not an emulator.
-2. **Offline is the default code path** — every write hits local PouchDB first and returns
+2. **Offline is the default code path** — every write hits local SQLite first and returns
    instantly; the UI never waits on the network; there is no "offline mode" toggle.
 3. **Usable in <60 min with no manual** (PRD §8) — a release gate, re-tested each milestone.
 4. **Solo builder** — favour few, boring, well-understood dependencies over cleverness;
@@ -40,10 +42,11 @@
 | UI framework | **React 18** | Ubiquitous, hireable later, huge ecosystem |
 | Build/dev | **Vite** | Fast dev loop; easy code-splitting; small output |
 | PWA/service worker | **vite-plugin-pwa (Workbox)** | Offline app shell + precache with little config |
-| Local datastore | **PouchDB (`pouchdb-browser`)** | Direct CouchDB replication; the core bet (root §2.2) |
+| Local datastore + sync | **PowerSync (`@powersync/web`) over SQLite (wa-sqlite WASM)** | Facility-scoped Sync Streams from PostgreSQL; upload queue, retries and reconnects handled by the SDK |
+| Local authorization | **`src/auth/authorization.ts`** over the shared permission matrix | Refuses a write before SQLite; the server re-decides on upload |
 | Routing | **React Router** | Standard; enables route-based code splitting |
 | Session/UI state | **Zustand** | Tiny; avoids Redux weight on low-end devices |
-| Data → UI binding | **Custom hooks over PouchDB `changes()`** | Live, reactive queries without a heavy data lib |
+| Data → UI binding | **Custom hooks over PowerSync's change events** | Live, reactive queries without a heavy data lib |
 | Forms | **React Hook Form** | Lightweight, uncontrolled inputs = fewer re-renders |
 | Validation | **Zod** (from shared package) | One schema validates forms *and* documents pre-write |
 | Styling | **Tailwind CSS** (purged) | Tiny shipped CSS; fast to build a consistent large-touch kit |
@@ -62,33 +65,51 @@
 │ Session/auth layer — offline shift login,     │  Zustand + local roster
 │   30/15/5 warnings, auto-logout, enrollment   │
 ├─────────────────────────────────────────────┤
-│ Data-access layer — typed repositories over   │  PouchDB + Zod + shared types
-│   PouchDB; live queries via changes() feed    │
+│ Authorization — AuthorizationContext from the  │  shared permission matrix + offline policy
+│   session; assertAllowed before every write    │
 ├─────────────────────────────────────────────┤
-│ Sync layer — background replication, sync-     │  PouchDB replication + status store
-│   state indicator, pending-change queue        │
+│ Data-access layer — typed repositories over   │  SQLite + Zod + shared types
+│   SQLite; live queries via change events      │
 ├─────────────────────────────────────────────┤
-│ PouchDB (IndexedDB) — the on-device replica    │  encrypted-at-rest (sensitive fields)
+│ Sync — PowerSync client: facility-scoped       │  connector → /sync/token, /sync/upload
+│   download, upload queue, retries, status      │
+├─────────────────────────────────────────────┤
+│ SQLite (wa-sqlite in a worker, IndexedDB VFS)  │  the on-device replica
 └─────────────────────────────────────────────┘
 ```
 
-- **Data-access layer is the only thing that touches PouchDB.** Screens never call PouchDB
-  directly — they use typed repositories (`patients`, `visits`, `registers`, `referrals`,
-  `stock`) so document shape, indexing, and validation live in one place.
-- **Every write is validated with the shared Zod schema before it hits PouchDB** — critical
-  because a bad doc written offline may not surface for up to 7 days at sync.
-- **Live UI** comes from subscribing to PouchDB's `changes()` feed, so a record edited in one
-  tab/unit updates everywhere instantly, online or off.
+- **The data-access layer is the only thing that touches SQLite.** Screens never run SQL —
+  they use typed repositories (`src/data/repos/*`) so record shape, mapping and validation
+  live in one place. `src/data/db.ts` is the single write path.
+- **Every write is authorised, then validated, then stored:** `insertRecord`/`updateRecord`
+  call `assertAllowed(context, permission)` first (a refusal throws and nothing is written —
+  so PowerSync has nothing to upload), then `parseDocument`. The server repeats both checks
+  on upload from its own facts; the local check exists so offline behaviour is deterministic.
+- **Live UI** comes from PowerSync's change events (`onChangeWithCallback`), so a record
+  edited in one tab/unit — or arriving by sync — updates everywhere, online or off.
+- **Wire mapping** (`src/data/rows.ts`, `contractShape.ts`): SQLite holds booleans as 1/0 and
+  lists/objects as JSON text; the schema and both mapping directions are derived from the
+  contract's Zod shapes, never hand-copied.
+- **The database opens lazily.** An unenrolled device holds no credential and never loads
+  the PowerSync client; `DataProvider` opens SQLite and connects only once a credential exists.
 
 ## 4. Cheap-Android performance budget (tracked like a test)
 
-- **Initial JS (gzipped) ≤ ~180 KB**; each lazy route chunk small. Fail CI if exceeded.
+- **Initial JS (gzipped) ≤ 300 KB** (raised from 180 KB for the PowerSync migration; measured
+  96.6 KB after it — the PowerSync client, ~65 KB gz across its chunks, loads only once the
+  device is enrolled). Measure with `vite build` + gzip of the entry and its
+  `modulepreload`s; fail CI if exceeded.
+- **The SQLite WASM is a one-time runtime asset, not initial JS, and is not hidden from the
+  budget:** the IndexedDB VFS build is 2.2 MB raw / 765 KB gzipped, fetched once per device
+  and cached. On a 2G link that is a first-install cost of a minute or two, never repeated.
+  If field measurement shows it bites, `OPFSCoopSyncVFS` uses the synchronous build (1.0 MB /
+  500 KB gz) — a measured decision, not a default.
 - **Route-based code splitting** — registration, visits, each register, dashboard, admin all
   lazy-loaded. A CHEW who only registers patients never downloads the dashboard code.
 - **Virtualise long lists** (patient search results, register history) — never render
   thousands of rows.
-- **Bounded local replica** — filtered replication pulls only active/recent facility data
-  (root §2.2), so IndexedDB and query cost stay small.
+- **Bounded local replica** — the Sync Streams deliver one facility's data; bounding it further
+  to active/recent records (root §2.2) is a stream-definition change on the server.
 - **Few re-renders** — uncontrolled forms, memoised list rows, avoid global re-render storms.
 - **Test on the real phone continuously**, not just Lighthouse — the M0 device (root §8) is
   the perf oracle.
@@ -101,11 +122,17 @@ geneus-web/
     app/            # app shell, routing, providers, service-worker registration
     ui/             # large-touch component kit (Button, Field, Card, Banner, Sheet…)
     session/        # offline shift login, roster eval, warnings, auto-logout, enrollment
+    auth/           # AuthorizationContext, assertAllowed — the rule before every write
     data/
-      db.ts         # PouchDB instance, indexes, encryption wrapper
-      repos/        # patients, visits, registers, referrals, stock, audit
-      hooks/        # useLiveQuery, useDoc, useSyncState
-    sync/           # replication setup, sync-state store, pending-change tracking
+      database.ts   # the PowerSync database, opened lazily once a credential exists
+      schema.ts     # SQLite schema derived from the contract (tables.ts names the tables)
+      db.ts         # the single write path: authorise → validate → SQLite; live change events
+      rows.ts       # SQLite ↔ contract value mapping (contractShape.ts reads the Zod kinds)
+      connector.ts  # PowerSync connector: /sync/token and /sync/upload as the device
+      sync.ts       # start sync, first-sync wait, de-enrollment (clear + restart)
+      deviceCredential.ts  # the device credential and last server contact
+      repos/        # patients, staff/roster, registers, appointments, facility
+      hooks/        # useLiveQuery, useSyncStatus
     features/
       registration/ # NASADOR form, dedup prompt, Patient ID display
       visit/        # guided visit notes, unit handoff
@@ -129,8 +156,8 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 
 ### FE-M0 — Foundations
 - Vite + React + TS + Tailwind skeleton; installable PWA shell that **loads fully offline**.
-- PouchDB instance + one repo + `useLiveQuery` hook; prove a **replication round-trip** and a
-  **deliberately-created conflict** surfaced in the UI.
+- SQLite + PowerSync + one repo + `useLiveQuery` hook; prove a **sync round-trip** and a
+  **deliberately-created conflict** surfaced as a `sync_rejection` in the UI.
 - Encryption-at-rest wrapper for sensitive fields (key management resolved with the auth
   design — see §7 open item).
 - The large-touch component kit v0 (Button, Field, Banner, Card) + the **sync-state
@@ -197,7 +224,10 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 - **The offline + conflict suite is the flagship** (root §4.1): simulate multi-device edits,
   7 days offline, reconnect → assert zero lost writes and every conflict visibly queued. Runs
   before every release.
-- **Schema/validation tests** — every repository rejects malformed docs via the shared Zod
+- **Authorization and write-boundary tests (Vitest, `npm test`)** — a denied write reaches
+  no SQLite statement; the connector sends the contract's shapes and completes only what the
+  server acknowledged; the row mapping round-trips PowerSync's wire types.
+- **Schema/validation tests** — every repository rejects malformed records via the shared Zod
   schema (guards the 7-day-late-failure risk).
 - **Component tests** for the clinical forms (registration, visit, each register) — correct
   data captured, dedup prompt fires, Patient ID format holds.

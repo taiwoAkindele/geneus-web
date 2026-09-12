@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import type { Appointment, Patient } from '@shared';
-import { useLiveQuery, useWriteContext } from '@/data';
-import { useCanWrite, useOptionalStaffId } from '@/session';
+import { useLiveQuery } from '@/data';
+import { useAuthorizationContext } from '@/session';
 import { book, listAppointments } from '@/data/repos/appointments';
 import { findPatient, listPatients } from '@/data/repos/patients';
 import type { BookedAppointment, NewAppointment } from './types';
@@ -39,7 +39,7 @@ const project = (appointments: Appointment[], patients: Patient[]): BookedAppoin
       const at = appointment.scheduledFor ?? appointment.createdOn;
       const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       return {
-        id: appointment._id,
+        id: appointment.id,
         patient: {
           id: appointment.patientId,
           name: patient?.fullName ?? 'Unknown patient',
@@ -56,7 +56,7 @@ const project = (appointments: Appointment[], patients: Patient[]): BookedAppoin
     });
 
 export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
-  const context = useWriteContext(useOptionalStaffId(), useCanWrite());
+  const context = useAuthorizationContext();
 
   const load = useCallback(async () => {
     const [appointments, patients] = await Promise.all([listAppointments(), listPatients()]);

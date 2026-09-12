@@ -2,9 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Role, StaffPermission } from "@shared";
 import { AppBar, Button, ChoiceChip, StatusPill, TextField, useToast } from "@/ui";
-import { useWriteContext } from "@/data";
 import { createStaff } from "@/data/repos/staff";
-import { useSession } from "@/session";
+import { useAuthorizationContext } from "@/session";
 
 const ROLES: { label: string; value: Role }[] = [
   { label: "CHEW", value: "chew" },
@@ -60,8 +59,7 @@ const PermissionCard = ({
 export const InviteStaffScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user } = useSession();
-  const context = useWriteContext(user.staffId, user.canWrite);
+  const context = useAuthorizationContext();
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<Role>("chew");
   const [permission, setPermission] = useState<StaffPermission>("read_write");
