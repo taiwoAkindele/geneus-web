@@ -46,3 +46,16 @@ export const post = <T>(path: string, body: unknown): Promise<T> =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+/**
+ * A call made as the enrolled device: the device credential rides as a Bearer
+ * token. A 401 here means the device is no longer enrolled, whatever it holds.
+ */
+export const postAsDevice = <T>(path: string, credential: string, body?: unknown): Promise<T> =>
+  request<T>(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${credential}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+export const isUnauthorized = (cause: unknown): boolean => cause instanceof ApiError && cause.status === 401;

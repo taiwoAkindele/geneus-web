@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { RosterShift, Staff } from '@shared';
+import type { AuthorizationContext, RosterShift, Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
+import { authorizationFor, nobody } from '@/auth/authorization';
 import { verifyPin } from './credentials';
 
 /**
@@ -54,6 +55,8 @@ type SessionValue = {
   user: SessionUser;
   facility: Facility;
   shift: Shift;
+  /** Who is acting, from where, with what rights — what every repository write is checked against. */
+  authorization: AuthorizationContext;
   notifications: AppNotification[];
   unreadCount: number;
   extendShift: () => void;
@@ -120,7 +123,7 @@ const timeLabel = (iso: string): string =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
-  const { facility } = useDeviceContext();
+  const { facility, deviceId } = useDeviceContext();
   const [staffId, setStaffId] = useState<string | null>(() => localStorage.getItem(SIGNED_IN_KEY));
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
   const [now, setNow] = useState(() => Date.now());
@@ -176,10 +179,22 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     [entry, onShift, loading, roster, signIn, signOut],
   );
 
+  const authorization = useMemo<AuthorizationContext>(
+    () =>
+      entry && onShift
+        ? authorizationFor({ staff: entry.staff, facilityId: facility?.code ?? '', deviceId })
+        : nobody(facility?.code ?? '', deviceId),
+    [entry, onShift, facility?.code, deviceId],
+  );
+
+  // Extending is a supervisor's permission (PRD §14.1); anyone else is refused
+  // by the repository, and the refusal surfaces like any other write error.
   const extend = useCallback(() => {
     if (!entry?.shift) return;
-    void persistExtension(entry.shift, new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString());
-  }, [entry]);
+    void persistExtension(entry.shift, new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(), authorization).catch(
+      (cause: unknown) => console.warn('shift extension refused', cause),
+    );
+  }, [entry, authorization]);
 
   const markAllRead = useCallback(
     () => setNotifications((list) => list.map((item) => ({ ...item, read: true }))),
@@ -199,6 +214,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         canWrite: staff.permission === 'read_write',
       },
       facility: { name: facility?.name ?? '', code: facility?.code ?? '' },
+      authorization,
       shift: {
         label: `${timeLabel(shift.startsAt)}–${timeLabel(shift.endsAt)}`,
         endsAtLabel: timeLabel(shift.extendedUntil ?? shift.endsAt),
@@ -209,7 +225,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       extendShift: extend,
       markAllRead,
     };
-  }, [entry, onShift, facility, notifications, now, extend, markAllRead]);
+  }, [entry, onShift, facility, authorization, notifications, now, extend, markAllRead]);
 
   return (
     <AuthContext.Provider value={auth}>
@@ -225,14 +241,18 @@ export const useAuth = (): AuthValue => {
 };
 
 /**
- * Who to attribute a write to. Feature providers mount above the shift guard, so
- * this falls back to 'system'; every screen that actually writes sits behind the
- * guard, where a signed-in staff id is guaranteed.
+ * The authorization context repositories check writes against. Feature
+ * providers mount above the shift guard, so with nobody signed in this is a
+ * context that holds no permission — any write through it is refused.
  */
-export const useOptionalStaffId = (): string => useContext(SessionContext)?.user.staffId ?? 'system';
-
-/** Read-only staff may look at records but not record care. */
-export const useCanWrite = (): boolean => useContext(SessionContext)?.user.canWrite ?? false;
+export const useAuthorizationContext = (): AuthorizationContext => {
+  const session = useContext(SessionContext);
+  const { facility, deviceId } = useDeviceContext();
+  return useMemo(
+    () => session?.authorization ?? nobody(facility?.code ?? '', deviceId),
+    [session?.authorization, facility?.code, deviceId],
+  );
+};
 
 /** Only valid behind the shift guard — screens outside it have no signed-in staff. */
 export const useSession = (): SessionValue => {

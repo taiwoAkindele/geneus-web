@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { StaffPermission } from '@shared';
 import { AppBar, Avatar, Button, Card, Icon, StatusPill, ToggleSwitch, useToast } from '@/ui';
-import { useWriteContext } from '@/data';
 import { setPermission } from '@/data/repos/staff';
-import { useAuth, useSession } from '@/session';
+import { useAuth, useAuthorizationContext } from '@/session';
 
 const ROLE_LABELS: Record<string, string> = {
   chew: 'CHEW',
@@ -28,8 +27,7 @@ export const RolesPermissionsScreen = () => {
   const toast = useToast();
   const { staffId } = (useLocation().state ?? {}) as { staffId?: string };
   const { roster } = useAuth();
-  const { user } = useSession();
-  const context = useWriteContext(user.staffId, user.canWrite);
+  const context = useAuthorizationContext();
   const [saving, setSaving] = useState(false);
   const [permission, setLocalPermission] = useState<StaffPermission>();
 

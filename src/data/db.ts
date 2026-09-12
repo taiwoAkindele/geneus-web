@@ -1,44 +1,32 @@
-import PouchDB from 'pouchdb-browser';
-import { parseDocument, SCHEMA_VERSION, type AnyDocument, type DocType } from '@shared';
+import {
+  parseDocument,
+  SCHEMA_VERSION,
+  type AnyDocument,
+  type AuthorizationContext,
+  type DocType,
+  type Permission,
+} from '@shared';
+import { assertAllowed } from '@/auth/authorization';
+import { getDatabase } from './database';
+import { fromRow, toRow, type Row } from './rows';
+import { ALL_TABLES, TABLE_FOR } from './tables';
 
 /**
- * The device's local replica — the app's source of truth while offline. Writes
- * land here first and return immediately; replication with the facility's
- * CouchDB is added on top later without changing any caller.
+ * The device's local database — the app's source of truth while offline.
+ * Writes land here first and return immediately; PowerSync carries them up
+ * when there is signal. Only `src/data` may import this module; repositories
+ * are the write boundary.
  *
- * Only `src/data` may import this module.
+ * Every write goes: authorization → contract validation → SQLite. A denial
+ * throws before anything is written, so PowerSync has nothing to upload
+ * (root §4.3, migration plan §15).
  */
-export const db: PouchDB.Database<AnyDocument> = new PouchDB('geneus');
+export { AuthorizationError } from '@/auth/authorization';
 
-/** Facility and device identity are stamped on every document (SCHEMA.md §2). */
-export type WriteContext = {
-  facilityId: string;
-  deviceId: string;
-  staffId: string;
-  /** False for read-only staff, who may look at records but not record care. */
-  canWrite: boolean;
-};
-
-export class PermissionError extends Error {
-  constructor() {
-    super('Your access is read-only — ask a facility admin to change it');
-    this.name = 'PermissionError';
-  }
-}
-
-/**
- * Read-only access is enforced here rather than only in the UI, so a hidden
- * button is a courtesy and this is the actual rule — the same way shift access
- * is enforced on the device (root §4.3).
- */
-export const assertCanWrite = (context: WriteContext): void => {
-  if (!context.canWrite) throw new PermissionError();
-};
-
-/** Thrown when a document fails the shared contract; never write past this. */
+/** Thrown when a record fails the shared contract; never write past this. */
 export class ContractError extends Error {
   constructor(readonly issues: string[]) {
-    super(`Document rejected by the shared contract: ${issues.join('; ')}`);
+    super(`Record rejected by the shared contract: ${issues.join('; ')}`);
     this.name = 'ContractError';
   }
 }
@@ -50,60 +38,83 @@ export const todayIso = (): string => nowIso().slice(0, 10);
 export const newId = (type: DocType): string =>
   `${type}:${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
-export const envelope = (context: WriteContext, createdOn = nowIso()) => ({
+/** Facility, device and staff identity are stamped on every record (SCHEMA.md §2). */
+export const envelope = (context: AuthorizationContext, createdOn = nowIso()) => ({
   facilityId: context.facilityId,
   deviceId: context.deviceId,
-  createdBy: context.staffId,
+  createdBy: context.userId,
   createdOn,
   schemaVersion: SCHEMA_VERSION,
 });
 
-/**
- * The single write path: validate against the contract, then persist. A document
- * written offline may not sync for 7 days, so a bad shape must be caught here
- * rather than at the far end (SCHEMA.md §1).
- */
-export const put = async <T extends AnyDocument>(doc: T): Promise<T> => {
-  const result = parseDocument(doc);
+const validate = <T extends AnyDocument>(record: unknown): T => {
+  const result = parseDocument(record);
   if (!result.success) {
-    throw new ContractError(result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
+    throw new ContractError(result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
   }
-  const validated = result.data as T;
-  const response = await db.put(validated as PouchDB.Core.PutDocument<AnyDocument>);
-  return { ...validated, _rev: response.rev };
+  return result.data as T;
+};
+
+const placeholders = (count: number): string => Array.from({ length: count }, () => '?').join(', ');
+
+/**
+ * Creates a record. `permission` is checked first; then the contract; then the
+ * row is inserted, which is what PowerSync queues as a PUT.
+ */
+export const insertRecord = async <T extends AnyDocument>(
+  context: AuthorizationContext,
+  permission: Permission,
+  type: DocType,
+  record: unknown,
+): Promise<T> => {
+  assertAllowed(context, permission);
+  const validated = validate<T>(record);
+  const row = toRow(type, validated);
+  const columns = Object.keys(row);
+  await getDatabase().execute(
+    `INSERT INTO ${TABLE_FOR[type]} (${columns.join(', ')}) VALUES (${placeholders(columns.length)})`,
+    columns.map((column) => row[column]),
+  );
+  return validated;
 };
 
 /**
- * Scans the replica and filters on `type`. Ids don't all share a type prefix
- * (a register definition's id is `${registerId}:v${version}`), so a key range
- * would silently miss documents. The replica is deliberately bounded, so a scan
- * is fast enough; revisit if a real facility's data outgrows it.
+ * Changes some fields of an existing record. Only the changed columns are
+ * written (plus who changed them and when), which is what PowerSync queues as
+ * a PATCH — and what lets the server merge column by column. The merged record
+ * is validated against the contract before anything is written.
  */
-/**
- * Applies the contract's defaults to a stored document, so one written before a
- * field existed behaves like one written today (SCHEMA.md §7) — without this, a
- * new optional field reads back as `undefined` and silently changes behaviour.
- *
- * Unknown keys are kept rather than stripped: a document may have been written
- * by a device running a newer contract, and reading must never quietly discard
- * what it does not recognise.
- */
-const upMigrate = <T extends AnyDocument>(doc: AnyDocument): T => {
-  const parsed = parseDocument(doc);
-  if (!parsed.success) {
-    console.warn(`document ${doc._id} does not match the contract`, parsed.error.issues);
-    return doc as T;
-  }
-  return { ...doc, ...(parsed.data as object) } as T;
+export const updateRecord = async <T extends AnyDocument>(
+  context: AuthorizationContext,
+  permission: Permission,
+  type: DocType,
+  id: string,
+  changes: Partial<T>,
+): Promise<T> => {
+  assertAllowed(context, permission);
+  const current = await findRecord<T>(type, id);
+  if (!current) throw new Error(`no ${type} ${id} to change`);
+  const stamped = { ...changes, updatedBy: context.userId, updatedOn: nowIso() };
+  const merged = validate<T>({ ...current, ...stamped });
+  const row = toRow(type, stamped);
+  const columns = Object.keys(row);
+  await getDatabase().execute(
+    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((column) => `${column} = ?`).join(', ')} WHERE id = ?`,
+    [...columns.map((column) => row[column]), id],
+  );
+  return merged;
 };
 
 export const allOfType = async <T extends AnyDocument>(type: DocType): Promise<T[]> => {
-  const result = await db.allDocs<AnyDocument>({ include_docs: true });
-  return result.rows.flatMap((row) => (row.doc?.type === type ? [upMigrate<T>(row.doc)] : []));
+  const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]}`);
+  return rows.map((row) => fromRow<T>(type, row));
+};
+
+export const findRecord = async <T extends AnyDocument>(type: DocType, id: string): Promise<T | undefined> => {
+  const row = await getDatabase().getOptional<Row>(`SELECT * FROM ${TABLE_FOR[type]} WHERE id = ?`, [id]);
+  return row ? fromRow<T>(type, row) : undefined;
 };
 
 /** Fires whenever local data changes, including changes pulled in by sync. */
-export const onChange = (listener: () => void): (() => void) => {
-  const feed = db.changes({ since: 'now', live: true }).on('change', listener);
-  return () => feed.cancel();
-};
+export const onChange = (listener: () => void): (() => void) =>
+  getDatabase().onChangeWithCallback({ onChange: listener }, { tables: [...ALL_TABLES] });

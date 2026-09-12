@@ -4,8 +4,8 @@ import type { Facility } from '@shared';
 import { Button, SegmentedControl, TextField, useToast } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { suggestCode } from '@/data/repos/facility';
-import { pullOnce, saveSyncCredential } from '@/data/sync';
 import { assignShift, today } from '@/data/repos/staff';
+import { authorizationFor } from '@/auth/authorization';
 import { registerFacility } from '@/lib/api/facilities';
 
 type Level = 'primary' | 'secondary' | 'tertiary';
@@ -24,13 +24,14 @@ const endOfToday = (): string => {
 
 /**
  * Registers the facility and its first account. This is the one online step:
- * the server has to create the facility's database, its validation guard and
- * this device's sync credential before any document can exist.
+ * the server has to create the facility, its first admin and this device's
+ * credential before any record can exist. The credential is stored, sync is
+ * started, and the facility and admin come down before the admin sets a PIN.
  */
 export const RegisterFacilityScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
-  const { deviceId } = useDeviceContext();
+  const { deviceId, enroll } = useDeviceContext();
   const { inviteToken } = (useLocation().state ?? {}) as { inviteToken?: string };
 
   const [name, setName] = useState('');
@@ -51,7 +52,7 @@ export const RegisterFacilityScreen = () => {
     if (!complete || saving) return;
     setSaving(true);
     try {
-      const { admin, sync } = await registerFacility({
+      const { admin, device } = await registerFacility({
         code: facilityCode,
         name: name.trim(),
         state: state.trim(),
@@ -61,12 +62,12 @@ export const RegisterFacilityScreen = () => {
         deviceId,
         inviteToken,
       });
-      saveSyncCredential(sync);
-      await pullOnce(sync);
+      await enroll(device);
       // Whoever registers the facility is on duty now, or nobody could get in.
+      // The admin assigns their own first shift: they hold roster:assign.
       await assignShift(
         { staffId: admin.staffId, day: today(), startsAt: new Date().toISOString(), endsAt: endOfToday() },
-        { facilityId: facilityCode, deviceId, staffId: 'system', canWrite: true },
+        authorizationFor({ staff: admin, facilityId: facilityCode, deviceId: device.deviceId }),
       );
       navigate('/onboarding/accept', { state: { staffId: admin.staffId, fullName: admin.fullName, role: 'Facility Admin' } });
     } catch (cause) {

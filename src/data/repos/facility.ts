@@ -3,8 +3,8 @@ import { allOfType } from '../db';
 
 /**
  * One facility per device: its code is the facilityId stamped on every
- * document. The document itself is created by the server at registration and
- * replicated down — never written here.
+ * record. The record itself is created by the server at registration and
+ * synced down — never written here.
  */
 export const getFacility = async (): Promise<Facility | undefined> => (await allOfType<Facility>('facility'))[0];
 

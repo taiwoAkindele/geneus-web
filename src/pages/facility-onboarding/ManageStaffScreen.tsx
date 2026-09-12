@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Avatar, Button, Card, Sheet, StatusPill, Tag, TextField, useToast } from '@/ui';
-import { useWriteContext } from '@/data';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
-import { hasPin, useAuth, useSession, type RosterEntry } from '@/session';
+import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
 
 const ROLE_LABELS: Record<string, string> = {
   chew: 'CHEW',
@@ -33,8 +32,7 @@ const atToday = (time: string): string => {
 
 const ShiftSheet = ({ entry, onClose }: { entry: RosterEntry; onClose: () => void }) => {
   const toast = useToast();
-  const { user } = useSession();
-  const context = useWriteContext(user.staffId, user.canWrite);
+  const context = useAuthorizationContext();
   const [start, setStart] = useState(entry.shift ? timeLabel(entry.shift.startsAt) : '08:00');
   const [end, setEnd] = useState(entry.shift ? timeLabel(entry.shift.endsAt) : '16:00');
   const [saving, setSaving] = useState(false);
@@ -89,7 +87,7 @@ export const ManageStaffScreen = () => {
   const toast = useToast();
   const { roster, loading } = useAuth();
   const { user } = useSession();
-  const context = useWriteContext(user.staffId, user.canWrite);
+  const context = useAuthorizationContext();
   const [editing, setEditing] = useState<RosterEntry | null>(null);
 
   const onShift = roster.filter(onShiftNow);

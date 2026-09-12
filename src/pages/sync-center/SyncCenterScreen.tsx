@@ -1,37 +1,61 @@
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Button, Stat, StatusPill } from '@/ui';
+import { indicatorFor, useSyncStatus } from '@/data';
 import { useAuth } from '@/session';
+
+const lastSyncedLabel = (at: Date | undefined): string => {
+  if (!at) return 'Never synced';
+  const minutes = Math.round((Date.now() - at.getTime()) / 60_000);
+  if (minutes < 1) return 'Synced just now';
+  if (minutes < 60) return `Synced ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `Synced ${hours} h ago`;
+  return `Synced ${Math.round(hours / 24)} days ago`;
+};
 
 /**
  * 4.10 Sync center & shift warning. Sync state is honest — nothing is lost when
- * the internet drops — and the system closes access on time, fairly.
+ * the internet drops — and the system closes access on time, fairly. The
+ * numbers are PowerSync's own: the upload queue and the last completed sync.
  */
 export const SyncCenterScreen = () => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const sync = useSyncStatus();
+  const indicator = indicatorFor(sync);
+  const headline =
+    indicator === 'error'
+      ? 'Sync problem'
+      : indicator === 'offline'
+        ? 'Offline — changes are safe on this device'
+        : sync.pending > 0
+          ? 'Syncing to cloud'
+          : 'Up to date';
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="Sync & device" onBack={() => navigate(-1)} right={<StatusPill status="syncing" />} />
+      <AppBar title="Sync & device" onBack={() => navigate(-1)} right={<StatusPill status={indicator} />} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:max-w-3xl">
         <div className="flex-1 space-y-5 px-5 py-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
           {/* Sync status */}
           <div>
             <div className="rounded-[18px] border border-outline-soft bg-white p-4">
               <div className="mb-3.5 flex items-center justify-between">
-                <span className="text-base font-bold">Syncing to cloud</span>
-                <span className="font-mono text-[13px] text-slate-text">3 of 12</span>
+                <span className="text-base font-bold">{headline}</span>
+                <span className="font-mono text-[13px] text-slate-text">{lastSyncedLabel(sync.lastSyncedAt)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-surface-high">
-                <div className="h-full w-1/4 bg-slate" />
+                <div className={`h-full bg-slate ${sync.pending > 0 ? 'w-1/2' : 'w-full'}`} />
               </div>
               <div className="mt-4 flex justify-between text-center">
-                <Stat value="184" label="Saved on device" />
-                <Stat value="9" label="Waiting" tone="amber" />
+                <Stat value={sync.connected ? 'Yes' : 'No'} label="Connected" />
+                <Stat value={String(sync.pending)} label="Waiting" tone={sync.pending > 0 ? 'amber' : undefined} />
                 <Stat value="0" label="Lost" />
               </div>
             </div>
             <p className="mx-1 mt-3.5 text-[13px] leading-relaxed text-ink-muted">
-              Everything is safe on this device. Nothing is ever lost because the internet dropped.
+              {sync.error
+                ? `The last sync attempt failed: ${sync.error}. Changes stay on this device and are retried automatically.`
+                : 'Everything is safe on this device. Nothing is ever lost because the internet dropped.'}
             </p>
           </div>
 
