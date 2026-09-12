@@ -7,15 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "size": "node scripts/check-bundle-size.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
     "@powersync/web": "^2.3.1",
-    "events": "^3.3.0",
     "lucide-react": "^1.23.0",
-    "pouchdb-browser": "^9.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
@@ -23,7 +22,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/pouchdb-browser": "^6.1.5",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
