@@ -237,10 +237,12 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 
 ## 9. Immediate next steps
 
-1. Scaffold Vite + React + TS + Tailwind + vite-plugin-pwa; confirm installable offline shell
-   on the **target phone**.
-2. Stand up PouchDB + one repo + `useLiveQuery`; prove replication round-trip + surfaced
-   conflict (this de-risks the whole architecture).
-3. Build the component kit v0 and the sync-state indicator shell.
-4. **Depends on shared contract:** finalize the CouchDB document schemas (root §3 / schema doc)
-   before writing repositories — the repos are generated against those types.
+1. Add vite-plugin-pwa so the shell — and the SQLite WASM — are precached; confirm the
+   installable offline shell on the **target phone**.
+2. Run the real flow on that phone against the compose stack: register a facility, work a
+   day offline, reconnect; watch the Sync Center and the reconcile queue (this is the field
+   proof of the migration; the connector and the stack are proven by tests, the browser
+   wiring is not yet).
+3. Wire the remaining mock screens (patient search, registration, encounter) to the
+   repositories as their contract shapes land.
+4. Resolve the encryption-at-rest key-management item (§7) before FE-M1 hardening.
