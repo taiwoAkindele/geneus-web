@@ -28,12 +28,17 @@ export type ConnectorOptions = {
 export const toMutation = (entry: CrudEntry): UploadMutation => {
   const table = TYPE_FOR[entry.table];
   if (!table) throw new Error(`queued write for unknown table ${entry.table}`);
+  const data = decodeValues(table, entry.opData ?? {});
+  // PowerSync omits unchanged columns from a PATCH, so a second edit by the same
+  // person arrives without `updatedBy`; db.ts put the actor in the write's
+  // metadata for exactly this case, and the server insists on knowing who.
+  if (entry.op === 'PATCH' && data.updatedBy === undefined && entry.metadata) data.updatedBy = entry.metadata;
   return {
     clientId: entry.clientId,
     op: entry.op.toLowerCase() as UploadMutation['op'],
     table,
     id: entry.id,
-    data: decodeValues(table, entry.opData ?? {}),
+    data,
     ...(entry.previousValues ? { previous: decodeValues(table, entry.previousValues) } : {}),
   };
 };

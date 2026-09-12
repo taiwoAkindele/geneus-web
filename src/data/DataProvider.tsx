@@ -20,9 +20,11 @@ export type DeviceContext = {
   enrolled: boolean;
   /**
    * Stores a freshly issued credential, opens the database and waits (bounded)
-   * for the first sync. Resolves when the facility can be read locally.
+   * for the first sync. Resolves true once the facility can be read locally,
+   * false if the wait ran out — sync keeps trying either way, and the facility
+   * shows up through `facility` when it lands.
    */
-  enroll: (credential: DeviceCredential) => Promise<void>;
+  enroll: (credential: DeviceCredential) => Promise<boolean>;
 };
 
 const DeviceContextContext = createContext<DeviceContext | null>(null);
@@ -78,9 +80,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const enroll = useCallback(async (issued: DeviceCredential) => {
     saveDeviceCredential(issued);
     const db = await startSync();
-    await waitForFirstSync(db);
+    // Switch to the enrolled tree now, so the facility shows the moment it
+    // lands rather than when this bounded wait gives up.
     setCredential(issued);
     setOpen(true);
+    return waitForFirstSync(db);
   }, []);
 
   const unenrolled = useMemo<DeviceContext>(

@@ -98,9 +98,11 @@ export const updateRecord = async <T extends AnyDocument>(
   const merged = validate<T>({ ...current, ...stamped });
   const row = toRow(type, stamped);
   const columns = Object.keys(row);
+  // `_metadata` is PowerSync's per-write note, not a contract field: it carries the
+  // actor even when `updatedBy` is unchanged and therefore absent from the PATCH.
   await getDatabase().execute(
-    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((column) => `${column} = ?`).join(', ')} WHERE id = ?`,
-    [...columns.map((column) => row[column]), id],
+    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((column) => `${column} = ?`).join(', ')}, _metadata = ? WHERE id = ?`,
+    [...columns.map((column) => row[column]), context.userId, id],
   );
   return merged;
 };

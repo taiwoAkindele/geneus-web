@@ -109,7 +109,7 @@ describe('repositories', () => {
       expect(db.statements).toEqual([]);
 
       await extendShift(existingShift as never, '2026-09-12T20:00:00Z', contextFor('supervisor'));
-      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET extendedUntil = \?, updatedBy = \?, updatedOn = \? WHERE id = \?$/);
+      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET extendedUntil = \?, updatedBy = \?, updatedOn = \?, _metadata = \? WHERE id = \?$/);
     });
 
     it('a record that fails the contract is refused before any write', async () => {
@@ -136,10 +136,12 @@ describe('repositories', () => {
       await setPermission(existingNurse, 'read_only', contextFor('facility_admin'));
 
       const [statement] = db.statements;
-      expect(statement.sql).toBe('UPDATE staff SET permission = ?, updatedBy = ?, updatedOn = ? WHERE id = ?');
+      expect(statement.sql).toBe('UPDATE staff SET permission = ?, updatedBy = ?, updatedOn = ?, _metadata = ? WHERE id = ?');
       expect(statement.parameters[0]).toBe('read_only');
       expect(statement.parameters[1]).toBe('staff:facility_admin');
-      expect(statement.parameters[3]).toBe('staff:nurse');
+      // The actor also rides in PowerSync's write metadata, for PATCHes that omit updatedBy.
+      expect(statement.parameters[3]).toBe('staff:facility_admin');
+      expect(statement.parameters[4]).toBe('staff:nurse');
     });
 
     it('deactivates by flag, never by delete', async () => {

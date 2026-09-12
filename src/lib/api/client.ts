@@ -54,7 +54,12 @@ export const post = <T>(path: string, body: unknown): Promise<T> =>
 export const postAsDevice = <T>(path: string, credential: string, body?: unknown): Promise<T> =>
   request<T>(path, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${credential}` },
+    // A JSON content-type with no body is a 400 at the server, so the header
+    // goes only with a body; the token call sends none.
+    headers:
+      body === undefined
+        ? { authorization: `Bearer ${credential}` }
+        : { 'content-type': 'application/json', authorization: `Bearer ${credential}` },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 

@@ -43,6 +43,8 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
   const record: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(row)) {
     if (value === null || value === undefined) continue;
+    // PowerSync's own columns (`_metadata`) are not part of the record.
+    if (field.startsWith('_')) continue;
     switch (kinds[field]) {
       case 'boolean':
         record[field] = value === 1 || value === true || value === '1';

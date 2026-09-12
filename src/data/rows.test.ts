@@ -57,6 +57,11 @@ describe('fromRow', () => {
     expect('updatedBy' in patient).toBe(false);
   });
 
+  it("leaves PowerSync's own _metadata column out of the record", () => {
+    const patient = fromRow<Patient>('patient', { ...wirePatient, _metadata: 'staff:nurse' });
+    expect('_metadata' in patient).toBe(false);
+  });
+
   it('coerces the string a numeric column arrives as', () => {
     const item = fromRow<StockItem>('stock_item', {
       id: 'stock_item:x',

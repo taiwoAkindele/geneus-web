@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { Facility } from '@shared';
+import type { Facility, Staff } from '@shared';
 import { Button, SegmentedControl, TextField, useToast } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { suggestCode } from '@/data/repos/facility';
 import { assignShift, today } from '@/data/repos/staff';
 import { authorizationFor } from '@/auth/authorization';
 import { registerFacility } from '@/lib/api/facilities';
+import { SyncingFacility } from '@/app/SyncingFacility';
 
 type Level = 'primary' | 'secondary' | 'tertiary';
 
@@ -23,6 +24,25 @@ const endOfToday = (): string => {
 };
 
 /**
+ * Enrolling swaps the provider tree and remounts this screen, and a slow first
+ * sync may outlive it entirely — so what registration still owes (the admin's
+ * first shift, the PIN step) is kept in sessionStorage until the facility has
+ * actually arrived, and survives a reload.
+ */
+const PENDING_KEY = 'geneus.pendingRegistration';
+type PendingRegistration = { facilityCode: string; facilityName: string; admin: Staff };
+
+const readPending = (): PendingRegistration | undefined => {
+  const raw = sessionStorage.getItem(PENDING_KEY);
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as PendingRegistration;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Registers the facility and its first account. This is the one online step:
  * the server has to create the facility, its first admin and this device's
  * credential before any record can exist. The credential is stored, sync is
@@ -31,8 +51,12 @@ const endOfToday = (): string => {
 export const RegisterFacilityScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
-  const { deviceId, enroll } = useDeviceContext();
+  const { deviceId, enroll, facility } = useDeviceContext();
   const { inviteToken } = (useLocation().state ?? {}) as { inviteToken?: string };
+  const [pending, setPending] = useState<PendingRegistration | undefined>(() => readPending());
+  // The facility record re-renders on every local change (it is a live query), so
+  // this must fire once per registration, not once per render that sees a facility.
+  const finishing = useRef(false);
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -44,6 +68,30 @@ export const RegisterFacilityScreen = () => {
 
   const facilityCode = (code || suggestCode(name)).toUpperCase();
   const complete = Boolean(name.trim() && facilityCode && state.trim() && lga.trim() && adminName.trim());
+
+  // The facility has landed: finish what registration owes, then on to the PIN.
+  useEffect(() => {
+    if (!pending || !facility || finishing.current) return;
+    finishing.current = true;
+    sessionStorage.removeItem(PENDING_KEY);
+    (async () => {
+      // Whoever registers the facility is on duty now, or nobody could get in.
+      // The admin assigns their own first shift: they hold roster:assign.
+      await assignShift(
+        { staffId: pending.admin.staffId, day: today(), startsAt: new Date().toISOString(), endsAt: endOfToday() },
+        authorizationFor({ staff: pending.admin, facilityId: pending.facilityCode, deviceId }),
+      );
+      navigate('/onboarding/accept', {
+        state: { staffId: pending.admin.staffId, fullName: pending.admin.fullName, role: 'Facility Admin' },
+      });
+    })().catch((cause: unknown) => {
+      finishing.current = false;
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+      toast(cause instanceof Error ? cause.message : 'Could not finish registration');
+    });
+  }, [pending, facility, deviceId, navigate, toast]);
+
+  if (pending) return <SyncingFacility facilityName={pending.facilityName} />;
 
   // Registration is only reachable by spending an invite code.
   if (!inviteToken) return <Navigate to="/onboarding/start" replace />;
@@ -62,14 +110,13 @@ export const RegisterFacilityScreen = () => {
         deviceId,
         inviteToken,
       });
+      // From here the facility exists on the server and this device is enrolled:
+      // the rest waits for the facility to sync down (the effect above), however
+      // long that takes, and survives the remount that enrolling causes.
+      const registration: PendingRegistration = { facilityCode, facilityName: name.trim(), admin };
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify(registration));
+      setPending(registration);
       await enroll(device);
-      // Whoever registers the facility is on duty now, or nobody could get in.
-      // The admin assigns their own first shift: they hold roster:assign.
-      await assignShift(
-        { staffId: admin.staffId, day: today(), startsAt: new Date().toISOString(), endsAt: endOfToday() },
-        authorizationFor({ staff: admin, facilityId: facilityCode, deviceId: device.deviceId }),
-      );
-      navigate('/onboarding/accept', { state: { staffId: admin.staffId, fullName: admin.fullName, role: 'Facility Admin' } });
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : 'Could not create the facility');
       setSaving(false);
