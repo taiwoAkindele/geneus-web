@@ -39,6 +39,10 @@ const tableFor = (type: DocType): Table => {
     // Previous values ride along with each local change, so the server can tell
     // "both devices changed this column" from "only this one did" (SCHEMA.md §7).
     trackPrevious: { onlyWhenChanged: true },
+    // A PATCH carries only the columns that changed, so a second edit by the same
+    // person would omit `updatedBy`. The actor rides in PowerSync's per-write
+    // metadata instead, and the connector restores it (db.ts, connector.ts).
+    trackMetadata: true,
   });
 };
 

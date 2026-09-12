@@ -45,6 +45,18 @@ describe('connector', () => {
       expect(mutation.previous).toEqual({ phone: '0801' });
     });
 
+    it('restores the actor of a patch from the write metadata when updatedBy was unchanged and omitted', () => {
+      const mutation = toMutation(entry({ op: 'PATCH' as CrudEntry['op'], table: 'roster_shifts', id: 'roster_shift:x', opData: { extendedUntil: '2026-09-12T20:00:00Z', updatedOn: '2026-09-12T18:00:00Z' }, metadata: 'staff:supervisor' }));
+
+      expect(mutation.data.updatedBy).toBe('staff:supervisor');
+    });
+
+    it('keeps an explicit updatedBy over the metadata', () => {
+      const mutation = toMutation(entry({ op: 'PATCH' as CrudEntry['op'], table: 'patients', id: 'X-Y-000001-K2', opData: { phone: '0802', updatedBy: 'staff:nurse' }, metadata: 'staff:other' }));
+
+      expect(mutation.data.updatedBy).toBe('staff:nurse');
+    });
+
     it('refuses a table the contract does not know', () => {
       expect(() => toMutation(entry({ op: 'PUT' as CrudEntry['op'], table: 'ps_secret', id: 'x' }))).toThrow(/unknown table/);
     });
@@ -58,7 +70,11 @@ describe('connector', () => {
       const credentials = await createConnector({ onDeenrolled: vi.fn() }).fetchCredentials();
 
       expect(credentials).toEqual({ endpoint: 'http://sync', token: 'jwt', expiresAt: new Date('2026-09-12T13:00:00Z') });
-      expect(fetch.mock.calls[0]?.[1] as RequestInit).toMatchObject({ headers: expect.objectContaining({ authorization: 'Bearer device-1.secret' }) });
+      const init = fetch.mock.calls[0]?.[1] as RequestInit;
+      expect(init).toMatchObject({ headers: expect.objectContaining({ authorization: 'Bearer device-1.secret' }) });
+      // No body, so no JSON content-type: Fastify rejects an empty JSON body with a 400.
+      expect(init.body).toBeUndefined();
+      expect((init.headers as Record<string, string>)['content-type']).toBeUndefined();
       expect(lastServerContactOn()).toBe('2026-09-12T12:00:00Z');
     });
 
