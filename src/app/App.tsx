@@ -59,16 +59,8 @@ const CreatePinScreen = lazy(() =>
 const ShiftLoginScreen = lazy(() =>
   import('@/pages/staff-onboarding/ShiftLoginScreen').then((m) => ({ default: m.ShiftLoginScreen })),
 );
-const ForgotPinScreen = lazy(() =>
-  import('@/pages/staff-onboarding/ForgotPinScreen').then((m) => ({ default: m.ForgotPinScreen })),
-);
-const ResetLinkSentScreen = lazy(() =>
-  import('@/pages/staff-onboarding/ResetLinkSentScreen').then((m) => ({
-    default: m.ResetLinkSentScreen,
-  })),
-);
-const ResetPinScreen = lazy(() =>
-  import('@/pages/staff-onboarding/ResetPinScreen').then((m) => ({ default: m.ResetPinScreen })),
+const PinApprovalScreen = lazy(() =>
+  import('@/pages/staff-onboarding/PinApprovalScreen').then((m) => ({ default: m.PinApprovalScreen })),
 );
 
 // Daily use
@@ -160,14 +152,12 @@ const App = () => {
             {/* A device with no facility can only register one. */}
             <Route element={<RequireFacility />}>
               <Route path="/login" element={<ShiftLoginScreen />} />
+              <Route path="/onboarding/approve" element={<PinApprovalScreen />} />
             </Route>
             <Route path="/onboarding/start" element={<MagicLinkScreen />} />
             <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
             <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
             <Route path="/onboarding/accept" element={<CreatePinScreen />} />
-            <Route path="/forgot-pin" element={<ForgotPinScreen />} />
-            <Route path="/forgot-pin/sent" element={<ResetLinkSentScreen />} />
-            <Route path="/reset-pin" element={<ResetPinScreen />} />
           </Route>
 
           {/* Daily use — behind the facility and shift guards */}
@@ -204,8 +194,8 @@ const App = () => {
           </Route>
           </Route>
 
-          {/* Dev screen index (temporary) */}
-          <Route path="/menu" element={<RouteIndex />} />
+          {/* Dev screen index — development builds only; it lists every screen unguarded. */}
+          {import.meta.env.DEV ? <Route path="/menu" element={<RouteIndex />} /> : null}
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

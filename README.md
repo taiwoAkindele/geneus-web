@@ -17,6 +17,11 @@ npm run build        # then measure: gzip of the entry + its modulepreloads must
 Set `VITE_API_URL` to reach a server elsewhere; the PowerSync endpoint is not configured
 here — the server hands it to the device at enrollment.
 
+Set `VITE_SIGNING_PUBLIC_KEY` to the server's public key (the second line `npm run
+key:generate` prints in geneus-server) so sign-in can check roster signatures offline.
+Without it every shift counts as unsigned, which is fine in development and a gap in
+production: a shift edited on the phone would not be caught.
+
 ## How a write travels
 
 ```

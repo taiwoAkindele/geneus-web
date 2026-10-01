@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Button, StatusPill, Tag } from '@/ui';
+import { AppBar, Avatar, Button, Tag } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { BookAppointmentSheet, useAppointments } from '@/features/appointments';
 
 const PATIENT = {
@@ -71,7 +72,7 @@ export const PatientProfileScreen = () => {
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Patient profile" onBack={() => navigate('/patients/search')} right={<StatusPill status="synced" />} />
+      <AppBar title="Patient profile" onBack={() => navigate('/patients/search')} right={<SyncPill />} />
       <div className="w-full px-5 py-2 md:px-8">
         {/* profile header */}
         <div className="rounded-card bg-brand p-5 text-white">

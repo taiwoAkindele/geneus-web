@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Icon, type IconName, Stat, StatusPill, Tag } from '@/ui';
+import { Icon, type IconName, Stat, Tag } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { useSession } from '@/session';
 
 const ReferralRow = ({
@@ -80,7 +81,7 @@ export const FacilityHomeScreen = () => {
       <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
         {/* Phone shows its own sync pill (no top header on mobile); sm+ uses the AppHeader. */}
         <div className="flex justify-end px-5 pt-4 sm:hidden">
-          <StatusPill status="synced" />
+          <SyncPill />
         </div>
         <header className="flex items-center justify-between px-5 pb-3 pt-2">
           <div>

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Stat, StatusPill, Tag } from '@/ui';
+import { Avatar, Stat, Tag } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { hasPin, useAuth, useSession, type RosterEntry } from '@/session';
 
 /** A setup-checklist row: done = filled amber check, todo = amber ring. */
@@ -153,7 +154,7 @@ export const AdminDashboardScreen = () => {
             <h1 className="text-[21px] font-extrabold tracking-[-0.02em] sm:text-2xl">{facility.name}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <StatusPill status="synced" />
+            <SyncPill />
             <Tag tone="amber">ADMIN</Tag>
           </div>
         </div>

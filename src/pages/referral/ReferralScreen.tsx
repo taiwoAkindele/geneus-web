@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, Icon, StatusPill, Tag, useToast } from '@/ui';
+import { AppBar, Button, Icon, Tag, useToast } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 
 const TRAVELS = ['Name, age, sex', 'Allergies', 'Current meds', 'Reason'];
 
@@ -122,7 +123,7 @@ export const ReferralScreen = () => {
     <>
       {/* ---- Phone / tablet: single referral tracker ---- */}
       <div className="flex min-h-screen flex-col bg-surface lg:hidden">
-        <AppBar title="Referral" onBack={() => navigate(-1)} right={<StatusPill status="offline" />} />
+        <AppBar title="Referral" onBack={() => navigate(-1)} right={<SyncPill />} />
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
           <div className="flex-1 space-y-4 px-5 py-3">
             <div className="rounded-card border border-outline-soft bg-white p-4">

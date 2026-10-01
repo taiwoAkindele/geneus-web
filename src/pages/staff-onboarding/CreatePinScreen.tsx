@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PinDots, PinKeypad } from '@/ui';
-import { setPin as storePin } from '@/session';
+import { isPinSetupApproved, setPin as storePin, takePinSetupApproval } from '@/session';
 
 type AcceptState = { staffId?: string; fullName?: string; role?: string };
 
@@ -9,6 +9,9 @@ type AcceptState = { staffId?: string; fullName?: string; role?: string };
  * 3.1 Accept invite · create PIN. The staff member sets a 4-digit PIN in two
  * passes (choose, then confirm) that they'll use to sign in at the start of
  * every shift. The PIN stays on this device and never enters the replica.
+ *
+ * Only reachable with an approval (pinApproval.ts) — from the approval screen,
+ * or straight after registering the facility for its first admin.
  */
 export const CreatePinScreen = () => {
   const navigate = useNavigate();
@@ -18,7 +21,7 @@ export const CreatePinScreen = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
 
-  if (!staffId) return <Navigate to="/login" replace />;
+  if (!staffId || !isPinSetupApproved(staffId)) return <Navigate to="/login" replace />;
 
   const onDigit = async (digit: string) => {
     if (pin.length >= 4) return;
@@ -39,7 +42,7 @@ export const CreatePinScreen = () => {
       setPin('');
       return;
     }
-    await storePin(staffId, next);
+    if (takePinSetupApproval(staffId)) await storePin(staffId, next);
     navigate('/login', { replace: true });
   };
 

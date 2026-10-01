@@ -3,16 +3,18 @@ import type { AuthorizationContext, RosterShift, Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
 import { authorizationFor, nobody } from '@/auth/authorization';
-import { verifyPin } from './credentials';
+import { lastServerContactOn } from '@/data/deviceCredential';
+import { checkPin } from './credentials';
+import { checkShiftSignature, isFrozen } from './signInChecks';
 
 /**
  * Shift login (PRD §14.1). Access is evaluated entirely on this device against
  * the roster and staff documents already in the replica, so a facility with no
  * signal can still start its day. Sign-out never waits for the network.
  *
- * Not yet enforced, because both need geneus-server: the roster's signature is
- * a development placeholder (see UNSIGNED_ROSTER), and the 7-day sync-or-freeze
- * window needs the server's clock as its authority (root §4.3).
+ * Beyond the PIN and the shift window, sign-in refuses a device that has not
+ * synced in 7 days (root §4.3) and a shift whose server signature no longer
+ * matches it (signInChecks.ts).
  */
 export type SessionUser = {
   staffId: string;
@@ -38,7 +40,10 @@ export type AppNotification = {
   read: boolean;
 };
 
-export type SignInFailure = 'unknown-staff' | 'wrong-pin' | 'off-shift';
+export type SignInFailure = 'unknown-staff' | 'wrong-pin' | 'locked' | 'off-shift' | 'sync-required' | 'shift-altered';
+
+/** Why sign-in was refused; `retryAt` comes with a lockout. */
+export type SignInRefusal = { reason: SignInFailure; retryAt?: number };
 
 export type RosterEntry = { staff: Staff; shift: RosterShift | undefined };
 
@@ -47,7 +52,7 @@ type AuthValue = {
   loading: boolean;
   /** Staff on this facility's roster, for the login screen's picker. */
   roster: RosterEntry[];
-  signIn: (staffId: string, pin: string) => Promise<SignInFailure | undefined>;
+  signIn: (staffId: string, pin: string) => Promise<SignInRefusal | undefined>;
   signOut: () => void;
 };
 
@@ -159,11 +164,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [staffId, loading, entry, onShift, signOut]);
 
   const signIn = useCallback(
-    async (candidateId: string, pin: string): Promise<SignInFailure | undefined> => {
+    async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
       const candidate = roster.find((member) => member.staff.staffId === candidateId);
-      if (!candidate) return 'unknown-staff';
-      if (!(await verifyPin(candidateId, pin))) return 'wrong-pin';
-      if (!candidate.shift || !covers(candidate.shift, Date.now())) return 'off-shift';
+      if (!candidate) return { reason: 'unknown-staff' };
+      if (isFrozen(lastServerContactOn())) return { reason: 'sync-required' };
+      const pinCheck = await checkPin(candidateId, pin);
+      if (!pinCheck.ok) {
+        return pinCheck.reason === 'locked' ? { reason: 'locked', retryAt: pinCheck.retryAt } : { reason: 'wrong-pin' };
+      }
+      if (!candidate.shift || !covers(candidate.shift, Date.now())) return { reason: 'off-shift' };
+      if ((await checkShiftSignature(candidate.shift)) === 'invalid') return { reason: 'shift-altered' };
       localStorage.setItem(SIGNED_IN_KEY, candidateId);
       // Re-anchor the clock: the coarse tick could still be behind a shift that
       // began seconds ago, which would read as off-shift and sign them out.

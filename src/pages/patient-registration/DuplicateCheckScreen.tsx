@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Button, StatusPill } from '@/ui';
+import { Avatar, Button } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 
 const MATCH_TAGS = ['✓ Name matches', '✓ Phone matches', '✓ Age matches'];
 
@@ -12,7 +13,7 @@ export const DuplicateCheckScreen = () => {
   return (
     <div className="relative flex min-h-screen flex-col bg-surface">
       <div className="flex justify-end px-5 pt-4">
-        <StatusPill status="offline" />
+        <SyncPill />
       </div>
 
       {/* Blurred form behind the sheet */}

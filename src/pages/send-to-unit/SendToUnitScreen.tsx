@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Button, ChoiceChip, StatusPill, useToast } from '@/ui';
+import { AppBar, Avatar, Button, ChoiceChip, useToast } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 
 const UNITS = ['Injection Room', 'Pharmacy', 'Antenatal Care', 'Family Planning'];
 
@@ -33,7 +34,7 @@ export const SendToUnitScreen = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
+      <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<SyncPill />} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 px-5 py-3">
           {/* Patient */}

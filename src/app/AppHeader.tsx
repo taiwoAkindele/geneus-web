@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, StatusPill } from '@/ui';
+import { Icon } from '@/ui';
+import { SyncPill } from './SyncPill';
 import { formatCountdown, useSession, useShiftCountdown } from '@/session';
 import { NotificationList } from './NotificationList';
 
@@ -65,7 +66,7 @@ export const AppHeader = () => {
       </button>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <StatusPill status="synced" />
+        <SyncPill />
 
         {/* Shift chip — tap for the sync/shift center. */}
         <button

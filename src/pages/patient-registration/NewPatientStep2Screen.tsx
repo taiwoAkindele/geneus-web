@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AppBar, Button, ChoiceChip, SegmentedControl, StatusPill, TextField } from '@/ui';
+import { AppBar, Button, ChoiceChip, SegmentedControl, TextField } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import type { RegNavState } from './NewPatientStep1Screen';
 
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
@@ -24,7 +25,7 @@ export const NewPatientStep2Screen = () => {
         onBack={() => navigate(-1)}
         right={
           <div className="flex items-center gap-2">
-            <StatusPill status="offline" />
+            <SyncPill />
             <span className="font-mono text-[11px] text-ink-muted">Step 2 of 2</span>
           </div>
         }

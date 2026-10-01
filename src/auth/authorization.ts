@@ -72,6 +72,26 @@ export const authorizationFor = (input: {
 });
 
 /**
+ * The one context a person acts in before they have a PIN: marking the PIN
+ * setup code issued for them as used, and nothing else. No role grants
+ * `pin_setup_code:claim`; the server accepts it only from the code's own staff
+ * member (SCHEMA.md §10).
+ */
+export const claimingFor = (input: {
+  staff: Pick<Staff, 'staffId' | 'role'>;
+  facilityId: string;
+  deviceId: string;
+}): AuthorizationContext => ({
+  userId: input.staff.staffId,
+  facilityId: input.facilityId,
+  deviceId: input.deviceId,
+  role: input.staff.role,
+  permissions: ['pin_setup_code:claim'],
+  policyVersion: POLICY_VERSION,
+  lastServerContactOn: lastServerContactOn(),
+});
+
+/**
  * Nobody signed in: holds no permission, so every write is refused. Used where
  * a provider mounts above the shift guard and has no session yet.
  */
