@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Avatar, Stat, Tag } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { hasPin, useAuth, useSession, type RosterEntry } from '@/session';
+import { RecoveryEmailCard } from './RecoveryEmailCard';
 
 /** A setup-checklist row: done = filled amber check, todo = amber ring. */
 const ChecklistItem = ({ done, children }: { done?: boolean; children: string }) => (
@@ -165,6 +166,7 @@ export const AdminDashboardScreen = () => {
           <Counts className="flex items-center justify-around rounded-[18px] border border-outline-soft bg-white px-5 py-4" />
           <Checklist />
           <StaffOnShift />
+          <RecoveryEmailCard />
           <div className="sm:col-span-2">
             <Tiles />
           </div>

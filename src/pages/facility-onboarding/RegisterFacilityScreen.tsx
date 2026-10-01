@@ -6,7 +6,7 @@ import { useDeviceContext } from '@/data';
 import { suggestCode } from '@/data/repos/facility';
 import { assignShift, today } from '@/data/repos/staff';
 import { authorizationFor } from '@/auth/authorization';
-import { registerFacility } from '@/lib/api/facilities';
+import { registerFacility, sendRegistrationEmailCode } from '@/lib/api/facilities';
 import { SyncingFacility } from '@/app/SyncingFacility';
 import { approvePinSetup } from '@/session';
 
@@ -64,11 +64,32 @@ export const RegisterFacilityScreen = () => {
   const [state, setState] = useState('');
   const [lga, setLga] = useState('');
   const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  /** Where the code went; the code field appears once it has. */
+  const [codeSentTo, setCodeSentTo] = useState<string>();
+  const [sendingCode, setSendingCode] = useState(false);
   const [level, setLevel] = useState<Level>('primary');
   const [saving, setSaving] = useState(false);
 
   const facilityCode = (code || suggestCode(name)).toUpperCase();
-  const complete = Boolean(name.trim() && facilityCode && state.trim() && lga.trim() && adminName.trim());
+  const complete = Boolean(
+    name.trim() && facilityCode && state.trim() && lga.trim() && adminName.trim() && codeSentTo && /^\d{6}$/.test(emailCode.trim()),
+  );
+
+  const sendCode = async () => {
+    if (!adminEmail.trim() || !inviteToken || sendingCode) return;
+    setSendingCode(true);
+    try {
+      const sent = await sendRegistrationEmailCode(adminEmail.trim(), inviteToken);
+      setCodeSentTo(sent.sentTo);
+      setEmailCode('');
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : 'Could not send the code');
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   // The facility has landed: finish what registration owes, then on to the PIN.
   useEffect(() => {
@@ -110,6 +131,8 @@ export const RegisterFacilityScreen = () => {
         lga: lga.trim(),
         level: LEVELS[level],
         adminFullName: adminName.trim(),
+        adminEmail: adminEmail.trim(),
+        emailCode: emailCode.trim(),
         deviceId,
         inviteToken,
       });
@@ -193,6 +216,39 @@ export const RegisterFacilityScreen = () => {
             value={adminName}
             onChange={(e) => setAdminName(e.target.value)}
           />
+
+          <div className="space-y-2">
+            <TextField
+              label="Your email"
+              hint="If you ever forget your PIN, a PIN code can be emailed here. We send a code now to check it."
+              placeholder="e.g. amaka@example.org"
+              name="admin_email"
+              type="email"
+              autoComplete="email"
+              value={adminEmail}
+              onChange={(e) => {
+                setAdminEmail(e.target.value);
+                setCodeSentTo(undefined);
+              }}
+            />
+            <Button variant="secondary" disabled={!adminEmail.trim()} loading={sendingCode} onClick={sendCode}>
+              {codeSentTo ? 'Send a new code' : 'Send code'}
+            </Button>
+          </div>
+
+          {codeSentTo ? (
+            <TextField
+              label="Code from the email"
+              hint={`Sent to ${codeSentTo}. It lasts 15 minutes.`}
+              placeholder="6 digits"
+              name="admin_email_code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={emailCode}
+              onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
+            />
+          ) : null}
         </div>
 
         <footer className="border-t border-outline-soft bg-surface px-5 pb-6 pt-4">
