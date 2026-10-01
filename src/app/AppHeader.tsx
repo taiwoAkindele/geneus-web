@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@/ui';
 import { SyncPill } from './SyncPill';
-import { formatCountdown, useSession, useShiftCountdown } from '@/session';
+import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/session';
 import { NotificationList } from './NotificationList';
 
 /**
@@ -68,15 +68,15 @@ export const AppHeader = () => {
       <div className="ml-auto flex items-center gap-1.5">
         <SyncPill />
 
-        {/* Shift chip — tap for the sync/shift center. */}
+        {/* Shift chip — tap for the sync/shift center. An admin has no shift to end (accessPolicy.ts). */}
         <button
           type="button"
           onClick={() => navigate('/sync')}
           className="flex min-h-0 items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1.5 text-xs font-bold text-ink-soft"
-          aria-label={`Shift ends at ${shift.endsAtLabel}`}
+          aria-label={shift ? `Shift ends at ${shift.endsAtLabel}` : 'Admin access — signs out after 30 minutes idle'}
         >
-          <Icon name="clock" className="h-4 w-4" />
-          <span className="font-mono">{shift.endsAtLabel}</span>
+          <Icon name={shift ? 'clock' : 'lock'} className="h-4 w-4" />
+          {shift ? <span className="font-mono">{shift.endsAtLabel}</span> : <span>Admin access</span>}
         </button>
 
         {/* Notification bell */}
@@ -115,7 +115,12 @@ const shiftTone = (minutesLeft: number) => {
  * live countdown. On phones the slim ShiftCountdownStrip does this job instead.
  */
 export const ShiftBanner = () => {
-  const { shift, extendShift } = useSession();
+  const { shift } = useSession();
+  return shift ? <ShiftBannerFor shift={shift} /> : null;
+};
+
+const ShiftBannerFor = ({ shift }: { shift: Shift }) => {
+  const { extendShift } = useSession();
   const [dismissed, setDismissed] = useState(false);
   const seconds = useShiftCountdown(shift.minutesLeft);
   const { minutesLeft, endsAtLabel } = shift;
@@ -159,8 +164,13 @@ export const ShiftBanner = () => {
  * last 30 minutes of a shift; escalates and shows a live m:ss countdown.
  */
 export const ShiftCountdownStrip = () => {
+  const { shift } = useSession();
+  return shift ? <ShiftCountdownStripFor shift={shift} /> : null;
+};
+
+const ShiftCountdownStripFor = ({ shift }: { shift: Shift }) => {
   const navigate = useNavigate();
-  const { shift, extendShift } = useSession();
+  const { extendShift } = useSession();
   const seconds = useShiftCountdown(shift.minutesLeft);
 
   if (shift.minutesLeft > 30) return null;

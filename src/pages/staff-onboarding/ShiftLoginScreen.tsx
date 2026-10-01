@@ -31,6 +31,8 @@ const lastSyncedLabel = (iso: string): string =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const shiftLabel = (entry: RosterEntry): string => {
+  // A facility admin signs in shift or no shift (accessPolicy.ts).
+  if (entry.staff.role === 'facility_admin') return 'Any time';
   if (!entry.shift) return 'No shift today';
   const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   return `${time(entry.shift.startsAt)}–${time(entry.shift.endsAt)}`;
@@ -231,7 +233,10 @@ export const ShiftLoginScreen = () => {
                           {ROLE_LABELS[entry.staff.role] ?? entry.staff.role}
                         </div>
                       </div>
-                      <Tag tone={hasPin(entry.staff.staffId) && entry.shift ? 'green' : 'amber'} className="font-mono">
+                      <Tag
+                        tone={hasPin(entry.staff.staffId) && (entry.shift || entry.staff.role === 'facility_admin') ? 'green' : 'amber'}
+                        className="font-mono"
+                      >
                         {hasPin(entry.staff.staffId) ? shiftLabel(entry) : 'Set PIN'}
                       </Tag>
                     </button>
