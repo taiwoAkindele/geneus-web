@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, Icon, type IconName, StatusPill } from '@/ui';
+import { AppBar, Button, Icon, type IconName } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 
 type Trend = 'up-bad' | 'down-good' | 'flat';
 
@@ -45,7 +46,7 @@ export const MonthlySummaryScreen = () => {
   const navigate = useNavigate();
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="This month" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
+      <AppBar title="This month" onBack={() => navigate(-1)} right={<SyncPill />} />
       <div className="flex w-full flex-1 flex-col">
         <div className="px-5 pb-1 text-[13px] text-ink-muted md:px-8">July 2026 · Odo-Ona Elewe PHC</div>
 

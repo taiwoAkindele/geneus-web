@@ -2,12 +2,27 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
 import { useDeviceContext } from '@/data';
-import { hasPin, useAuth, type RosterEntry, type SignInFailure } from '@/session';
+import { hasPin, pinLength, useAuth, type RosterEntry, type SignInRefusal } from '@/session';
 
-const FAILURE_MESSAGES: Record<SignInFailure, string> = {
-  'unknown-staff': 'That staff member is not on this facility’s roster',
-  'wrong-pin': 'Wrong PIN — try again',
-  'off-shift': 'You are not on shift right now — no shift, no access',
+const minutesUntil = (at: number): number => Math.max(1, Math.ceil((at - Date.now()) / 60_000));
+
+const failureMessage = ({ reason, retryAt }: SignInRefusal): string => {
+  switch (reason) {
+    case 'unknown-staff':
+      return 'That staff member is not on this facility’s roster';
+    case 'wrong-pin':
+      return 'Wrong PIN — try again';
+    case 'locked':
+      return `Too many wrong PINs — try again in ${minutesUntil(retryAt ?? Date.now())} min`;
+    case 'off-shift':
+      return 'You are not on shift right now — no shift, no access';
+    case 'sync-required':
+      return 'This phone hasn’t synced in 7 days — connect to the internet to sign in';
+    case 'shift-altered':
+      return 'This shift was changed on this phone — ask your admin';
+    case 'pin-upgrade':
+      return 'PINs are now 6 digits — choose a new one';
+  }
 };
 
 const shiftLabel = (entry: RosterEntry): string => {
@@ -35,7 +50,7 @@ export const ShiftLoginScreen = () => {
   const { roster, loading, signIn, signedIn } = useAuth();
   const [staffId, setStaffId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
-  const [failure, setFailure] = useState<SignInFailure>();
+  const [failure, setFailure] = useState<SignInRefusal>();
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
@@ -43,30 +58,48 @@ export const ShiftLoginScreen = () => {
   }, [signedIn, navigate]);
 
   const selected = roster.find((entry) => entry.staff.staffId === staffId);
+  // Old 4-digit PINs still work once, so the keypad completes at their length.
+  const digits = staffId ? pinLength(staffId) : 6;
+
+  /** Setting a PIN — first time or forgotten — always needs someone's approval first. */
+  const askForApproval = (entry: RosterEntry, reset: boolean) =>
+    navigate('/onboarding/approve', {
+      state: {
+        staffId: entry.staff.staffId,
+        fullName: entry.staff.fullName,
+        role: ROLE_LABELS[entry.staff.role] ?? entry.staff.role,
+        reset,
+      },
+    });
 
   const choose = (entry: RosterEntry) => {
     if (hasPin(entry.staff.staffId)) {
       setStaffId(entry.staff.staffId);
       return;
     }
-    navigate('/onboarding/accept', {
-      state: {
-        staffId: entry.staff.staffId,
-        fullName: entry.staff.fullName,
-        role: ROLE_LABELS[entry.staff.role] ?? entry.staff.role,
-      },
-    });
+    askForApproval(entry, false);
   };
 
   const onDigit = async (digit: string) => {
-    if (!staffId || pin.length >= 4 || checking) return;
+    if (!staffId || pin.length >= digits || checking) return;
     setFailure(undefined);
     const next = pin + digit;
     setPin(next);
-    if (next.length < 4) return;
+    if (next.length < digits) return;
 
     setChecking(true);
     const result = await signIn(staffId, next);
+    if (result?.reason === 'pin-upgrade' && selected) {
+      navigate('/onboarding/accept', {
+        state: {
+          staffId: selected.staff.staffId,
+          fullName: selected.staff.fullName,
+          role: ROLE_LABELS[selected.staff.role] ?? selected.staff.role,
+          upgrade: true,
+        },
+      });
+      return;
+    }
     if (result) {
       setFailure(result);
       setPin('');
@@ -139,10 +172,10 @@ export const ShiftLoginScreen = () => {
                     Not you?
                   </button>
                 </div>
-                <PinDots filled={pin.length} className={failure ? 'animate-shake' : ''} />
+                <PinDots length={digits} filled={pin.length} className={failure ? 'animate-shake' : ''} />
                 {failure ? (
                   <div className="mt-3 text-center text-[13px] font-semibold text-danger">
-                    {FAILURE_MESSAGES[failure]}
+                    {failureMessage(failure)}
                   </div>
                 ) : null}
               </>
@@ -191,13 +224,15 @@ export const ShiftLoginScreen = () => {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => navigate('/forgot-pin')}
-            className="mt-5 min-h-0 text-[13px] font-semibold text-brand-accent-soft"
-          >
-            Forgot PIN?
-          </button>
+          {selected ? (
+            <button
+              type="button"
+              onClick={() => askForApproval(selected, true)}
+              className="mt-5 min-h-0 text-[13px] font-semibold text-brand-accent-soft"
+            >
+              Forgot PIN?
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

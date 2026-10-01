@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { StaffPermission } from '@shared';
-import { AppBar, Avatar, Button, Card, Icon, StatusPill, ToggleSwitch, useToast } from '@/ui';
+import { AppBar, Avatar, Button, Card, Icon, ToggleSwitch, useToast } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { setPermission } from '@/data/repos/staff';
 import { useAuth, useAuthorizationContext } from '@/session';
 
@@ -65,7 +66,7 @@ export const RolesPermissionsScreen = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title={`${firstName}'s access`} onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
+      <AppBar title={`${firstName}'s access`} onBack={() => navigate(-1)} right={<SyncPill />} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
         <div className="flex-1 space-y-4 px-5 py-3">
           <Card className="flex items-center gap-3">

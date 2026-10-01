@@ -37,6 +37,7 @@ export const fakeDatabase = (seed: Record<string, Record<string, unknown>[]> = {
     currentStatus: {} as SyncStatus,
     connect: async () => undefined,
     disconnectAndClear: async () => undefined,
+    close: async () => undefined,
     waitForFirstSync: async () => undefined,
     getNextCrudTransaction: async () => transactions.shift() ?? null,
   };

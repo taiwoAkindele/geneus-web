@@ -1,6 +1,6 @@
+import { destroySecureStorage } from '@/lib/secureStorage';
 import { createConnector } from './connector';
-import { openDatabase, type LocalDatabase } from './database';
-import { clearDeviceCredential } from './deviceCredential';
+import { databaseCatchingUp, destroyDatabases, openDatabase, type LocalDatabase } from './database';
 
 /**
  * Starting and stopping synchronisation for this device. PowerSync does the
@@ -13,13 +13,14 @@ const FIRST_SYNC_TIMEOUT_MS = 30_000;
 /**
  * De-enrollment as the device experiences it: its credential stops working.
  * The local replica is cleared — it is the facility's data, not the phone's
- * (root §4.3c) — and the app restarts into onboarding. Unsynced local writes
- * are lost with it; the server would have refused them anyway.
+ * (root §4.3c) — and the device key is destroyed with every secret under it:
+ * the credential, the PINs and the database key. The app restarts into
+ * onboarding. Unsynced local writes are lost with it; the server would have
+ * refused them anyway.
  */
 const onDeenrolled = async (): Promise<void> => {
-  const db = await openDatabase();
-  await db.disconnectAndClear();
-  clearDeviceCredential();
+  await destroyDatabases();
+  await destroySecureStorage();
   if (typeof window !== 'undefined') window.location.replace('/onboarding/start');
 };
 
@@ -30,6 +31,9 @@ const onDeenrolled = async (): Promise<void> => {
 export const startSync = async (): Promise<LocalDatabase> => {
   const db = await openDatabase();
   await db.connect(createConnector({ onDeenrolled }));
+  // The encrypted database replacing a legacy one downloads in the background;
+  // it has no local writes, so it never uploads (database.ts).
+  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled }));
   return db;
 };
 

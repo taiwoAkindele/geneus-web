@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, StatusPill, Tag } from '@/ui';
+import { AppBar, Avatar, Tag } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { useAppointments, type BookedAppointment } from '@/features/appointments';
 
 const AppointmentRow = ({ appt, onOpen }: { appt: BookedAppointment; onOpen: () => void }) => (
@@ -37,7 +38,7 @@ export const AppointmentsScreen = () => {
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Appointments" onBack={() => navigate('/encounters')} right={<StatusPill status="synced" />} />
+      <AppBar title="Appointments" onBack={() => navigate('/encounters')} right={<SyncPill />} />
       <div className="w-full px-5 py-2 md:px-8">
         <div className="pb-1 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-strong">Appointments</div>
         <h1 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em]">Today &amp; upcoming</h1>

@@ -28,8 +28,6 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { to: '/login', label: 'Shift login (PIN)', note: 'Default screen' },
       { to: '/onboarding/accept', label: 'Accept invite · create PIN', note: 'From the link' },
-      { to: '/forgot-pin', label: 'Forgot PIN', note: '' },
-      { to: '/reset-pin', label: 'Reset PIN', note: 'From the link' },
     ],
   },
   {

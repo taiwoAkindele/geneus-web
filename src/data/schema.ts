@@ -19,6 +19,7 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   register_entry: { register: ['registerId'], patient: ['patientId'] },
   roster_shift: { staff: ['staffId'] },
   sync_rejection: { open: ['resolvedOn'] },
+  pin_setup_code: { staff: ['staffId'] },
 };
 
 const COLUMN_FOR: Record<FieldKind, typeof column.text> = {

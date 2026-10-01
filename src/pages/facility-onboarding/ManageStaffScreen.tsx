@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Button, Card, Sheet, StatusPill, Tag, TextField, useToast } from '@/ui';
+import type { PinSetupCodeIssued } from '@shared';
+import { AppBar, Avatar, Button, Card, Sheet, Tag, TextField, useToast } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
+import { issuePinSetupCode } from '@/lib/api/staff';
 import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -82,6 +85,67 @@ const ShiftSheet = ({ entry, onClose }: { entry: RosterEntry; onClose: () => voi
   );
 };
 
+/**
+ * A one-time code that lets this person set or reset their PIN on any of the
+ * facility's phones — so the admin need not be there. Issued by the server on
+ * request (online only); shown once and never stored on this phone.
+ */
+const PinCodeSheet = ({ entry, issuedBy, onClose }: { entry: RosterEntry; issuedBy: string; onClose: () => void }) => {
+  const [issued, setIssued] = useState<PinSetupCodeIssued>();
+  const [error, setError] = useState<string>();
+  const [creating, setCreating] = useState(false);
+
+  const create = async () => {
+    if (creating) return;
+    setCreating(true);
+    setError(undefined);
+    try {
+      setIssued(await issuePinSetupCode(entry.staff.staffId, issuedBy));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not create a code');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Sheet onClose={onClose} eyebrow="PIN code" title={entry.staff.fullName}>
+      {issued ? (
+        <>
+          <div className="rounded-card bg-brand-tint px-4 py-5 text-center font-mono text-[28px] font-extrabold tracking-[0.2em] text-brand">
+            {issued.code}
+          </div>
+          <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
+            Read this to {entry.staff.fullName.split(' ')[0]}. On the sign-in screen they tap their name, choose
+            &ldquo;I have a code from my admin&rdquo; and set a new PIN. It works once, until{' '}
+            {new Date(issued.expiresOn).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+            , and replaces any earlier code. Their phone needs to sync once before the code works there.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-[13px] leading-relaxed text-ink-muted">
+            Creates a one-time code that lets {entry.staff.fullName.split(' ')[0]} set or reset their PIN on this
+            facility&rsquo;s phones, without you being there. Any earlier code stops working. Needs an internet
+            connection.
+          </p>
+          {error ? <p className="mt-3 text-[13px] font-semibold text-danger">{error}</p> : null}
+        </>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2.5">
+        {issued ? null : (
+          <Button variant="primary" fullWidth={false} className="flex-1" loading={creating} onClick={create}>
+            Create code
+          </Button>
+        )}
+        <Button variant="outlined" fullWidth={Boolean(issued)} className={issued ? '' : 'px-6'} onClick={onClose}>
+          {issued ? 'Done' : 'Cancel'}
+        </Button>
+      </div>
+    </Sheet>
+  );
+};
+
 export const ManageStaffScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -89,6 +153,7 @@ export const ManageStaffScreen = () => {
   const { user } = useSession();
   const context = useAuthorizationContext();
   const [editing, setEditing] = useState<RosterEntry | null>(null);
+  const [issuingFor, setIssuingFor] = useState<RosterEntry | null>(null);
 
   const onShift = roster.filter(onShiftNow);
   const others = roster.filter((entry) => !onShiftNow(entry));
@@ -140,6 +205,15 @@ export const ManageStaffScreen = () => {
       {entry.staff.staffId === user.staffId ? null : (
         <button
           type="button"
+          onClick={() => setIssuingFor(entry)}
+          className="min-h-0 flex-none rounded-lg bg-brand-tint px-2.5 py-1.5 text-[12px] font-bold text-brand"
+        >
+          PIN code
+        </button>
+      )}
+      {entry.staff.staffId === user.staffId ? null : (
+        <button
+          type="button"
           onClick={() => remove(entry)}
           className="min-h-0 flex-none text-[12px] font-bold text-danger"
         >
@@ -156,7 +230,7 @@ export const ManageStaffScreen = () => {
         onBack={() => navigate(-1)}
         right={
           <div className="flex items-center gap-2">
-            <StatusPill status="synced" />
+            <SyncPill />
             <button
               type="button"
               onClick={() => navigate('/admin/staff/invite')}
@@ -203,6 +277,9 @@ export const ManageStaffScreen = () => {
       </div>
 
       {editing ? <ShiftSheet entry={editing} onClose={() => setEditing(null)} /> : null}
+      {issuingFor ? (
+        <PinCodeSheet entry={issuingFor} issuedBy={user.staffId} onClose={() => setIssuingFor(null)} />
+      ) : null}
     </div>
   );
 };

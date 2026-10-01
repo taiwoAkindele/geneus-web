@@ -8,6 +8,7 @@ import { assignShift, today } from '@/data/repos/staff';
 import { authorizationFor } from '@/auth/authorization';
 import { registerFacility } from '@/lib/api/facilities';
 import { SyncingFacility } from '@/app/SyncingFacility';
+import { approvePinSetup } from '@/session';
 
 type Level = 'primary' | 'secondary' | 'tertiary';
 
@@ -81,6 +82,8 @@ export const RegisterFacilityScreen = () => {
         { staffId: pending.admin.staffId, day: today(), startsAt: new Date().toISOString(), endsAt: endOfToday() },
         authorizationFor({ staff: pending.admin, facilityId: pending.facilityCode, deviceId }),
       );
+      // The first admin sets their PIN unapproved: nobody else exists yet to approve it.
+      approvePinSetup(pending.admin.staffId);
       navigate('/onboarding/accept', {
         state: { staffId: pending.admin.staffId, fullName: pending.admin.fullName, role: 'Facility Admin' },
       });

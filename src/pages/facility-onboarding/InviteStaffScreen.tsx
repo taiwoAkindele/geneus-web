@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Role, StaffPermission } from "@shared";
-import { AppBar, Button, ChoiceChip, StatusPill, TextField, useToast } from "@/ui";
+import { AppBar, Button, ChoiceChip, TextField, useToast } from "@/ui";
+import { SyncPill } from "@/app/SyncPill";
 import { createStaff } from "@/data/repos/staff";
 import { useAuthorizationContext } from "@/session";
 
@@ -70,7 +71,7 @@ export const InviteStaffScreen = () => {
     setSaving(true);
     try {
       await createStaff({ fullName: fullName.trim(), role, permission }, context);
-      toast(`${fullName.trim()} added — they set a PIN from the sign-in screen`);
+      toast(`${fullName.trim()} added — give them a PIN code from Staff so they can set their PIN`);
       navigate("/admin/staff");
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Could not add the staff member");
@@ -83,7 +84,7 @@ export const InviteStaffScreen = () => {
       <AppBar
         title="Invite staff"
         onBack={() => navigate(-1)}
-        right={<StatusPill status="synced" />}
+        right={<SyncPill />}
       />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
         <div className="flex-1 space-y-4 px-5 py-3">

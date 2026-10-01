@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, StatusPill, Tag } from '@/ui';
+import { AppBar, Button, Tag } from '@/ui';
+import { SyncPill } from '@/app/SyncPill';
 
 type Item = {
   name: string;
@@ -30,7 +31,7 @@ export const StockScreen = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="Medicine & stock" onBack={() => navigate(-1)} right={<StatusPill status="synced" />} />
+      <AppBar title="Medicine & stock" onBack={() => navigate(-1)} right={<SyncPill />} />
       <div className="flex w-full flex-1 flex-col">
         <div className="flex items-center justify-between px-5 pb-1 pt-1 md:px-8">
           <p className="text-[13px] text-ink-muted">Odo-Ona Elewe PHC</p>
