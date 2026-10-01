@@ -4,7 +4,8 @@ import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
 import { authorizationFor, nobody } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
-import { checkPin } from './credentials';
+import { checkPin, needsLongerPin } from './credentials';
+import { approvePinSetup } from './pinApproval';
 import { checkShiftSignature, isFrozen } from './signInChecks';
 
 /**
@@ -40,7 +41,15 @@ export type AppNotification = {
   read: boolean;
 };
 
-export type SignInFailure = 'unknown-staff' | 'wrong-pin' | 'locked' | 'off-shift' | 'sync-required' | 'shift-altered';
+export type SignInFailure =
+  | 'unknown-staff'
+  | 'wrong-pin'
+  | 'locked'
+  | 'off-shift'
+  | 'sync-required'
+  | 'shift-altered'
+  /** Right PIN, but an old 4-digit one: they choose a 6-digit PIN before anything else. */
+  | 'pin-upgrade';
 
 /** Why sign-in was refused; `retryAt` comes with a lockout. */
 export type SignInRefusal = { reason: SignInFailure; retryAt?: number };
@@ -171,6 +180,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       const pinCheck = await checkPin(candidateId, pin);
       if (!pinCheck.ok) {
         return pinCheck.reason === 'locked' ? { reason: 'locked', retryAt: pinCheck.retryAt } : { reason: 'wrong-pin' };
+      }
+      if (needsLongerPin(candidateId)) {
+        // The right old PIN is itself the approval to replace it.
+        approvePinSetup(candidateId);
+        return { reason: 'pin-upgrade' };
       }
       if (!candidate.shift || !covers(candidate.shift, Date.now())) return { reason: 'off-shift' };
       if ((await checkShiftSignature(candidate.shift)) === 'invalid') return { reason: 'shift-altered' };

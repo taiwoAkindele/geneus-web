@@ -78,7 +78,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [credential]);
 
   const enroll = useCallback(async (issued: DeviceCredential) => {
-    saveDeviceCredential(issued);
+    await saveDeviceCredential(issued);
     const db = await startSync();
     // Switch to the enrolled tree now, so the facility shows the moment it
     // lands rather than when this bounded wait gives up.

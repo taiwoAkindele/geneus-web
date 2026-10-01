@@ -4,7 +4,7 @@ import { Avatar, Button, PinDots, PinKeypad, TextField } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { AuthorizationError, claimingFor } from '@/auth/authorization';
 import { findMatchingCode, markCodeUsed } from '@/data/repos/pinSetupCodes';
-import { approvePinSetup, checkPin, hasPin, useAuth, type RosterEntry } from '@/session';
+import { approvePinSetup, checkPin, hasPin, pinLength, useAuth, type RosterEntry } from '@/session';
 
 type ApprovalState = { staffId?: string; fullName?: string; role?: string; reset?: boolean };
 
@@ -82,11 +82,13 @@ export const PinApprovalScreen = () => {
   };
 
   const onDigit = async (digit: string) => {
-    if (!approver || pin.length >= 4 || checking) return;
+    if (!approver) return;
+    const digits = pinLength(approver.staff.staffId);
+    if (pin.length >= digits || checking) return;
     setError(undefined);
     const next = pin + digit;
     setPin(next);
-    if (next.length < 4) return;
+    if (next.length < digits) return;
 
     setChecking(true);
     const result = await checkPin(approver.staff.staffId, next);
@@ -183,7 +185,11 @@ export const PinApprovalScreen = () => {
         {mode === 'approver' && approver ? (
           <div className="mt-8 flex flex-col items-center">
             <div className="text-[13px] font-semibold text-ink-soft">{approver.staff.fullName}, enter your PIN</div>
-            <PinDots filled={pin.length} className={`mt-4 ${error ? 'animate-shake' : ''}`} />
+            <PinDots
+              length={pinLength(approver.staff.staffId)}
+              filled={pin.length}
+              className={`mt-4 ${error ? 'animate-shake' : ''}`}
+            />
             {error ? <p className="mt-3 text-center text-[13px] font-semibold text-danger">{error}</p> : null}
             <div className="mt-6 w-full max-w-[300px]">
               <PinKeypad

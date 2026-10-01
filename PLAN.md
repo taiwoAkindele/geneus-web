@@ -215,9 +215,14 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
   design print stylesheets early.
 - **Session security:** encrypted sensitive fields at rest; auto-logout wipes on-screen state;
   un-enrolled devices keep **nothing** durable and wipe session data at logout (root §4.3c).
-- **[OPEN ITEM] Encryption key management** — how the field-encryption key is derived/stored
-  so it survives across shift logins on an *enrolled* device yet is unreadable without a valid
-  shift. Resolve jointly with the auth design before FE-M1 hardening.
+- **Encryption at rest (decided, October 2026)** — the whole SQLite replica is encrypted
+  (ChaCha20, PowerSync's `encryptionKey`) with a random key; that key, the device credential
+  and the 6-digit PIN records are stored AES-GCM-encrypted under a non-extractable WebCrypto
+  **device key** kept in IndexedDB (`src/lib/secureStorage.ts`). The key is device-bound, not
+  shift-bound, because background sync must run with nobody signed in (root §4.3a); a PIN
+  gates the screen, not the data, so cracking one opens nothing. De-enrollment destroys the
+  device key. Not covered: a rooted phone whose browser profile is copied whole (the key is
+  not hardware-backed on Android), and code running inside the app.
 
 ## 8. Testing strategy (solo builder's safety net)
 
@@ -245,4 +250,5 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
    wiring is not yet).
 3. Wire the remaining mock screens (patient search, registration, encounter) to the
    repositories as their contract shapes land.
-4. Resolve the encryption-at-rest key-management item (§7) before FE-M1 hardening.
+4. Measure the encrypted replica on the target phone (§7): first sync, a register list, sign-in
+   time with 100,000-round PBKDF2.

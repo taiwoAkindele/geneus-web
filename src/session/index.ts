@@ -10,5 +10,5 @@ export type {
   SignInRefusal,
 } from './SessionProvider';
 export { formatCountdown, useShiftCountdown } from './useShiftCountdown';
-export { checkPin, hasPin, setPin } from './credentials';
+export { checkPin, hasPin, PIN_LENGTH, pinLength, setPin } from './credentials';
 export { approvePinSetup, isPinSetupApproved, takePinSetupApproval } from './pinApproval';

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PinDots, PinKeypad } from '@/ui';
-import { isPinSetupApproved, setPin as storePin, takePinSetupApproval } from '@/session';
+import { isPinSetupApproved, PIN_LENGTH, setPin as storePin, takePinSetupApproval } from '@/session';
 
-type AcceptState = { staffId?: string; fullName?: string; role?: string };
+/** `upgrade`: they signed in with an old 4-digit PIN and are replacing it. */
+type AcceptState = { staffId?: string; fullName?: string; role?: string; upgrade?: boolean };
 
 /**
- * 3.1 Accept invite · create PIN. The staff member sets a 4-digit PIN in two
+ * 3.1 Accept invite · create PIN. The staff member sets a 6-digit PIN in two
  * passes (choose, then confirm) that they'll use to sign in at the start of
  * every shift. The PIN stays on this device and never enters the replica.
  *
@@ -15,7 +16,7 @@ type AcceptState = { staffId?: string; fullName?: string; role?: string };
  */
 export const CreatePinScreen = () => {
   const navigate = useNavigate();
-  const { staffId, fullName, role } = (useLocation().state ?? {}) as AcceptState;
+  const { staffId, fullName, role, upgrade } = (useLocation().state ?? {}) as AcceptState;
   const [phase, setPhase] = useState<'choose' | 'confirm'>('choose');
   const [firstPin, setFirstPin] = useState('');
   const [pin, setPin] = useState('');
@@ -24,9 +25,9 @@ export const CreatePinScreen = () => {
   if (!staffId || !isPinSetupApproved(staffId)) return <Navigate to="/login" replace />;
 
   const onDigit = async (digit: string) => {
-    if (pin.length >= 4) return;
+    if (pin.length >= PIN_LENGTH) return;
     const next = pin + digit;
-    if (next.length < 4) {
+    if (next.length < PIN_LENGTH) {
       setPin(next);
       return;
     }
@@ -59,11 +60,17 @@ export const CreatePinScreen = () => {
           Welcome, {fullName?.split(' ')[0] ?? 'there'}
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a 4-digit PIN — you&rsquo;ll
-          use it to sign in at the start of every shift.
+          {upgrade ? (
+            <>PINs are now 6 digits, to keep patient records safer. Choose a new one &mdash; you&rsquo;ll use it from now on.</>
+          ) : (
+            <>
+              You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a 6-digit PIN &mdash;
+              you&rsquo;ll use it to sign in at the start of every shift.
+            </>
+          )}
         </p>
 
-        <PinDots filled={pin.length} className="mb-2 mt-9" />
+        <PinDots length={PIN_LENGTH} filled={pin.length} className="mb-2 mt-9" />
         <div className="text-[13px] text-ink-muted">
           {error ? (
             <span className="font-semibold text-danger">PINs didn&rsquo;t match — try again</span>
@@ -85,7 +92,7 @@ export const CreatePinScreen = () => {
         <p className="mt-auto pt-4 text-xs text-ink-muted">
           {phase === 'choose'
             ? 'You’ll confirm it once more on the next step.'
-            : 'Enter the same four digits again.'}
+            : 'Enter the same six digits again.'}
         </p>
       </div>
     </div>

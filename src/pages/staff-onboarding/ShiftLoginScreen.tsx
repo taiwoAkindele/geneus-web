@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
 import { useDeviceContext } from '@/data';
-import { hasPin, useAuth, type RosterEntry, type SignInRefusal } from '@/session';
+import { hasPin, pinLength, useAuth, type RosterEntry, type SignInRefusal } from '@/session';
 
 const minutesUntil = (at: number): number => Math.max(1, Math.ceil((at - Date.now()) / 60_000));
 
@@ -20,6 +20,8 @@ const failureMessage = ({ reason, retryAt }: SignInRefusal): string => {
       return 'This phone hasn’t synced in 7 days — connect to the internet to sign in';
     case 'shift-altered':
       return 'This shift was changed on this phone — ask your admin';
+    case 'pin-upgrade':
+      return 'PINs are now 6 digits — choose a new one';
   }
 };
 
@@ -56,6 +58,8 @@ export const ShiftLoginScreen = () => {
   }, [signedIn, navigate]);
 
   const selected = roster.find((entry) => entry.staff.staffId === staffId);
+  // Old 4-digit PINs still work once, so the keypad completes at their length.
+  const digits = staffId ? pinLength(staffId) : 6;
 
   /** Setting a PIN — first time or forgotten — always needs someone's approval first. */
   const askForApproval = (entry: RosterEntry, reset: boolean) =>
@@ -77,14 +81,25 @@ export const ShiftLoginScreen = () => {
   };
 
   const onDigit = async (digit: string) => {
-    if (!staffId || pin.length >= 4 || checking) return;
+    if (!staffId || pin.length >= digits || checking) return;
     setFailure(undefined);
     const next = pin + digit;
     setPin(next);
-    if (next.length < 4) return;
+    if (next.length < digits) return;
 
     setChecking(true);
     const result = await signIn(staffId, next);
+    if (result?.reason === 'pin-upgrade' && selected) {
+      navigate('/onboarding/accept', {
+        state: {
+          staffId: selected.staff.staffId,
+          fullName: selected.staff.fullName,
+          role: ROLE_LABELS[selected.staff.role] ?? selected.staff.role,
+          upgrade: true,
+        },
+      });
+      return;
+    }
     if (result) {
       setFailure(result);
       setPin('');
@@ -157,7 +172,7 @@ export const ShiftLoginScreen = () => {
                     Not you?
                   </button>
                 </div>
-                <PinDots filled={pin.length} className={failure ? 'animate-shake' : ''} />
+                <PinDots length={digits} filled={pin.length} className={failure ? 'animate-shake' : ''} />
                 {failure ? (
                   <div className="mt-3 text-center text-[13px] font-semibold text-danger">
                     {failureMessage(failure)}

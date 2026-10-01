@@ -1,4 +1,5 @@
 import { pbkdf2Base64, randomSalt, sameText } from '@/lib/pbkdf2';
+import { secureGet, secureSet } from '@/lib/secureStorage';
 
 /**
  * PINs are held on the device only and never enter the replica: the contract
@@ -6,15 +7,21 @@ import { pbkdf2Base64, randomSalt, sameText } from '@/lib/pbkdf2';
  * them permanently, because offline login must work with no network (SCHEMA.md
  * §10).
  *
- * A 4-digit PIN has 10,000 values, so what protects it is how many guesses
- * someone gets. At the keypad that is the lockout below. Against someone who
- * copies this browser's storage, PBKDF2 only slows them down — that needs the
- * device encryption still open in PLAN.md §7.
+ * PINs are 6 digits — a million values — and what protects them is how many
+ * guesses someone gets. At the keypad that is the lockout below. Away from the
+ * phone there is nothing to guess against: the PIN records are stored
+ * encrypted under the device key (src/lib/secureStorage.ts), so a copy of this
+ * browser's storage holds no hash to brute-force.
  */
 const STORAGE_KEY = 'geneus.credentials';
 
 /** Slow enough to matter, fast enough that a sub-$100 phone signs in without a visible wait. */
 const PIN_ITERATIONS = 100_000;
+
+/** Every PIN set from now on. */
+export const PIN_LENGTH = 6;
+/** PINs set before 6 digits; their holders choose a 6-digit one at their next sign-in. */
+const LEGACY_PIN_LENGTH = 4;
 
 /** Wrong PINs allowed before the first lockout. */
 const FREE_ATTEMPTS = 5;
@@ -26,13 +33,15 @@ type Credential = {
   hash: string;
   /** Absent on PINs stored before PBKDF2: those are one round of salted SHA-256, upgraded at the next sign-in. */
   iterations?: number;
+  /** Absent on 4-digit PINs set before PINs became 6 digits. */
+  digits?: number;
   failures?: number;
   lockedUntil?: number;
 };
 type Store = Record<string, Credential>;
 
 const read = (): Store => {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = secureGet(STORAGE_KEY);
   if (!raw) return {};
   try {
     return JSON.parse(raw) as Store;
@@ -41,12 +50,12 @@ const read = (): Store => {
   }
 };
 
-const write = (store: Store) => localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+const write = (store: Store): Promise<void> => secureSet(STORAGE_KEY, JSON.stringify(store));
 
 const update = (staffId: string, change: (credential: Credential) => Credential) => {
   const store = read();
   const credential = store[staffId];
-  if (credential) write({ ...store, [staffId]: change(credential) });
+  if (credential) void write({ ...store, [staffId]: change(credential) });
 };
 
 const toHex = (buffer: ArrayBuffer): string =>
@@ -60,12 +69,22 @@ const legacyHash = async (pin: string, salt: string): Promise<string> =>
 const hashOf = (pin: string, credential: Credential): Promise<string> =>
   credential.iterations ? pbkdf2Base64(pin, credential.salt, credential.iterations) : legacyHash(pin, credential.salt);
 
-/** Sets or replaces a PIN, clearing any lockout. Callers check the approval first (pinApproval.ts). */
+/**
+ * Sets or replaces a PIN, clearing any lockout, and resolves once it is stored
+ * encrypted. Callers check the approval first (pinApproval.ts).
+ */
 export const setPin = async (staffId: string, pin: string): Promise<void> => {
+  if (pin.length !== PIN_LENGTH || !/^\d+$/.test(pin)) throw new Error(`A PIN is ${PIN_LENGTH} digits`);
   const salt = randomSalt();
   const hash = await pbkdf2Base64(pin, salt, PIN_ITERATIONS);
-  write({ ...read(), [staffId]: { salt, hash, iterations: PIN_ITERATIONS } });
+  await write({ ...read(), [staffId]: { salt, hash, iterations: PIN_ITERATIONS, digits: PIN_LENGTH } });
 };
+
+/** How many digits this person's PIN on this device has, so the keypad knows when it is complete. */
+export const pinLength = (staffId: string): number => read()[staffId]?.digits ?? LEGACY_PIN_LENGTH;
+
+/** A PIN from before 6 digits: still accepted once, then it must be replaced. */
+export const needsLongerPin = (staffId: string): boolean => hasPin(staffId) && pinLength(staffId) < PIN_LENGTH;
 
 export type PinCheck = { ok: true } | { ok: false; reason: 'no-pin' | 'wrong' } | { ok: false; reason: 'locked'; retryAt: number };
 
@@ -89,8 +108,14 @@ export const checkPin = async (staffId: string, pin: string, now = Date.now()): 
     return lockout ? { ok: false, reason: 'locked', retryAt: now + lockout } : { ok: false, reason: 'wrong' };
   }
 
-  if (credential.iterations) update(staffId, ({ salt, hash, iterations }) => ({ salt, hash, iterations }));
-  else await setPin(staffId, pin);
+  if (credential.iterations) {
+    update(staffId, ({ salt, hash, iterations, digits }) => ({ salt, hash, iterations, digits }));
+  } else {
+    // A pre-PBKDF2 PIN is rehashed as it is; its length is dealt with at sign-in (needsLongerPin).
+    const salt = randomSalt();
+    const hash = await pbkdf2Base64(pin, salt, PIN_ITERATIONS);
+    update(staffId, () => ({ salt, hash, iterations: PIN_ITERATIONS }));
+  }
   return { ok: true };
 };
 
