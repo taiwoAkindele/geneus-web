@@ -22,8 +22,8 @@ key:generate` prints in geneus-server) so sign-in can check roster signatures of
 Without it every shift counts as unsigned, which is fine in development and a gap in
 production: a shift edited on the phone would not be caught.
 
-`npm run build` is a production build and refuses to run unless both variables are set
-(in `.env` or the environment). `npm run dev` needs neither.
+`npm run build` is a production build and refuses to run unless both variables are set;
+the committed `.env.production` sets them (see *Deployment*). `npm run dev` needs neither.
 
 ## Offline and install
 
@@ -42,8 +42,11 @@ The install icons in `public/icons/` are rendered from `public/favicon.svg` by
 ## Deployment
 
 The output is a static site (`dist/`); the shared contract submodule must be checked out
-before building. On the host, set `VITE_API_URL` (the server's public URL) and
-`VITE_SIGNING_PUBLIC_KEY`, and add the app's origin to the server's `APP_ORIGINS`.
+before building. `VITE_API_URL` and `VITE_SIGNING_PUBLIC_KEY` for production live in the
+committed `.env.production` — both are public by nature (they ship in the JavaScript), and
+keeping them in the repo avoids hosts that refuse `VITE_*` variables as "sensitive". Never
+add a secret to that file. A host environment variable of the same name still overrides
+it. Add the app's origin to the server's `APP_ORIGINS`.
 
 - **Vercel** — `vercel.json`: Vite preset, every non-asset path served `index.html`
   (deep links), `no-cache` on the service worker, page and manifest, immutable `/assets/`.
