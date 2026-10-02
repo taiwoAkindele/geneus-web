@@ -21,6 +21,8 @@ dev-dist/
 .env
 .env.*
 !.env.example
+# Public, non-secret production build settings (see the file's header).
+!.env.production
 
 # Logs
 logs/
