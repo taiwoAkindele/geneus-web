@@ -4,12 +4,20 @@ import { Avatar, Button, PinDots, PinKeypad, TextField } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { AuthorizationError, claimingFor } from '@/auth/authorization';
 import { findMatchingCode, markCodeUsed } from '@/data/repos/pinSetupCodes';
+import { emailPinSetupCode } from '@/lib/api/staff';
 import { approvePinSetup, checkPin, hasPin, pinLength, useAuth, type RosterEntry } from '@/session';
 
 type ApprovalState = { staffId?: string; fullName?: string; role?: string; reset?: boolean };
 
-/** Roles that can approve a PIN in person (SCHEMA.md §10). */
-const APPROVER_ROLES = new Set(['facility_admin', 'supervisor']);
+/**
+ * Who may approve a PIN in person (SCHEMA.md §10). Whoever approves stands
+ * beside the phone while the new PIN is chosen, so they could choose it
+ * themselves: approving is as good as becoming that person here. A supervisor
+ * may therefore approve clinical staff, but only a facility admin may approve
+ * a facility admin — otherwise a supervisor could take over admin rights.
+ */
+const approverRolesFor = (role: string): ReadonlySet<string> =>
+  role === 'facility_admin' ? new Set(['facility_admin']) : new Set(['facility_admin', 'supervisor']);
 
 const initials = (fullName: string) =>
   fullName
@@ -36,14 +44,18 @@ export const PinApprovalScreen = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string>();
   const [checking, setChecking] = useState(false);
+  /** Where an emailed PIN code went (facility admins only). */
+  const [emailedTo, setEmailedTo] = useState<string>();
+  const [emailing, setEmailing] = useState(false);
 
   const person = roster.find((entry) => entry.staff.staffId === state.staffId);
   if (loading) return null;
   if (!state.staffId || !person) return <Navigate to="/login" replace />;
 
+  const approverRoles = approverRolesFor(person.staff.role);
   const approvers = roster.filter(
     (entry) =>
-      APPROVER_ROLES.has(entry.staff.role) && entry.staff.staffId !== person.staff.staffId && hasPin(entry.staff.staffId),
+      approverRoles.has(entry.staff.role) && entry.staff.staffId !== person.staff.staffId && hasPin(entry.staff.staffId),
   );
 
   const approved = () => {
@@ -78,6 +90,23 @@ export const PinApprovalScreen = () => {
       );
     } finally {
       setChecking(false);
+    }
+  };
+
+  /** A facility admin with no one to approve them: the server emails their own PIN code (SCHEMA.md §10). */
+  const emailMeACode = async () => {
+    if (emailing) return;
+    setEmailing(true);
+    setError(undefined);
+    try {
+      const sent = await emailPinSetupCode(person.staff.staffId);
+      setEmailedTo(sent.sentTo);
+      setCode('');
+      setMode('code');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not email a code');
+    } finally {
+      setEmailing(false);
     }
   };
 
@@ -123,19 +152,32 @@ export const PinApprovalScreen = () => {
               I have a code from my admin
             </Button>
             <Button variant="outlined" onClick={() => setMode('approver')}>
-              An admin or supervisor is here
+              {person.staff.role === 'facility_admin' ? 'Another facility admin is here' : 'An admin or supervisor is here'}
             </Button>
+            {person.staff.role === 'facility_admin' ? (
+              <Button variant="ghost" loading={emailing} onClick={emailMeACode}>
+                Email me a code
+              </Button>
+            ) : null}
+            {error ? <p className="text-center text-[13px] font-semibold text-danger">{error}</p> : null}
             <p className="mt-2 text-center text-[13px] leading-relaxed text-ink-muted">
-              No code? Ask your facility admin to create one for you under Staff. They can do it from their own
-              phone and read it to you.
+              {person.staff.role === 'facility_admin'
+                ? 'No other admin to ask? We can email a code to the address you registered with. This phone needs an internet connection.'
+                : 'No code? Ask your facility admin to create one for you under Staff. They can do it from their own phone and read it to you.'}
             </p>
           </div>
         ) : null}
 
         {mode === 'code' ? (
           <div className="mt-8 space-y-4">
+            {emailedTo ? (
+              <p className="text-[13px] leading-relaxed text-ink-muted">
+                We emailed a code to <b className="text-ink">{emailedTo}</b>. It can take a minute to arrive, and this
+                phone needs to stay online until it has synced.
+              </p>
+            ) : null}
             <TextField
-              label="Code from your admin"
+              label={emailedTo ? 'Code from the email' : 'Code from your admin'}
               name="pin_setup_code"
               placeholder="e.g. K7QM2XPA"
               autoCapitalize="characters"
@@ -175,7 +217,9 @@ export const PinApprovalScreen = () => {
               ))}
               {approvers.length === 0 ? (
                 <p className="py-4 text-center text-[13px] leading-relaxed text-ink-muted">
-                  No admin or supervisor has a PIN on this phone yet. Ask your admin for a code instead.
+                  {person.staff.role === 'facility_admin'
+                    ? 'Only another facility admin can approve an admin’s PIN, and none has a PIN on this phone. Ask another admin for a code instead.'
+                    : 'No admin or supervisor has a PIN on this phone yet. Ask your admin for a code instead.'}
                 </p>
               ) : null}
             </div>

@@ -88,7 +88,7 @@ export const FacilityHomeScreen = () => {
             <div className="text-[13px] text-ink-muted">Good morning,</div>
             <div className="text-[22px] font-extrabold tracking-[-0.02em]">{user.name.split(' ')[0]}</div>
           </div>
-          <Tag tone="amber">Shift ends {shift.endsAtLabel}</Tag>
+          <Tag tone="amber">{shift ? `Shift ends ${shift.endsAtLabel}` : 'Admin access'}</Tag>
         </header>
 
         <main className="flex-1 space-y-4 px-5 pb-24 lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-5 lg:space-y-0">

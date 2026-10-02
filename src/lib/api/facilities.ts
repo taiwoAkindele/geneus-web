@@ -1,8 +1,12 @@
-import type { FacilityRegistration, FacilityRegistrationResult, InviteCheck } from '@shared';
+import type { EmailSent, FacilityRegistration, FacilityRegistrationResult, InviteCheck } from '@shared';
 import { get, post } from './client';
 
 /** Checks the code before the admin fills in anything else. */
 export const checkInvite = (token: string) => get<InviteCheck>(`/invites/${encodeURIComponent(token)}`);
+
+/** Emails the would-be admin a 6-digit code proving their address; it goes back with the registration. */
+export const sendRegistrationEmailCode = (email: string, inviteToken: string) =>
+  post<EmailSent>('/email-verifications', { email, inviteToken });
 
 /**
  * The one operation that cannot happen offline: the server creates the

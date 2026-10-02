@@ -67,7 +67,7 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold">{user.role}</div>
           <div className="text-[13px] text-ink-muted">
-            Shift {shift.label} · ends {shift.endsAtLabel}
+            {shift ? `Shift ${shift.label} · ends ${shift.endsAtLabel}` : 'Admin access · signs out after 30 minutes idle'}
             {user.canWrite ? '' : ' · read only'}
           </div>
         </div>

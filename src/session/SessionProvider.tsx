@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthorizationContext, RosterShift, Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
@@ -6,6 +6,7 @@ import { authorizationFor, nobody } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
 import { checkPin, needsLongerPin } from './credentials';
 import { approvePinSetup } from './pinApproval';
+import { accessFor, covers, mayStaySignedIn, shiftEnd, type Access } from './accessPolicy';
 import { checkShiftSignature, isFrozen } from './signInChecks';
 
 /**
@@ -68,7 +69,10 @@ type AuthValue = {
 type SessionValue = {
   user: SessionUser;
   facility: Facility;
-  shift: Shift;
+  /** How this session is held: by a shift, or by a facility admin's any-time access (accessPolicy.ts). */
+  access: Access;
+  /** The shift holding the session; absent for an admin, whom no shift signs out. */
+  shift: Shift | undefined;
   /** Who is acting, from where, with what rights — what every repository write is checked against. */
   authorization: AuthorizationContext;
   notifications: AppNotification[];
@@ -81,6 +85,15 @@ const AuthContext = createContext<AuthValue | null>(null);
 const SessionContext = createContext<SessionValue | null>(null);
 
 const SIGNED_IN_KEY = 'geneus.signedInStaffId';
+/** When the signed-in person last touched the app, so a reload cannot reset an admin's idle time. */
+const LAST_ACTIVITY_KEY = 'geneus.lastActivityOn';
+/** Activity is written down at most this often; the idle limit is 30 minutes, so this is precise enough. */
+const ACTIVITY_WRITE_MS = 15_000;
+
+const readLastActivity = (): number | undefined => {
+  const stored = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
+  return Number.isFinite(stored) && stored > 0 ? stored : undefined;
+};
 const EXTENSION_MINUTES = 240;
 
 const INITIAL_NOTIFICATIONS: AppNotification[] = [
@@ -127,12 +140,6 @@ const ROLE_LABELS: Record<string, string> = {
   supervisor: 'Supervisor',
 };
 
-const shiftEnd = (shift: RosterShift): number =>
-  new Date(shift.extendedUntil ?? shift.endsAt).getTime();
-
-const covers = (shift: RosterShift, at: number): boolean =>
-  new Date(shift.startsAt).getTime() <= at && at < shiftEnd(shift);
-
 const timeLabel = (iso: string): string =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
@@ -141,6 +148,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [staffId, setStaffId] = useState<string | null>(() => localStorage.getItem(SIGNED_IN_KEY));
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
   const [now, setNow] = useState(() => Date.now());
+  const lastActivity = useRef<number | undefined>(readLastActivity());
 
   const load = useCallback(async () => {
     const [staff, shifts] = await Promise.all([listStaff(), listShifts()]);
@@ -154,23 +162,53 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   // Coarse on purpose: every consumer re-renders on this, and the visible
   // per-second countdown is derived locally by useShiftCountdown.
+  // A phone wakes from sleep with timers far behind; re-check at once rather than up to 30 s later.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(id);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now());
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
+  // Any touch or key counts as activity — the measure of an admin's idle time.
+  useEffect(() => {
+    if (!staffId) return;
+    let written = 0;
+    const touched = () => {
+      const at = Date.now();
+      lastActivity.current = at;
+      if (at - written < ACTIVITY_WRITE_MS) return;
+      written = at;
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
+    };
+    window.addEventListener('pointerdown', touched, { passive: true });
+    window.addEventListener('keydown', touched);
+    return () => {
+      window.removeEventListener('pointerdown', touched);
+      window.removeEventListener('keydown', touched);
+    };
+  }, [staffId]);
+
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
-  const onShift = Boolean(entry?.shift && covers(entry.shift, now));
+  const active = Boolean(entry && mayStaySignedIn(entry, now, lastActivity.current));
 
   const signOut = useCallback(() => {
     localStorage.removeItem(SIGNED_IN_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+    lastActivity.current = undefined;
     setStaffId(null);
   }, []);
 
-  // Auto-logout is the system's job, not the user's (PRD §14.1).
+  // Auto-logout is the system's job, not the user's (PRD §14.1): at shift end,
+  // or after 30 idle minutes for a facility admin.
   useEffect(() => {
-    if (staffId && !loading && entry && !onShift) signOut();
-  }, [staffId, loading, entry, onShift, signOut]);
+    if (staffId && !loading && entry && !active) signOut();
+  }, [staffId, loading, entry, active, signOut]);
 
   const signIn = useCallback(
     async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
@@ -186,8 +224,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         approvePinSetup(candidateId);
         return { reason: 'pin-upgrade' };
       }
-      if (!candidate.shift || !covers(candidate.shift, Date.now())) return { reason: 'off-shift' };
-      if ((await checkShiftSignature(candidate.shift)) === 'invalid') return { reason: 'shift-altered' };
+      // A facility admin signs in shift or no shift (accessPolicy.ts); everyone else needs a genuine one.
+      if (accessFor(candidate.staff) === 'shift') {
+        if (!candidate.shift || !covers(candidate.shift, Date.now())) return { reason: 'off-shift' };
+        if ((await checkShiftSignature(candidate.shift)) === 'invalid') return { reason: 'shift-altered' };
+      }
+      const signedInAt = Date.now();
+      lastActivity.current = signedInAt;
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(signedInAt));
       localStorage.setItem(SIGNED_IN_KEY, candidateId);
       // Re-anchor the clock: the coarse tick could still be behind a shift that
       // began seconds ago, which would read as off-shift and sign them out.
@@ -199,16 +243,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const auth = useMemo<AuthValue>(
-    () => ({ signedIn: Boolean(entry) && onShift, loading, roster, signIn, signOut }),
-    [entry, onShift, loading, roster, signIn, signOut],
+    () => ({ signedIn: active, loading, roster, signIn, signOut }),
+    [active, loading, roster, signIn, signOut],
   );
 
   const authorization = useMemo<AuthorizationContext>(
     () =>
-      entry && onShift
+      entry && active
         ? authorizationFor({ staff: entry.staff, facilityId: facility?.code ?? '', deviceId })
         : nobody(facility?.code ?? '', deviceId),
-    [entry, onShift, facility?.code, deviceId],
+    [entry, active, facility?.code, deviceId],
   );
 
   // Extending is a supervisor's permission (PRD §14.1); anyone else is refused
@@ -226,8 +270,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const session = useMemo<SessionValue | null>(() => {
-    if (!entry?.shift || !onShift) return null;
+    if (!entry || !active) return null;
     const { staff, shift } = entry;
+    const access = accessFor(staff);
     return {
       user: {
         staffId: staff.staffId,
@@ -239,17 +284,21 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       },
       facility: { name: facility?.name ?? '', code: facility?.code ?? '' },
       authorization,
-      shift: {
-        label: `${timeLabel(shift.startsAt)}–${timeLabel(shift.endsAt)}`,
-        endsAtLabel: timeLabel(shift.extendedUntil ?? shift.endsAt),
-        minutesLeft: Math.max(0, Math.ceil((shiftEnd(shift) - now) / 60_000)),
-      },
+      access,
+      shift:
+        access === 'shift' && shift
+          ? {
+              label: `${timeLabel(shift.startsAt)}–${timeLabel(shift.endsAt)}`,
+              endsAtLabel: timeLabel(shift.extendedUntil ?? shift.endsAt),
+              minutesLeft: Math.max(0, Math.ceil((shiftEnd(shift) - now) / 60_000)),
+            }
+          : undefined,
       notifications,
       unreadCount: notifications.filter((item) => !item.read).length,
       extendShift: extend,
       markAllRead,
     };
-  }, [entry, onShift, facility, authorization, notifications, now, extend, markAllRead]);
+  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead]);
 
   return (
     <AuthContext.Provider value={auth}>
