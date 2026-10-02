@@ -22,6 +22,37 @@ key:generate` prints in geneus-server) so sign-in can check roster signatures of
 Without it every shift counts as unsigned, which is fine in development and a gap in
 production: a shift edited on the phone would not be caught.
 
+`npm run build` is a production build and refuses to run unless both variables are set;
+the committed `.env.production` sets them (see *Deployment*). `npm run dev` needs neither.
+
+## Offline and install
+
+The app is an installable PWA (`vite-plugin-pwa`, configured in `vite.config.ts`). The
+first visit precaches the whole shell — every route chunk, the PowerSync workers, the
+fonts and the encrypted SQLite WASM, about 1.3 MB gzipped — so afterwards the app opens,
+signs in and works with no network. The service worker only exists in a build: test
+offline behaviour with `npm run build && npm run preview`, not `npm run dev`.
+
+A new version downloads in the background and takes over once every window of the app
+has been closed, never by reloading a screen someone is using.
+
+The install icons in `public/icons/` are rendered from `public/favicon.svg` by
+`node scripts/render-icons.mjs` (uses an installed Chrome); rerun it when the SVG changes.
+
+## Deployment
+
+The output is a static site (`dist/`); the shared contract submodule must be checked out
+before building. `VITE_API_URL` and `VITE_SIGNING_PUBLIC_KEY` for production live in the
+committed `.env.production` — both are public by nature (they ship in the JavaScript), and
+keeping them in the repo avoids hosts that refuse `VITE_*` variables as "sensitive". Never
+add a secret to that file. A host environment variable of the same name still overrides
+it. Add the app's origin to the server's `APP_ORIGINS`.
+
+- **Vercel** — `vercel.json`: Vite preset, every non-asset path served `index.html`
+  (deep links), `no-cache` on the service worker, page and manifest, immutable `/assets/`.
+- **Cloudflare Pages** — build command `npm run build`, output `dist`. `public/_headers`
+  carries the same cache rules; Pages serves `index.html` for unknown paths by itself.
+
 ## How a write travels
 
 ```

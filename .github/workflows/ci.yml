@@ -23,5 +23,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        # A production build refuses to run without these (vite.config.ts).
+        # This build is measured, never deployed, so placeholders suffice.
+        env:
+          VITE_API_URL: https://api.example.invalid
+          VITE_SIGNING_PUBLIC_KEY: ci-placeholder
       # The cheap-Android budget is a test, not a guideline (PLAN.md §4).
       - run: npm run size

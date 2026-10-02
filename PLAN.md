@@ -242,8 +242,10 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 
 ## 9. Immediate next steps
 
-1. Add vite-plugin-pwa so the shell — and the SQLite WASM — are precached; confirm the
-   installable offline shell on the **target phone**.
+1. ~~Add vite-plugin-pwa so the shell — and the SQLite WASM — are precached~~ (done
+   October 2026: the shell, every chunk and the encrypted SQLite WASM precache on first
+   visit, ~1.3 MB gz; updates take over on the next cold start). Still to do: confirm the
+   install and a fully offline cold start on the **target phone**.
 2. Run the real flow on that phone against the compose stack: register a facility, work a
    day offline, reconnect; watch the Sync Center and the reconcile queue (this is the field
    proof of the migration; the connector and the stack are proven by tests, the browser
