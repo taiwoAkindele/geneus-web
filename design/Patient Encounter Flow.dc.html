@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #00502e; }
+  a:hover { color: #006b3f; }
+  input, textarea, select { font-family: inherit; }
+  ::placeholder { color: #9aa3a8; }
+  @keyframes cbFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes cbRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  /* CareBridge is phone-first: on a phone it becomes the native app shell
+     (status bar + bottom tab bar); on tablet & desktop it opens out. */
+  .cb-viewport { container-type: inline-size; }
+  .cb-statusbar { display: none; }
+  .cb-bottomnav { display: none; }
+  @container (max-width: 640px) {
+    .cb-desk { background: #f8f9fa; }
+    .cb-shell { max-width: 100%; padding: 0 14px 100px !important; }
+    .cb-toolbar { display: none !important; }
+    .cb-statusbar { display: flex !important; }
+    .cb-bottomnav { display: flex !important; }
+    .cb-toast { bottom: 108px !important; }
+    .cb-h1 { font-size: 24px !important; }
+  }
+</style>
+</helmet>
+
+<div class="cb-viewport" style="container-type:inline-size;">
+<div class="cb-desk" style="font-family:'Hanken Grotesk',system-ui,sans-serif; background:#eceeef; color:#191c1d; -webkit-font-smoothing:antialiased; min-height:100vh;">
+
+  <!-- ============ PHONE STATUS BAR (mobile only) ============ -->
+  <div class="cb-statusbar" style="align-items:center; justify-content:space-between; padding:11px 18px 9px; background:#f8f9fa; position:sticky; top:0; z-index:30;">
+    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;">09:12</span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; background:#dcefe2; color:#00502e; padding:4px 9px; border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+      <div onClick="{{ onOpenSwitch }}" style="cursor:pointer; width:30px; height:30px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px;">{{ staffInitials }}</div>
+    </div>
+  </div>
+
+<div class="cb-shell" style="max-width:1080px; margin:0 auto; padding:clamp(16px,3vw,32px) clamp(14px,3vw,30px) 90px;">
+
+  <!-- ============ TOP BAR (tablet / desktop) ============ -->
+  <div class="cb-toolbar" style="display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px; margin-bottom:22px;">
+    <div style="display:flex; align-items:center; gap:11px;">
+      <div style="width:34px; height:34px; border-radius:10px; background:#00502e; position:relative; flex:none;">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:15px; height:4.5px; border-radius:3px; background:#9df5bd;"></div>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:4.5px; height:15px; border-radius:3px; background:#9df5bd;"></div>
+      </div>
+      <div>
+        <div style="font-weight:800; font-size:18px; letter-spacing:-0.02em; line-height:1;">CareBridge</div>
+        <div style="font-size:12px; color:#6f7a71; margin-top:2px;">Odo-Ona Elewe PHC</div>
+      </div>
+    </div>
+    <span style="margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:7px 12px; border-radius:999px;"><span style="width:7px;height:7px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+    <div onClick="{{ onOpenSwitch }}" style="cursor:pointer; display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e1e3e4; border-radius:13px; padding:7px 12px 7px 8px;">
+      <div style="width:34px; height:34px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">{{ staffInitials }}</div>
+      <div style="line-height:1.15;">
+        <div style="font-size:11px; color:#6f7a71;">Signed in</div>
+        <div style="font-size:13px; font-weight:700;">{{ staffName }} <span style="color:#6f7a71; font-weight:600;">▾</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FIND / PATIENT LIST ================= -->
+  <sc-if value="{{ isFind }}" hint-placeholder-val="{{ true }}">
+    <div style="animation:cbFade .25s ease;">
+      <div style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:22px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#006b3f;">Patients</div>
+          <h1 style="font-size:clamp(26px,4vw,34px); font-weight:800; letter-spacing:-0.02em; margin:6px 0 0;">Find a patient</h1>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <div onClick="{{ onOpenAppointments }}" style="cursor:pointer; background:#fff; border:1.5px solid #bec9bf; color:#00502e; font-weight:700; font-size:14px; padding:12px 16px; border-radius:12px;">Today's appointments</div>
+          <div onClick="{{ onUnknown }}" style="cursor:pointer; background:#00502e; color:#fff; font-weight:700; font-size:14px; padding:12px 18px; border-radius:12px;">＋ Unknown patient</div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; border:1.5px solid #dfe3e0; border-radius:14px; padding:14px 15px; background:#fff; margin-bottom:8px;">
+        <span style="width:15px;height:15px;border:2.4px solid #6f7a71;border-radius:50%;display:inline-block;flex:none;"></span>
+        <span style="font-size:15px; color:#6f7a71; flex:1;">Search by name, phone or Patient ID…</span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600;">Scan ID</span>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; margin:14px 4px 12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Registered patients</div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:12px;">
+        <sc-for list="{{ patientCards }}" as="p" hint-placeholder-count="4">
+          <div onClick="{{ p.onOpen }}" style="cursor:pointer; background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:15px;">
+            <div style="display:flex; align-items:center; gap:13px;">
+              <div style="width:44px; height:44px; border-radius:50%; background:{{ p.avBg }}; color:{{ p.avFg }}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; flex:none;">{{ p.initials }}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:16px;">{{ p.name }}</div>
+                <div style="font-size:13px; color:#6f7a71;">{{ p.sub }}</div>
+              </div>
+              <sc-if value="{{ p.unknown }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:10px; font-weight:700; background:#fdeecb; color:#7a4f00; padding:4px 8px; border-radius:999px;">Unconfirmed</span>
+              </sc-if>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#00502e; background:#f3f4f5; padding:4px 8px; border-radius:7px;">{{ p.id }}</span>
+              <span style="font-size:12px; color:#6f7a71;">{{ p.last }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; line-height:1.5; margin-top:18px; max-width:66ch;">Tap a patient card to open their profile — full details and every encounter on record. Registration already lives in CareBridge; this flow picks up once a patient exists and links them to a new encounter.</div>
+    </div>
+  </sc-if>
+
+  <!-- ================= APPOINTMENTS ================= -->
+  <sc-if value="{{ isAppointments }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:cbFade .25s ease;">
+      <div onClick="{{ goFind }}" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:#00502e; margin-bottom:16px;">‹ Back to patients</div>
+      <div style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:20px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#006b3f;">Saturday · 5 Jul 2026</div>
+          <h1 style="font-size:clamp(24px,4vw,32px); font-weight:800; letter-spacing:-0.02em; margin:6px 0 0;">Appointments today</h1>
+        </div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:18px;">
+        <div style="flex:1 1 320px; min-width:290px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <span style="font-size:13px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase;">Follow-ups — unassigned</span>
+            <span style="font-size:11px; font-weight:700; color:#7a4f00; background:#fdeecb; padding:4px 10px; border-radius:999px;">Any free doctor</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ apptUnassigned }}" as="a" hint-placeholder-count="2">
+              <div onClick="{{ a.onOpen }}" style="cursor:pointer; background:#fff; border:1px solid {{ a.border }}; border-radius:15px; padding:14px 15px; box-shadow:{{ a.shadow }};">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                  <div>
+                    <div style="font-weight:700; font-size:16px;">{{ a.name }}</div>
+                    <div style="font-size:13px; color:#6f7a71; margin-top:2px;">{{ a.reason }}</div>
+                  </div>
+                  <sc-if value="{{ a.isNew }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10px; font-weight:700; background:#8af5b4; color:#00323f; padding:4px 9px; border-radius:999px;">Just booked</span>
+                  </sc-if>
+                </div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#6f7a71; margin-top:9px;">{{ a.when }} · {{ a.from }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex:1 1 300px; min-width:280px;">
+          <div style="font-size:13px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">Dr. Tunde Bello · booked</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ apptToday }}" as="a" hint-placeholder-count="3">
+              <div style="background:#fff; border:1px solid #eceeef; border-radius:15px; padding:13px 15px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div>
+                  <div style="font-weight:700; font-size:15px;">{{ a.name }}</div>
+                  <div style="font-size:13px; color:#6f7a71; margin-top:2px;">{{ a.reason }}</div>
+                </div>
+                <span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:5px 10px; border-radius:999px; white-space:nowrap;">{{ a.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:12px; color:#6f7a71; line-height:1.5; margin-top:16px;">A follow-up booked when an encounter is closed drops into the unassigned list for the chosen day. Whichever doctor is free that day picks it up; each doctor also keeps their own booked list.</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= PROFILE ================= -->
+  <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:cbFade .25s ease;">
+      <div onClick="{{ goFind }}" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:#00502e; margin-bottom:16px;">‹ Back to patients</div>
+
+      <div style="background:#00502e; color:#fff; border-radius:20px; padding:clamp(18px,3vw,26px); margin-bottom:18px;">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px;">
+          <div style="width:60px; height:60px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; flex:none;">{{ p.initials }}</div>
+          <div style="flex:1; min-width:200px;">
+            <div style="font-size:clamp(22px,3vw,28px); font-weight:800; letter-spacing:-0.02em;">{{ p.title }}</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9df5bd; margin-top:3px;">{{ p.id }}</div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <sc-if value="{{ p.unknown }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:12px; font-weight:700; background:#fdeecb; color:#7a4f00; padding:6px 12px; border-radius:999px;">Identity unconfirmed</span>
+            </sc-if>
+            <span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:6px 12px; border-radius:999px;">⚠ Allergy: {{ p.allergy }}</span>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:20px 30px; margin-top:22px;">
+          <sc-for list="{{ p.facts }}" as="f" hint-placeholder-count="6">
+            <div><div style="font-size:11px; color:#9df5bd; letter-spacing:0.04em; text-transform:uppercase;">{{ f.label }}</div><div style="font-size:15px; font-weight:600; margin-top:3px;">{{ f.value }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:24px;">
+          <div onClick="{{ onCreateEncounter }}" style="cursor:pointer; background:#9df5bd; color:#00323f; font-weight:700; font-size:15px; padding:13px 20px; border-radius:12px;">＋ Create encounter</div>
+          <div onClick="{{ onEditDetails }}" style="cursor:pointer; background:rgba(255,255,255,0.14); color:#fff; font-weight:700; font-size:15px; padding:13px 20px; border-radius:12px;">Edit patient details</div>
+        </div>
+        <sc-if value="{{ p.unknown }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12px; color:#c8e9d5; line-height:1.5; margin-top:14px; max-width:70ch;">Patient details can be edited later once identity is confirmed. Encounter records already saved stay locked and unchanged.</div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin:24px 4px 14px;">
+        <span style="font-size:15px; font-weight:800; letter-spacing:-0.01em;">Encounters</span>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">{{ p.encCount }} on record</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <sc-for list="{{ p.encounters }}" as="e" hint-placeholder-count="3">
+          <div onClick="{{ e.onOpen }}" style="cursor:pointer; background:#fff; border:1px solid {{ e.border }}; border-radius:16px; padding:16px 18px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:10px;">
+              <div>
+                <div style="font-weight:700; font-size:17px;">{{ e.title }}</div>
+                <div style="font-size:13px; color:#6f7a71; margin-top:3px;">{{ e.date }} · {{ e.facility }}</div>
+              </div>
+              <span style="font-size:11px; font-weight:700; background:{{ e.pillBg }}; color:{{ e.pillFg }}; padding:5px 11px; border-radius:999px; white-space:nowrap;">{{ e.status }}</span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:12px;">
+              <sc-for list="{{ e.chips }}" as="c" hint-placeholder-count="3">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; background:#f3f4f5; color:#3f4941; padding:4px 9px; border-radius:7px;">{{ c }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= ENCOUNTER ================= -->
+  <sc-if value="{{ isEncounter }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:cbFade .25s ease;">
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:14px;">
+        <div onClick="{{ onBackToProfile }}" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:#00502e;">‹ Patient profile</div>
+        <div onClick="{{ onOpenAudit }}" style="cursor:pointer; margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:#3f4941; background:#fff; border:1px solid #e1e3e4; padding:8px 13px; border-radius:10px;">Activity log · {{ auditCount }}</div>
+      </div>
+
+      <!-- patient banner -->
+      <div style="background:#00502e; color:#fff; border-radius:18px 18px 0 0; padding:clamp(16px,2.4vw,22px) clamp(18px,3vw,26px);">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px;">
+          <div style="width:48px; height:48px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:none;">{{ encPatientInitials }}</div>
+          <div style="flex:1; min-width:180px;">
+            <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">{{ encPatientName }}</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9df5bd;">{{ encPatientId }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9df5bd;">{{ encId }}</div>
+            <div style="font-size:13px; color:#dcefe2; margin-top:2px;">{{ encStatusLabel }}</div>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:14px;">
+          <span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:5px 10px; border-radius:999px;">⚠ Allergy: {{ encAllergy }}</span>
+          <sc-if value="{{ encUnknown }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:12px; font-weight:700; background:#fdeecb; color:#7a4f00; padding:5px 10px; border-radius:999px;">Identity unconfirmed</span>
+          </sc-if>
+          <span style="font-size:12px; font-weight:600; background:rgba(255,255,255,0.16); color:#fff; padding:5px 10px; border-radius:999px;">Opened {{ encDate }}</span>
+        </div>
+      </div>
+
+      <!-- spine -->
+      <div style="background:#fff; border-left:1px solid #e1e3e4; border-right:1px solid #e1e3e4; padding:14px clamp(14px,3vw,22px); display:flex; flex-wrap:wrap; gap:7px;">
+        <sc-for list="{{ spine }}" as="s" hint-placeholder-count="7">
+          <div style="display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; padding:6px 11px; border-radius:999px; background:{{ s.bg }}; color:{{ s.fg }};">
+            <span style="width:16px; height:16px; border-radius:50%; background:{{ s.dotBg }}; color:{{ s.dotFg }}; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800;">{{ s.dot }}</span>
+            {{ s.label }}
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- closed banner -->
+      <sc-if value="{{ encClosedOnly }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#dcefe2; border-left:1px solid #e1e3e4; border-right:1px solid #e1e3e4; padding:14px clamp(14px,3vw,22px); display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+          <span style="width:26px; height:26px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">✓</span>
+          <div style="flex:1; min-width:200px; font-size:14px; color:#00502e; font-weight:600;">Encounter closed &amp; locked. The full record is now part of {{ encPatientName }}'s permanent history.</div>
+          <div onClick="{{ onOpenAppointments }}" style="cursor:pointer; font-size:13px; font-weight:700; color:#00502e; background:#fff; border:1.5px solid #9dcbb0; padding:9px 14px; border-radius:10px;">See booked follow-up</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ encAdmitted }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#e6ecff; border-left:1px solid #e1e3e4; border-right:1px solid #e1e3e4; padding:14px clamp(14px,3vw,22px); display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+          <span style="width:26px; height:26px; border-radius:50%; background:#1b3a8f; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">⚑</span>
+          <div style="flex:1; min-width:200px; font-size:14px; color:#1b3a8f; font-weight:600;">{{ encPatientName }} admitted as an inpatient — {{ encAdmitLoc }}. Encounter locked; care continues on the ward.</div>
+        </div>
+      </sc-if>
+
+      <!-- sections wrapper -->
+      <div style="background:#f8f9fa; border:1px solid #e1e3e4; border-top:none; border-radius:0 0 18px 18px; padding:clamp(14px,3vw,22px); display:flex; flex-direction:column; gap:14px;">
+
+        <!-- generic section renderer -->
+        <sc-for list="{{ sections }}" as="s" hint-placeholder-count="7">
+          <div style="background:#fff; border:1px solid {{ s.border }}; border-radius:16px; overflow:hidden; opacity:{{ s.opacity }};">
+            <!-- header -->
+            <div style="display:flex; align-items:center; gap:12px; padding:15px 17px; border-bottom:1px solid {{ s.headBorder }}; background:{{ s.headBg }};">
+              <span style="width:26px; height:26px; border-radius:8px; background:{{ s.numBg }}; color:{{ s.numFg }}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; font-family:'JetBrains Mono',monospace; flex:none;">{{ s.num }}</span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:800; font-size:16px; letter-spacing:-0.01em;">{{ s.title }}</div>
+                <div style="font-size:12px; color:#6f7a71; margin-top:1px;">{{ s.hint }}</div>
+              </div>
+              <span style="font-size:11px; font-weight:700; background:{{ s.badgeBg }}; color:{{ s.badgeFg }}; padding:5px 11px; border-radius:999px; white-space:nowrap;">{{ s.badge }}</span>
+            </div>
+
+            <!-- PENDING -->
+            <sc-if value="{{ s.isPending }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:20px 17px; font-size:13px; color:#9aa3a8; display:flex; align-items:center; gap:9px;">
+                <span style="width:18px; height:18px; border-radius:50%; border:2px solid #cdd3ce;"></span>
+                Complete the step above before recording this.
+              </div>
+            </sc-if>
+
+            <!-- LOCKED -->
+            <sc-if value="{{ s.isLocked }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:15px 17px;">
+                <div style="display:flex; flex-direction:column; gap:9px;">
+                  <sc-for list="{{ s.summary }}" as="r" hint-placeholder-count="2">
+                    <div style="display:flex; flex-wrap:wrap; gap:4px 14px;">
+                      <div style="font-size:12px; color:#6f7a71; font-weight:600; min-width:130px;">{{ r.l }}</div>
+                      <div style="font-size:14px; color:#191c1d; flex:1; min-width:160px;">{{ r.v }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <!-- signature -->
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; padding-top:13px; border-top:1px dashed #d9dadb;">
+                  <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#00502e; background:#dcefe2; padding:5px 10px; border-radius:8px;">🔒 Locked</span>
+                  <div style="font-size:12px; color:#3f4941;">Recorded by <b>{{ s.sig.actor }}</b> · {{ s.sig.title }} · <span style="font-family:'JetBrains Mono',monospace;">{{ s.sig.time }} · {{ s.sig.date }}</span></div>
+                  <div onClick="{{ s.onAmend }}" style="cursor:pointer; margin-left:auto; font-size:13px; font-weight:700; color:#00502e;">＋ Add amendment</div>
+                </div>
+                <!-- amendments -->
+                <sc-if value="{{ s.hasAmend }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+                    <sc-for list="{{ s.amendments }}" as="am" hint-placeholder-count="1">
+                      <div style="background:#f3f4f5; border-radius:11px; padding:11px 13px;">
+                        <div style="font-size:11px; color:#6f7a71; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Amendment · {{ am.time }}</div>
+                        <div style="font-size:14px; color:#191c1d; margin:3px 0 5px;">{{ am.note }}</div>
+                        <div style="font-size:12px; color:#3f4941;">by <b>{{ am.by }}</b> · {{ am.title }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- ACTIVE — forms are keyed by section id -->
+            <sc-if value="{{ s.isActive }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:16px 17px;">
+
+                <!-- VITALS -->
+                <sc-if value="{{ s.isVitals }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;">
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Temperature (°C)</label><input value="{{ V.temp }}" onChange="{{ V.onTemp }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Blood pressure (mmHg)</label><input value="{{ V.bp }}" onChange="{{ V.onBp }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Pulse (bpm)</label><input value="{{ V.pulse }}" onChange="{{ V.onPulse }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Weight (kg)</label><input value="{{ V.weight }}" onChange="{{ V.onWeight }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">SpO₂ (%)</label><input value="{{ V.spo2 }}" onChange="{{ V.onSpo2 }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                  </div>
+                </sc-if>
+
+                <!-- COMPLAINT -->
+                <sc-if value="{{ s.isComplaint }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Patient's complaints</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                    <sc-for list="{{ C.chips }}" as="ch" hint-placeholder-count="6">
+                      <div onClick="{{ ch.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:600; padding:8px 13px; border-radius:999px; background:{{ ch.bg }}; color:{{ ch.fg }}; border:1.5px solid {{ ch.bd }};">{{ ch.label }}</div>
+                    </sc-for>
+                  </div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Clinical note</label>
+                  <textarea onChange="{{ C.onNote }}" rows="3" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:15px; background:#fff; outline:none; resize:vertical; line-height:1.45;" style-focus="border-color:#00502e; border-width:2px;">{{ C.note }}</textarea>
+                </sc-if>
+
+                <!-- LAB ORDER -->
+                <sc-if value="{{ s.isLaborder }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Investigations to order</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <sc-for list="{{ LO.chips }}" as="ch" hint-placeholder-count="5">
+                      <div onClick="{{ ch.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:600; padding:8px 13px; border-radius:999px; background:{{ ch.bg }}; color:{{ ch.fg }}; border:1.5px solid {{ ch.bd }};">{{ ch.label }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="font-size:12px; color:#6f7a71; margin-top:12px;">The lab attendant sees exactly these orders on the patient's record and enters results against them.</div>
+                </sc-if>
+
+                <!-- LAB RESULTS -->
+                <sc-if value="{{ s.isLabresults }}" hint-placeholder-val="{{ false }}">
+                  <sc-if value="{{ LR.hasOrders }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                      <sc-for list="{{ LR.rows }}" as="r" hint-placeholder-count="2">
+                        <div>
+                          <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:7px;">{{ r.test }}</label>
+                          <input value="{{ r.value }}" onChange="{{ r.onChange }}" placeholder="Enter result…" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:15px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" />
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ LR.noOrders }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:13px; color:#6f7a71;">No investigations were ordered for this encounter.</div>
+                  </sc-if>
+                </sc-if>
+
+                <!-- DIAGNOSIS -->
+                <sc-if value="{{ s.isDiagnosis }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Diagnosis</label>
+                  <input value="{{ DX.dx }}" onChange="{{ DX.onDx }}" placeholder="Diagnosis from findings…" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:13px; font-size:16px; background:#fff; outline:none; margin-bottom:16px;" style-focus="border-color:#00502e; border-width:2px;" />
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Prescription</label>
+                  <div style="display:flex; flex-direction:column; gap:9px;">
+                    <sc-for list="{{ DX.rx }}" as="m" hint-placeholder-count="2">
+                      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:10px;">
+                        <div style="flex:1;">
+                          <div style="font-weight:700; font-size:15px;">{{ m.name }}</div>
+                          <div style="font-size:13px; color:#6f7a71; margin-top:1px;">{{ m.dose }}</div>
+                        </div>
+                        <div onClick="{{ m.onRemove }}" style="cursor:pointer; width:28px; height:28px; border-radius:8px; background:#f3f4f5; color:#93000a; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;">✕</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div onClick="{{ DX.onAdd }}" style="cursor:pointer; border:1.5px dashed #bec9bf; border-radius:12px; padding:12px; text-align:center; color:#00502e; font-weight:700; font-size:14px; margin-top:9px;">＋ Add medication</div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin:18px 0 9px;">Plan / disposition</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <sc-for list="{{ DX.dispositions }}" as="o" hint-placeholder-count="2">
+                      <div onClick="{{ o.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:600; padding:8px 13px; border-radius:999px; background:{{ o.bg }}; color:{{ o.fg }}; border:1.5px solid {{ o.bd }};">{{ o.label }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="font-size:12px; color:#6f7a71; margin-top:10px; line-height:1.5;">Prescribing adds a pharmacy step. Injection adds a nurse-administered step. Admitting keeps the patient as an inpatient instead of closing with a follow-up — the matching sections appear below once you lock this step.</div>
+                </sc-if>
+
+                <!-- INJECTION -->
+                <sc-if value="{{ s.isInjection }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;">
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Drug</label><input value="{{ INJ.drug }}" onChange="{{ INJ.onDrug }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Dose</label><input value="{{ INJ.dose }}" onChange="{{ INJ.onDose }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                    <div><label style="font-size:12px; font-weight:600; color:#3f4941; display:block; margin-bottom:6px;">Site</label><input value="{{ INJ.site }}" onChange="{{ INJ.onSite }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" /></div>
+                  </div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin:16px 0 9px;">Route</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <sc-for list="{{ INJ.routes }}" as="r" hint-placeholder-count="4">
+                      <div onClick="{{ r.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:700; padding:9px 18px; border-radius:11px; background:{{ r.bg }}; color:{{ r.fg }}; border:1.5px solid {{ r.bd }};">{{ r.label }}</div>
+                    </sc-for>
+                  </div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin:16px 0 9px;">Note (optional)</label>
+                  <textarea onChange="{{ INJ.onNote }}" rows="2" placeholder="Reaction, batch number, patient tolerance…" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:15px; background:#fff; outline:none; resize:vertical; line-height:1.45;" style-focus="border-color:#00502e; border-width:2px;">{{ INJ.note }}</textarea>
+                  <div style="font-size:12px; color:#6f7a71; margin-top:12px;">The nurse who administers the injection signs this step — use the <b>Signed in</b> switch if it isn't you.</div>
+                </sc-if>
+
+                <!-- DISPENSE -->
+                <sc-if value="{{ s.isDispense }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Tick each medication as it is handed over</label>
+                  <div style="display:flex; flex-direction:column; gap:9px;">
+                    <sc-for list="{{ DP.rows }}" as="m" hint-placeholder-count="2">
+                      <div onClick="{{ m.onToggle }}" style="cursor:pointer; background:#fff; border:1.5px solid {{ m.bd }}; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px;">
+                        <span style="width:24px; height:24px; border-radius:7px; background:{{ m.boxBg }}; border:2px solid {{ m.boxBd }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex:none;">{{ m.check }}</span>
+                        <div style="flex:1;">
+                          <div style="font-weight:700; font-size:15px;">{{ m.name }}</div>
+                          <div style="font-size:13px; color:#6f7a71; margin-top:1px;">{{ m.dose }}</div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <!-- ADMISSION -->
+                <sc-if value="{{ s.isAdmission }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Ward</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                    <sc-for list="{{ AD.wards }}" as="w" hint-placeholder-count="4">
+                      <div onClick="{{ w.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:600; padding:8px 13px; border-radius:999px; background:{{ w.bg }}; color:{{ w.fg }}; border:1.5px solid {{ w.bd }};">{{ w.label }}</div>
+                    </sc-for>
+                  </div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Bed</label>
+                  <input value="{{ AD.bed }}" onChange="{{ AD.onBed }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:13px; font-size:16px; background:#fff; outline:none; margin-bottom:16px;" style-focus="border-color:#00502e; border-width:2px;" />
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Admitting diagnosis</label>
+                  <div style="background:#f3f4f5; border-radius:11px; padding:12px 14px; font-size:15px; font-weight:600; color:#191c1d; margin-bottom:16px;">{{ AD.dx }}</div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Admitting note</label>
+                  <textarea onChange="{{ AD.onNote }}" rows="3" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:12px; font-size:15px; background:#fff; outline:none; resize:vertical; line-height:1.45;" style-focus="border-color:#00502e; border-width:2px;">{{ AD.note }}</textarea>
+                  <div style="background:#e6ecff; border:1px solid #c3d0f5; border-radius:12px; padding:12px 14px; margin-top:16px; font-size:13px; color:#1b3a8f; line-height:1.5;">Saving this step <b>admits the patient</b> and locks the encounter as an inpatient episode — no follow-up appointment is booked. The patient shows as admitted on their profile.</div>
+                </sc-if>
+
+                <!-- FOLLOW-UP -->
+                <sc-if value="{{ s.isFollowup }}" hint-placeholder-val="{{ false }}">
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Book a follow-up</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                    <sc-for list="{{ FU.chips }}" as="ch" hint-placeholder-count="3">
+                      <div onClick="{{ ch.onToggle }}" style="cursor:pointer; font-size:14px; font-weight:600; padding:8px 13px; border-radius:999px; background:{{ ch.bg }}; color:{{ ch.fg }}; border:1.5px solid {{ ch.bd }};">{{ ch.label }}</div>
+                    </sc-for>
+                  </div>
+                  <label style="font-size:13px; font-weight:700; color:#00502e; display:block; margin-bottom:9px;">Reason for review</label>
+                  <input value="{{ FU.reason }}" onChange="{{ FU.onReason }}" style="width:100%; border:1.5px solid #bec9bf; border-radius:11px; padding:13px; font-size:16px; background:#fff; outline:none;" style-focus="border-color:#00502e; border-width:2px;" />
+                  <div style="background:#fdeecb; border:1px solid #f0d79a; border-radius:12px; padding:12px 14px; margin-top:16px; font-size:13px; color:#7a4f00; line-height:1.5;">Saving this step <b>closes the encounter</b> — every section becomes permanent. The follow-up is added to the appointments list for the chosen day.</div>
+                </sc-if>
+
+                <!-- review button -->
+                <div onClick="{{ s.onReview }}" style="cursor:pointer; background:#00502e; color:#fff; text-align:center; padding:15px; border-radius:12px; font-weight:700; font-size:16px; margin-top:18px;">{{ s.reviewLabel }}</div>
+              </div>
+            </sc-if>
+
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= AUDIT ================= -->
+  <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:cbFade .25s ease; max-width:720px;">
+      <div onClick="{{ onBackToEncounter }}" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:#00502e; margin-bottom:16px;">‹ Back to encounter</div>
+      <h1 style="font-size:clamp(24px,4vw,30px); font-weight:800; letter-spacing:-0.02em; margin:0 0 4px;">Activity log</h1>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#6f7a71; margin-bottom:22px;">{{ encId }} · {{ encPatientName }}</div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:20px 22px;">
+        <sc-for list="{{ auditRows }}" as="a" hint-placeholder-count="4">
+          <div style="display:flex; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div style="width:24px; height:24px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex:none;">✓</div>
+              <div style="width:2px; flex:1; background:{{ a.line }}; margin:2px 0;"></div>
+            </div>
+            <div style="padding-bottom:{{ a.pad }};">
+              <div style="font-size:15px; font-weight:700;">{{ a.action }}</div>
+              <div style="font-size:13px; color:#3f4941; margin-top:2px;">{{ a.actor }} · {{ a.title }}</div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71; margin-top:2px;">{{ a.time }} · {{ encDate }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:12px; color:#6f7a71; line-height:1.5; margin-top:16px; max-width:64ch;">Every save is written here against the staff member who was signed in at the moment of saving. Entries can never be edited or deleted — a correction is added as a new amendment, also logged.</div>
+    </div>
+  </sc-if>
+
+  <!-- ================= SYSTEM NOTES / LEGEND ================= -->
+  <div style="margin-top:56px; border-top:1px solid #d9dadb; padding-top:32px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#006b3f; margin-bottom:10px;">How this flow works</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;">
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:18px 20px;">
+        <div style="font-weight:800; font-size:16px; margin-bottom:8px;">One encounter, one screen</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.55;">The whole visit is a single record, split into titled sections — vitals, complaint, lab order, lab results, diagnosis, dispensing, follow-up. Anyone viewing has the full picture at a glance.</div>
+      </div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:18px 20px;">
+        <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Any staff, any field</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.55;">There are no role locks — whoever is at the station records the step. Use the <b>Signed in</b> switch (top-right) to change who is saving; the save is stamped to that person.</div>
+      </div>
+      <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:18px 20px;">
+        <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Review, then lock</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.55;">Saving always opens a summary of exactly what you entered. Confirm and the section locks — signed, timestamped, immutable. A mistake is fixed with an <b>amendment</b>, never an edit.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STAFF SWITCH MODAL ================= -->
+  <sc-if value="{{ showSwitch }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div onClick="{{ onCloseModal }}" style="position:absolute; inset:0; background:rgba(15,30,25,0.5); animation:cbFade .2s ease;"></div>
+      <div style="position:relative; width:100%; max-width:420px; background:#fff; border-radius:22px; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,0.3); animation:cbRise .25s ease;">
+        <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Who is at the workstation?</div>
+        <div style="font-size:13px; color:#6f7a71; margin:5px 0 18px; line-height:1.45;">Saves are stamped to the signed-in staff member. Any of them can record any section.</div>
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <sc-for list="{{ staffList }}" as="m" hint-placeholder-count="4">
+            <div onClick="{{ m.onPick }}" style="cursor:pointer; display:flex; align-items:center; gap:12px; border:1.5px solid {{ m.bd }}; border-radius:13px; padding:12px 14px; background:{{ m.bg }};">
+              <div style="width:40px; height:40px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex:none;">{{ m.initials }}</div>
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:15px;">{{ m.name }}</div>
+                <div style="font-size:12px; color:#6f7a71;">{{ m.title }}</div>
+              </div>
+              <sc-if value="{{ m.active }}" hint-placeholder-val="{{ false }}"><span style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= REVIEW MODAL ================= -->
+  <sc-if value="{{ showReview }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; inset:0; z-index:60; display:flex; align-items:flex-end; justify-content:center; padding:0;">
+      <div onClick="{{ onCloseModal }}" style="position:absolute; inset:0; background:rgba(15,30,25,0.5); animation:cbFade .2s ease;"></div>
+      <div style="position:relative; width:100%; max-width:520px; background:#fff; border-radius:24px 24px 0 0; padding:24px 22px 26px; box-shadow:0 -14px 50px rgba(0,0,0,0.25); animation:cbRise .28s ease; max-height:90vh; overflow:auto;">
+        <div style="width:40px; height:5px; border-radius:999px; background:#d9dadb; margin:0 auto 16px;"></div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#006b3f;">Review before saving</div>
+        <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:3px 0 4px;">{{ reviewTitle }}</div>
+        <div style="font-size:13px; color:#6f7a71; margin-bottom:16px; line-height:1.45;">Check every entry. Once saved this section is locked to your name and can only be amended, never edited.</div>
+
+        <div style="background:#f8f9fa; border:1px solid #e1e3e4; border-radius:14px; overflow:hidden; margin-bottom:16px;">
+          <sc-for list="{{ reviewRows }}" as="r" hint-placeholder-count="3">
+            <div style="padding:12px 15px; border-bottom:1px solid #ececec; display:flex; flex-wrap:wrap; gap:4px 14px;">
+              <div style="font-size:12px; color:#6f7a71; font-weight:600; min-width:130px;">{{ r.l }}</div>
+              <div style="font-size:15px; color:#191c1d; flex:1; min-width:180px; font-weight:500;">{{ r.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:11px; background:#dcefe2; border-radius:12px; padding:12px 14px; margin-bottom:18px;">
+          <div style="width:34px; height:34px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex:none;">{{ staffInitials }}</div>
+          <div style="font-size:13px; color:#00502e; line-height:1.35;">Signing as <b>{{ staffName }}</b> · {{ staffTitle }}<br><span style="color:#3f4941;">Stamped {{ reviewTime }} · {{ encDate }}</span></div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <div onClick="{{ onConfirmLock }}" style="cursor:pointer; flex:1 1 220px; text-align:center; background:#00502e; color:#fff; font-weight:700; font-size:16px; padding:15px; border-radius:13px;">{{ confirmLabel }}</div>
+          <div onClick="{{ onCloseModal }}" style="cursor:pointer; flex:1 1 120px; text-align:center; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:16px; padding:15px; border-radius:13px;">Keep editing</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= AMEND MODAL ================= -->
+  <sc-if value="{{ showAmend }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div onClick="{{ onCloseModal }}" style="position:absolute; inset:0; background:rgba(15,30,25,0.5); animation:cbFade .2s ease;"></div>
+      <div style="position:relative; width:100%; max-width:460px; background:#fff; border-radius:22px; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,0.3); animation:cbRise .25s ease;">
+        <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Add an amendment</div>
+        <div style="font-size:13px; color:#6f7a71; margin:5px 0 16px; line-height:1.45;">The original record stays locked and unchanged. Your amendment is appended and logged against your name.</div>
+        <textarea onChange="{{ onAmendInput }}" rows="4" placeholder="Describe the correction or addition…" style="width:100%; border:1.5px solid #bec9bf; border-radius:12px; padding:13px; font-size:15px; background:#fff; outline:none; resize:vertical; line-height:1.45;" style-focus="border-color:#00502e; border-width:2px;">{{ amendDraft }}</textarea>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;">
+          <div onClick="{{ onSaveAmend }}" style="cursor:pointer; flex:1 1 200px; text-align:center; background:#00502e; color:#fff; font-weight:700; font-size:16px; padding:14px; border-radius:12px;">Save amendment</div>
+          <div onClick="{{ onCloseModal }}" style="cursor:pointer; flex:1 1 120px; text-align:center; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:16px; padding:14px; border-radius:12px;">Cancel</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= TOAST ================= -->
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div class="cb-toast" style="position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:70; background:#191c1d; color:#fff; border-radius:14px; padding:14px 18px; display:flex; gap:11px; align-items:center; box-shadow:0 14px 40px rgba(0,0,0,0.35); animation:cbRise .28s ease; max-width:92vw;">
+      <span style="width:22px; height:22px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none;">✓</span>
+      <div style="font-size:14px; line-height:1.35;">{{ toast }}</div>
+    </div>
+  </sc-if>
+
+</div>
+
+  <!-- ============ BOTTOM TAB BAR (mobile only) ============ -->
+  <div class="cb-bottomnav" style="position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fff; border-top:1px solid #e1e3e4; justify-content:space-around; padding:9px 0 16px; box-shadow:0 -6px 20px -12px rgba(0,40,20,0.25);">
+    <sc-for list="{{ navTabs }}" as="t" hint-placeholder-count="4">
+      <div onClick="{{ t.onTap }}" style="cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding:2px 14px; color:{{ t.fg }};">
+        <div style="width:22px; height:22px; border-radius:6px; background:{{ t.icon }};"></div>
+        <span style="font-size:11px; font-weight:{{ t.weight }};">{{ t.label }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  HEAD = ['vitals','complaint','laborder','labresults','diagnosis'];
+  STEPDEFS = {
+    vitals:     { key:'vitals',     title:'Vitals',                         hint:'Temperature, blood pressure, pulse, weight, SpO₂',  short:'Vitals' },
+    complaint:  { key:'complaint',  title:'Chief complaint & clinical note', hint:"What the patient reports, plus the clinician's note", short:'Complaint' },
+    laborder:   { key:'laborder',   title:'Lab investigations ordered',      hint:'Tests requested for the patient',                    short:'Lab order' },
+    labresults: { key:'labresults', title:'Lab results',                     hint:'Findings entered against each ordered test',         short:'Lab results' },
+    diagnosis:  { key:'diagnosis',  title:'Diagnosis, prescription & plan',   hint:'Diagnosis, medications, and what happens next',      short:'Diagnosis' },
+    injection:  { key:'injection',  title:'Injection administered',          hint:'Drug, dose and route — signed by the nurse who gave it', short:'Injection' },
+    dispense:   { key:'dispense',   title:'Medication dispensed',            hint:'What the pharmacy handed over',                      short:'Dispense' },
+    admission:  { key:'admission',  title:'Admission to facility',           hint:'Ward, bed and admitting note',                       short:'Admission' },
+    followup:   { key:'followup',   title:'Follow-up & close encounter',     hint:'Book a review, then lock the encounter',             short:'Follow-up' },
+  };
+  // tail depends on the disposition the doctor chose at diagnosis
+  tailKeys(enc){
+    const d=enc.data.diagnosis; const t=[];
+    if(d.injection) t.push('injection');
+    if((enc.data.diagnosis.rx||[]).length) t.push('dispense');
+    if(d.admit) t.push('admission'); else t.push('followup');
+    return t;
+  }
+  stepsFor(enc){ return [...this.HEAD, ...this.tailKeys(enc)].map(k=>this.STEPDEFS[k]); }
+  TIMES = ['09:14','09:31','09:36','10:05','10:22','10:31','10:38','10:44','10:52'];
+  COMPLAINTS = ['Fever','Headache','Body pain','Chills','Vomiting','Cough','Poor appetite'];
+  TESTS = ['Malaria RDT','FBC','Widal','Blood glucose','Urinalysis'];
+
+  staffAll = [
+    { id:'an', name:'Ada Nwosu',      title:'CHEW · Vitals',   initials:'AN' },
+    { id:'tb', name:'Dr. Tunde Bello',title:'Medical officer', initials:'TB' },
+    { id:'fa', name:'Femi Adeyemi',   title:'Lab scientist',   initials:'FA' },
+    { id:'sb', name:'Sola Bright',    title:'Pharmacist',      initials:'SB' },
+  ];
+
+  patientsSeed = [
+    { id:'OOE-PHC-000047-K2', name:'Amaka Okoro', age:32, sex:'F', phone:'0803 555 0147', community:'Odo-Ona Elewe, Ibadan', blood:'O+', reg:'12 Jun 2026', occupation:'Trader', allergy:'Penicillin',
+      encounters:[
+        { title:'Malaria — recovery review', date:'14 Jun 2026', facility:'Odo-Ona Elewe PHC', status:'Closed', chips:['Follow-up','37.1°C','Improving'] },
+        { title:'Malaria (RDT positive)',    date:'12 Jun 2026', facility:'Odo-Ona Elewe PHC', status:'Closed', chips:['38.9°C','118/76','ACT · 3 days'] },
+      ] },
+    { id:'OOE-PHC-000051-B7', name:'Ibrahim Musa', age:34, sex:'M', phone:'0812 220 6631', community:'Alafia, Ibadan', blood:'B+', reg:'5 Jul 2026', occupation:'Driver', allergy:'Sulfa drugs',
+      encounters:[] },
+    { id:'OOE-PHC-000052-Q4', name:'Grace Eze', age:28, sex:'F', phone:'0806 774 1020', community:'Ring Road, Ibadan', blood:'A+', reg:'3 May 2026', occupation:'Teacher', allergy:'None on record',
+      encounters:[ { title:'2nd ANC visit — normal', date:'3 May 2026', facility:'Odo-Ona Elewe PHC', status:'Closed', chips:['Antenatal','BP 110/70'] } ] },
+  ];
+
+  state = {
+    view: 'find',
+    staffId: 'an',
+    patients: this.patientsSeed,
+    selectedId: null,
+    enc: null,
+    lastView: 'profile',
+    modal: null,        // {type:'switch'|'review'|'amend', stepKey}
+    amendDraft: '',
+    appts: [
+      { id:'appt-seed', name:'Yusuf Bala', reason:'Hypertension review', when:'5 Jul 2026', from:'Booked 28 Jun', isNew:false },
+    ],
+    apptToday: [
+      { name:'Ngozi Umeh', reason:'ANC · 3rd visit', time:'11:00' },
+      { name:'Segun Adio', reason:'BP check', time:'11:40' },
+    ],
+    toast: null,
+  };
+
+  get staff(){ return this.staffAll.find(s=>s.id===this.state.staffId); }
+  initials(name){ const p=name.replace(/^Dr\.?\s+/,'').trim().split(/\s+/); return ((p[0]||'')[0]||'').toUpperCase()+((p[1]||'')[0]||'').toUpperCase(); }
+  flash(msg){ clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:null}), 3400); this.setState({toast:msg}); }
+  patientById(id){ return this.state.patients.find(p=>p.id===id); }
+
+  // ---- navigation ----
+  goFind(){ this.setState({ view:'find' }); }
+  openPatient(id){ this.setState({ view:'profile', selectedId:id }); }
+  openAppointments(){ this.setState({ view:'appointments' }); }
+  editDetails(){ this.flash('Patient details are editable — encounter records stay locked.'); }
+
+  newEncounter(patient){
+    const seedComplaints = patient.unknown ? ['Fever'] : ['Fever','Headache'];
+    return {
+      id:'OOE-ENC-'+String(Math.floor(Math.random()*900)+100),
+      patient, date:'5 Jul 2026', stage:0, closed:false, sig:{}, amend:{},
+      audit:[{ time:'09:08', actor:this.staff.name, title:this.staff.title, action:'Encounter opened' }],
+      data:{
+        vitals:{ temp:'38.9', bp:'118/76', pulse:'98', weight:'63', spo2:'98' },
+        complaint:{ complaints:seedComplaints, note:'Fever and headache for 3 days, worse at night. Poor appetite.' },
+        laborder:{ tests:['Malaria RDT','FBC'] },
+        labresults:{ 'Malaria RDT':'Positive (P. falciparum)', 'FBC':'WBC 11.2 · Hb 11.4 · Plt 180' },
+        diagnosis:{ dx:'Malaria (confirmed by RDT)', injection:false, admit:false, rx:[
+          { name:'Artemether-Lumefantrine', dose:'1 tab · twice daily · 3 days' },
+          { name:'Paracetamol 500mg', dose:'1 tab · as needed · 5 days' },
+        ] },
+        injection:{ drug:'Artemether 80mg', dose:'80 mg', route:'IM', site:'Left gluteus', note:'' },
+        dispense:{ done:{} },
+        admission:{ ward:'General ward', bed:'Bed 4', note:'Admit for IV fluids and observation — malaria with persistent vomiting.' },
+        followup:{ when:'1 week · 12 Jul 2026', reason:'Malaria recovery review' },
+      },
+    };
+  }
+  createEncounter(){
+    const p = this.patientById(this.state.selectedId);
+    this.setState({ enc:this.newEncounter(p), view:'encounter', lastView:'profile' });
+  }
+  createUnknown(){
+    const n = String(Math.floor(Math.random()*90)+10);
+    const p = { id:'OOE-PHC-0000'+n+'-U9', name:'Unknown patient', age:'~40', sex:'M', phone:'—', community:'—', blood:'Unknown', reg:'5 Jul 2026', occupation:'—', allergy:'Unknown', unknown:true, encounters:[] };
+    const patients=[p, ...this.state.patients];
+    this.setState({ patients, selectedId:p.id, enc:this.newEncounter(p), view:'encounter', lastView:'find', toast:'Encounter opened for an unknown patient — details can be confirmed later.' });
+    clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:null}),3600);
+  }
+  backToProfile(){ this.setState({ view: this.state.enc && this.state.enc.patient.unknown && this.state.lastView==='find' ? 'find' : 'profile' }); }
+
+  openAudit(){ this.setState({ view:'audit' }); }
+  backToEncounter(){ this.setState({ view:'encounter' }); }
+
+  // ---- editing ----
+  setField(step, field, value){
+    const enc={...this.state.enc, data:{...this.state.enc.data, [step]:{...this.state.enc.data[step], [field]:value}}};
+    this.setState({ enc });
+  }
+  toggleIn(step, field, value){
+    const arr=[...(this.state.enc.data[step][field]||[])];
+    const i=arr.indexOf(value); i<0?arr.push(value):arr.splice(i,1);
+    this.setField(step, field, arr);
+  }
+  setResult(test, value){
+    const lr={...this.state.enc.data.labresults, [test]:value};
+    const enc={...this.state.enc, data:{...this.state.enc.data, labresults:lr}};
+    this.setState({ enc });
+  }
+  removeRx(idx){
+    const rx=this.state.enc.data.diagnosis.rx.filter((_,i)=>i!==idx);
+    this.setField('diagnosis','rx',rx);
+  }
+  addRx(){
+    const rx=[...this.state.enc.data.diagnosis.rx, { name:'New medication', dose:'dose · frequency · duration' }];
+    this.setField('diagnosis','rx',rx);
+  }
+  toggleDispense(idx){
+    const done={...(this.state.enc.data.dispense.done||{})}; done[idx]=!done[idx];
+    this.setField('dispense','done',done);
+  }
+
+  // ---- save / lock ----
+  auditLabel(key){ return ({
+    vitals:'Vitals recorded and locked', complaint:'Chief complaint and clinical note recorded',
+    laborder:'Lab investigations ordered', labresults:'Lab results entered and locked',
+    diagnosis:'Diagnosis made, prescription and plan issued',
+    injection:'Injection administered and locked', dispense:'Medication dispensed',
+    admission:'Patient admitted to facility',
+    followup:'Follow-up booked and encounter closed',
+  })[key]; }
+
+  confirmLock(){
+    const key=this.state.modal.stepKey;
+    const steps=this.stepsFor(this.state.enc);
+    const idx=steps.findIndex(s=>s.key===key);
+    const staff=this.staff;
+    const time=this.TIMES[idx]||'—';
+    const enc={...this.state.enc, sig:{...this.state.enc.sig}, audit:[...this.state.enc.audit]};
+    enc.sig[key]={ actor:staff.name, title:staff.title, time, date:enc.date };
+    enc.audit.push({ time, actor:staff.name, title:staff.title, action:this.auditLabel(key) });
+    enc.stage=idx+1;
+    const patch={ enc, modal:null };
+    if(key==='followup'){
+      enc.closed=true;
+      const appt={ id:enc.id, name:enc.patient.name, reason:enc.data.followup.reason||'Follow-up', when:enc.data.followup.when, from:'From today’s encounter', isNew:true };
+      patch.appts=[appt, ...this.state.appts.map(a=>({...a,isNew:false}))];
+      patch.toast='Encounter closed & locked. Follow-up booked for '+enc.data.followup.when+'.';
+    } else if(key==='admission'){
+      enc.closed=true; enc.admitted=true;
+      patch.toast='Patient admitted to '+enc.data.admission.ward+' ('+enc.data.admission.bed+'). Encounter locked as inpatient.';
+    } else {
+      patch.toast='Saved & locked — signed by '+staff.name+'.';
+    }
+    clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:null}),3600);
+    this.setState(patch);
+  }
+
+  saveAmend(){
+    const note=(this.state.amendDraft||'').trim(); if(!note) return;
+    const key=this.state.modal.stepKey; const staff=this.staff;
+    const enc={...this.state.enc, amend:{...this.state.enc.amend}, audit:[...this.state.enc.audit]};
+    enc.amend[key]=[...(enc.amend[key]||[]), { by:staff.name, title:staff.title, time:'11:07', note }];
+    enc.audit.push({ time:'11:07', actor:staff.name, title:staff.title, action:'Amendment added to '+this.STEPDEFS[key].title });
+    this.setState({ enc, modal:null, amendDraft:'' });
+    this.flash('Amendment logged — the original record is unchanged.');
+  }
+
+  // ---- summaries ----
+  summaryFor(key){
+    const d=this.state.enc.data;
+    if(key==='vitals') return [
+      {l:'Temperature', v:(d.vitals.temp||'—')+' °C'}, {l:'Blood pressure', v:(d.vitals.bp||'—')+' mmHg'},
+      {l:'Pulse', v:(d.vitals.pulse||'—')+' bpm'}, {l:'Weight', v:(d.vitals.weight||'—')+' kg'}, {l:'SpO₂', v:(d.vitals.spo2||'—')+' %'} ];
+    if(key==='complaint') return [
+      {l:'Complaints', v:(d.complaint.complaints||[]).join(', ')||'—'}, {l:'Clinical note', v:d.complaint.note||'—'} ];
+    if(key==='laborder') return [ {l:'Investigations', v:(d.laborder.tests||[]).join(', ')||'None'} ];
+    if(key==='labresults') return (d.laborder.tests||[]).map(t=>({l:t, v:d.labresults[t]||'—'}));
+    if(key==='diagnosis'){ const plan=[]; if(d.diagnosis.injection) plan.push('Give injection'); if((d.diagnosis.rx||[]).length) plan.push('Prescribe medication'); if(d.diagnosis.admit) plan.push('Admit patient'); if(!d.diagnosis.admit) plan.push('Send home + follow-up');
+      return [
+        {l:'Diagnosis', v:d.diagnosis.dx||'—'},
+        {l:'Prescription', v:(d.diagnosis.rx||[]).map(m=>m.name+' — '+m.dose).join('; ')||'None'},
+        {l:'Plan', v:plan.join(' · ')} ]; }
+    if(key==='injection') return [
+      {l:'Drug', v:d.injection.drug||'—'}, {l:'Dose', v:d.injection.dose||'—'},
+      {l:'Route', v:d.injection.route||'—'}, {l:'Site', v:d.injection.site||'—'},
+      {l:'Note', v:d.injection.note||'—'} ];
+    if(key==='admission') return [
+      {l:'Ward', v:d.admission.ward||'—'}, {l:'Bed', v:d.admission.bed||'—'},
+      {l:'Admitting diagnosis', v:d.diagnosis.dx||'—'}, {l:'Admitting note', v:d.admission.note||'—'} ];
+    if(key==='dispense'){ const rx=d.diagnosis.rx||[]; const done=d.dispense.done||{};
+      return [ {l:'Dispensed', v:rx.filter((_,i)=>done[i]).map(m=>m.name).join(', ')||'None ticked'},
+               {l:'Not dispensed', v:rx.filter((_,i)=>!done[i]).map(m=>m.name).join(', ')||'—'} ]; }
+    if(key==='followup') return [ {l:'Follow-up', v:d.followup.when||'—'}, {l:'Reason', v:d.followup.reason||'—'} ];
+    return [];
+  }
+
+  renderVals(){
+    const st=this.state; const staff=this.staff; const enc=st.enc;
+    const chip=(active,base,activeBg,activeFg)=>active
+      ? {bg:activeBg||'#00502e', fg:activeFg||'#fff', bd:activeBg||'#00502e'}
+      : {bg:'#fff', fg:'#3f4941', bd:'#bec9bf'};
+
+    const base = {
+      isFind: st.view==='find', isProfile: st.view==='profile', isEncounter: st.view==='encounter',
+      isAudit: st.view==='audit', isAppointments: st.view==='appointments',
+      staffName: staff.name, staffTitle: staff.title, staffInitials: staff.initials,
+      onOpenSwitch: ()=>this.setState({modal:{type:'switch'}}),
+      onCloseModal: ()=>this.setState({modal:null}),
+      goFind: ()=>this.goFind(),
+      onUnknown: ()=>this.createUnknown(),
+      onOpenAppointments: ()=>this.openAppointments(),
+      // modal flags
+      showSwitch: st.modal&&st.modal.type==='switch',
+      showReview: st.modal&&st.modal.type==='review',
+      showAmend:  st.modal&&st.modal.type==='amend',
+      staffList: this.staffAll.map(m=>({ ...m, active:m.id===st.staffId,
+        bg:m.id===st.staffId?'#f3faf5':'#fff', bd:m.id===st.staffId?'#00502e':'#e1e3e4',
+        onPick:()=>this.setState({staffId:m.id, modal: st.modal&&st.modal.type==='switch'?null:st.modal}) })),
+      // toast
+      hasToast: !!st.toast, toast: st.toast,
+      // bottom tab bar (mobile)
+      navTabs: [
+        { label:'Patients',     active: st.view!=='appointments', onTap:()=>this.goFind() },
+        { label:'Appointments', active: st.view==='appointments',  onTap:()=>this.openAppointments() },
+        { label:'Registers',    active: false, onTap:()=>this.flash('Registers live elsewhere in CareBridge.') },
+        { label:'Stock',        active: false, onTap:()=>this.flash('Stock lives elsewhere in CareBridge.') },
+      ].map(t=>({ ...t, fg:t.active?'#00502e':'#6f7a71', icon:t.active?'#00502e':'#bec9bf', weight:t.active?'700':'600' })),
+      // amend
+      amendDraft: st.amendDraft,
+      onAmendInput: e=>this.setState({amendDraft:e.target.value}),
+      onSaveAmend: ()=>this.saveAmend(),
+    };
+
+    // FIND
+    base.patientCards = st.patients.map(p=>({
+      name:p.name, id:p.id, initials:p.unknown?'??':this.initials(p.name),
+      avBg:p.unknown?'#fdeecb':'#dcefe2', avFg:p.unknown?'#7a4f00':'#00502e',
+      sub:(p.sex||'—')+' · '+p.age+(p.community&&p.community!=='—'?' · '+p.community.split(',')[0]:''),
+      last:(p.encounters&&p.encounters[0])?('Last: '+p.encounters[0].date.replace(' 2026','')):'New',
+      unknown:!!p.unknown, onOpen:()=>this.openPatient(p.id),
+    }));
+
+    // APPOINTMENTS
+    base.apptUnassigned = st.appts.map(a=>({ ...a, border:a.isNew?'#8af5b4':'#eceeef', shadow:a.isNew?'0 8px 24px -12px rgba(0,80,46,0.4)':'none',
+      onOpen:()=>{ const m=st.patients.find(p=>p.name===a.name); if(m) this.openPatient(m.id); else this.flash('Opening '+a.name); } }));
+    base.apptToday = st.apptToday;
+
+    // PROFILE
+    const sp = this.patientById(st.selectedId);
+    if(sp){
+      const encs = (sp.encounters||[]).map(e=>({ ...e,
+        border:'#e1e3e4', pillBg: e.status==='Closed'?'#edeeef':'#dcefe2', pillFg: e.status==='Closed'?'#3f4941':'#00502e',
+        onOpen:()=> this.flash('This encounter is closed and locked — opening read-only history.') }));
+      if(enc && enc.patient.id===sp.id){
+        encs.unshift({ title: enc.admitted?('Admitted — '+(enc.data.diagnosis.dx||'')):(enc.closed?(enc.data.diagnosis.dx||'Encounter'):'Encounter in progress'),
+          date:enc.date, facility:'Odo-Ona Elewe PHC', status: enc.admitted?'Admitted':(enc.closed?'Closed':'Open'),
+          pillBg: enc.admitted?'#e6ecff':(enc.closed?'#edeeef':'#fdeecb'), pillFg: enc.admitted?'#1b3a8f':(enc.closed?'#3f4941':'#7a4f00'), border: enc.admitted?'#c3d0f5':(enc.closed?'#e1e3e4':'#f0d79a'),
+          chips:[ enc.data.vitals.temp+'°C', enc.data.vitals.bp, ...(enc.admitted?[enc.data.admission.ward+' · '+enc.data.admission.bed]:[(enc.data.laborder.tests||[]).length+' tests']) ],
+          onOpen:()=>this.setState({view:'encounter', lastView:'profile'}) });
+      }
+      base.p = {
+        title: sp.name, id: sp.id, initials: sp.unknown?'??':this.initials(sp.name),
+        unknown: !!sp.unknown, allergy: sp.allergy,
+        facts:[ {label:'Age / Sex', value:sp.age+' · '+sp.sex}, {label:'Phone', value:sp.phone},
+                {label:'Community', value:sp.community}, {label:'Blood group', value:sp.blood},
+                {label:'Registered', value:sp.reg}, {label:'Occupation', value:sp.occupation} ],
+        encCount: encs.length, encounters: encs,
+        onOpen:()=>{}, 
+      };
+      base.onCreateEncounter = ()=>this.createEncounter();
+      base.onEditDetails = ()=>this.editDetails();
+    }
+
+    // ENCOUNTER (compute whenever enc exists)
+    if(enc){
+      const d=enc.data;
+      base.encPatientName=enc.patient.name; base.encPatientId=enc.patient.id;
+      base.encPatientInitials=enc.patient.unknown?'??':this.initials(enc.patient.name);
+      base.encAllergy=enc.patient.allergy; base.encUnknown=!!enc.patient.unknown;
+      base.encId=enc.id; base.encDate=enc.date; base.encClosed=enc.closed; base.encAdmitted=!!enc.admitted;
+      base.encClosedOnly= enc.closed && !enc.admitted;
+      base.encAdmitLoc= enc.data.admission.ward+' · '+enc.data.admission.bed;
+      const steps=this.stepsFor(enc);
+      base.encStatusLabel= enc.admitted?'Admitted · inpatient':(enc.closed?'Closed':('In progress · '+(steps[enc.stage]?steps[enc.stage].short:'—')));
+      base.auditCount=enc.audit.length;
+      base.onBackToProfile=()=>this.backToProfile();
+      base.onOpenAudit=()=>this.openAudit();
+      base.onBackToEncounter=()=>this.backToEncounter();
+
+      // spine
+      base.spine=steps.map((sd,i)=>{
+        const locked=!!enc.sig[sd.key]; const active=(i===enc.stage)&&!enc.closed;
+        return { label:sd.short,
+          bg: locked?'#dcefe2':(active?'#00502e':'#f3f4f5'),
+          fg: locked?'#00502e':(active?'#fff':'#9aa3a8'),
+          dot: locked?'✓':String(i+1),
+          dotBg: locked?'#00502e':(active?'#9df5bd':'#e1e3e4'),
+          dotFg: locked?'#fff':(active?'#00323f':'#9aa3a8') };
+      });
+
+      // sections
+      base.sections=steps.map((sd,i)=>{
+        const isLocked=!!enc.sig[sd.key];
+        const isActive=(i===enc.stage)&&!enc.closed&&!isLocked;
+        const isPending=(i>enc.stage)&&!isLocked && !enc.closed;
+        const amendments=(enc.amend[sd.key]||[]);
+        return {
+          key:sd.key, num:isLocked?'✓':String(i+1).padStart(2,'0'), title:sd.title, hint:sd.hint,
+          isLocked, isActive, isPending,
+          isVitals:sd.key==='vitals', isComplaint:sd.key==='complaint', isLaborder:sd.key==='laborder',
+          isLabresults:sd.key==='labresults', isDiagnosis:sd.key==='diagnosis', isInjection:sd.key==='injection',
+          isDispense:sd.key==='dispense', isAdmission:sd.key==='admission', isFollowup:sd.key==='followup',
+          border:isActive?'#00502e':'#e1e3e4', opacity:isPending?'0.72':'1',
+          headBorder:isActive?'#cfe4d6':'#edeeef', headBg:isActive?'#f3faf5':(isLocked?'#fbfcfb':'#fff'),
+          numBg:isLocked?'#00502e':(isActive?'#00502e':'#edeeef'), numFg:(isLocked||isActive)?'#fff':'#9aa3a8',
+          badge:isLocked?'Locked':(isActive?'Recording':'Pending'),
+          badgeBg:isLocked?'#dcefe2':(isActive?'#00502e':'#edeeef'), badgeFg:isLocked?'#00502e':(isActive?'#fff':'#9aa3a8'),
+          summary:this.summaryFor(sd.key), sig:enc.sig[sd.key]||{}, amendments, hasAmend:amendments.length>0,
+          reviewLabel: sd.key==='followup'?'Review & close encounter':(sd.key==='admission'?'Review & admit patient':'Review & save'),
+          onReview:()=>this.setState({modal:{type:'review',stepKey:sd.key}}),
+          onAmend:()=>this.setState({modal:{type:'amend',stepKey:sd.key}, amendDraft:''}),
+        };
+      });
+
+      // form bindings
+      base.V={ temp:d.vitals.temp, bp:d.vitals.bp, pulse:d.vitals.pulse, weight:d.vitals.weight, spo2:d.vitals.spo2,
+        onTemp:e=>this.setField('vitals','temp',e.target.value), onBp:e=>this.setField('vitals','bp',e.target.value),
+        onPulse:e=>this.setField('vitals','pulse',e.target.value), onWeight:e=>this.setField('vitals','weight',e.target.value),
+        onSpo2:e=>this.setField('vitals','spo2',e.target.value) };
+      base.C={ note:d.complaint.note, onNote:e=>this.setField('complaint','note',e.target.value),
+        chips:this.COMPLAINTS.map(l=>{ const on=(d.complaint.complaints||[]).includes(l); return {label:on?l+' ✓':l, ...chip(on), onToggle:()=>this.toggleIn('complaint','complaints',l)}; }) };
+      base.LO={ chips:this.TESTS.map(l=>{ const on=(d.laborder.tests||[]).includes(l); return {label:on?l+' ✓':l, ...chip(on), onToggle:()=>this.toggleIn('laborder','tests',l)}; }) };
+      const orders=(d.laborder.tests||[]);
+      base.LR={ hasOrders:orders.length>0, noOrders:orders.length===0,
+        rows:orders.map(t=>({ test:t, value:d.labresults[t]||'', onChange:e=>this.setResult(t,e.target.value) })) };
+      base.DX={ dx:d.diagnosis.dx, onDx:e=>this.setField('diagnosis','dx',e.target.value),
+        rx:(d.diagnosis.rx||[]).map((m,idx)=>({ ...m, onRemove:()=>this.removeRx(idx) })), onAdd:()=>this.addRx(),
+        dispositions:[
+          { label:'Give injection', on:!!d.diagnosis.injection, onToggle:()=>this.setField('diagnosis','injection',!d.diagnosis.injection) },
+          { label:'Admit patient',  on:!!d.diagnosis.admit,     onToggle:()=>this.setField('diagnosis','admit',!d.diagnosis.admit) },
+        ].map(o=>({ label:o.on?o.label+' ✓':o.label, ...chip(o.on), onToggle:o.onToggle })) };
+      const routes=['IM','IV','SC','ID'];
+      base.INJ={ drug:d.injection.drug, dose:d.injection.dose, site:d.injection.site, note:d.injection.note,
+        onDrug:e=>this.setField('injection','drug',e.target.value), onDose:e=>this.setField('injection','dose',e.target.value),
+        onSite:e=>this.setField('injection','site',e.target.value), onNote:e=>this.setField('injection','note',e.target.value),
+        routes:routes.map(r=>{ const on=d.injection.route===r; return {label:r, ...chip(on), onToggle:()=>this.setField('injection','route',r)}; }) };
+      const wards=['General ward','Maternity','Paediatric','Observation'];
+      base.AD={ bed:d.admission.bed, note:d.admission.note, dx:d.diagnosis.dx,
+        onBed:e=>this.setField('admission','bed',e.target.value), onNote:e=>this.setField('admission','note',e.target.value),
+        wards:wards.map(w=>{ const on=d.admission.ward===w; return {label:w, ...chip(on), onToggle:()=>this.setField('admission','ward',w)}; }) };
+      const done=d.dispense.done||{};
+      base.DP={ rows:(d.diagnosis.rx||[]).map((m,idx)=>({ name:m.name, dose:m.dose, check:done[idx]?'✓':'',
+        boxBg:done[idx]?'#00502e':'#fff', boxBd:done[idx]?'#00502e':'#bec9bf', bd:done[idx]?'#00502e':'#e1e3e4',
+        onToggle:()=>this.toggleDispense(idx) })) };
+      const fuOpts=['3 days · 8 Jul 2026','1 week · 12 Jul 2026','2 weeks · 19 Jul 2026'];
+      base.FU={ reason:d.followup.reason, onReason:e=>this.setField('followup','reason',e.target.value),
+        chips:fuOpts.map(l=>{ const on=d.followup.when===l; return {label:l, ...chip(on), onToggle:()=>this.setField('followup','when',l)}; }) };
+
+      // audit rows
+      base.auditRows=enc.audit.map((a,i)=>({ ...a, line:i===enc.audit.length-1?'transparent':'#cfd8d1', pad:i===enc.audit.length-1?'0':'18px' }));
+
+      // review modal content
+      if(st.modal && st.modal.type==='review'){
+        const steps=this.stepsFor(enc); const sd=this.STEPDEFS[st.modal.stepKey]; const idx=steps.findIndex(s=>s.key===st.modal.stepKey);
+        base.reviewTitle=sd.title; base.reviewRows=this.summaryFor(sd.key);
+        base.reviewTime=this.TIMES[idx]||'—';
+        base.confirmLabel= sd.key==='followup'?'Confirm & close encounter':(sd.key==='admission'?'Confirm & admit':'Confirm & lock');
+        base.onConfirmLock=()=>this.confirmLock();
+      }
+    }
+
+    return base;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+export { RegisterPatientScreen } from './RegisterPatientScreen';

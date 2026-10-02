@@ -1,0 +1,17 @@
+import type { EmailSent, FacilityRegistration, FacilityRegistrationResult, InviteCheck } from '@shared';
+import { get, post } from './client';
+
+/** Checks the code before the admin fills in anything else. */
+export const checkInvite = (token: string) => get<InviteCheck>(`/invites/${encodeURIComponent(token)}`);
+
+/** Emails the would-be admin a 6-digit code proving their address; it goes back with the registration. */
+export const sendRegistrationEmailCode = (email: string, inviteToken: string) =>
+  post<EmailSent>('/email-verifications', { email, inviteToken });
+
+/**
+ * The one operation that cannot happen offline: the server creates the
+ * facility, its first admin and this device's credential before any record can
+ * exist. The credential comes back exactly once (SCHEMA.md §12).
+ */
+export const registerFacility = (registration: FacilityRegistration) =>
+  post<FacilityRegistrationResult>('/facilities', registration);

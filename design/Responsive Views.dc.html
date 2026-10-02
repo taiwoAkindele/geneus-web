@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+</style>
+</helmet>
+
+<div style="font-family:'Hanken Grotesk',system-ui,sans-serif; background:#eceeef; color:#191c1d; -webkit-font-smoothing:antialiased; padding:48px 40px 100px; min-height:100vh;">
+  <div style="max-width:1440px; margin:0 auto; overflow-x:auto;">
+
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#006b3f; margin-bottom:12px;">CareBridge — responsive behaviour</div>
+    <h1 style="font-size:40px; font-weight:800; letter-spacing:-0.03em; margin:0 0 14px;">The same screens on tablet &amp; desktop</h1>
+    <p style="font-size:17px; line-height:1.55; color:#3f4941; max-width:70ch; margin:0 0 8px;">Phone is the primary device, so it stays single-column with a bottom nav. On wider screens the bottom nav becomes a <b>persistent left sidebar</b>, and screens that were a drill-down (tap a patient → new page) become <b>master–detail</b>: the list and the open record sit side by side. Nothing is redesigned — the same components just reflow into the extra space.</p>
+
+    <!-- rules -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin:32px 0 52px;">
+      <div style="background:#fff; border:1px solid #d9dadb; border-radius:16px; padding:18px 20px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600; margin-bottom:8px;">≤ 640px · PHONE</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.5;">Single column. Bottom tab bar. Full-screen forms &amp; sheets. Everything one thumb can reach.</div>
+      </div>
+      <div style="background:#fff; border:1px solid #d9dadb; border-radius:16px; padding:18px 20px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600; margin-bottom:8px;">641–1024px · TABLET</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.5;">Rail sidebar (icons + labels). Two-column content. Sheets become centered dialogs. Great in the consulting room.</div>
+      </div>
+      <div style="background:#fff; border:1px solid #d9dadb; border-radius:16px; padding:18px 20px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#006b3f; font-weight:600; margin-bottom:8px;">≥ 1025px · DESKTOP</div>
+        <div style="font-size:14px; color:#3f4941; line-height:1.5;">Full sidebar + master–detail. The records desk &amp; admin live here — more visible at once, less navigating.</div>
+      </div>
+    </div>
+
+    <!-- ============ DESKTOP: records desk / patient history ============ -->
+    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:16px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">A</span>
+      <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.02em; margin:0;">Desktop — records desk (patient history, master–detail)</h2>
+    </div>
+
+    <div style="width:1200px; border-radius:16px 16px 14px 14px; overflow:hidden; box-shadow:0 30px 60px -24px rgba(0,40,20,0.35); border:1px solid #cfd4d0; margin-bottom:56px;">
+      <!-- browser chrome -->
+      <div style="height:44px; background:#e7e8e9; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid #d4d7d5;">
+        <span style="width:12px; height:12px; border-radius:50%; background:#ff5f57;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#febc2e;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#28c840;"></span>
+        <div style="flex:1; max-width:520px; margin:0 auto; background:#fff; border-radius:8px; height:26px; display:flex; align-items:center; padding:0 12px; gap:8px;">
+          <span style="width:11px;height:11px;border:2px solid #6f7a71;border-radius:50%;display:inline-block;"></span>
+          <span style="font-size:12px; color:#3f4941; font-family:'JetBrains Mono',monospace;">app.carebridge.ng / patients / OOE-PHC-000047-K2</span>
+        </div>
+      </div>
+      <!-- app -->
+      <div style="display:flex; height:720px; background:#f8f9fa;">
+        <!-- sidebar -->
+        <div style="width:236px; flex:none; background:#00502e; color:#fff; display:flex; flex-direction:column; padding:22px 16px;">
+          <div style="display:flex; align-items:center; gap:11px; padding:0 6px 22px;">
+            <div style="width:34px; height:34px; border-radius:10px; background:#9df5bd; position:relative; flex:none;">
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:15px; height:4.5px; border-radius:3px; background:#00502e;"></div>
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:4.5px; height:15px; border-radius:3px; background:#00502e;"></div>
+            </div>
+            <span style="font-weight:800; font-size:17px; letter-spacing:-0.02em;">CareBridge</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px 12px; border-radius:11px; background:rgba(255,255,255,0.14); margin-bottom:5px;">
+            <div style="width:20px; height:20px; border-radius:6px; background:#9df5bd;"></div><span style="font-size:14px; font-weight:700;">Patients</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;">
+            <div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Registers</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;">
+            <div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Referrals</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;">
+            <div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">This month</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;">
+            <div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Stock</span>
+          </div>
+          <div style="margin-top:auto; background:rgba(255,255,255,0.1); border-radius:13px; padding:13px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:34px; height:34px; border-radius:50%; background:#8af5b4; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">TB</div>
+              <div style="flex:1;"><div style="font-size:13px; font-weight:700;">Dr. Tunde Bello</div><div style="font-size:11px; color:#9df5bd;">Shift ends 15:00</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- main: master-detail -->
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <!-- top bar -->
+          <div style="height:64px; flex:none; background:#fff; border-bottom:1px solid #e1e3e4; display:flex; align-items:center; padding:0 24px; gap:16px;">
+            <div style="flex:1; max-width:420px; display:flex; align-items:center; gap:10px; border:1.5px solid #dfe3e0; border-radius:11px; padding:10px 14px;">
+              <span style="width:14px;height:14px;border:2px solid #6f7a71;border-radius:50%;display:inline-block;"></span>
+              <span style="font-size:14px; color:#6f7a71;">Search name, phone or Patient ID…</span>
+            </div>
+            <span style="margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:7px 12px; border-radius:999px;"><span style="width:7px;height:7px;border-radius:50%;background:#006b3f;"></span>Synced</span>
+            <div style="background:#00502e; color:#fff; font-weight:700; font-size:14px; padding:10px 16px; border-radius:11px;">＋ New patient</div>
+          </div>
+
+          <div style="flex:1; display:flex; overflow:hidden;">
+            <!-- master list -->
+            <div style="width:300px; flex:none; border-right:1px solid #e1e3e4; background:#fbfcfc; overflow:hidden; display:flex; flex-direction:column;">
+              <div style="padding:16px 18px 10px; font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase;">Today · 18 seen</div>
+              <div style="padding:0 12px 12px; display:flex; flex-direction:column; gap:6px;">
+                <div style="background:#00502e; color:#fff; border-radius:12px; padding:12px 13px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:15px;">Amaka Okoro</span><span style="font-size:11px; color:#9df5bd;">32 F</span></div>
+                  <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#bdeccf; margin-top:3px;">OOE-PHC-000047-K2</div>
+                </div>
+                <div style="background:#fff; border:1px solid #eceeef; border-radius:12px; padding:12px 13px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:15px;">Ibrahim Musa</span><span style="font-size:11px; color:#6f7a71;">34 M</span></div>
+                  <div style="font-size:12px; color:#8a5a00; margin-top:3px;">Referred · severe malaria</div>
+                </div>
+                <div style="background:#fff; border:1px solid #eceeef; border-radius:12px; padding:12px 13px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:15px;">Grace Eze</span><span style="font-size:11px; color:#6f7a71;">28 F</span></div>
+                  <div style="font-size:12px; color:#6f7a71; margin-top:3px;">ANC · 2nd visit</div>
+                </div>
+                <div style="background:#fff; border:1px solid #eceeef; border-radius:12px; padding:12px 13px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:15px;">Musa Danjuma</span><span style="font-size:11px; color:#6f7a71;">5 M</span></div>
+                  <div style="font-size:12px; color:#6f7a71; margin-top:3px;">Immunisation · Penta 3</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- detail -->
+            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+              <!-- patient header -->
+              <div style="background:#00502e; color:#fff; padding:18px 26px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                  <div style="width:48px; height:48px; border-radius:50%; background:#9df5bd; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px;">AO</div>
+                  <div style="flex:1;">
+                    <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Amaka Okoro · 32 · F</div>
+                    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9df5bd;">OOE-PHC-000047-K2 · referred from Alafia CHC</div>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:6px 11px; border-radius:999px;">⚠ Penicillin allergy</span>
+                    <div style="background:#9df5bd; color:#00323f; font-weight:700; font-size:13px; padding:8px 14px; border-radius:10px;">＋ New record</div>
+                  </div>
+                </div>
+              </div>
+              <!-- two-column body: history + record preview -->
+              <div style="flex:1; display:flex; overflow:hidden;">
+                <div style="flex:1; padding:20px 22px; overflow:hidden;">
+                  <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">Previous visits · 4</div>
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:14px;">
+                      <div style="display:flex; justify-content:space-between;"><span style="font-weight:700; font-size:15px;">Malaria — recovery review</span><span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:4px 9px; border-radius:999px;">Malaria</span></div>
+                      <div style="font-size:12px; color:#6f7a71; margin-top:4px;">14 Jun 2026 · Adeoyo General Hospital</div>
+                      <div style="font-size:12px; color:#2c3b52; font-weight:600; margin-top:6px;">↳ Follow-up of 12 Jun</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:14px;">
+                      <div style="display:flex; justify-content:space-between;"><span style="font-weight:700; font-size:15px;">Malaria (RDT positive)</span><span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:4px 9px; border-radius:999px;">Malaria</span></div>
+                      <div style="font-size:12px; color:#6f7a71; margin-top:4px;">12 Jun 2026 · Odo-Ona Elewe PHC</div>
+                      <div style="display:flex; gap:7px; margin-top:9px;">
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:11px; background:#f3f4f5; color:#3f4941; padding:4px 8px; border-radius:7px;">38.9°C</span>
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:11px; background:#f3f4f5; color:#3f4941; padding:4px 8px; border-radius:7px;">118/76</span>
+                      </div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:14px;">
+                      <div style="display:flex; justify-content:space-between;"><span style="font-weight:700; font-size:15px;">2nd ANC visit — normal</span><span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:4px 9px; border-radius:999px;">Antenatal</span></div>
+                      <div style="font-size:12px; color:#6f7a71; margin-top:4px;">03 May 2026 · Odo-Ona Elewe PHC</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- open record editor -->
+                <div style="width:320px; flex:none; border-left:1px solid #e1e3e4; background:#fbfcfc; padding:20px; overflow:hidden;">
+                  <div style="display:inline-flex; align-items:center; gap:7px; background:#f3f4f5; border-radius:9px; padding:6px 10px; margin-bottom:14px;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:#00502e;"></span>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3f4941;">5 Jul 2026 · 11:52</span>
+                  </div>
+                  <div style="font-size:13px; font-weight:700; color:#00502e; margin-bottom:8px;">Complaints</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+                    <span style="font-size:13px; font-weight:600; background:#00502e; color:#fff; padding:6px 11px; border-radius:999px;">Fever</span>
+                    <span style="font-size:13px; font-weight:600; background:#00502e; color:#fff; padding:6px 11px; border-radius:999px;">Headache</span>
+                  </div>
+                  <div style="font-size:13px; font-weight:700; color:#00502e; margin-bottom:8px;">Diagnosis</div>
+                  <div style="border:1.5px solid #dfe3e0; border-radius:10px; padding:11px; background:#fff; font-size:14px; margin-bottom:14px;">Malaria (confirmed by RDT)</div>
+                  <div style="font-size:13px; font-weight:700; color:#00502e; margin-bottom:8px;">Prescription</div>
+                  <div style="background:#fff; border:1px solid #e1e3e4; border-radius:11px; padding:11px 12px; margin-bottom:14px;">
+                    <div style="font-weight:700; font-size:14px;">Artemether-Lumefantrine</div>
+                    <div style="font-size:12px; color:#6f7a71;">1 tab · twice daily · 3 days</div>
+                  </div>
+                  <div style="background:#00502e; color:#fff; text-align:center; padding:13px; border-radius:11px; font-weight:700; font-size:15px;">Save record</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TABLET: admin dashboard ============ -->
+    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:16px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">B</span>
+      <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.02em; margin:0;">Tablet — admin dashboard (rail sidebar, two columns)</h2>
+    </div>
+
+    <div style="width:1024px; max-width:100%; margin:0 auto 20px; border-radius:26px; overflow:hidden; box-shadow:0 30px 60px -24px rgba(0,40,20,0.35); border:10px solid #1d2422;">
+      <div style="display:flex; height:680px; background:#f8f9fa;">
+        <!-- rail -->
+        <div style="width:92px; flex:none; background:#00502e; display:flex; flex-direction:column; align-items:center; padding:20px 0; gap:8px;">
+          <div style="width:38px; height:38px; border-radius:11px; background:#9df5bd; position:relative; margin-bottom:14px;">
+            <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:16px; height:5px; border-radius:3px; background:#00502e;"></div>
+            <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:5px; height:16px; border-radius:3px; background:#00502e;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:5px; color:#fff; background:rgba(255,255,255,0.14); border-radius:13px; padding:11px 0; width:64px;">
+            <div style="width:22px;height:22px;border-radius:7px;background:#9df5bd;"></div><span style="font-size:10px; font-weight:700;">Home</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:5px; color:#c8e9d5; padding:11px 0; width:64px;">
+            <div style="width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,0.28);"></div><span style="font-size:10px; font-weight:600;">Staff</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:5px; color:#c8e9d5; padding:11px 0; width:64px;">
+            <div style="width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,0.28);"></div><span style="font-size:10px; font-weight:600;">Roster</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:5px; color:#c8e9d5; padding:11px 0; width:64px;">
+            <div style="width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,0.28);"></div><span style="font-size:10px; font-weight:600;">Reports</span>
+          </div>
+        </div>
+        <!-- content -->
+        <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+          <div style="padding:22px 28px 6px; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:13px; color:#6f7a71;">Facility admin</div>
+              <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">Odo-Ona Elewe PHC</div>
+            </div>
+            <span style="font-size:11px; font-weight:700; color:#7a4f00; background:#fdeecb; padding:7px 12px; border-radius:999px;">ADMIN</span>
+          </div>
+          <div style="flex:1; overflow:hidden; padding:14px 28px 24px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto 1fr; gap:16px;">
+            <!-- facility code -->
+            <div style="background:#00502e; border-radius:18px; padding:18px 20px; color:#fff; display:flex; align-items:center; justify-content:space-between;">
+              <div><div style="font-size:12px; color:#9df5bd;">Facility code</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; margin-top:2px;">OOE-PHC</div></div>
+              <span style="font-size:11px; background:rgba(255,255,255,0.16); padding:6px 10px; border-radius:999px;">Primary · Oyo</span>
+            </div>
+            <!-- stats -->
+            <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:18px 20px; display:flex; justify-content:space-around; align-items:center;">
+              <div style="text-align:center;"><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">3</div><div style="font-size:12px; color:#6f7a71;">Staff</div></div>
+              <div style="text-align:center;"><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#8a5a00;">1</div><div style="font-size:12px; color:#6f7a71;">Pending</div></div>
+              <div style="text-align:center;"><div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:600; color:#00502e;">2</div><div style="font-size:12px; color:#6f7a71;">On shift</div></div>
+            </div>
+            <!-- setup checklist -->
+            <div style="background:#fdeecb; border:1px solid #f0d79a; border-radius:18px; padding:18px 20px;">
+              <div style="font-weight:700; font-size:15px; color:#7a4f00; margin-bottom:12px;">Finish setting up</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:14px; color:#7a4f00; margin-bottom:9px;"><span style="width:20px;height:20px;border-radius:50%;background:#8a5a00;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">✓</span> Facility registered</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:14px; color:#7a4f00; margin-bottom:9px;"><span style="width:20px;height:20px;border-radius:50%;border:2px solid #c9a24a;box-sizing:border-box;"></span> Invite your staff</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:14px; color:#7a4f00;"><span style="width:20px;height:20px;border-radius:50%;border:2px solid #c9a24a;box-sizing:border-box;"></span> Upload this week's roster</div>
+            </div>
+            <!-- staff on shift -->
+            <div style="background:#fff; border:1px solid #e1e3e4; border-radius:18px; padding:18px 20px;">
+              <div style="font-size:12px; font-weight:700; color:#006b3f; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">On shift now</div>
+              <div style="display:flex; align-items:center; gap:11px; margin-bottom:12px;">
+                <div style="width:38px; height:38px; border-radius:50%; background:#dcefe2; color:#00502e; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">AO</div>
+                <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Amaka Okoro</div><div style="font-size:12px; color:#6f7a71;">CHEW · Read &amp; write</div></div>
+                <span style="font-size:11px; font-weight:700; color:#00502e; background:#dcefe2; padding:4px 9px; border-radius:999px;">07–15</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:11px;">
+                <div style="width:38px; height:38px; border-radius:50%; background:#dde3f0; color:#2c3b52; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">TB</div>
+                <div style="flex:1;"><div style="font-weight:700; font-size:15px;">Dr. Tunde Bello</div><div style="font-size:12px; color:#6f7a71;">Doctor · Read &amp; write</div></div>
+                <span style="font-size:11px; font-weight:700; color:#00502e; background:#dcefe2; padding:4px 9px; border-radius:999px;">07–15</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ============ DESKTOP: programme register as data table ============ -->
+    <div style="display:flex; align-items:baseline; gap:14px; margin:52px 0 16px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">C</span>
+      <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.02em; margin:0;">Desktop — programme register as a full data table</h2>
+    </div>
+    <p style="font-size:15px; line-height:1.55; color:#3f4941; max-width:74ch; margin:0 0 20px;">On a phone the Malaria register is a guided one-entry-at-a-time form. At the records desk the whole month opens as a scannable table with running totals pinned in the header — the same data, now auditable at a glance.</p>
+
+    <div style="width:1200px; border-radius:16px 16px 14px 14px; overflow:hidden; box-shadow:0 30px 60px -24px rgba(0,40,20,0.35); border:1px solid #cfd4d0; margin-bottom:56px;">
+      <div style="height:44px; background:#e7e8e9; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid #d4d7d5;">
+        <span style="width:12px; height:12px; border-radius:50%; background:#ff5f57;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#febc2e;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#28c840;"></span>
+        <div style="flex:1; max-width:520px; margin:0 auto; background:#fff; border-radius:8px; height:26px; display:flex; align-items:center; padding:0 12px;">
+          <span style="font-size:12px; color:#3f4941; font-family:'JetBrains Mono',monospace;">app.carebridge.ng / registers / malaria</span>
+        </div>
+      </div>
+      <div style="display:flex; height:660px; background:#f8f9fa;">
+        <!-- sidebar -->
+        <div style="width:236px; flex:none; background:#00502e; color:#fff; display:flex; flex-direction:column; padding:22px 16px;">
+          <div style="display:flex; align-items:center; gap:11px; padding:0 6px 22px;">
+            <div style="width:34px; height:34px; border-radius:10px; background:#9df5bd; position:relative; flex:none;">
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:15px; height:4.5px; border-radius:3px; background:#00502e;"></div>
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:4.5px; height:15px; border-radius:3px; background:#00502e;"></div>
+            </div>
+            <span style="font-weight:800; font-size:17px; letter-spacing:-0.02em;">CareBridge</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Patients</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; background:rgba(255,255,255,0.14); margin:5px 0;"><div style="width:20px; height:20px; border-radius:6px; background:#9df5bd;"></div><span style="font-size:14px; font-weight:700;">Registers</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Referrals</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">This month</span></div>
+          <!-- register submenu -->
+          <div style="margin-top:14px; padding:0 6px;">
+            <div style="font-size:11px; font-weight:700; color:#81d9a2; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Programmes</div>
+            <div style="font-size:13px; color:#c8e9d5; padding:7px 8px;">Outpatient</div>
+            <div style="font-size:13px; color:#c8e9d5; padding:7px 8px;">Immunisation</div>
+            <div style="font-size:13px; color:#fff; font-weight:700; padding:7px 8px; background:rgba(255,255,255,0.12); border-radius:8px;">Malaria</div>
+            <div style="font-size:13px; color:#c8e9d5; padding:7px 8px;">Antenatal</div>
+            <div style="font-size:13px; color:#c8e9d5; padding:7px 8px;">TB · Family Planning</div>
+          </div>
+        </div>
+        <!-- table area -->
+        <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+          <div style="padding:20px 26px 0; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em;">Malaria register</div>
+              <div style="font-size:13px; color:#6f7a71;">July 2026 · Odo-Ona Elewe PHC</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <div style="border:1.5px solid #bec9bf; background:#fff; color:#00502e; font-weight:700; font-size:14px; padding:10px 16px; border-radius:11px;">Print / export</div>
+              <div style="background:#00502e; color:#fff; font-weight:700; font-size:14px; padding:10px 16px; border-radius:11px;">＋ New entry</div>
+            </div>
+          </div>
+          <!-- running totals -->
+          <div style="display:flex; gap:12px; padding:16px 26px;">
+            <div style="flex:1; background:#00502e; color:#fff; border-radius:14px; padding:12px 16px;"><div style="font-size:12px; color:#9df5bd;">Tested</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600;">96</div></div>
+            <div style="flex:1; background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:12px 16px;"><div style="font-size:12px; color:#6f7a71;">Positive</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#ba1a1a;">37</div></div>
+            <div style="flex:1; background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:12px 16px;"><div style="font-size:12px; color:#6f7a71;">Treated</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#00502e;">37</div></div>
+            <div style="flex:1; background:#fff; border:1px solid #e1e3e4; border-radius:14px; padding:12px 16px;"><div style="font-size:12px; color:#6f7a71;">Positivity</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#8a5a00;">38%</div></div>
+            <div style="flex:1; background:#fdeecb; border:1px solid #f0d79a; border-radius:14px; padding:12px 16px;"><div style="font-size:12px; color:#7a4f00;">RDTs used</div><div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; color:#7a4f00;">96</div></div>
+          </div>
+          <!-- table -->
+          <div style="flex:1; overflow:hidden; padding:0 26px 20px;">
+            <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; overflow:hidden;">
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; gap:0; background:#f3f4f5; padding:12px 18px; font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.04em; text-transform:uppercase;">
+                <div>Date</div><div>Patient</div><div>Patient ID</div><div>Test</div><div>Result</div><div>Treatment</div><div>Setting</div>
+              </div>
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; padding:14px 18px; border-top:1px solid #edeeef; font-size:14px; align-items:center;">
+                <div style="font-family:'JetBrains Mono',monospace; color:#3f4941;">05 Jul</div><div style="font-weight:600;">Amaka Okoro</div><div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">…000047-K2</div><div>RDT</div><div><span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:3px 9px; border-radius:999px;">Positive</span></div><div style="color:#3f4941;">ACT · 3 days</div><div><span style="font-size:11px; color:#3f4941; background:#edeeef; padding:3px 8px; border-radius:999px;">Facility</span></div>
+              </div>
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; padding:14px 18px; border-top:1px solid #edeeef; font-size:14px; align-items:center;">
+                <div style="font-family:'JetBrains Mono',monospace; color:#3f4941;">05 Jul</div><div style="font-weight:600;">Segun Adio</div><div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">…000046-P9</div><div>RDT</div><div><span style="font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:3px 9px; border-radius:999px;">Negative</span></div><div style="color:#6f7a71;">—</div><div><span style="font-size:11px; color:#3f4941; background:#edeeef; padding:3px 8px; border-radius:999px;">Facility</span></div>
+              </div>
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; padding:14px 18px; border-top:1px solid #edeeef; font-size:14px; align-items:center;">
+                <div style="font-family:'JetBrains Mono',monospace; color:#3f4941;">04 Jul</div><div style="font-weight:600;">Ngozi Umeh</div><div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">…000044-B3</div><div>Micro.</div><div><span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:3px 9px; border-radius:999px;">Positive</span></div><div style="color:#3f4941;">ACT · 3 days</div><div><span style="font-size:11px; color:#7a4f00; background:#fdeecb; padding:3px 8px; border-radius:999px;">Outreach</span></div>
+              </div>
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; padding:14px 18px; border-top:1px solid #edeeef; font-size:14px; align-items:center;">
+                <div style="font-family:'JetBrains Mono',monospace; color:#3f4941;">04 Jul</div><div style="font-weight:600;">Musa Danjuma</div><div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">…000041-K7</div><div>RDT</div><div><span style="font-size:12px; font-weight:700; background:#dcefe2; color:#00502e; padding:3px 9px; border-radius:999px;">Negative</span></div><div style="color:#6f7a71;">—</div><div><span style="font-size:11px; color:#3f4941; background:#edeeef; padding:3px 8px; border-radius:999px;">Facility</span></div>
+              </div>
+              <div style="display:grid; grid-template-columns:70px 1.6fr 1fr 0.8fr 1fr 1.3fr 0.9fr; padding:14px 18px; border-top:1px solid #edeeef; font-size:14px; align-items:center;">
+                <div style="font-family:'JetBrains Mono',monospace; color:#3f4941;">03 Jul</div><div style="font-weight:600;">Blessing Eze</div><div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6f7a71;">…000039-M2</div><div>RDT</div><div><span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:3px 9px; border-radius:999px;">Positive</span></div><div style="color:#3f4941;">ACT · 3 days</div><div><span style="font-size:11px; color:#3f4941; background:#edeeef; padding:3px 8px; border-radius:999px;">Facility</span></div>
+              </div>
+              <div style="padding:12px 18px; border-top:1px solid #edeeef; font-size:13px; color:#6f7a71; text-align:center;">＋ 91 more entries this month</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DESKTOP: referral inbox ============ -->
+    <div style="display:flex; align-items:baseline; gap:14px; margin:0 0 16px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">D</span>
+      <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.02em; margin:0;">Desktop — referral inbox (master–detail)</h2>
+    </div>
+    <p style="font-size:15px; line-height:1.55; color:#3f4941; max-width:74ch; margin:0 0 20px;">The phone shows incoming referrals as a stacked panel on the home screen. At a receiving hospital's records desk it becomes a triage inbox: the queue on the left, the selected referral's Tier-1 details and lifecycle on the right.</p>
+
+    <div style="width:1200px; border-radius:16px 16px 14px 14px; overflow:hidden; box-shadow:0 30px 60px -24px rgba(0,40,20,0.35); border:1px solid #cfd4d0; margin-bottom:24px;">
+      <div style="height:44px; background:#e7e8e9; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid #d4d7d5;">
+        <span style="width:12px; height:12px; border-radius:50%; background:#ff5f57;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#febc2e;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#28c840;"></span>
+        <div style="flex:1; max-width:520px; margin:0 auto; background:#fff; border-radius:8px; height:26px; display:flex; align-items:center; padding:0 12px;">
+          <span style="font-size:12px; color:#3f4941; font-family:'JetBrains Mono',monospace;">app.carebridge.ng / referrals / incoming</span>
+        </div>
+      </div>
+      <div style="display:flex; height:660px; background:#f8f9fa;">
+        <!-- sidebar -->
+        <div style="width:236px; flex:none; background:#00502e; color:#fff; display:flex; flex-direction:column; padding:22px 16px;">
+          <div style="display:flex; align-items:center; gap:11px; padding:0 6px 22px;">
+            <div style="width:34px; height:34px; border-radius:10px; background:#9df5bd; position:relative; flex:none;">
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:15px; height:4.5px; border-radius:3px; background:#00502e;"></div>
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:4.5px; height:15px; border-radius:3px; background:#00502e;"></div>
+            </div>
+            <span style="font-weight:800; font-size:17px; letter-spacing:-0.02em;">CareBridge</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Patients</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5; margin:5px 0;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">Registers</span></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:11px; background:rgba(255,255,255,0.14);">
+            <span style="display:flex; align-items:center; gap:12px;"><div style="width:20px; height:20px; border-radius:6px; background:#9df5bd;"></div><span style="font-size:14px; font-weight:700;">Referrals</span></span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; background:#8af5b4; color:#00323f; font-weight:700; padding:2px 7px; border-radius:999px;">2</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:11px; color:#c8e9d5; margin-top:5px;"><div style="width:20px; height:20px; border-radius:6px; background:rgba(255,255,255,0.28);"></div><span style="font-size:14px; font-weight:600;">This month</span></div>
+        </div>
+        <!-- inbox master -->
+        <div style="width:320px; flex:none; border-right:1px solid #e1e3e4; background:#fbfcfc; display:flex; flex-direction:column;">
+          <div style="padding:18px 20px 12px; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">Incoming</span>
+            <span style="font-size:12px; font-weight:700; color:#00502e; background:#dcefe2; padding:5px 10px; border-radius:999px;">2 new</span>
+          </div>
+          <div style="padding:0 12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="background:#394750; color:#fff; border-radius:14px; padding:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;"><span style="font-weight:700; font-size:15px;">Ibrahim Musa · 34 M</span><span style="font-size:11px; font-weight:700; background:#8af5b4; color:#00323f; padding:3px 8px; border-radius:999px;">Arrived</span></div>
+              <div style="font-size:13px; color:#cad9e3; margin-top:5px;">Suspected severe malaria</div>
+              <div style="font-size:12px; color:#bac9d3; margin-top:8px;">Alafia CHC · 12 min ago</div>
+            </div>
+            <div style="background:#fff; border:1px solid #eceeef; border-radius:14px; padding:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;"><span style="font-weight:700; font-size:15px;">Grace Eze · 28 F</span><span style="font-size:11px; font-weight:700; background:#fdeecb; color:#7a4f00; padding:3px 8px; border-radius:999px;">Seen</span></div>
+              <div style="font-size:13px; color:#6f7a71; margin-top:5px;">Obstructed labour — C-section</div>
+              <div style="font-size:12px; color:#9aa3a8; margin-top:8px;">Alafia CHC · just now</div>
+            </div>
+            <div style="background:#fff; border:1px solid #eceeef; border-radius:14px; padding:14px; opacity:0.7;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;"><span style="font-weight:700; font-size:15px;">Yusuf Bala · 51 M</span><span style="font-size:11px; font-weight:700; background:#edeeef; color:#3f4941; padding:3px 8px; border-radius:999px;">Closed</span></div>
+              <div style="font-size:13px; color:#6f7a71; margin-top:5px;">Hypertensive crisis</div>
+              <div style="font-size:12px; color:#9aa3a8; margin-top:8px;">Ojoo PHC · yesterday</div>
+            </div>
+          </div>
+        </div>
+        <!-- referral detail -->
+        <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+          <div style="background:#00502e; color:#fff; padding:20px 28px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:22px; font-weight:800; letter-spacing:-0.02em;">Ibrahim Musa · 34 · M</div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9df5bd; margin-top:2px;">from Alafia CHC · ALF-CHC-000231-T4</div>
+              </div>
+              <div style="background:#9df5bd; color:#00323f; font-weight:700; font-size:14px; padding:11px 18px; border-radius:11px;">Match &amp; admit</div>
+            </div>
+          </div>
+          <div style="flex:1; overflow:hidden; padding:22px 28px; display:grid; grid-template-columns:1.2fr 1fr; gap:20px;">
+            <!-- tier 1 info -->
+            <div>
+              <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">Travels with the referral</div>
+              <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; overflow:hidden;">
+                <div style="padding:14px 16px; border-bottom:1px solid #edeeef;"><div style="font-size:12px; color:#6f7a71;">Reason for referral</div><div style="font-size:15px; font-weight:600; color:#00502e; margin-top:3px;">Suspected severe malaria — needs admission</div></div>
+                <div style="padding:14px 16px; border-bottom:1px solid #edeeef;"><div style="font-size:12px; color:#6f7a71;">Known allergies</div><div style="font-size:15px; margin-top:3px;"><span style="font-size:12px; font-weight:700; background:#ffdad6; color:#93000a; padding:3px 9px; border-radius:999px;">Sulfa drugs</span></div></div>
+                <div style="padding:14px 16px;"><div style="font-size:12px; color:#6f7a71;">Current medications</div><div style="font-size:15px; margin-top:3px;">Artemether-Lumefantrine (started today)</div></div>
+              </div>
+              <div style="font-size:12px; color:#6f7a71; margin-top:12px; line-height:1.5;">Full history &amp; sensitive categories are not shared automatically in V1 — request-based access is planned.</div>
+            </div>
+            <!-- lifecycle -->
+            <div>
+              <div style="font-size:12px; font-weight:700; color:#6f7a71; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:12px;">Lifecycle</div>
+              <div style="background:#fff; border:1px solid #e1e3e4; border-radius:16px; padding:16px 16px 6px;">
+                <div style="display:flex; gap:12px;"><div style="display:flex; flex-direction:column; align-items:center;"><div style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</div><div style="width:2px; flex:1; background:#00502e;"></div></div><div style="padding-bottom:14px;"><div style="font-weight:700; font-size:14px;">Sent</div><div style="font-size:12px; color:#6f7a71;">Alert delivered</div></div></div>
+                <div style="display:flex; gap:12px;"><div style="display:flex; flex-direction:column; align-items:center;"><div style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</div><div style="width:2px; flex:1; background:#00502e;"></div></div><div style="padding-bottom:14px;"><div style="font-weight:700; font-size:14px;">Seen</div><div style="font-size:12px; color:#6f7a71;">Opened here · 11:20</div></div></div>
+                <div style="display:flex; gap:12px;"><div style="display:flex; flex-direction:column; align-items:center;"><div style="width:22px; height:22px; border-radius:50%; background:#00502e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">✓</div><div style="width:2px; flex:1; background:#bec9bf;"></div></div><div style="padding-bottom:14px;"><div style="font-weight:700; font-size:14px;">Arrived</div><div style="font-size:12px; color:#6f7a71;">Matched by Patient ID</div></div></div>
+                <div style="display:flex; gap:12px;"><div><div style="width:22px; height:22px; border-radius:50%; border:2px solid #bec9bf; box-sizing:border-box;"></div></div><div style="padding-bottom:12px;"><div style="font-weight:700; font-size:14px; color:#6f7a71;">Closed</div><div style="font-size:12px; color:#6f7a71;">Care handed over</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DESKTOP: onboarding centered card ============ -->
+    <div style="display:flex; align-items:baseline; gap:14px; margin:52px 0 16px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#006b3f;">E</span>
+      <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.02em; margin:0;">Desktop &amp; tablet — onboarding (centered card on a brand split)</h2>
+    </div>
+    <p style="font-size:15px; line-height:1.55; color:#3f4941; max-width:74ch; margin:0 0 20px;">Onboarding screens (magic link, facility registration, create PIN, login) don't need master–detail — they're single tasks. So instead of stretching, the full-screen phone form becomes a fixed-width card centered on a branded split: a green welcome panel on the left, the form on the right. On tablet the panel narrows; below 640px the panel drops away and the card goes full-screen — exactly the phone screens in the library.</p>
+
+    <div style="width:1200px; border-radius:16px 16px 14px 14px; overflow:hidden; box-shadow:0 30px 60px -24px rgba(0,40,20,0.35); border:1px solid #cfd4d0; margin-bottom:20px;">
+      <div style="height:44px; background:#e7e8e9; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid #d4d7d5;">
+        <span style="width:12px; height:12px; border-radius:50%; background:#ff5f57;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#febc2e;"></span>
+        <span style="width:12px; height:12px; border-radius:50%; background:#28c840;"></span>
+        <div style="flex:1; max-width:520px; margin:0 auto; background:#fff; border-radius:8px; height:26px; display:flex; align-items:center; padding:0 12px;">
+          <span style="font-size:12px; color:#3f4941; font-family:'JetBrains Mono',monospace;">app.carebridge.ng / register</span>
+        </div>
+      </div>
+      <div style="display:flex; height:660px;">
+        <!-- brand panel -->
+        <div style="width:44%; flex:none; background:#00502e; color:#fff; padding:52px 48px; display:flex; flex-direction:column; position:relative; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:12px; position:relative; z-index:2;">
+            <div style="width:38px; height:38px; border-radius:11px; background:#9df5bd; position:relative; flex:none;">
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:16px; height:5px; border-radius:3px; background:#00502e;"></div>
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:5px; height:16px; border-radius:3px; background:#00502e;"></div>
+            </div>
+            <span style="font-weight:800; font-size:20px; letter-spacing:-0.02em;">CareBridge</span>
+          </div>
+          <div style="margin-top:auto; position:relative; z-index:2;">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#81d9a2; margin-bottom:18px;">Set up your facility</div>
+            <div style="font-size:34px; font-weight:800; letter-spacing:-0.03em; line-height:1.08;">One patient. One record. Every level of care.</div>
+            <p style="font-size:15px; color:#c8e9d5; line-height:1.55; margin:18px 0 0; max-width:38ch;">Register once and your facility code, admin account and staff invites are ready in minutes — works offline from day one.</p>
+            <div style="display:flex; gap:10px; margin-top:26px;">
+              <span style="width:9px; height:9px; border-radius:50%; background:#9df5bd;"></span>
+              <span style="width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,0.3);"></span>
+              <span style="width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,0.3);"></span>
+            </div>
+          </div>
+          <div style="position:absolute; right:-120px; bottom:-160px; width:420px; height:420px; border-radius:50%; border:56px solid rgba(129,217,162,0.10); z-index:1;"></div>
+        </div>
+        <!-- form side -->
+        <div style="flex:1; background:#f8f9fa; display:flex; align-items:center; justify-content:center; padding:40px;">
+          <div style="width:440px; background:#fff; border:1px solid #e1e3e4; border-radius:22px; padding:34px 34px 30px; box-shadow:0 12px 30px -18px rgba(0,40,20,0.2);">
+            <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">Register your facility</div>
+            <div style="font-size:14px; color:#6f7a71; margin:5px 0 24px;">This creates your facility code &amp; admin account.</div>
+            <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Facility name</label>
+            <div style="border:2px solid #00502e; border-radius:12px; padding:14px; font-size:16px; margin-bottom:16px;">Odo-Ona Elewe PHC</div>
+            <div style="display:flex; gap:12px; margin-bottom:16px;">
+              <div style="flex:1;"><label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">State / LGA</label><div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:15px;">Oyo · Ibadan SW</div></div>
+              <div style="flex:1;"><label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Community</label><div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:15px;">Odo-Ona Elewe</div></div>
+            </div>
+            <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:9px;">Level of care</label>
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+              <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#00502e; color:#fff; font-weight:700; font-size:13px;">Primary</div>
+              <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:13px;">Secondary</div>
+              <div style="flex:1; text-align:center; padding:12px 4px; border-radius:11px; background:#fff; border:1.5px solid #bec9bf; color:#3f4941; font-weight:700; font-size:13px;">Tertiary</div>
+            </div>
+            <label style="font-size:13px; font-weight:600; color:#3f4941; display:block; margin-bottom:7px;">Email <span style="color:#6f7a71; font-weight:400;">— from your link</span></label>
+            <div style="border:1.5px solid #bec9bf; border-radius:12px; padding:14px; font-size:15px; background:#f3f4f5; display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;"><span>admin@odoona-phc.ng</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#006b3f; font-weight:600; background:#dcefe2; padding:3px 7px; border-radius:6px;">autofilled</span></div>
+            <div style="background:#00502e; color:#fff; text-align:center; padding:15px; border-radius:13px; font-weight:700; font-size:16px;">Create facility</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:14px; color:#6f7a71; margin:0 0 56px;">The same centered-card + brand-split holds for the magic-link, create-PIN and login screens — swap the card contents, keep the frame.</p>
+
+    <p style="font-size:14px; color:#6f7a71; text-align:center; margin:0;">Same green tokens, type scale and components as the phone library — only the layout container changes at each breakpoint.</p>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
