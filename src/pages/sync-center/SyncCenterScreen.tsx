@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppBar, Button, Stat, StatusPill } from '@/ui';
 import { indicatorFor, useSyncStatus } from '@/data';
 import { useAuth } from '@/session';
+import { ReconcileQueue } from '@/features/reconcile';
 
 const lastSyncedLabel = (at: Date | undefined): string => {
   if (!at) return 'Never synced';
@@ -85,6 +86,12 @@ export const SyncCenterScreen = () => {
                 OK
               </button>
             </div>
+          </div>
+
+          {/* Reconcile queue — refused uploads wait here for a person, never silently dropped */}
+          <div className="lg:col-span-2">
+            <div className="mb-2.5 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Needs attention</div>
+            <ReconcileQueue />
           </div>
 
           <div className="flex items-center gap-2.5 px-1 lg:col-span-2">

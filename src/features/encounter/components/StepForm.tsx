@@ -1,11 +1,11 @@
 import { Button, ChoiceChip, Icon, TextField } from '@/ui';
-import { COMPLAINT_OPTIONS, FOLLOWUP_OPTIONS, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
+import { COMPLAINT_OPTIONS, followUpOptions, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 
 /** The active-state input form for a given section. Reads/writes through the hook. */
 export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterController }) => {
-  const { enc, setField, toggleIn, setResult, addRx, removeRx } = ctl;
+  const { enc, setField, toggleIn, setResult, addRx, setRx, removeRx, setDispenseReason } = ctl;
   const d = enc.data;
 
   if (stepKey === 'vitals') {
@@ -45,15 +45,15 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
     );
   }
 
-  if (stepKey === 'laborder') {
+  if (stepKey === 'lab_order') {
     return (
       <>
         <div className="mb-2 text-[13px] font-semibold text-ink-soft">Investigations to order</div>
         <div className="flex flex-wrap gap-2">
           {TEST_OPTIONS.map((t) => {
-            const on = d.laborder.tests.includes(t);
+            const on = d.lab_order.tests.includes(t);
             return (
-              <ChoiceChip key={t} selected={on} onClick={() => toggleIn('laborder', 'tests', t)}>
+              <ChoiceChip key={t} selected={on} onClick={() => toggleIn('lab_order', 'tests', t)}>
                 {t}{on ? ' ✓' : ''}
               </ChoiceChip>
             );
@@ -66,14 +66,14 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
     );
   }
 
-  if (stepKey === 'labresults') {
-    if (d.laborder.tests.length === 0) {
-      return <div className="text-[13px] text-ink-muted">No investigations were ordered for this encounter.</div>;
+  if (stepKey === 'lab_results') {
+    if (d.lab_order.tests.length === 0) {
+      return <div className="text-[13px] text-ink-muted">No investigations were ordered for this encounter — skip this step.</div>;
     }
     return (
       <div className="space-y-3">
-        {d.laborder.tests.map((t) => (
-          <TextField key={t} label={t} name={`lr_${t}`} value={d.labresults[t] || ''} placeholder="Enter result…" onChange={(e) => setResult(t, e.target.value)} />
+        {d.lab_order.tests.map((t) => (
+          <TextField key={t} label={t} name={`lr_${t}`} value={d.lab_results[t] || ''} placeholder="Enter result…" onChange={(e) => setResult(t, e.target.value)} />
         ))}
       </div>
     );
@@ -86,15 +86,15 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
         <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Prescription</div>
         <div className="space-y-2">
           {d.diagnosis.rx.map((m, idx) => (
-            <div key={idx} className="flex items-center gap-2.5 rounded-field border border-outline-soft bg-white p-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-bold text-ink">{m.name}</div>
-                <div className="text-[13px] text-ink-muted">{m.dose}</div>
+            <div key={idx} className="flex items-end gap-2.5 rounded-field border border-outline-soft bg-white p-3">
+              <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                <TextField label="Drug" name={`rx_${idx}_drug`} value={m.name} placeholder="e.g. Artemether-Lumefantrine" onChange={(e) => setRx(idx, 'name', e.target.value)} />
+                <TextField label="Dose · frequency · duration" name={`rx_${idx}_dose`} value={m.dose} placeholder="1 tab · twice daily · 3 days" onChange={(e) => setRx(idx, 'dose', e.target.value)} />
               </div>
               <button
                 type="button"
                 onClick={() => removeRx(idx)}
-                aria-label={`Remove ${m.name}`}
+                aria-label={`Remove ${m.name || 'medication'}`}
                 className="flex h-7 w-7 min-h-0 flex-none items-center justify-center rounded-lg bg-surface-muted text-danger-strong"
               >
                 <Icon name="close" className="h-4 w-4" />
@@ -189,8 +189,8 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
           {d.diagnosis.rx.map((m, idx) => {
             const done = Boolean(d.dispense.done[idx]);
             return (
+              <div key={idx} className="space-y-2">
               <button
-                key={idx}
                 type="button"
                 onClick={() => ctl.toggleDispense(idx)}
                 className={`flex w-full items-center gap-3 rounded-field border-[1.5px] p-3 text-left ${done ? 'border-brand bg-brand-wash' : 'border-outline bg-white'}`}
@@ -203,6 +203,16 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
                   <span className="block text-[13px] text-ink-muted">{m.dose}</span>
                 </span>
               </button>
+              {done ? null : (
+                <TextField
+                  label={`Why ${m.name} was not given`}
+                  name={`dispense_${idx}_reason`}
+                  value={d.dispense.reasons[idx] ?? ''}
+                  placeholder="e.g. Out of stock"
+                  onChange={(e) => setDispenseReason(idx, e.target.value)}
+                />
+              )}
+              </div>
             );
           })}
         </div>
@@ -210,20 +220,20 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
     );
   }
 
-  // followup
+  // follow_up
   return (
     <>
       <div className="mb-2 text-[13px] font-semibold text-ink-soft">Book a follow-up</div>
       <div className="mb-4 flex flex-wrap gap-2">
-        {FOLLOWUP_OPTIONS.map((o) => (
-          <ChoiceChip key={o} selected={d.followup.when === o} onClick={() => setField('followup', 'when', o)}>
-            {o}
+        {followUpOptions().map((o) => (
+          <ChoiceChip key={o.label} selected={d.follow_up.when === o.value} onClick={() => setField('follow_up', 'when', o.value)}>
+            {o.label}
           </ChoiceChip>
         ))}
       </div>
-      <TextField label="Reason for review" name="fu_reason" value={d.followup.reason} onChange={(e) => setField('followup', 'reason', e.target.value)} />
+      <TextField label="Reason for review" name="fu_reason" value={d.follow_up.reason} onChange={(e) => setField('follow_up', 'reason', e.target.value)} />
       <div className="mt-4 rounded-card border border-amber-border bg-amber-bg p-3.5 text-[13px] leading-relaxed text-amber-text">
-        Saving this step <b>closes the encounter</b> — every section becomes permanent. The follow-up is added to the
+        Saving this step <b>closes the encounter</b> — every section becomes permanent. A follow-up is added to the
         appointments list for the chosen day.
       </div>
     </>

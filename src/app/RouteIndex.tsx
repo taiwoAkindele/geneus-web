@@ -17,6 +17,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { to: '/patients/new/details', label: 'New patient · step 2', note: '' },
       { to: '/patients/duplicate', label: 'Duplicate check', note: 'Bottom sheet' },
       { to: '/patients/send-to-unit', label: 'Send to another unit', note: '' },
+      { to: '/units', label: 'Unit queue', note: '' },
+      { to: '/admin/units', label: 'Units & rooms (admin)', note: '' },
       { to: '/registers/malaria', label: 'Programme register — Malaria', note: '' },
       { to: '/reports/month', label: 'This month at a glance', note: '' },
       { to: '/referrals/track', label: 'Refer & track', note: '' },
@@ -34,6 +36,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: 'Facility onboarding & admin',
     items: [
       { to: '/onboarding/start', label: 'Get started (magic link)', note: 'Flow entry' },
+      { to: '/onboarding/join', label: 'Join an existing facility', note: 'Second device' },
+      { to: '/admin/devices', label: 'Add a device (admin)', note: '' },
       { to: '/onboarding/register', label: 'Register facility', note: 'From the link' },
       { to: '/admin', label: 'Admin dashboard', note: 'Set up the team' },
       { to: '/admin/staff/invite', label: 'Invite staff', note: '' },

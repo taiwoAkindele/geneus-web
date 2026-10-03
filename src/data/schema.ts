@@ -15,6 +15,9 @@ import { TABLE_FOR } from './tables';
 const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   patient: { name: ['fullName'], phone: ['phone'] },
   appointment: { patient: ['patientId'], scheduled: ['scheduledFor'] },
+  encounter: { patient: ['patientId'] },
+  handoff: { toUnit: ['toUnitId'], patient: ['patientId'] },
+  encounter_entry: { encounter: ['encounterId'], patient: ['patientId'], step: ['step'] },
   register_definition: { register: ['registerId'] },
   register_entry: { register: ['registerId'], patient: ['patientId'] },
   roster_shift: { staff: ['staffId'] },

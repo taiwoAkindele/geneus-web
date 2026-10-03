@@ -1,10 +1,14 @@
-export { STEP_DEFS, stepsFor } from './steps';
+export { STEP_DEFS, isClosingStep, stepsFor } from './steps';
 export type { StepDef } from './steps';
 export { summarize, useEncounter } from './useEncounter';
-export type { EncounterController, EncounterInit } from './useEncounter';
+export type { EncounterController } from './useEncounter';
+export { encounterLabel } from './encounterRecord';
 export { EncounterSpine } from './components/EncounterSpine';
 export { SectionCard } from './components/SectionCard';
 export { StepForm } from './components/StepForm';
 export { ReviewSaveSheet } from './components/ReviewSaveSheet';
 export { AmendSheet } from './components/AmendSheet';
-export type { Actor, EncounterState, StepKey } from './types';
+export type { Actor, EncounterNavState, EncounterState, StepKey } from './types';
+export { summariseEncounter, type EncounterStatus, type EncounterSummary } from './encounterSummary';
+export { useEncounterList, usePatientEncounters } from './useEncounterLists';
+export { EncounterCard } from './components/EncounterCard';

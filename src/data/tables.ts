@@ -9,6 +9,8 @@ import type { DocType } from '@shared';
 export const TABLE_FOR: Record<DocType, string> = {
   patient: 'patients',
   visit: 'visits',
+  encounter: 'encounters',
+  encounter_entry: 'encounter_entries',
   handoff: 'handoffs',
   appointment: 'appointments',
   register_definition: 'register_definitions',

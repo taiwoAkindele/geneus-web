@@ -143,6 +143,8 @@ export const AdminDashboardScreen = () => {
       <ActionTile label="Manage staff" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Roster & shifts" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Registers" onClick={() => navigate('/registers')} />
+      <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} />
+      <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} />
     </div>
   );
 

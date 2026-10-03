@@ -27,7 +27,11 @@ export const fakeDatabase = (seed: Record<string, Record<string, unknown>[]> = {
     execute: async (sql, parameters = []) => {
       statements.push({ sql, parameters });
     },
-    getAll: async <T>(sql: string) => (rows[tableOf(sql) ?? ''] ?? []) as T[],
+    getAll: async <T>(sql: string, parameters: unknown[] = []) => {
+      const table = rows[tableOf(sql) ?? ''] ?? [];
+      const field = /WHERE\s+(\w+)\s*=\s*\?/i.exec(sql)?.[1];
+      return (field ? table.filter((row) => row[field] === parameters[0]) : table) as T[];
+    },
     getOptional: async <T>(sql: string, parameters: unknown[] = []) => {
       const table = rows[tableOf(sql) ?? ''] ?? [];
       return (table.find((row) => row.id === parameters[0]) ?? null) as T | null;

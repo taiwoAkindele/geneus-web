@@ -7,6 +7,7 @@ import {
   type Permission,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
+import { fieldKindsFor } from './contractShape';
 import { getDatabase } from './database';
 import { fromRow, toRow, type Row } from './rows';
 import { ALL_TABLES, TABLE_FOR } from './tables';
@@ -78,6 +79,27 @@ export const insertRecord = async <T extends AnyDocument>(
   return validated;
 };
 
+export type NewRecord = { permission: Permission; type: DocType; record: unknown };
+
+/**
+ * Creates several records that only make sense together — an encounter and
+ * its first saved step. Every permission and every record is checked before
+ * the first INSERT, so a refusal or a contract failure writes none of them.
+ */
+export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[]): Promise<AnyDocument[]> => {
+  for (const { permission } of records) assertAllowed(context, permission);
+  const validated = records.map(({ type, record }) => ({ type, record: validate(record) }));
+  for (const { type, record } of validated) {
+    const row = toRow(type, record);
+    const columns = Object.keys(row);
+    await getDatabase().execute(
+      `INSERT INTO ${TABLE_FOR[type]} (${columns.join(', ')}) VALUES (${placeholders(columns.length)})`,
+      columns.map((column) => row[column]),
+    );
+  }
+  return validated.map(({ record }) => record);
+};
+
 /**
  * Changes some fields of an existing record. Only the changed columns are
  * written (plus who changed them and when), which is what PowerSync queues as
@@ -109,6 +131,18 @@ export const updateRecord = async <T extends AnyDocument>(
 
 export const allOfType = async <T extends AnyDocument>(type: DocType): Promise<T[]> => {
   const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]}`);
+  return rows.map((row) => fromRow<T>(type, row));
+};
+
+/**
+ * Records whose `field` equals `value` — for tables that grow every day, where
+ * reading and parsing the whole table on each change would be too slow on a
+ * cheap phone. `field` must be a contract field of `type`, so nothing else can
+ * reach the SQL.
+ */
+export const allWhere = async <T extends AnyDocument>(type: DocType, field: string, value: string): Promise<T[]> => {
+  if (!(field in fieldKindsFor(type))) throw new Error(`${type} has no field ${field}`);
+  const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]} WHERE ${field} = ?`, [value]);
   return rows.map((row) => fromRow<T>(type, row));
 };
 
