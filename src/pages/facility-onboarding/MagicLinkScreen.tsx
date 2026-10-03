@@ -78,9 +78,15 @@ export const MagicLinkScreen = () => {
             </button>
           </div>
         ) : (
-          <p className="mt-auto pt-8 text-center text-sm text-brand-on-dark">
-            Don&rsquo;t have a code? Ask whoever approved your facility for one.
-          </p>
+          <div className="mt-auto space-y-3 pt-8 text-center text-sm text-brand-on-dark">
+            <p>
+              Facility already uses Geneus?{' '}
+              <button type="button" onClick={() => navigate('/onboarding/join')} className="min-h-0 font-bold text-white underline">
+                Join an existing facility
+              </button>
+            </p>
+            <p>Don&rsquo;t have a code? Ask whoever approved your facility for one.</p>
+          </div>
         )}
       </div>
     </div>

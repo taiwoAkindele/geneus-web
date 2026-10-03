@@ -14,9 +14,11 @@ type Props = {
   confirmLabel: string;
   onConfirm: () => void;
   onClose: () => void;
+  /** While the save is being written: no second tap, no closing mid-save. */
+  saving?: boolean;
 };
 
-export const ReviewSaveSheet = ({ title, rows, actor, confirmLabel, onConfirm, onClose }: Props) => (
+export const ReviewSaveSheet = ({ title, rows, actor, confirmLabel, onConfirm, onClose, saving = false }: Props) => (
   <Sheet onClose={onClose} eyebrow="Review before saving" title={title}>
     <p className="mb-4 text-sm leading-relaxed text-ink-muted">
       You are about to save this permanently. It cannot be edited after saving — only amended.
@@ -46,10 +48,10 @@ export const ReviewSaveSheet = ({ title, rows, actor, confirmLabel, onConfirm, o
     </div>
 
     <div className="mt-5 space-y-2">
-      <Button variant="primary" onClick={onConfirm}>
+      <Button variant="primary" disabled={saving} loading={saving} onClick={onConfirm}>
         {confirmLabel}
       </Button>
-      <Button variant="outlined" onClick={onClose}>
+      <Button variant="outlined" disabled={saving} onClick={onClose}>
         Keep editing
       </Button>
     </div>

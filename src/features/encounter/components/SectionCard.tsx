@@ -3,21 +3,25 @@ import { Button, Icon } from '@/ui';
 import type { Amendment, Signature } from '../types';
 
 /**
- * One encounter section. Three states (PRD §9.8): pending (locked behind the
- * step before it), active (its form + a distinct Review & Save), and locked
- * (a read-only summary signed by its author, with any amendments beneath).
+ * One encounter section. Four states (PRD §9.8): pending (locked behind the
+ * step before it), active (its form + a distinct Review & Save), locked (a
+ * read-only summary signed by its author, with any amendments beneath), and
+ * skipped (passed over — nothing was recorded, PRD §9.8.2).
  */
 type Props = {
   index: number;
   title: string;
   hint: string;
-  state: 'pending' | 'active' | 'locked';
+  state: 'pending' | 'active' | 'locked' | 'skipped';
   summary: { label: string; value: string }[];
   signature?: Signature;
   amendments?: Amendment[];
   reviewLabel: string;
   onReview: () => void;
   onAmend: () => void;
+  /** Absent for a step that cannot be skipped (one that closes the encounter). */
+  onSkip?: () => void;
+  saving?: boolean;
   children?: ReactNode;
 };
 
@@ -43,6 +47,8 @@ export const SectionCard = ({
   reviewLabel,
   onReview,
   onAmend,
+  onSkip,
+  saving = false,
   children,
 }: Props) => {
   const active = state === 'active';
@@ -72,12 +78,14 @@ export const SectionCard = ({
             locked ? 'bg-brand-tint text-brand' : active ? 'bg-brand text-white' : 'bg-surface-container text-ink-muted'
           }`}
         >
-          {locked ? 'Locked' : active ? 'Recording' : 'Pending'}
+          {locked ? 'Locked' : active ? 'Recording' : state === 'skipped' ? 'Skipped' : 'Pending'}
         </span>
       </div>
 
       {/* body */}
-      {state === 'pending' ? (
+      {state === 'skipped' ? (
+        <div className="px-4 py-5 text-[13px] text-ink-muted">Not recorded for this encounter.</div>
+      ) : state === 'pending' ? (
         <div className="flex items-center gap-2.5 px-4 py-5 text-[13px] text-ink-muted">
           <span className="h-4 w-4 flex-none rounded-full border-2 border-outline" />
           Complete the step above before recording this.
@@ -120,10 +128,15 @@ export const SectionCard = ({
       ) : (
         <div className="px-4 py-4">
           {children}
-          <div className="mt-4">
-            <Button variant="primary" onClick={onReview}>
+          <div className="mt-4 space-y-1">
+            <Button variant="primary" disabled={saving} loading={saving} onClick={onReview}>
               {reviewLabel}
             </Button>
+            {onSkip ? (
+              <Button variant="ghost" disabled={saving} onClick={onSkip}>
+                Skip — not needed for this patient
+              </Button>
+            ) : null}
           </div>
         </div>
       )}

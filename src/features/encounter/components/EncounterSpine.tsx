@@ -10,7 +10,8 @@ export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
   <div className="flex gap-2 overflow-x-auto px-5 py-3 md:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     {stepsFor(enc.data).map((s, i) => {
       const locked = Boolean(enc.sig[s.key]);
-      const active = i === enc.stage && !enc.closed;
+      const skipped = enc.skipped.includes(s.key);
+      const active = i === enc.activeIndex;
       return (
         <span
           key={s.key}
@@ -23,7 +24,7 @@ export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
               locked ? 'bg-brand text-white' : active ? 'bg-brand-accent-soft text-brand' : 'bg-surface-high text-ink-muted'
             }`}
           >
-            {locked ? '✓' : i + 1}
+            {locked ? '✓' : skipped ? '–' : i + 1}
           </span>
           {s.short}
         </span>

@@ -41,6 +41,12 @@ const InviteStaffScreen = lazy(() =>
     default: m.InviteStaffScreen,
   })),
 );
+const JoinFacilityScreen = lazy(() =>
+  import('@/pages/facility-onboarding/JoinFacilityScreen').then((m) => ({ default: m.JoinFacilityScreen })),
+);
+const AddDeviceScreen = lazy(() =>
+  import('@/pages/facility-onboarding/AddDeviceScreen').then((m) => ({ default: m.AddDeviceScreen })),
+);
 const RolesPermissionsScreen = lazy(() =>
   import('@/pages/facility-onboarding/RolesPermissionsScreen').then((m) => ({
     default: m.RolesPermissionsScreen,
@@ -90,6 +96,8 @@ const DuplicateCheckScreen = lazy(() =>
 const SendToUnitScreen = lazy(() =>
   import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
+const UnitQueueScreen = lazy(() => import('@/pages/units/UnitQueueScreen').then((m) => ({ default: m.UnitQueueScreen })));
+const UnitsScreen = lazy(() => import('@/pages/units/UnitsScreen').then((m) => ({ default: m.UnitsScreen })));
 const RegistersListScreen = lazy(() =>
   import('@/pages/registers/RegistersListScreen').then((m) => ({ default: m.RegistersListScreen })),
 );
@@ -155,6 +163,7 @@ const App = () => {
               <Route path="/onboarding/approve" element={<PinApprovalScreen />} />
             </Route>
             <Route path="/onboarding/start" element={<MagicLinkScreen />} />
+            <Route path="/onboarding/join" element={<JoinFacilityScreen />} />
             <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
             <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
             <Route path="/onboarding/accept" element={<CreatePinScreen />} />
@@ -173,6 +182,7 @@ const App = () => {
             <Route path="/patients/new" element={<NewPatientStep1Screen />} />
             <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
             <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
+            <Route path="/units" element={<UnitQueueScreen />} />
             <Route path="/registers" element={<RegistersListScreen />} />
             <Route path="/registers/new" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} />
@@ -188,6 +198,8 @@ const App = () => {
             <Route path="/admin/staff" element={<ManageStaffScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
+            <Route path="/admin/units" element={<UnitsScreen />} />
+            <Route path="/admin/devices" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
           <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />

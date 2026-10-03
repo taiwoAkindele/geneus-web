@@ -34,7 +34,7 @@ export const AppointmentsScreen = () => {
   const upcoming = appointments.filter((a) => a.status === 'scheduled');
 
   // The patient has arrived → start their encounter.
-  const start = (appt: BookedAppointment) => navigate('/encounters/record', { state: { patient: appt.patient } });
+  const start = (appt: BookedAppointment) => navigate('/encounters/record', { state: { patientId: appt.patient.id } });
 
   return (
     <div className="min-h-screen bg-surface">
