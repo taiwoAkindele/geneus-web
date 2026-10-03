@@ -36,7 +36,6 @@ export const stepsFor = (data: EncounterData): StepDef[] => {
   return [...HEAD_KEYS, ...tail].map((k) => STEP_DEFS[k]);
 };
 
-export const COMPLAINT_OPTIONS = ['Fever', 'Headache', 'Body pain', 'Chills', 'Vomiting', 'Cough', 'Poor appetite'];
 export const TEST_OPTIONS = ['Malaria RDT', 'FBC', 'Widal', 'Blood glucose', 'Urinalysis'];
 export const INJECTION_ROUTES = ['IM', 'IV', 'SC', 'ID'];
 export const WARD_OPTIONS = ['General ward', 'Maternity', 'Paediatric', 'Observation'];

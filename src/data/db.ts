@@ -59,6 +59,13 @@ const validate = <T extends AnyDocument>(record: unknown): T => {
 const placeholders = (count: number): string => Array.from({ length: count }, () => '?').join(', ');
 
 /**
+ * A column name as SQL. Always quoted: contract field names are not chosen
+ * with SQL in mind, and one that is a keyword (`values`, on register and
+ * encounter entries) is a syntax error unquoted.
+ */
+const column = (name: string): string => `"${name}"`;
+
+/**
  * Creates a record. `permission` is checked first; then the contract; then the
  * row is inserted, which is what PowerSync queues as a PUT.
  */
@@ -73,7 +80,7 @@ export const insertRecord = async <T extends AnyDocument>(
   const row = toRow(type, validated);
   const columns = Object.keys(row);
   await getDatabase().execute(
-    `INSERT INTO ${TABLE_FOR[type]} (${columns.join(', ')}) VALUES (${placeholders(columns.length)})`,
+    `INSERT INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
     columns.map((column) => row[column]),
   );
   return validated;
@@ -93,7 +100,7 @@ export const insertRecords = async (context: AuthorizationContext, records: read
     const row = toRow(type, record);
     const columns = Object.keys(row);
     await getDatabase().execute(
-      `INSERT INTO ${TABLE_FOR[type]} (${columns.join(', ')}) VALUES (${placeholders(columns.length)})`,
+      `INSERT INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
       columns.map((column) => row[column]),
     );
   }
@@ -123,7 +130,7 @@ export const updateRecord = async <T extends AnyDocument>(
   // `_metadata` is PowerSync's per-write note, not a contract field: it carries the
   // actor even when `updatedBy` is unchanged and therefore absent from the PATCH.
   await getDatabase().execute(
-    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((column) => `${column} = ?`).join(', ')}, _metadata = ? WHERE id = ?`,
+    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((name) => `${column(name)} = ?`).join(', ')}, _metadata = ? WHERE id = ?`,
     [...columns.map((column) => row[column]), context.userId, id],
   );
   return merged;
@@ -142,7 +149,7 @@ export const allOfType = async <T extends AnyDocument>(type: DocType): Promise<T
  */
 export const allWhere = async <T extends AnyDocument>(type: DocType, field: string, value: string): Promise<T[]> => {
   if (!(field in fieldKindsFor(type))) throw new Error(`${type} has no field ${field}`);
-  const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]} WHERE ${field} = ?`, [value]);
+  const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]} WHERE ${column(field)} = ?`, [value]);
   return rows.map((row) => fromRow<T>(type, row));
 };
 

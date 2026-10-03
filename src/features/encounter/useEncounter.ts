@@ -22,7 +22,7 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
       ];
     case 'complaint':
       return [
-        { label: 'Complaints', value: data.complaint.complaints.join(', ') || '—' },
+        { label: 'Complaints', value: data.complaint.text.trim() || '—' },
         { label: 'Clinical note', value: data.complaint.note || '—' },
       ];
     case 'lab_order':
@@ -137,7 +137,7 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
     setDraft((d) => ({ ...d, [step]: { ...d[step], [field]: value } }));
   }, []);
 
-  const toggleIn = useCallback((step: 'complaint' | 'lab_order', field: 'complaints' | 'tests', value: string) => {
+  const toggleIn = useCallback((step: 'lab_order', field: 'tests', value: string) => {
     setDraft((d) => {
       const arr = [...((d[step] as Record<string, string[]>)[field] || [])];
       const i = arr.indexOf(value);

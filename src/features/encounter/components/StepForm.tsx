@@ -1,5 +1,5 @@
 import { Button, ChoiceChip, Icon, TextField } from '@/ui';
-import { COMPLAINT_OPTIONS, followUpOptions, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
+import { followUpOptions, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 
@@ -24,16 +24,13 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
     return (
       <>
         <div className="mb-2 text-[13px] font-semibold text-ink-soft">Patient's complaints</div>
-        <div className="mb-4 flex flex-wrap gap-2">
-          {COMPLAINT_OPTIONS.map((c) => {
-            const on = d.complaint.complaints.includes(c);
-            return (
-              <ChoiceChip key={c} selected={on} onClick={() => toggleIn('complaint', 'complaints', c)}>
-                {c}{on ? ' ✓' : ''}
-              </ChoiceChip>
-            );
-          })}
-        </div>
+        <textarea
+          rows={3}
+          value={d.complaint.text}
+          placeholder="In the patient's words — e.g. fever and headache for 3 days, worse at night"
+          onChange={(e) => setField('complaint', 'text', e.target.value)}
+          className="mb-4 w-full rounded-field border-[1.5px] border-outline bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand placeholder:text-ink-muted"
+        />
         <div className="mb-2 text-[13px] font-semibold text-ink-soft">Clinical note</div>
         <textarea
           rows={3}

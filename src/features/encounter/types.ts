@@ -13,7 +13,8 @@ export type RxLine = { name: string; dose: string };
 /** What each section's form holds while it is being recorded — strings as typed. */
 export type EncounterData = {
   vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string };
-  complaint: { complaints: string[]; note: string };
+  /** The complaints as typed, in the patient's words — free text, not a fixed list. */
+  complaint: { text: string; note: string };
   lab_order: { tests: string[] };
   lab_results: Record<string, string>;
   // `injection` / `admit` are the doctor's disposition — they decide which tail
