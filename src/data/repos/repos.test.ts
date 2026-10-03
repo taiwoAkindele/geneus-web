@@ -138,7 +138,7 @@ describe('repositories', () => {
       expect(db.statements).toEqual([]);
 
       await extendShift(existingShift as never, '2026-09-12T20:00:00Z', contextFor('supervisor'));
-      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET extendedUntil = \?, updatedBy = \?, updatedOn = \?, _metadata = \? WHERE id = \?$/);
+      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET "extendedUntil" = \?, "updatedBy" = \?, "updatedOn" = \?, _metadata = \? WHERE id = \?$/);
     });
 
     it('read-only staff cannot register a patient', async () => {
@@ -249,7 +249,7 @@ describe('repositories', () => {
     it('retires a unit by flag, never by delete', async () => {
       await setUnitActive(consultation as never, false, contextFor('facility_admin'));
 
-      expect(db.statements[0].sql).toMatch(/^UPDATE units SET active = \?/);
+      expect(db.statements[0].sql).toMatch(/^UPDATE units SET "active" = \?/);
       expect(db.statements[0].parameters[0]).toBe(0);
     });
 
@@ -299,7 +299,7 @@ describe('repositories', () => {
 
       await markHandoff(pending, 'received', contextFor('nurse'));
 
-      expect(db.statements[0].sql).toBe('UPDATE handoffs SET status = ?, updatedBy = ?, updatedOn = ?, _metadata = ? WHERE id = ?');
+      expect(db.statements[0].sql).toBe('UPDATE handoffs SET "status" = ?, "updatedBy" = ?, "updatedOn" = ?, _metadata = ? WHERE id = ?');
       expect(await handoffsTo('unit:pharmacy')).toEqual([]);
     });
   });
@@ -311,7 +311,7 @@ describe('repositories', () => {
       expect(staff).toMatchObject({ facilityId: 'OOE-PHC', deviceId: 'device-1', createdBy: 'staff:facility_admin', schemaVersion: 3, active: true });
       const [statement] = db.statements;
       expect(statement.sql).toMatch(/^INSERT INTO staff \(/);
-      const columns = /\(([^)]+)\)/.exec(statement.sql)?.[1].split(', ') ?? [];
+      const columns = /\(([^)]+)\)/.exec(statement.sql)?.[1].split(', ').map((name) => name.replace(/"/g, '')) ?? [];
       expect(statement.parameters[columns.indexOf('active')]).toBe(1);
       expect(statement.parameters[columns.indexOf('facilityId')]).toBe('OOE-PHC');
     });
@@ -320,7 +320,7 @@ describe('repositories', () => {
       await setPermission(existingNurse, 'read_only', contextFor('facility_admin'));
 
       const [statement] = db.statements;
-      expect(statement.sql).toBe('UPDATE staff SET permission = ?, updatedBy = ?, updatedOn = ?, _metadata = ? WHERE id = ?');
+      expect(statement.sql).toBe('UPDATE staff SET "permission" = ?, "updatedBy" = ?, "updatedOn" = ?, _metadata = ? WHERE id = ?');
       expect(statement.parameters[0]).toBe('read_only');
       expect(statement.parameters[1]).toBe('staff:facility_admin');
       // The actor also rides in PowerSync's write metadata, for PATCHes that omit updatedBy.
@@ -331,7 +331,7 @@ describe('repositories', () => {
     it('deactivates by flag, never by delete', async () => {
       await removeStaff(existingNurse, contextFor('facility_admin'));
 
-      expect(db.statements[0].sql).toMatch(/^UPDATE staff SET active = \?/);
+      expect(db.statements[0].sql).toMatch(/^UPDATE staff SET "active" = \?/);
       expect(db.statements[0].parameters[0]).toBe(0);
       expect(db.statements.some((statement) => /DELETE/i.test(statement.sql))).toBe(false);
     });
@@ -341,7 +341,7 @@ describe('repositories', () => {
       await assignShift({ staffId: 'staff:nurse', day: '2026-09-12', startsAt: '2026-09-12T09:00:00Z', endsAt: '2026-09-12T17:00:00Z' }, admin);
       await assignShift({ staffId: 'staff:nurse', day: '2026-09-13', startsAt: '2026-09-13T09:00:00Z', endsAt: '2026-09-13T17:00:00Z' }, admin);
 
-      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET startsAt = \?, endsAt = \?/);
+      expect(db.statements[0].sql).toMatch(/^UPDATE roster_shifts SET "startsAt" = \?, "endsAt" = \?/);
       expect(db.statements[1].sql).toMatch(/^INSERT INTO roster_shifts/);
       expect(db.statements[1].sql).not.toMatch(/signature/);
     });
@@ -362,7 +362,7 @@ describe('repositories', () => {
         contextFor('records_officer'),
       );
 
-      expect(db.statements[0].sql).toBe('UPDATE patients SET address = ?, updatedBy = ?, updatedOn = ?, _metadata = ? WHERE id = ?');
+      expect(db.statements[0].sql).toBe('UPDATE patients SET "address" = ?, "updatedBy" = ?, "updatedOn" = ?, _metadata = ? WHERE id = ?');
     });
 
     it('writes nothing when no patient field changed', async () => {
@@ -380,7 +380,7 @@ describe('repositories', () => {
 
       expect(definition.id).toBe('register:opd:v2');
       const [statement] = db.statements;
-      const columns = /\(([^)]+)\)/.exec(statement.sql)?.[1].split(', ') ?? [];
+      const columns = /\(([^)]+)\)/.exec(statement.sql)?.[1].split(', ').map((name) => name.replace(/"/g, '')) ?? [];
       expect(statement.parameters[columns.indexOf('fields')]).toBe(JSON.stringify(definition.fields));
     });
   });

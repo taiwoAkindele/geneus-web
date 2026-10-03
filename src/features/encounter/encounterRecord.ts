@@ -6,7 +6,7 @@ import type { Amendment, AuditRow, EncounterData, EncounterState, Signature, Ste
 /** What a new encounter's forms start with: nothing. A default would be saved as a finding. */
 export const EMPTY_ENCOUNTER_DATA: EncounterData = {
   vitals: { temp: '', bp: '', pulse: '', weight: '', spo2: '' },
-  complaint: { complaints: [], note: '' },
+  complaint: { text: '', note: '' },
   lab_order: { tests: [] },
   lab_results: {},
   diagnosis: { dx: '', rx: [], injection: false, admit: false },

@@ -29,7 +29,8 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         spo2Percent: measured(data.vitals.spo2),
       };
     case 'complaint':
-      return { complaints: data.complaint.complaints, note: text(data.complaint.note) };
+      // Saved as one item: the complaints are free text, written as the patient put them.
+      return { complaints: data.complaint.text.trim() ? [data.complaint.text.trim()] : [], note: text(data.complaint.note) };
     case 'lab_order':
       return { tests: data.lab_order.tests };
     case 'lab_results':
@@ -116,7 +117,7 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
     }
     case 'complaint': {
       const v = ENCOUNTER_STEP_VALUES.complaint.parse(values) as EncounterStepValues['complaint'];
-      return { ...data, complaint: { complaints: v.complaints, note: v.note ?? '' } };
+      return { ...data, complaint: { text: v.complaints.join(', '), note: v.note ?? '' } };
     }
     case 'lab_order':
       return { ...data, lab_order: { tests: ENCOUNTER_STEP_VALUES.lab_order.parse(values).tests } };

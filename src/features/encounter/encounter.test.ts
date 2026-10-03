@@ -80,6 +80,14 @@ describe('section values', () => {
     expect(stepProblems('dispense', { ...data, dispense: { done: {}, reasons: { 0: 'Out of stock' } } })).toEqual([]);
   });
 
+  it('saves complaints as typed, in the patient’s words, and reads older lists back joined', () => {
+    const typed = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: '  pain when passing urine for 2 days ', note: '' } };
+
+    expect(toStepValues('complaint', typed)).toEqual({ complaints: ['pain when passing urine for 2 days'], note: undefined });
+    expect(stepProblems('complaint', EMPTY_ENCOUNTER_DATA)).toEqual(['Record a complaint or a clinical note']);
+    expect(fromStepValues('complaint', { complaints: ['Fever', 'Headache'] }, EMPTY_ENCOUNTER_DATA).complaint.text).toBe('Fever, Headache');
+  });
+
   it('reads a saved section back exactly as it was entered', () => {
     const data = { ...EMPTY_ENCOUNTER_DATA, vitals: { temp: '37.5', bp: '120/80', pulse: '72', weight: '60', spo2: '98' } };
 

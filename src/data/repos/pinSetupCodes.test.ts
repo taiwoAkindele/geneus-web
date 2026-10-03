@@ -76,7 +76,7 @@ describe('PIN setup codes on the device', () => {
     );
 
     expect(db.statements).toHaveLength(1);
-    expect(db.statements[0]?.sql).toMatch(/^UPDATE pin_setup_codes SET usedOn = \?, usedOnDevice = \?, updatedBy = \?, updatedOn = \?/);
+    expect(db.statements[0]?.sql).toMatch(/^UPDATE pin_setup_codes SET "usedOn" = \?, "usedOnDevice" = \?, "updatedBy" = \?, "updatedOn" = \?/);
     expect(db.statements[0]?.parameters).toContain('staff:nurse');
   });
 

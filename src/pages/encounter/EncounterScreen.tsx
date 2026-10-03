@@ -95,8 +95,11 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
     else setReviewKey(key);
   };
 
-  const failed = (cause: unknown, fallback: string) =>
+  const failed = (cause: unknown, fallback: string) => {
+    // The toast stays plain for the health worker; the cause goes where it can be debugged.
+    if (!(cause instanceof AuthorizationError)) console.error('encounter save failed', cause);
     toast(cause instanceof AuthorizationError ? cause.message : fallback, { tone: 'error' });
+  };
 
   const confirmSave = async () => {
     if (!reviewKey) return;

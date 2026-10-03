@@ -155,7 +155,7 @@ describe('resolving', () => {
     expect(db.statements).toEqual([]);
 
     await resolveRejection(refusedPatient, 'Reviewed', contextFor('records_officer'));
-    expect(db.statements[0].sql).toMatch(/^UPDATE sync_rejections SET resolvedOn = \?, resolvedBy = \?, resolution = \?/);
+    expect(db.statements[0].sql).toMatch(/^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/);
   });
 
   it('re-registers under the next ID, restores what was held, and closes all of it', async () => {
@@ -187,7 +187,7 @@ describe('resolving', () => {
     expect(db.statements).toEqual([]);
     await applyDeviceValues(conflict, ['phone'], contextFor('facility_admin'));
 
-    expect(db.statements[0].sql).toMatch(/^UPDATE patients SET phone = \?/);
+    expect(db.statements[0].sql).toMatch(/^UPDATE patients SET "phone" = \?/);
     expect(db.statements[0].parameters[0]).toBe('0803');
     expect(db.statements[1].sql).toMatch(/^UPDATE sync_rejections/);
   });
