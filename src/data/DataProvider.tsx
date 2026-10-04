@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { DeviceCredential, Facility } from '@shared';
+import { PulseLoader } from '@/ui';
 import { deviceId as localDeviceId } from './device';
 import { getDeviceCredential, saveDeviceCredential } from './deviceCredential';
 import { getFacility } from './repos/facility';
@@ -52,7 +53,7 @@ const EnrolledDevice = ({ credential, enroll, children }: { credential: DeviceCr
       </Screen>
     );
   }
-  if (loading) return <Screen>Loading…</Screen>;
+  if (loading) return <Screen><PulseLoader label="Loading this facility…" /></Screen>;
   return <DeviceContextContext.Provider value={value}>{children}</DeviceContextContext.Provider>;
 };
 
@@ -103,7 +104,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     );
   }
   if (!credential) return <DeviceContextContext.Provider value={unenrolled}>{children}</DeviceContextContext.Provider>;
-  if (!open) return <Screen>Opening records…</Screen>;
+  if (!open) return <Screen><PulseLoader label="Opening records…" /></Screen>;
   return (
     <EnrolledDevice credential={credential} enroll={enroll}>
       {children}
