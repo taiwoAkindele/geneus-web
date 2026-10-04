@@ -48,10 +48,23 @@ keeping them in the repo avoids hosts that refuse `VITE_*` variables as "sensiti
 add a secret to that file. A host environment variable of the same name still overrides
 it. Add the app's origin to the server's `APP_ORIGINS`.
 
-- **Vercel** — `vercel.json`: Vite preset, every non-asset path served `index.html`
-  (deep links), `no-cache` on the service worker, page and manifest, immutable `/assets/`.
-- **Cloudflare Pages** — build command `npm run build`, output `dist`. `public/_headers`
-  carries the same cache rules; Pages serves `index.html` for unknown paths by itself.
+Two backends, chosen by the build's mode:
+
+| Build | Mode | Settings | Backend |
+| --- | --- | --- | --- |
+| Vercel production deployment, Cloudflare Pages, local `npm run build` | `production` | `.env.production` | `https://api.geneush.com` |
+| Vercel preview deployment (the `dev` branch, every other branch) | `preview` | `.env.preview` | `https://api-dev.geneush.com` |
+
+Both files hold only public values and both modes refuse to build with either one
+missing. The development backend is described in the geneus-server README,
+*Development environment*. A local `npm run dev` uses whatever `.env` says.
+
+- **Vercel** — `vercel.json`: builds with `--mode $VERCEL_ENV` (so preview deployments
+  get the development backend), every non-asset path served `index.html` (deep links),
+  `no-cache` on the service worker, page and manifest, immutable `/assets/`.
+- **Cloudflare Pages** — build command `npm run build`, output `dist`: every branch
+  builds against **production**. `public/_headers` carries the same cache rules; Pages
+  serves `index.html` for unknown paths by itself.
 
 ## How a write travels
 
