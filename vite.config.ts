@@ -4,11 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
 /**
- * A production build without these silently ships a broken app: the API
- * client falls back to localhost, and sign-in stops checking roster signatures
+ * A deployed build without these silently ships a broken app: the API client
+ * falls back to localhost, and sign-in stops checking roster signatures
  * (README "Local development").
  */
 const REQUIRED_PRODUCTION_ENV = ['VITE_API_URL', 'VITE_SIGNING_PUBLIC_KEY'];
+/**
+ * The modes a deployed build runs in: `production` (.env.production) and, on
+ * Vercel preview deployments, `preview` (.env.preview, the development backend).
+ */
+const DEPLOYED_MODES = ['production', 'preview'];
 
 /** The SQLite build every enrolled device opens: encrypted, IndexedDB VFS (src/data/database.ts). */
 const SQLITE_WASM = 'assets/mc-wa-sqlite-async-*.wasm';
@@ -19,12 +24,12 @@ const assertProductionEnv = (mode: string): void => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const missing = REQUIRED_PRODUCTION_ENV.filter((name) => !env[name]);
   if (missing.length > 0) {
-    throw new Error(`production build needs ${missing.join(' and ')} (see README "Deployment")`);
+    throw new Error(`${mode} build needs ${missing.join(' and ')} (see README "Deployment")`);
   }
 };
 
 export default defineConfig(({ command, mode }) => {
-  if (command === 'build' && mode === 'production') assertProductionEnv(mode);
+  if (command === 'build' && DEPLOYED_MODES.includes(mode)) assertProductionEnv(mode);
 
   return {
     resolve: {
