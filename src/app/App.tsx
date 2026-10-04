@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { ToastProvider } from '@/ui';
+import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
 import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/features/appointments';
@@ -136,8 +136,8 @@ const AppointmentsScreen = lazy(() =>
 
 const ScreenFallback = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface text-ink-muted">
-      Loading…
+    <div className="flex min-h-screen items-center justify-center bg-surface">
+      <PulseLoader label="Loading…" />
     </div>
   );
 }

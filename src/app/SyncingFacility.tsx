@@ -1,29 +1,47 @@
-import { indicatorFor, useSyncStatus } from '@/data';
+import { useSyncStatus } from '@/data';
+import { PulseLoader } from '@/ui';
+
+/** Browsers word an unreachable server differently; all mean "no route to it". */
+const NETWORK_FAILURE = /failed to fetch|networkerror|load failed|network request failed/i;
+
+/** Turns a raw sync error into something a nurse can act on. */
+const describeSyncError = (error: string) =>
+  NETWORK_FAILURE.test(error)
+    ? 'This device could not reach the Geneus server. Check the internet connection, then reload.'
+    : 'Something went wrong while bringing the facility to this device. Reload to try again.';
 
 /**
  * An enrolled device whose facility record has not arrived yet — the one moment
  * the app has nothing local to show. Registration created the facility on the
  * server; PowerSync keeps trying to bring it down, and the tree re-renders the
- * instant it lands. Honest about why, and about the connection.
+ * instant it lands. While that is working it pulses; when it is not, it says
+ * why and offers a reload.
  */
 export const SyncingFacility = ({ facilityName }: { facilityName?: string }) => {
   const sync = useSyncStatus();
-  const indicator = indicatorFor(sync);
-  const detail =
-    indicator === 'offline'
-      ? 'This phone is offline. Keep it connected — the facility will arrive as soon as there is signal.'
-      : sync.error
-        ? `The last attempt failed (${sync.error}). It is retried automatically.`
-        : 'Connected — receiving the facility now.';
+  // The browser's own flag, not `!sync.connected`: the hook starts out idle
+  // (never connected) before its first read, which would flash "offline".
+  const offline = !navigator.onLine;
+  const title = facilityName ? `${facilityName} is registered` : 'This device is enrolled';
+
+  if (!sync.error && !offline) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center">
+        <PulseLoader label={sync.connected ? 'Fetching your facility’s data…' : 'Connecting to Geneus…'} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center">
-      <div className="max-w-sm">
-        <p className="text-base font-bold text-ink">
-          {facilityName ? `${facilityName} is registered` : 'This device is enrolled'}
+      <div role="alert" className="max-w-sm">
+        <p className="text-base font-bold text-ink">{title}, but its data has not arrived</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          {sync.error
+            ? describeSyncError(sync.error)
+            : 'This device is offline. Connect it to the internet, then reload.'}
         </p>
-        <p className="mt-2 text-sm text-ink-muted">Waiting for the facility to reach this device…</p>
-        <p className="mt-4 text-[13px] leading-relaxed text-ink-muted">{detail}</p>
+        {sync.error ? <p className="mt-3 text-xs text-ink-muted">Details: {sync.error}</p> : null}
         <button
           type="button"
           onClick={() => window.location.reload()}

@@ -12,6 +12,7 @@ export { PatientIdToken } from './PatientIdToken';
 export { ToastProvider, useToast } from './ToastProvider';
 export { PinDots } from './PinDots';
 export { PinKeypad } from './PinKeypad';
+export { PulseLoader } from './PulseLoader';
 export { SegmentedControl } from './SegmentedControl';
 export { SelectField } from './SelectField';
 export { Sheet } from './Sheet';
