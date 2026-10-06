@@ -5,9 +5,10 @@ import { fieldKindsFor } from './contractShape';
 import { insertRecord, envelope, newId } from './db';
 import { recordServerContact } from './deviceCredential';
 import { setDatabaseForTests, type LocalDatabase } from './database';
+import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { registerPatient, updatePatient } from './repos/patients';
-import { TABLE_FOR } from './tables';
+import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { fakeDatabase } from './testing/fakeDatabase';
 
 /**
@@ -32,6 +33,7 @@ const sqliteDatabase = (): LocalDatabase & { close: () => Promise<void> } => {
     const columns = Object.keys(fieldKindsFor(type)).filter((field) => field !== 'id');
     sqlite.exec(`CREATE TABLE "${table}" ("id" TEXT PRIMARY KEY, ${[...columns, '_metadata'].map((name) => `"${name}"`).join(', ')})`);
   }
+  sqlite.exec(`CREATE TABLE "${DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "patientId", "encounterKey", "step", "data", "updatedOn")`);
   type Bindable = string | number | null;
   const bind = (parameters: unknown[]) => parameters.map((value) => (value === undefined ? null : value)) as Bindable[];
   return {
@@ -99,5 +101,37 @@ describe('the write path against a real SQLite', () => {
         values: { diagnosis: 'Malaria' },
       }),
     ).resolves.toMatchObject({ values: { diagnosis: 'Malaria' } });
+  });
+
+  describe('unsaved encounter work', () => {
+    const nurse = { staffId: 'staff:nurse', patientId: 'OOE-PHC-000047-K2', encounterKey: 'new' };
+
+    it('keeps a section as it is typed, replacing the earlier version', async () => {
+      await writeDraft(nurse, 'vitals', { temp: '38', bp: '', pulse: '', weight: '', spo2: '' });
+      await writeDraft(nurse, 'vitals', { temp: '38.9', bp: '120/80', pulse: '', weight: '', spo2: '' });
+
+      const drafts = await readDrafts(nurse);
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0]).toMatchObject({ step: 'vitals', data: { temp: '38.9', bp: '120/80' } });
+    });
+
+    /** On a shared phone the next person on shift must not see, or save under their name, a half-written note. */
+    it('shows a draft only to the person who typed it', async () => {
+      await writeDraft(nurse, 'complaint', { text: 'fever for 3 days', note: '' });
+
+      expect(await readDrafts({ ...nurse, staffId: 'staff:doctor' })).toEqual([]);
+      expect(await readDrafts({ ...nurse, encounterKey: 'encounter:other' })).toEqual([]);
+    });
+
+    it('throws a section away once saved, and everything once the encounter closes', async () => {
+      await writeDraft(nurse, 'vitals', { temp: '38.9', bp: '', pulse: '', weight: '', spo2: '' });
+      await writeDraft(nurse, 'complaint', { text: 'fever', note: '' });
+
+      await discardDraft(nurse, 'vitals');
+      expect((await readDrafts(nurse)).map((draft) => draft.step)).toEqual(['complaint']);
+
+      await discardDrafts(nurse);
+      expect(await readDrafts(nurse)).toEqual([]);
+    });
   });
 });

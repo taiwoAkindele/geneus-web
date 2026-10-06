@@ -28,6 +28,13 @@ export const TABLE_FOR: Record<DocType, string> = {
   pin_setup_code: 'pin_setup_codes',
 };
 
+/**
+ * Unsaved encounter work (PRD §9.8.4). Local-only: never uploaded, never a
+ * record, not in the contract — it exists so a power cut does not lose ten
+ * minutes of typing, and lives inside the encrypted database with the rest.
+ */
+export const DRAFTS_TABLE = 'encounter_drafts';
+
 export const TYPE_FOR: Record<string, DocType> = Object.fromEntries(
   Object.entries(TABLE_FOR).map(([type, table]) => [table, type as DocType]),
 ) as Record<string, DocType>;

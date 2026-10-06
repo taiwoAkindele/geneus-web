@@ -1,7 +1,7 @@
 import { column, Schema, Table, type ColumnsType, type IndexShorthand } from '@powersync/web';
 import type { DocType } from '@shared';
 import { fieldKindsFor, type FieldKind } from './contractShape';
-import { TABLE_FOR } from './tables';
+import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 
 /**
  * The local SQLite schema, derived from the shared contract: one table per
@@ -50,6 +50,13 @@ const tableFor = (type: DocType): Table => {
   });
 };
 
-export const AppSchema = new Schema(
-  Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
+/** One unsaved section per staff member, patient, encounter and step (repos/drafts.ts). */
+const draftsTable = new Table(
+  { staffId: column.text, patientId: column.text, encounterKey: column.text, step: column.text, data: column.text, updatedOn: column.text },
+  { localOnly: true, indexes: { owner: ['staffId', 'patientId', 'encounterKey'] } },
 );
+
+export const AppSchema = new Schema({
+  ...Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
+  [DRAFTS_TABLE]: draftsTable,
+});

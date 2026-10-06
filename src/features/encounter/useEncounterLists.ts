@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { useLiveQuery, type LiveQuery } from '@/data';
-import { closingEntries, encountersForPatient, entriesForEncounter, listEncounters } from '@/data/repos/encounters';
+import { closingEntries, encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters } from '@/data/repos/encounters';
 import { summariseEncounter, type EncounterSummary } from './encounterSummary';
+import { QUEUE_STEPS, stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
 
 /** How many finished encounters the hub lists; older ones live on each patient's profile. */
 const RECENTLY_CLOSED = 20;
@@ -40,3 +41,7 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
   }, [patientId]);
   return useLiveQuery(load);
 };
+
+/** The lab, results-ready and pharmacy queues, kept current as steps are saved on any device. */
+export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient[]>> =>
+  useLiveQuery(useCallback(async () => stationQueues(await entriesAtSteps(QUEUE_STEPS)), []));

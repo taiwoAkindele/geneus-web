@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CLOSING_STEPS, type Encounter, type EncounterEntry } from '@shared';
 import { useLiveQuery } from '@/data';
+import { discardDraft, discardDrafts, readDrafts, writeDraft, type DraftOwner } from '@/data/repos/drafts';
 import { amendEntry, encountersForPatient, entriesForEncounter, saveStep } from '@/data/repos/encounters';
 import { listStaff } from '@/data/repos/staff';
 import { useAuthorizationContext } from '@/session';
 import { EMPTY_ENCOUNTER_DATA, projectEncounter } from './encounterRecord';
-import { isClosingStep } from './steps';
+import { isClosingStep, STEP_DEFS, stepsFor } from './steps';
 import { stepProblems, toStepValues } from './stepValues';
 import type { EncounterData, StepKey } from './types';
 
@@ -83,6 +84,24 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
 /** A follow-up review is booked for the morning of the chosen day. */
 const REVIEW_HOUR = 9;
 
+/** How long typing must pause before the section being recorded is written to the device. */
+const DRAFT_PAUSE_MS = 800;
+
+const ownerKey = (owner: DraftOwner) => `${owner.staffId}|${owner.patientId}|${owner.encounterKey}`;
+
+const keepDraftWarning = (cause: unknown) => console.warn('unsaved work could not be kept on this device', cause);
+
+/**
+ * Whether a stored draft still has the shape its section's form expects — a
+ * draft kept by an older version of the app is dropped rather than allowed to
+ * break the form.
+ */
+const fitsSection = (step: string, data: unknown): data is EncounterData[StepKey] => {
+  if (!(step in STEP_DEFS) || typeof data !== 'object' || data === null) return false;
+  if (step === 'lab_results') return true;
+  return Object.keys(EMPTY_ENCOUNTER_DATA[step as StepKey]).every((field) => field in data);
+};
+
 type Loaded = { encounter: Encounter | undefined; entries: EncounterEntry[]; staffNames: Map<string, string> };
 
 /**
@@ -97,6 +116,14 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
   const [currentId, setCurrentId] = useState(encounterId);
   const [draft, setDraft] = useState<EncounterData>(EMPTY_ENCOUNTER_DATA);
   const [skippedNow, setSkippedNow] = useState<StepKey[]>([]);
+  // Unsaved work (PRD §9.8.4) is kept per person: whoever is typing, for this patient and encounter.
+  const owner = useMemo<DraftOwner>(
+    () => ({ staffId: context.userId, patientId, encounterKey: currentId ?? 'new' }),
+    [context.userId, patientId, currentId],
+  );
+  const [restoredFor, setRestoredFor] = useState<string>();
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string>();
+  const pendingDraft = useRef<(() => void) | undefined>(undefined);
 
   const load = useCallback(async (): Promise<Loaded> => {
     const [encounters, staff] = await Promise.all([encountersForPatient(patientId), listStaff()]);
@@ -132,6 +159,53 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
       }),
     [patientId, live.data, draft, skippedNow],
   );
+
+  const savedSteps = Object.keys(enc.entries).sort().join(',');
+  // Drafts are read once the encounter is known — named, found open, or confirmed new.
+  const settled = !live.loading && live.data !== undefined && (currentId ? live.data.encounter?.id === currentId : !foundId);
+
+  useEffect(() => {
+    if (!settled || restoredFor === ownerKey(owner)) return;
+    let cancelled = false;
+    const saved = new Set(savedSteps.split(','));
+    readDrafts(owner).then(
+      (drafts) => {
+        if (cancelled) return;
+        const unsaved = drafts.filter((stored) => !saved.has(stored.step) && fitsSection(stored.step, stored.data));
+        if (unsaved.length > 0) {
+          setDraft((current) => unsaved.reduce((data, stored) => ({ ...data, [stored.step]: stored.data }), current));
+          setDraftRestoredAt(unsaved.reduce((latest, stored) => (stored.updatedOn > latest ? stored.updatedOn : latest), ''));
+        }
+        setRestoredFor(ownerKey(owner));
+      },
+      (cause: unknown) => {
+        keepDraftWarning(cause);
+        if (!cancelled) setRestoredFor(ownerKey(owner));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [settled, owner, restoredFor, savedSteps]);
+
+  const activeKey = stepsFor(enc.data)[enc.activeIndex]?.key;
+
+  // Keep the section being recorded on the device after each pause in typing.
+  useEffect(() => {
+    if (!activeKey || restoredFor !== ownerKey(owner)) return;
+    const section = draft[activeKey];
+    const untouched = JSON.stringify(section) === JSON.stringify(EMPTY_ENCOUNTER_DATA[activeKey]);
+    const keep = () => {
+      pendingDraft.current = undefined;
+      (untouched ? discardDraft(owner, activeKey) : writeDraft(owner, activeKey, section)).catch(keepDraftWarning);
+    };
+    pendingDraft.current = keep;
+    const timer = window.setTimeout(keep, DRAFT_PAUSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft, activeKey, owner, restoredFor]);
+
+  // Leaving the screen keeps whatever was typed since the last pause.
+  useEffect(() => () => pendingDraft.current?.(), []);
 
   const setField = useCallback(<K extends StepKey, F extends keyof EncounterData[K]>(step: K, field: F, value: EncounterData[K][F]) => {
     setDraft((d) => ({ ...d, [step]: { ...d[step], [field]: value } }));
@@ -175,9 +249,15 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
   }, []);
 
   /** Moves past a section without writing anything for it (PRD §9.8.2). Closing steps cannot be skipped. */
-  const skip = useCallback((key: StepKey) => {
-    if (!isClosingStep(key)) setSkippedNow((keys) => [...keys, key]);
-  }, []);
+  const skip = useCallback(
+    (key: StepKey) => {
+      if (isClosingStep(key)) return;
+      pendingDraft.current = undefined;
+      discardDraft(owner, key).catch(keepDraftWarning);
+      setSkippedNow((keys) => [...keys, key]);
+    },
+    [owner],
+  );
 
   /** What must be fixed before the section may be reviewed; empty when it can be saved. */
   const problems = useCallback((key: StepKey) => stepProblems(key, enc.data), [enc.data]);
@@ -201,9 +281,16 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
         },
         context,
       );
+      // Saved: the draft has become the record. Once the encounter closes, nothing typed for it can be saved.
+      pendingDraft.current = undefined;
+      discardDraft(owner, key).catch(keepDraftWarning);
+      if (isClosingStep(key)) {
+        discardDrafts({ ...owner, encounterKey: entry.encounterId }).catch(keepDraftWarning);
+        discardDrafts({ ...owner, encounterKey: 'new' }).catch(keepDraftWarning);
+      }
       setCurrentId(entry.encounterId);
     },
-    [context, enc.data, enc.id, patientId],
+    [context, enc.data, enc.id, owner, patientId],
   );
 
   const amendStep = useCallback(
@@ -220,7 +307,7 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
     [setField, toggleIn, setResult, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
   );
 
-  return { enc, loading: live.loading, error: live.error, reload: live.reload, ...actions };
+  return { enc, draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, ...actions };
 };
 
 export type EncounterController = ReturnType<typeof useEncounter>;

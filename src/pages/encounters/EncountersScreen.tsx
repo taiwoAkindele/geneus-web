@@ -1,8 +1,42 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Button, Icon, Tag, useToast } from '@/ui';
-import { EncounterCard, useEncounterList, type EncounterNavState, type EncounterSummary } from '@/features/encounter';
+import { Avatar, Button, ChoiceChip, Icon, Tag, useToast } from '@/ui';
+import {
+  EncounterCard,
+  readDeviceStation,
+  rememberDeviceStation,
+  useEncounterList,
+  useStationQueues,
+  type EncounterNavState,
+  type EncounterSummary,
+  type QueuedPatient,
+  type StationView,
+} from '@/features/encounter';
 import { useAppointments } from '@/features/appointments';
 import { usePatients } from '@/features/search';
+
+const STATION_LABEL: Record<StationView, string> = {
+  all: 'All encounters',
+  lab: 'Lab',
+  results: 'Results ready',
+  pharmacy: 'Pharmacy',
+};
+
+const STATION_EMPTY: Record<Exclude<StationView, 'all'>, string> = {
+  lab: 'No tests waiting for the lab.',
+  results: 'No results waiting for the doctor.',
+  pharmacy: 'No prescriptions waiting at the pharmacy.',
+};
+
+const initialsOf = (fullName: string): string =>
+  fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+
+const timeOf = (iso: string): string => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 const Empty = ({ children }: { children: React.ReactNode }) => (
   <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted sm:col-span-2 lg:col-span-3">
@@ -18,6 +52,18 @@ export const EncountersScreen = () => {
   const encounters = useEncounterList();
   const patients = usePatients();
   const patientOf = (patientId: string) => patients.data?.find((patient) => patient.patientId === patientId);
+  const queues = useStationQueues();
+  const [station, setStation] = useState<StationView>(readDeviceStation());
+
+  const chooseStation = (view: StationView) => {
+    setStation(view);
+    rememberDeviceStation(view);
+  };
+
+  const openQueued = (queued: QueuedPatient) =>
+    navigate('/encounters/record', {
+      state: { patientId: queued.patientId, encounterId: queued.encounterId } satisfies EncounterNavState,
+    });
 
   const open = (card: EncounterSummary) =>
     navigate('/encounters/record', { state: { patientId: card.patientId, encounterId: card.id } satisfies EncounterNavState });
@@ -64,6 +110,60 @@ export const EncountersScreen = () => {
           </div>
         </div>
 
+        {/* Station queues (PRD §9.8.1) — the lab, the doctor and the pharmacy each see who is waiting for them. */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(Object.keys(STATION_LABEL) as StationView[]).map((view) => {
+            const waiting = view === 'all' ? undefined : queues.data?.[view].length;
+            return (
+              <ChoiceChip key={view} selected={station === view} onClick={() => chooseStation(view)}>
+                {STATION_LABEL[view]}
+                {waiting ? ` · ${waiting}` : ''}
+              </ChoiceChip>
+            );
+          })}
+        </div>
+
+        {station !== 'all' ? (
+          <>
+            <div className="mt-5 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Waiting · oldest first</span>
+              <span className="font-mono text-xs text-ink-muted">{queues.data?.[station].length ?? 0} waiting</span>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 pb-24 sm:grid-cols-2 lg:grid-cols-3">
+              {queues.loading ? <Empty>Loading…</Empty> : null}
+              {queues.error ? (
+                <Empty>
+                  The queue could not be read from this device.{' '}
+                  <button type="button" className="font-bold text-brand" onClick={queues.reload}>
+                    Try again
+                  </button>
+                </Empty>
+              ) : null}
+              {queues.data && queues.data[station].length === 0 ? <Empty>{STATION_EMPTY[station]}</Empty> : null}
+              {(queues.data?.[station] ?? []).map((queued) => {
+                const patient = patientOf(queued.patientId);
+                return (
+                  <button
+                    key={queued.encounterId}
+                    type="button"
+                    onClick={() => openQueued(queued)}
+                    className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar tone="green">{patient ? initialsOf(patient.fullName) : '??'}</Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-bold">{patient?.fullName ?? queued.patientId}</div>
+                        <div className="text-[13px] text-ink-muted">Waiting since {timeOf(queued.waitingSince)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-[11px] bg-brand-tint px-3.5 py-2.5 text-[14px] font-semibold text-brand">{queued.detail}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+        <>
         {/* Pending & upcoming — patients booked from a profile land here. */}
         <div className="mt-5 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Pending &amp; upcoming</span>
@@ -120,6 +220,8 @@ export const EncountersScreen = () => {
             <EncounterCard key={c.id} card={c} patient={patientOf(c.patientId)} onOpen={() => open(c)} />
           ))}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
