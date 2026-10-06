@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Encounter, EncounterEntry } from '@shared';
 import { EMPTY_ENCOUNTER_DATA, projectEncounter } from './encounterRecord';
 import { summariseEncounter } from './encounterSummary';
+import { stationQueues } from './stationQueues';
 import { fromStepValues, stepProblems, toStepValues } from './stepValues';
 import type { EncounterData, StepKey } from './types';
 
@@ -173,5 +174,38 @@ describe('encounter list cards', () => {
 
   it('is closed once a follow-up is saved, with or without a review booked', () => {
     expect(summariseEncounter(encounter, [entry('follow_up', {})]).status).toBe('Closed');
+  });
+});
+
+describe('station queues', () => {
+  const inEncounter = (encounterId: string, step: EncounterEntry['step'], values: Record<string, unknown>) =>
+    entry(step, values, { encounterId });
+
+  it('puts an ordered test in the lab queue until its results are saved', () => {
+    const order = inEncounter('encounter:a', 'lab_order', { tests: ['Malaria RDT', 'FBC'] });
+
+    expect(stationQueues([order]).lab).toEqual([
+      { encounterId: 'encounter:a', patientId: encounter.patientId, waitingSince: order.createdOn, detail: 'Malaria RDT, FBC' },
+    ]);
+    const withResults = stationQueues([order, inEncounter('encounter:a', 'lab_results', { results: [{ test: 'FBC', result: 'Normal' }] })]);
+    expect(withResults.lab).toEqual([]);
+    expect(withResults.results.map((queued) => queued.encounterId)).toEqual(['encounter:a']);
+  });
+
+  it('sends a prescription to the pharmacy until it is dispensed, and nothing without one', () => {
+    const prescribed = inEncounter('encounter:b', 'diagnosis', { diagnosis: 'Malaria', prescription: [{ drug: 'ACT', dose: '1 tab' }] });
+    const noDrugs = inEncounter('encounter:c', 'diagnosis', { diagnosis: 'Viral fever' });
+
+    expect(stationQueues([prescribed, noDrugs]).pharmacy.map((queued) => queued.detail)).toEqual(['ACT']);
+    expect(stationQueues([prescribed, inEncounter('encounter:b', 'dispense', { lines: [{ drug: 'ACT', dispensed: true }] })]).pharmacy).toEqual([]);
+  });
+
+  it('drops a closed encounter from every queue, and lists the longest wait first', () => {
+    const early = inEncounter('encounter:d', 'lab_order', { tests: ['Widal'] });
+    const late = inEncounter('encounter:e', 'lab_order', { tests: ['FBC'] });
+    const closed = inEncounter('encounter:f', 'lab_order', { tests: ['RDT'] });
+
+    const queues = stationQueues([late, closed, early, inEncounter('encounter:f', 'follow_up', {})]);
+    expect(queues.lab.map((queued) => queued.encounterId)).toEqual(['encounter:d', 'encounter:e']);
   });
 });

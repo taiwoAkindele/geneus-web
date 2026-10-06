@@ -10,5 +10,7 @@ export { ReviewSaveSheet } from './components/ReviewSaveSheet';
 export { AmendSheet } from './components/AmendSheet';
 export type { Actor, EncounterNavState, EncounterState, StepKey } from './types';
 export { summariseEncounter, type EncounterStatus, type EncounterSummary } from './encounterSummary';
-export { useEncounterList, usePatientEncounters } from './useEncounterLists';
+export { useEncounterList, usePatientEncounters, useStationQueues } from './useEncounterLists';
+export { stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
+export { readDeviceStation, rememberDeviceStation, type StationView } from './deviceStation';
 export { EncounterCard } from './components/EncounterCard';

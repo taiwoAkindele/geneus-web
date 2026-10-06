@@ -188,6 +188,14 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
       <div>
         <EncounterSpine enc={enc} />
 
+        {ctl.draftRestoredAt && !enc.closed ? (
+          <div className="mx-5 mb-1 rounded-card border border-amber-border bg-amber-bg p-3.5 text-[13px] leading-relaxed text-amber-text md:mx-8">
+            Unsaved work from{' '}
+            {new Date(ctl.draftRestoredAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}{' '}
+            was brought back. Check it before saving — it is not part of the record until you review and save.
+          </div>
+        ) : null}
+
         {enc.admitted ? (
           <div className="mx-5 mb-1 flex flex-wrap items-center gap-3 rounded-card bg-slate-bg p-4 md:mx-8">
             <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate text-white">

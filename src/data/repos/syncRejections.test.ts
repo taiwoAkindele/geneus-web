@@ -5,7 +5,17 @@ import { kindOf } from '@/features/reconcile';
 import { recordServerContact } from '../deviceCredential';
 import { setDatabaseForTests } from '../database';
 import { fakeDatabase, type FakeDatabase } from '../testing/fakeDatabase';
-import { applyDeviceValues, heldFor, planRestore, reRegisterPatient, resolveRejection } from './syncRejections';
+import {
+  applyAgain,
+  applyAgainBlocker,
+  applyDeviceValues,
+  discardRejection,
+  heldFor,
+  planRestore,
+  reRegisterPatient,
+  resolveRejection,
+  withHeldEdits,
+} from './syncRejections';
 
 const HOUR = 60 * 60 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
@@ -89,11 +99,17 @@ const amendment = heldEntry('encounter_entry:amend', 'amendment', { note: 'Was 3
 const unrelated = rejection({ deviceId: 'device-9', entityType: 'encounter', entityId: 'encounter:x', refusedRecord: { patientId: 'OOE-PHC-000047-K2' } });
 
 describe('the reconcile queue', () => {
-  it('sorts each refusal into the decision it needs', () => {
+  it('sorts each refusal into the decision it needs — none is just dropped', () => {
     expect(kindOf(refusedPatient)).toBe('patient_id_clash');
-    expect(kindOf(heldEncounter)).toBe('held');
+    expect(kindOf(heldEncounter, [refusedPatient, heldEncounter])).toBe('held');
     expect(kindOf(rejection({ operation: 'patch', conflicts: [{ column: 'phone', deviceValue: '1', serverValue: '2' }] }))).toBe('column_conflict');
-    expect(kindOf(rejection({ category: 'authorization', refusedRecord: undefined }))).toBe('review');
+    expect(kindOf(rejection({ category: 'authorization', operation: 'patch', refusedChanges: { phone: '0803' } }))).toBe('refused_write');
+    expect(kindOf(rejection({ category: 'authorization', operation: 'delete', refusedRecord: undefined }))).toBe('nothing_kept');
+  });
+
+  /** Once its patient's clash is decided (or discarded), a held record is decided on its own — never stranded. */
+  it('frees a held record once its patient is no longer open', () => {
+    expect(kindOf(heldEncounter, [heldEncounter])).toBe('refused_write');
   });
 
   it('finds what the same device recorded for the refused patient, and nothing from other devices', () => {
@@ -190,5 +206,74 @@ describe('resolving', () => {
     expect(db.statements[0].sql).toMatch(/^UPDATE patients SET "phone" = \?/);
     expect(db.statements[0].parameters[0]).toBe('0803');
     expect(db.statements[1].sql).toMatch(/^UPDATE sync_rejections/);
+  });
+
+  const columnsOf = (sql: string) => (/\(([^)]+)\)/.exec(sql)?.[1].split(', ') ?? []).map((name) => name.replace(/"/g, ''));
+
+  /** A nurse deactivated while the device was offline: her correction is not lost, it waits for a decision. */
+  it('applies a refused change again, in the name of the person applying it', async () => {
+    const refusedEdit = rejection({
+      operation: 'patch',
+      category: 'authorization',
+      attributedTo: 'staff:chew',
+      reason: 'staff:chew is deactivated',
+      refusedChanges: { phone: '0809' },
+    });
+    db.rows.sync_rejections.push(refusedEdit);
+
+    await applyAgain(refusedEdit, contextFor('records_officer'));
+
+    expect(db.statements[0].sql).toMatch(/^UPDATE patients SET "phone" = \?, "updatedBy" = \?/);
+    expect(db.statements[0].parameters.slice(0, 2)).toEqual(['0809', 'staff:records_officer']);
+    expect(db.statements[1].parameters).toContain('Applied again');
+  });
+
+  it('saves a refused record again under the person applying it, keeping when it first happened', async () => {
+    const refusedStep = rejection({
+      entityType: 'encounter_entry',
+      entityId: 'encounter_entry:refused',
+      category: 'authorization',
+      attributedTo: 'staff:nurse',
+      reason: 'staff:nurse is deactivated',
+      refusedRecord: { ...vitals.refusedRecord, id: 'encounter_entry:refused' },
+    });
+    db.rows.sync_rejections.push(refusedStep);
+
+    await applyAgain(refusedStep, contextFor('facility_admin'));
+
+    const [insert] = db.statements;
+    const columns = columnsOf(insert.sql);
+    expect(insert.sql).toMatch(/^INSERT INTO encounter_entries/);
+    expect(insert.parameters[columns.indexOf('createdBy')]).toBe('staff:facility_admin');
+    expect(insert.parameters[columns.indexOf('actorRole')]).toBe('facility_admin');
+    expect(insert.parameters[columns.indexOf('deviceId')]).toBe('device-3');
+    expect(insert.parameters[columns.indexOf('createdOn')]).toBe('2026-10-02T09:05:00.000Z');
+  });
+
+  it('says plainly who can apply it again, and offers only discarding when nothing was kept', () => {
+    const clinical = rejection({ entityType: 'encounter_entry', refusedRecord: vitals.refusedRecord });
+
+    expect(applyAgainBlocker(clinical, contextFor('records_officer'))).toMatch(/whose role can/);
+    // A clinician may record the step but not resolve the queue (sync_rejection:resolve), so cannot apply it.
+    expect(applyAgainBlocker(clinical, contextFor('nurse'))).toMatch(/records officer or facility admin/);
+    expect(applyAgainBlocker(clinical, contextFor('facility_admin'))).toBeUndefined();
+    expect(applyAgainBlocker(rejection({ operation: 'delete', refusedRecord: undefined }), contextFor('facility_admin'))).toMatch(/only be discarded/);
+  });
+
+  it('records a discard in the name of the person who discarded it', async () => {
+    await discardRejection(refusedPatient, contextFor('records_officer'));
+
+    const [update] = db.statements;
+    expect(update.sql).toMatch(/^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/);
+    expect(update.parameters.slice(1, 3)).toEqual(['staff:records_officer', 'Discarded']);
+  });
+
+  it('carries held edits onto the re-registered patient, in the order they were made', () => {
+    const edit = (phone: string, occurredOn: string) =>
+      rejection({ operation: 'patch', reason: 'held: …', occurredOn, refusedChanges: { phone } });
+
+    const merged = withHeldEdits(refusedPatient, [edit('0805', '2026-10-02T11:00:00.000Z'), edit('0803', '2026-10-02T10:00:00.000Z')]);
+
+    expect(merged.refusedRecord).toMatchObject({ fullName: 'Bisi Adeyemi', phone: '0805' });
   });
 });

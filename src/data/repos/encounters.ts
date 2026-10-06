@@ -15,6 +15,10 @@ export const encountersForPatient = (patientId: string) => allWhere<Encounter>('
 export const entriesForEncounter = (encounterId: string) =>
   allWhere<EncounterEntry>('encounter_entry', 'encounterId', encounterId);
 
+/** Every saved entry at these steps, across encounters — what the station queues are read from. */
+export const entriesAtSteps = async (steps: readonly EncounterStep[]): Promise<EncounterEntry[]> =>
+  (await Promise.all(steps.map((step) => allWhere<EncounterEntry>('encounter_entry', 'step', step)))).flat();
+
 /** Every closing entry on the device — what tells an open encounter from a finished one. */
 export const closingEntries = async (): Promise<EncounterEntry[]> =>
   (await Promise.all(CLOSING_STEPS.map((step) => allWhere<EncounterEntry>('encounter_entry', 'step', step)))).flat();

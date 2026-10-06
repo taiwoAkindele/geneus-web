@@ -16,7 +16,6 @@ export * from './patient-registration';
 export * from './patient-search';
 export * from './programme-register';
 export * from './referral';
-export * from './register-patient';
 export * from './send-to-unit';
 export * from './staff-onboarding';
 export * from './sync-center';
