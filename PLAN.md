@@ -259,6 +259,42 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
   reversals, overpayments and allocation checks. Field proof on the target phone remains
   required before launch.
 
+## Frontend UX audit implementation (October 2026)
+
+The approved UX audit permits changes to phone navigation and workflow behaviour that
+supersede the earlier frozen-mobile rule for these specific fixes. Clinical forms keep
+their section-card design; structured desktop worklists use tables.
+
+- Registration keeps an in-memory draft across both steps and browser Back. It clears
+  after saving, choosing an existing duplicate, or changing signed-in staff. Sex is an
+  explicit choice. Form values are never copied into browser history. A cold reload
+  does not restore an unfinished registration.
+- The phone dock stays visible throughout signed-in work, with profile/sign-out,
+  role-appropriate navigation, and a persistent shift warning. Shift extensions report
+  success or refusal; staff without that permission are directed to a supervisor.
+- Appointment groups use local calendar dates, not the stored pending/scheduled flag.
+  Today, Overdue, Upcoming and Completed remain derived views. New encounters can retain
+  the booking's existing appointmentId; a saved closing step completes that linked view.
+- Home counts and notifications use the local database and PowerSync. Prototype stock,
+  referral and monthly-report routes show a clear unavailable message, never sample
+  operational data. The cashier workspace explains that booking/payment integration is
+  still pending.
+- Desktop patients use a sortable table and adjacent record preview. Appointments,
+  encounters, unit queues, staff and fees use tables; register entries retain a desktop
+  table and gain expandable phone summaries. Table pages render at most 25 rows.
+- Actions follow the shared permission names. Clinical steps are view-only for staff
+  without encounter:record. Native modal dialogs contain focus, support Escape, restore
+  focus and prevent background interaction. Fee exemptions have editable optional
+  presets and currency choices have readable names.
+- Live queries refresh when their inputs change and ignore obsolete async results;
+  choosing a different patient or unit must never show a previous selection's response.
+
+Validation: 171 tests pass across 22 files; TypeScript, production build, diff checks,
+and the 300 KB initial-JavaScript budget pass (109.7 KB gzipped). Sixteen isolated
+Chrome walkthrough checks pass on phone and desktop layouts using synthetic records,
+including real PIN handover, stale history, duplicate checks and 65-patient pagination.
+Target-phone usability and full offline/reconnect field testing remain outstanding.
+
 ## 9. Immediate next steps
 
 1. ~~Add vite-plugin-pwa so the shell — and the SQLite WASM — are precached~~ (done
@@ -269,7 +305,8 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
    day offline, reconnect; watch the Sync Center and the reconcile queue (this is the field
    proof of the migration; the connector and the stack are proven by tests, the browser
    wiring is not yet).
-3. Wire the remaining mock screens (patient search, registration, encounter) to the
-   repositories as their contract shapes land.
+3. Finish booking fees, the nursing payment bypass, cashier collection, receipts and
+   billing reports. Stock, referrals and monthly reporting stay unavailable until their
+   screens can use real records.
 4. Measure the encrypted replica on the target phone (§7): first sync, a register list, sign-in
    time with 100,000-round PBKDF2.

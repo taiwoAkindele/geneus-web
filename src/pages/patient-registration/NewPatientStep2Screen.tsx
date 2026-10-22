@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Button, ChoiceChip, SegmentedControl, TextField } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { listPatients } from '@/data/repos/patients';
 import {
-  EMPTY_REGISTRATION,
+  useRegistrationDraft,
   toPatientDetails,
   useNextPatientNumber,
   useSavePatient,
@@ -26,12 +27,11 @@ type Step2Values = Pick<RegistrationValues, 'occupation' | 'religion' | 'folder'
  * edit saves only what changed. Nothing is pre-chosen — a default would record
  * an answer the patient never gave.
  */
-export const NewPatientStep2Screen = () => {
+const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
   const navigate = useNavigate();
   const savePatient = useSavePatient();
   const nextNumber = useNextPatientNumber();
-  const state = (useLocation().state as RegistrationNavState) ?? {};
-  const values = { ...EMPTY_REGISTRATION, ...state.values };
+  const { values, keep } = useRegistrationDraft(state);
   const editing = Boolean(state.patientId);
 
   const {
@@ -43,18 +43,25 @@ export const NewPatientStep2Screen = () => {
     formState: { isSubmitting },
   } = useForm<Step2Values>({ defaultValues: values });
   const occupation = watch('occupation');
+  useEffect(() => {
+    const subscription = watch((partial) => keep(partial));
+    return () => subscription.unsubscribe();
+  }, [watch, keep]);
 
   const save = async (step2: Step2Values) => {
     const complete = { ...values, ...step2 };
+    keep(step2);
     if (state.patientId) return savePatient(complete, state.patientId);
 
     const matches = findLikelyMatches(toPatientDetails(complete), await listPatients());
     if (matches.length > 0) {
-      const duplicate: DuplicateNavState = { values: complete, matchIds: matches.map((match) => match.patient.patientId) };
+      const duplicate: DuplicateNavState = { matchIds: matches.map((match) => match.patient.patientId) };
       return navigate('/patients/duplicate', { state: duplicate });
     }
     return savePatient(complete);
   };
+
+  if (!values.fullName || !values.sex || !values.address || (!values.age && !values.dateOfBirth)) return <Navigate to="/patients/new" state={{ patientId: state.patientId }} replace />;
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
@@ -137,4 +144,9 @@ export const NewPatientStep2Screen = () => {
       </form>
     </div>
   );
+};
+
+export const NewPatientStep2Screen = () => {
+  const state = (useLocation().state as RegistrationNavState) ?? {};
+  return <Step2Form key={state.patientId ?? 'new'} state={state} />;
 };

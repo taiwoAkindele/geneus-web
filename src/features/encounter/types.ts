@@ -57,7 +57,7 @@ export type EncounterState = {
 };
 
 /** Which encounter to open: the one named, else the patient's open one, else a new one. */
-export type EncounterNavState = { patientId?: string; encounterId?: string } | null;
+export type EncounterNavState = { patientId?: string; encounterId?: string; appointmentId?: string } | null;
 
 /** The signed-in staff member a save is attributed to (from the shift session). */
 export type Actor = { name: string; role: string };

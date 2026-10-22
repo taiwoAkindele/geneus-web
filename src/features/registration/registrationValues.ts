@@ -5,13 +5,13 @@ export type Religion = 'christianity' | 'islam' | 'other';
 
 /**
  * The two registration steps' inputs, exactly as typed — strings, and blanks
- * for anything not asked yet. They travel between the steps in navigation
- * state and become a {@link PatientDetails} only at the save (ENGINEERING.md:
- * normalise at the persistence boundary).
+ * for anything not asked yet. They stay in memory between steps and become
+ * a {@link PatientDetails} only at the save (ENGINEERING.md: normalise at
+ * the persistence boundary).
  */
 export type RegistrationValues = {
   fullName: string;
-  sex: 'F' | 'M';
+  sex: '' | 'F' | 'M';
   age: string;
   dateOfBirth: string;
   phone: string;
@@ -22,11 +22,11 @@ export type RegistrationValues = {
 };
 
 /** Present when the form edits a registered patient rather than registering a new one. */
-export type RegistrationNavState = { values?: Partial<RegistrationValues>; patientId?: string } | null;
+export type RegistrationNavState = { patientId?: string } | null;
 
 export const EMPTY_REGISTRATION: RegistrationValues = {
   fullName: '',
-  sex: 'F',
+  sex: '',
   age: '',
   dateOfBirth: '',
   phone: '',
@@ -41,7 +41,9 @@ const optional = (value: string): string | undefined => value.trim() || undefine
 /** Whole years, as the contract stores them; blank when not given. */
 export const parseAge = (age: string): number | undefined => (age.trim() === '' ? undefined : Number(age));
 
-export const toPatientDetails = (values: RegistrationValues): PatientDetails => ({
+export const toPatientDetails = (values: RegistrationValues): PatientDetails => {
+  if (!values.sex) throw new Error('Choose the patient’s sex');
+  return ({
   fullName: values.fullName.trim(),
   address: values.address.trim(),
   sex: values.sex === 'F' ? 'female' : 'male',
@@ -51,7 +53,8 @@ export const toPatientDetails = (values: RegistrationValues): PatientDetails => 
   occupation: optional(values.occupation),
   religion: optional(values.religion),
   legacyPaperRef: optional(values.folder),
-});
+  });
+};
 
 const isReligion = (value: string | undefined): value is Religion =>
   value === 'christianity' || value === 'islam' || value === 'other';

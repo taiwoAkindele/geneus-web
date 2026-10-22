@@ -6,6 +6,7 @@ import type { AppointmentStatus } from '@shared';
  * "scheduled" when booked ahead.
  */
 export type { AppointmentStatus };
+export type AppointmentGroup = 'today' | 'overdue' | 'upcoming' | 'completed';
 
 export type AppointmentPatient = { id: string; name: string; initials: string; allergy: string };
 
@@ -19,6 +20,9 @@ export type BookedAppointment = {
   /** When, for display — 'Now' or e.g. '16 Jul · 10:00'. */
   when: string;
   status: AppointmentStatus;
+  at: string;
+  group: AppointmentGroup;
+  encounterId?: string;
 };
 
 export type NewAppointment = {

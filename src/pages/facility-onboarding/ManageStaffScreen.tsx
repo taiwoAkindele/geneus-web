@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PinSetupCodeIssued } from '@shared';
-import { AppBar, Avatar, Button, Card, Sheet, Tag, TextField, useToast } from '@/ui';
+import { AppBar, Button, DataTable, Sheet, Tag, TextField, useToast } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
 import { issuePinSetupCode } from '@/lib/api/staff';
@@ -62,7 +62,7 @@ const ShiftSheet = ({ entry, onClose }: { entry: RosterEntry; onClose: () => voi
   };
 
   return (
-    <Sheet onClose={onClose} eyebrow="Today's shift" title={entry.staff.fullName}>
+    <Sheet onClose={onClose} eyebrow="Today's shift" title={entry.staff.fullName} closeDisabled={saving}>
       <div className="flex gap-3">
         <div className="flex-1">
           <TextField label="Starts" name="shift_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
@@ -110,7 +110,7 @@ const PinCodeSheet = ({ entry, issuedBy, onClose }: { entry: RosterEntry; issued
   };
 
   return (
-    <Sheet onClose={onClose} eyebrow="PIN code" title={entry.staff.fullName}>
+    <Sheet onClose={onClose} closeDisabled={creating} eyebrow="PIN code" title={entry.staff.fullName}>
       {issued ? (
         <>
           <div className="rounded-card bg-brand-tint px-4 py-5 text-center font-mono text-[28px] font-extrabold tracking-[0.2em] text-brand">
@@ -150,137 +150,55 @@ const PinCodeSheet = ({ entry, issuedBy, onClose }: { entry: RosterEntry; issued
 export const ManageStaffScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
-  const { roster, loading } = useAuth();
+  const { roster, loading, error, reload } = useAuth();
   const { user } = useSession();
   const context = useAuthorizationContext();
   const [editing, setEditing] = useState<RosterEntry | null>(null);
   const [issuingFor, setIssuingFor] = useState<RosterEntry | null>(null);
-
-  const onShift = roster.filter(onShiftNow);
-  const others = roster.filter((entry) => !onShiftNow(entry));
-
-  const remove = async (entry: RosterEntry) => {
-    try {
-      await removeStaff(entry.staff, context);
-      toast(`${entry.staff.fullName} can no longer sign in — their records stay intact`);
-    } catch (cause) {
-      toast(cause instanceof Error ? cause.message : 'Could not remove that staff member');
-    }
+  const [removing, setRemoving] = useState<RosterEntry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const canManage = context.permissions.includes('staff:manage');
+  const onShift = roster.filter(onShiftNow), others = roster.filter((entry) => !onShiftNow(entry));
+  const remove = async () => {
+    if (!removing || busy) return;
+    setBusy(true);
+    try { await removeStaff(removing.staff, context); toast('Access removed on this device; the change will sync to other devices'); setRemoving(null); }
+    catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not remove access', { tone: 'error' }); }
+    finally { setBusy(false); }
   };
-
-  const row = (entry: RosterEntry) => (
-    <div key={entry.staff.staffId} className="flex items-center gap-3 px-4 py-3.5">
-      <Avatar tone={onShiftNow(entry) ? 'green' : 'muted'} size="sm">
-        {entry.staff.fullName
-          .split(' ')
-          .slice(0, 2)
-          .map((part) => part[0])
-          .join('')}
-      </Avatar>
-      <button
-        type="button"
-        onClick={() => navigate('/admin/staff/access', { state: { staffId: entry.staff.staffId } })}
-        className="min-w-0 flex-1 text-left"
-      >
-        <div className="text-[15px] font-bold">{entry.staff.fullName}</div>
-        <div className="text-xs text-ink-muted">
-          {ROLE_LABELS[entry.staff.role] ?? entry.staff.role}
-          {entry.staff.permission === 'read_only' ? ' · Read only' : ''}
-          {hasPin(entry.staff.staffId) ? '' : ' · PIN not set'}
-        </div>
-      </button>
-      {entry.shift ? (
-        <Tag tone={onShiftNow(entry) ? 'green' : 'amber'}>
-          {timeLabel(entry.shift.startsAt)}–{timeLabel(entry.shift.endsAt)}
-        </Tag>
-      ) : (
-        <Tag tone="amber">No shift</Tag>
-      )}
-      <button
-        type="button"
-        onClick={() => setEditing(entry)}
-        className="min-h-0 flex-none rounded-lg bg-brand-tint px-2.5 py-1.5 text-[12px] font-bold text-brand"
-      >
-        Shift
-      </button>
-      {entry.staff.staffId === user.staffId ? null : (
-        <button
-          type="button"
-          onClick={() => setIssuingFor(entry)}
-          className="min-h-0 flex-none rounded-lg bg-brand-tint px-2.5 py-1.5 text-[12px] font-bold text-brand"
-        >
-          PIN code
-        </button>
-      )}
-      {entry.staff.staffId === user.staffId ? null : (
-        <button
-          type="button"
-          onClick={() => remove(entry)}
-          className="min-h-0 flex-none text-[12px] font-bold text-danger"
-        >
-          Remove
-        </button>
-      )}
-    </div>
-  );
-
+  const access = (entry: RosterEntry) => navigate('/admin/staff/access', { state: { staffId: entry.staff.staffId } });
+  const shift = (entry: RosterEntry) => entry.shift ? `${timeLabel(entry.shift.startsAt)}–${timeLabel(entry.shift.extendedUntil ?? entry.shift.endsAt)}` : 'No shift';
+  const actions = (entry: RosterEntry) => <div className="flex flex-wrap gap-2">
+    {context.permissions.includes('roster:assign') ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" aria-label={`Edit shift for ${entry.staff.fullName}`} onClick={() => setEditing(entry)}>Shift</Button> : null}
+    {canManage && entry.staff.staffId !== user.staffId ? <Button variant="ghost" fullWidth={false} className="px-3 py-2" aria-label={`Issue PIN code for ${entry.staff.fullName}`} onClick={() => setIssuingFor(entry)}>PIN code</Button> : null}
+    {context.permissions.includes('staff:deactivate') && entry.staff.staffId !== user.staffId ? <Button variant="danger" fullWidth={false} className="px-3 py-2" onClick={() => setRemoving(entry)}>Remove access</Button> : null}
+  </div>;
+  const list = (entries: RosterEntry[], caption: string) => <>
+    <div className="space-y-2 lg:hidden">{entries.map((entry) => <article key={entry.staff.staffId} className="rounded-card border border-outline-soft bg-white p-4"><button type="button" onClick={() => access(entry)} className="min-h-[44px] w-full text-left"><div className="text-[16px] font-bold">{entry.staff.fullName}</div><div className="mt-1 text-[13px] text-ink-muted">{ROLE_LABELS[entry.staff.role] ?? entry.staff.role} · {entry.staff.permission === 'read_only' ? 'Read only' : 'Read & write'}</div></button><div className="my-3 flex flex-wrap gap-2"><Tag tone={onShiftNow(entry) ? 'green' : 'amber'}>{shift(entry)}</Tag><Tag tone={hasPin(entry.staff.staffId) ? 'green' : 'neutral'}>{hasPin(entry.staff.staffId) ? 'PIN ready here' : 'PIN not set here'}</Tag></div>{actions(entry)}</article>)}</div>
+    <div className="hidden lg:block"><DataTable caption={caption} rows={entries} rowKey={(row) => row.staff.staffId} columns={[
+      { key: 'name', label: 'Staff member', sortValue: (row) => row.staff.fullName, render: (row) => <button type="button" className="min-h-0 py-1 text-left font-bold text-brand hover:underline" onClick={() => access(row)}>{row.staff.fullName}</button> },
+      { key: 'role', label: 'Role', sortValue: (row) => row.staff.role, render: (row) => ROLE_LABELS[row.staff.role] ?? row.staff.role },
+      { key: 'shift', label: "Today's shift", render: shift },
+      { key: 'pin', label: 'PIN on this device', render: (row) => hasPin(row.staff.staffId) ? 'Ready' : 'Not set here' },
+      { key: 'access', label: 'Access', render: (row) => row.staff.permission === 'read_only' ? 'Read only' : 'Read & write' },
+      { key: 'actions', label: 'Actions', render: actions },
+    ]} /></div>
+  </>;
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar
-        title="Staff"
-        onBack={() => navigate(-1)}
-        right={
-          <div className="flex items-center gap-2">
-            <SyncPill />
-            <button
-              type="button"
-              onClick={() => navigate('/admin/staff/invite')}
-              className="min-h-0 rounded-full bg-brand-tint px-3 py-1.5 text-[13px] font-bold text-brand"
-            >
-              ＋ Invite
-            </button>
-          </div>
-        }
-      />
-      <div className="mx-auto max-w-md space-y-4 px-5 py-3 pb-24 md:max-w-2xl">
-        {loading ? <div className="h-24 animate-pulse rounded-card bg-surface-muted" /> : null}
-
-        {onShift.length > 0 ? (
-          <>
-            <div className="text-xs font-bold uppercase tracking-[0.06em] text-brand-strong">
-              On shift now · {onShift.length}
-            </div>
-            <Card padded={false} className="divide-y divide-outline-soft">
-              {onShift.map(row)}
-            </Card>
-          </>
-        ) : null}
-
-        {others.length > 0 ? (
-          <>
-            <div className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Off shift &amp; pending</div>
-            <Card padded={false} className="divide-y divide-outline-soft">
-              {others.map(row)}
-            </Card>
-          </>
-        ) : null}
-
-        {!loading && roster.length === 0 ? (
-          <div className="rounded-card border border-dashed border-outline p-10 text-center">
-            <div className="text-[15px] font-bold text-ink-soft">No staff yet</div>
-            <div className="mt-1.5 text-[13px] text-ink-muted">Invite the first member of staff to this facility.</div>
-          </div>
-        ) : null}
-
-        <p className="text-xs leading-relaxed text-ink-muted">
-          Removing revokes access immediately, on every device — their past records stay intact.
-        </p>
+      <AppBar title="Staff" onBack={() => navigate('/admin')} right={<SyncPill />} />
+      <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
+        <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; shifts</h1>{canManage ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
+        {loading ? <div role="status" className="h-24 animate-pulse rounded-card bg-surface-muted" aria-label="Loading staff" /> : error ? <div role="alert">Staff could not be read from this device.<Button variant="ghost" onClick={reload}>Try again</Button></div> : <>
+          {onShift.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">On shift now · {onShift.length}</h2>{list(onShift, 'Staff on shift')}</section> : null}
+          {others.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">Off shift &amp; awaiting setup</h2>{list(others, 'Other staff')}</section> : null}
+          {!roster.length ? <p className="rounded-card border border-dashed border-outline p-5 text-sm text-ink-muted">No staff yet. Add the first staff member above.</p> : null}
+        </>}
+        <p className="text-xs leading-relaxed text-ink-muted">PIN setup is specific to this device. Access changes reach other devices when they sync; existing records are kept.</p>
       </div>
-
       {editing ? <ShiftSheet entry={editing} onClose={() => setEditing(null)} /> : null}
-      {issuingFor ? (
-        <PinCodeSheet entry={issuingFor} issuedBy={user.staffId} onClose={() => setIssuingFor(null)} />
-      ) : null}
+      {issuingFor ? <PinCodeSheet entry={issuingFor} issuedBy={user.staffId} onClose={() => setIssuingFor(null)} /> : null}
+      {removing ? <Sheet title={`Remove access for ${removing.staff.fullName}?`} closeDisabled={busy} onClose={() => setRemoving(null)}><p className="text-sm leading-relaxed text-ink-muted">Their past records stay intact. Access stops on this device now and on other devices once they receive the change.</p><div className="mt-5 space-y-2"><Button variant="outlined" disabled={busy} onClick={() => setRemoving(null)}>Keep access</Button><Button variant="danger-outline" loading={busy} onClick={() => void remove()}>Remove access</Button></div></Sheet> : null}
     </div>
   );
 };

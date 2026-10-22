@@ -15,12 +15,16 @@ const KIND_ICON: Record<NotificationKind, IconName> = {
 
 type Props = {
   notifications: AppNotification[];
+  loading?: boolean;
+  error?: Error;
   onDone: () => void;
 };
 
-export const NotificationList = ({ notifications, onDone }: Props) => {
+export const NotificationList = ({ notifications, onDone, loading, error }: Props) => {
   const navigate = useNavigate();
 
+  if (loading) return <p role="status" className="px-4 py-6 text-sm text-ink-muted">Reading alerts…</p>;
+  if (error) return <p role="alert" className="px-4 py-6 text-sm text-danger">Alerts could not be read. Open Sync &amp; device to check the connection.</p>;
   if (notifications.length === 0) {
     return <div className="px-4 py-8 text-center text-[13px] text-ink-muted">You're all caught up.</div>;
   }

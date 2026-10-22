@@ -1,41 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Icon, Sheet, type IconName } from '@/ui';
-import { useAuth, useSession } from '@/session';
+import { Avatar, Icon, Sheet } from '@/ui';
+import { useAuth, useAuthorizationContext, useSession } from '@/session';
+import { navigationFor } from './navigation';
 import { AppHeader, ShiftBanner, ShiftCountdownStrip } from './AppHeader';
 import { NotificationList } from './NotificationList';
 
-/**
- * Responsive app shell for the signed-in daily-use screens.
- *   ≤640  phone — NO top header (the design's full-height frames with pinned
- *         footers stay intact); notifications live in the bottom nav and the
- *         shift countdown sits above it. Bottom nav shows on home only.
- *   641+  the persistent AppHeader + ShiftBanner appear (they hide themselves
- *         below sm), plus the rail/sidebar. Screen AppBars stick beneath the
- *         header via the `--app-header-h` offset (0 on phone, 46px on sm+).
- */
-type NavItem = { key: string; label: string; to: string; match: string; icon: IconName; bottom?: boolean };
-
-const NAV: NavItem[] = [
-  { key: 'home', label: 'Home', to: '/home', match: '/home', icon: 'home', bottom: true },
-  { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', icon: 'patients', bottom: true },
-  { key: 'encounters', label: 'Encounters', to: '/encounters', match: '/encounters', icon: 'encounter', bottom: true },
-  { key: 'registers', label: 'Registers', to: '/registers', match: '/registers', icon: 'registers', bottom: true },
-  { key: 'units', label: 'Unit queue', to: '/units', match: '/units', icon: 'clock' },
-  { key: 'referrals', label: 'Referrals', to: '/referrals/track', match: '/referrals', icon: 'referrals' },
-  { key: 'month', label: 'This month', to: '/reports/month', match: '/reports', icon: 'month' },
-  { key: 'stock', label: 'Stock', to: '/stock', match: '/stock', icon: 'stock' },
-];
-
-/** Staff and roster management belong to the facility admin only. */
-const ADMIN_NAV: NavItem = {
-  key: 'admin',
-  label: 'Admin',
-  to: '/admin',
-  match: '/admin',
-  icon: 'patients',
-};
-
+/** Shared navigation stays available during daily work; the phone dock reserves room for screen actions. */
 const Logo = () => (
   <div className="relative h-[34px] w-[34px] flex-none rounded-[10px] bg-brand-accent-soft">
     <div className="absolute left-1/2 top-1/2 h-[4.5px] w-[15px] -translate-x-1/2 -translate-y-1/2 rounded bg-brand" />
@@ -113,6 +84,7 @@ const Sidebar = ({ onProfile }: { onProfile: () => void }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user } = useSession();
+  const navigation = navigationFor(useAuthorizationContext());
   return (
     <aside className="sticky top-0 hidden h-screen w-[92px] flex-none flex-col bg-brand px-0 py-5 text-white sm:flex lg:w-[236px] lg:px-4">
       <div className="mb-5 flex items-center justify-center gap-3 lg:justify-start lg:px-1.5">
@@ -123,7 +95,7 @@ const Sidebar = ({ onProfile }: { onProfile: () => void }) => {
       </div>
 
       <nav className="flex flex-col gap-1 px-2 lg:px-0">
-        {[...NAV, ...(user.roleId === 'facility_admin' ? [ADMIN_NAV] : [])].map((item) => {
+        {navigation.map((item) => {
           const active = isActive(pathname, item.match);
           return (
             <button
@@ -180,16 +152,17 @@ const BottomBar = ({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user } = useSession();
+  const navigation = navigationFor(useAuthorizationContext());
   return (
-    <nav className="flex justify-around border-t border-outline-soft bg-white px-1 pb-5 pt-2.5 sm:hidden">
-      {NAV.filter((n) => n.bottom).map((item) => {
+    <nav aria-label="Main navigation" className="flex items-center justify-around border-t border-outline-soft bg-white px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:hidden">
+      {navigation.filter((n) => n.bottom).map((item) => {
         const active = isActive(pathname, item.match);
         return (
           <button
             key={item.key}
             type="button"
             onClick={() => navigate(item.to)}
-            className="flex min-h-0 flex-col items-center gap-1"
+            className="flex min-h-[52px] flex-col items-center justify-center gap-1"
           >
             <Icon name={item.icon} className={`h-[22px] w-[22px] ${active ? 'text-brand' : 'text-ink-muted'}`} />
             <span
@@ -204,7 +177,7 @@ const BottomBar = ({
       <button
         type="button"
         onClick={onAlerts}
-        className="flex min-h-0 flex-col items-center gap-1"
+        className="flex min-h-[52px] flex-col items-center justify-center gap-1"
         aria-label={`Alerts${unread ? `, ${unread} unread` : ''}`}
       >
         <span className="relative">
@@ -221,7 +194,7 @@ const BottomBar = ({
       <button
         type="button"
         onClick={onProfile}
-        className="flex min-h-0 flex-col items-center gap-1"
+        className="flex min-h-[52px] flex-col items-center justify-center gap-1"
         aria-label="Your profile and sign out"
       >
         <Avatar tone="mint" size="sm">
@@ -234,44 +207,19 @@ const BottomBar = ({
 };
 
 const MobileNotificationSheet = ({ onClose }: { onClose: () => void }) => {
-  const { notifications } = useSession();
-  return (
-    <div className="fixed inset-0 z-50 sm:hidden">
-      <button
-        type="button"
-        aria-label="Close notifications"
-        onClick={onClose}
-        className="absolute inset-0 min-h-0 cursor-default bg-black/40"
-      />
-      <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-hidden rounded-t-sheet bg-white pb-4 shadow-sheet">
-        <div className="flex items-center justify-between border-b border-outline-soft px-4 py-3.5">
-          <span className="text-base font-bold text-ink">Notifications</span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-8 w-8 min-h-0 items-center justify-center rounded-full text-ink-soft"
-          >
-            <Icon name="close" className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="max-h-[60vh] overflow-auto">
-          <NotificationList notifications={notifications} onDone={onClose} />
-        </div>
-      </div>
-    </div>
-  );
+  const { notifications, notificationsLoading, notificationsError } = useSession();
+  return <Sheet title="Notifications" onClose={onClose}><NotificationList notifications={notifications} loading={notificationsLoading} error={notificationsError} onDone={onClose} /></Sheet>;
 };
 
 export const AppShell = () => {
   const { pathname } = useLocation();
-  const { unreadCount, markAllRead } = useSession();
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }); }, [pathname]);
+  const { unreadCount, markAllRead, shift } = useSession();
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // The phone design only shows the bottom bar (and thus the mobile notification
-  // + shift chrome) on the home screen; drill-downs keep their own footer action.
-  const showBottomBar = pathname === '/home';
+  // Reserve space for the fixed dock, including a shift warning when one is due.
+  const ending = Boolean(shift && shift.minutesLeft <= 30);
 
   const openAlerts = () => {
     markAllRead();
@@ -284,15 +232,13 @@ export const AppShell = () => {
       <div className="flex min-h-screen min-w-0 flex-1 flex-col [--app-header-h:0px] sm:[--app-header-h:46px]">
         <AppHeader />
         <ShiftBanner />
-        <div className="flex-1">
+        <div className={`flex-1 ${ending ? 'pb-44' : 'pb-28'} sm:pb-0`}>
           <Outlet />
         </div>
-        {showBottomBar ? (
-          <>
-            <ShiftCountdownStrip />
-            <BottomBar onAlerts={openAlerts} onProfile={() => setProfileOpen(true)} unread={unreadCount} />
-          </>
-        ) : null}
+        <div className="fixed inset-x-0 bottom-0 z-30 sm:hidden">
+          <ShiftCountdownStrip />
+          <BottomBar onAlerts={openAlerts} onProfile={() => setProfileOpen(true)} unread={unreadCount} />
+        </div>
       </div>
       {alertsOpen ? <MobileNotificationSheet onClose={() => setAlertsOpen(false)} /> : null}
       {profileOpen ? <ProfileSheet onClose={() => setProfileOpen(false)} /> : null}

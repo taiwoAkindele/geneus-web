@@ -110,7 +110,7 @@ type Loaded = { encounter: Encounter | undefined; entries: EncounterEntry[]; sta
  * Forms hold what is being typed; a save writes a locked entry and the section
  * is read back from it from then on.
  */
-export const useEncounter = (patientId: string, encounterId?: string) => {
+export const useEncounter = (patientId: string, encounterId?: string, appointmentId?: string) => {
   const context = useAuthorizationContext();
   // Once known (named, found open, or created by the first save) the screen stays on this encounter.
   const [currentId, setCurrentId] = useState(encounterId);
@@ -118,8 +118,8 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
   const [skippedNow, setSkippedNow] = useState<StepKey[]>([]);
   // Unsaved work (PRD §9.8.4) is kept per person: whoever is typing, for this patient and encounter.
   const owner = useMemo<DraftOwner>(
-    () => ({ staffId: context.userId, patientId, encounterKey: currentId ?? 'new' }),
-    [context.userId, patientId, currentId],
+    () => ({ staffId: context.userId, patientId, encounterKey: currentId ?? appointmentId ?? 'new' }),
+    [context.userId, patientId, currentId, appointmentId],
   );
   const [restoredFor, setRestoredFor] = useState<string>();
   const [draftRestoredAt, setDraftRestoredAt] = useState<string>();
@@ -129,7 +129,8 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
     const [encounters, staff] = await Promise.all([encountersForPatient(patientId), listStaff()]);
     const staffNames = new Map(staff.map((member) => [member.staffId, member.fullName]));
     let encounter = currentId ? encounters.find((candidate) => candidate.id === currentId) : undefined;
-    if (!currentId) {
+    if (!currentId && appointmentId) encounter = encounters.find((candidate) => candidate.appointmentId === appointmentId);
+    if (!currentId && !appointmentId) {
       for (const candidate of [...encounters].sort((a, b) => b.openedOn.localeCompare(a.openedOn))) {
         const entries = await entriesForEncounter(candidate.id);
         if (!entries.some((entry) => (CLOSING_STEPS as readonly string[]).includes(entry.step))) {
@@ -139,7 +140,7 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
       }
     }
     return { encounter, entries: encounter ? await entriesForEncounter(encounter.id) : [], staffNames };
-  }, [patientId, currentId]);
+  }, [patientId, currentId, appointmentId]);
 
   const live = useLiveQuery(load);
   const foundId = live.data?.encounter?.id;
@@ -269,6 +270,7 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
       const entry = await saveStep(
         {
           encounterId: enc.id,
+          appointmentId,
           patientId,
           step: key,
           values: toStepValues(key, enc.data),
@@ -290,7 +292,7 @@ export const useEncounter = (patientId: string, encounterId?: string) => {
       }
       setCurrentId(entry.encounterId);
     },
-    [context, enc.data, enc.id, owner, patientId],
+    [context, enc.data, enc.id, owner, patientId, appointmentId],
   );
 
   const amendStep = useCallback(

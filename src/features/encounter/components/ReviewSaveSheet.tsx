@@ -19,7 +19,7 @@ type Props = {
 };
 
 export const ReviewSaveSheet = ({ title, rows, actor, confirmLabel, onConfirm, onClose, saving = false }: Props) => (
-  <Sheet onClose={onClose} eyebrow="Review before saving" title={title}>
+  <Sheet onClose={onClose} closeDisabled={saving} eyebrow="Review before saving" title={title}>
     <p className="mb-4 text-sm leading-relaxed text-ink-muted">
       You are about to save this permanently. It cannot be edited after saving — only amended.
     </p>

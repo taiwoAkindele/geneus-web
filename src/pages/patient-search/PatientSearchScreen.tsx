@@ -1,133 +1,59 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Button, Icon, PatientIdToken } from '@/ui';
+import { Avatar, Button, DataTable, Icon, PatientIdToken } from '@/ui';
 import { currentAge, searchPatients, usePatients } from '@/features/search';
+import { PatientProfile } from '@/features/patients/PatientProfile';
 import { useAuthorizationContext } from '@/session';
 
-/** A cheap phone renders a few dozen cards comfortably; past that, a narrower search beats scrolling. */
 const MAX_SHOWN = 50;
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('');
 
-const initialsOf = (fullName: string): string =>
-  fullName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-
-const formatDay = (iso: string): string => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-
-/** Patients — find a registered patient by ID, "47", phone or name, or add a new one (PRD §9.8.1, §10). */
 export const PatientSearchScreen = () => {
   const navigate = useNavigate();
-  const { facilityId } = useAuthorizationContext();
+  const context = useAuthorizationContext();
   const patients = usePatients();
   const [query, setQuery] = useState('');
-
-  const found = useMemo(() => searchPatients(patients.data ?? [], query, facilityId), [patients.data, query, facilityId]);
-  const shown = found.slice(0, MAX_SHOWN);
+  const [mobileLimit, setMobileLimit] = useState(MAX_SHOWN);
+  const [selectedId, setSelectedId] = useState<string>();
+  const found = useMemo(() => searchPatients(patients.data ?? [], query, context.facilityId), [patients.data, query, context.facilityId]);
+  const shown = found.slice(0, mobileLimit);
+  const open = (patientId: string) => navigate('/patients/profile', { state: { patientId } });
 
   return (
     <div className="min-h-screen bg-surface">
-      <div className="w-full px-5 py-4 md:px-8">
-        {/* Header — title and actions share a line, wrapping on narrow phones. */}
+      <div className="w-full space-y-4 px-5 py-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Back"
-              onClick={() => navigate('/home')}
-              className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center text-ink-soft"
-            >
-              <Icon name="back" className="h-6 w-6" />
-            </button>
-            <div>
-              <div className="font-mono text-[12px] uppercase tracking-[0.16em] text-brand-strong">Patients</div>
-              <h1 className="text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">Find a patient</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2.5">
-            <Button variant="primary" fullWidth={false} className="px-4" onClick={() => navigate('/patients/new')}>
-              ＋ Add patient
-            </Button>
-          </div>
+          <div className="flex items-center gap-2"><button type="button" aria-label="Back" onClick={() => navigate('/home')} className="-ml-2 flex h-11 w-11 min-h-0 items-center justify-center"><Icon name="back" className="h-6 w-6" /></button><h1 className="text-[24px] font-extrabold tracking-[-0.02em]">Find a patient</h1></div>
+          {context.permissions.includes('patient:create') ? <Button fullWidth={false} className="px-4" onClick={() => navigate('/patients/new')}>＋ Add patient</Button> : null}
         </div>
-
-        {/* Search */}
-        <div className="mt-4 flex items-center gap-2.5 rounded-[14px] border-[1.5px] border-outline bg-white px-4 py-3.5">
-          <Icon name="search" className="h-5 w-5 text-ink-muted" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="min-h-0 flex-1 border-0 p-0 text-base text-ink outline-none placeholder:text-ink-muted"
-            placeholder="Search by name, phone or Patient ID…"
-            aria-label="Search patients"
-            autoComplete="off"
-          />
+        <div className="flex items-center gap-3 rounded-field border-[1.5px] border-outline bg-white px-4 py-3">
+          <Icon name="search" className="h-5 w-5 text-ink-muted" /><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setMobileLimit(MAX_SHOWN); }} aria-label="Search patients" placeholder="Name, phone or Patient ID…" autoComplete="off" className="min-h-0 min-w-0 flex-1 border-0 p-0 text-base outline-none" />
         </div>
-
-        <div className="mt-5 flex items-center justify-between text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">
-          <span>{query.trim() ? 'Matching patients' : 'Registered patients'}</span>
-          {patients.data ? <span className="font-mono normal-case tracking-normal">{found.length}</span> : null}
-        </div>
-
-        {patients.loading ? (
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading patients">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[112px] animate-pulse rounded-card bg-surface-muted" />
-            ))}
-          </div>
-        ) : patients.error ? (
-          <div className="mt-3 rounded-card border border-danger-bg bg-white p-4 text-[13px]">
-            <p className="font-semibold text-danger-strong">Patients could not be read from this device.</p>
-            <Button variant="outlined" fullWidth={false} className="mt-3 px-4" onClick={patients.reload}>
-              Try again
-            </Button>
-          </div>
+        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-ink-muted"><span>{query.trim() ? 'Matching patients' : 'Registered patients'}</span>{!patients.loading && !patients.error ? <span>{found.length}</span> : null}</div>
+        {patients.loading ? <div role="status" aria-label="Loading patients" className="h-40 animate-pulse rounded-card bg-surface-muted" /> : patients.error ? (
+          <div role="alert" className="rounded-card bg-white p-4"><p>Patients could not be read from this device.</p><Button variant="ghost" onClick={patients.reload}>Try again</Button></div>
         ) : found.length === 0 ? (
-          <div className="mt-3 rounded-card border border-dashed border-outline p-5 text-center text-[13px] text-ink-muted">
-            {query.trim()
-              ? 'No patient matches. Check the spelling, try their phone or patient number — or add them as a new patient.'
-              : 'No patients registered on this device yet.'}
-          </div>
+          <p className="rounded-card border border-dashed border-outline p-5 text-center text-sm text-ink-muted">{query.trim() ? 'No matching patient. Check the spelling, phone or patient number.' : 'No patients registered on this device yet.'}</p>
         ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {shown.map((p) => (
-              <button
-                key={p.patientId}
-                type="button"
-                onClick={() => navigate('/patients/profile', { state: { patientId: p.patientId } })}
-                className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar tone={p.sex === 'female' ? 'green' : 'slate'}>{initialsOf(p.fullName)}</Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-bold">{p.fullName}</div>
-                    <div className="truncate text-[13px] text-ink-muted">
-                      {[p.sex === 'female' ? 'F' : 'M', currentAge(p), p.address].filter((part) => part !== undefined).join(' · ')}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <PatientIdToken id={p.patientId} variant="inline" />
-                  <span className="text-xs text-ink-muted">Reg. {formatDay(p.createdOn)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="space-y-2 lg:hidden">
+              {shown.map((patient) => <button key={patient.patientId} type="button" onClick={() => open(patient.patientId)} className="flex w-full items-center gap-3 rounded-card border border-outline-soft bg-white p-3.5 text-left"><Avatar tone={patient.sex === 'female' ? 'green' : 'slate'} size="sm">{initials(patient.fullName)}</Avatar><div className="min-w-0 flex-1"><div className="font-bold">{patient.fullName}</div><div className="text-[13px] text-ink-muted">{patient.sex === 'female' ? 'F' : 'M'} · {currentAge(patient) ?? 'Age not recorded'} · {patient.phone ?? patient.address}</div><PatientIdToken id={patient.patientId} variant="inline" /></div><Icon name="chevron" className="h-4 w-4 text-ink-muted" /></button>)}
+            </div>
+            <div className="hidden items-start gap-4 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(290px,0.8fr)]">
+              <DataTable caption="Registered patients" rows={found} rowKey={(row) => row.patientId} selectedKey={selectedId} columns={[
+                { key: 'name', label: 'Patient', sortValue: (row) => row.fullName, render: (row) => <button type="button" className="min-h-0 py-1 text-left font-bold text-brand hover:underline" onClick={() => setSelectedId(row.patientId)}>{row.fullName}</button> },
+                { key: 'id', label: 'Patient ID', sortValue: (row) => row.patientId, render: (row) => <span className="font-mono text-[11px]">{row.patientId}</span> },
+                { key: 'age', label: 'Age / sex', sortValue: (row) => currentAge(row) ?? -1, render: (row) => `${currentAge(row) ?? '—'} / ${row.sex === 'female' ? 'F' : 'M'}` },
+                { key: 'phone', label: 'Phone', render: (row) => row.phone ?? '—' },
+              ]} />
+              <aside aria-label="Selected patient" className="sticky top-28 max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-card border border-outline-soft bg-white">
+                {selectedId ? <><div className="flex items-center justify-between border-b border-outline-soft px-3 py-2"><span className="text-[13px] font-bold">Patient details</span><button type="button" className="min-h-[44px] px-2 text-[13px] font-bold text-brand" onClick={() => setSelectedId(undefined)}>Close details</button></div><PatientProfile key={selectedId} patientId={selectedId} embedded /><div className="px-3 pb-3"><Button variant="outlined" onClick={() => open(selectedId)}>Open full record</Button></div></> : <p className="p-5 text-sm leading-relaxed text-ink-muted">Select a patient's name to see their details and history here.</p>}
+              </aside>
+            </div>
+          </>
         )}
-
-        {found.length > MAX_SHOWN ? (
-          <p className="mt-3 text-center text-xs text-ink-muted">
-            Showing {MAX_SHOWN} of {found.length} — type a name, phone or number to narrow the list.
-          </p>
-        ) : null}
-
-        <p className="mt-5 max-w-[66ch] pb-24 text-xs leading-relaxed text-ink-muted">
-          Tap a patient card to open their profile — full details and every encounter on record. Staff can search by
-          the number they say aloud: “47” finds patient 47.
-        </p>
+        {found.length > mobileLimit ? <div className="space-y-2 lg:hidden"><p className="text-xs text-ink-muted">Showing {shown.length} of {found.length}. Search to narrow the list.</p><Button variant="outlined" onClick={() => setMobileLimit((limit) => limit + MAX_SHOWN)}>Load more patients</Button></div> : null}
+        <p className="text-xs leading-relaxed text-ink-muted">You can search by the number said aloud: “47” finds patient 47.</p>
       </div>
     </div>
   );

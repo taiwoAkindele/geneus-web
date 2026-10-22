@@ -7,7 +7,7 @@ import { createFeeItem, listFeeItems, setFeeItemActive, updateFeeItem, type FeeD
 import { CATEGORY_LABELS, CHARGE_WHEN_LABELS, FeeEditorSheet } from '@/features/billing';
 import { formatMoney } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
-import { AppBar, Button, Tag, useToast } from '@/ui';
+import { AppBar, Button, DataTable, Tag, useToast } from '@/ui';
 
 export const FeeScheduleScreen = () => {
   const navigate = useNavigate();
@@ -53,7 +53,7 @@ export const FeeScheduleScreen = () => {
   return (
     <div className="min-h-screen bg-surface">
       <AppBar title="Fee schedule" onBack={() => navigate('/admin')} right={<SyncPill />} />
-      <div className="mx-auto w-full max-w-md space-y-4 px-5 pb-24 pt-2 md:max-w-2xl">
+      <div className="mx-auto w-full max-w-md space-y-4 px-5 pb-24 pt-2 md:max-w-2xl lg:max-w-none lg:px-8">
         <p className="text-[13px] leading-relaxed text-ink-muted">
           Set the fees this facility charges and who receives care free of charge. Changes save on this device and sync when connected.
         </p>
@@ -74,7 +74,17 @@ export const FeeScheduleScreen = () => {
             <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">Facilities providing free care can leave this empty. Add a fee when your facility needs to charge for a service.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <>
+          <div className="hidden lg:block"><DataTable caption="Facility fee schedule" rows={all} rowKey={(row) => row.id} columns={[
+            { key: 'name', label: 'Fee', sortValue: (row) => row.name, render: (row) => <button type="button" className="min-h-0 py-1 text-left font-bold text-brand" onClick={() => setEditing(row)}>{row.name}</button> },
+            { key: 'category', label: 'Category', sortValue: (row) => row.category, render: (row) => CATEGORY_LABELS[row.category] },
+            { key: 'amount', label: 'Amount', align: 'right', render: (row) => formatMoney(row.amountMinor, row.currency) },
+            { key: 'when', label: 'Charged', render: (row) => CHARGE_WHEN_LABELS[row.chargeWhen] },
+            { key: 'exempt', label: 'Exemptions', render: (row) => row.exemptions.map((rule) => rule.reason).join(' · ') || 'None' },
+            { key: 'active', label: 'Status', render: (row) => row.active ? 'Active' : 'Retired' },
+            { key: 'actions', label: 'Actions', render: (row) => <div className="flex flex-wrap gap-2"><Button variant="ghost" fullWidth={false} className="px-2 py-2" disabled={Boolean(busyId)} onClick={() => setEditing(row)}>Edit</Button><Button variant="ghost" fullWidth={false} className="px-2 py-2" loading={busyId === row.id} disabled={Boolean(busyId)} onClick={() => void toggle(row)}>{row.active ? 'Retire' : 'Restore'}</Button></div> },
+          ]} /></div>
+          <div className="space-y-3 lg:hidden">
             {all.map((fee) => (
               <article key={fee.id} className="rounded-card border border-outline-soft bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -101,6 +111,7 @@ export const FeeScheduleScreen = () => {
               </article>
             ))}
           </div>
+          </>
         )}
       </div>
       {editing ? (

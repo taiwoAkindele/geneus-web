@@ -1,78 +1,39 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppBar, Avatar, Tag } from '@/ui';
+import { AppBar, Button, ChoiceChip } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { useAppointments, type BookedAppointment } from '@/features/appointments';
+import { APPOINTMENT_GROUP_LABELS, AppointmentWorklist, useAppointments, type AppointmentGroup, type BookedAppointment } from '@/features/appointments';
+import { useAuthorizationContext } from '@/session';
 
-const AppointmentRow = ({ appt, onOpen }: { appt: BookedAppointment; onOpen: () => void }) => (
-  <button type="button" onClick={onOpen} className="w-full rounded-card border border-outline-soft bg-white p-4 text-left">
-    <div className="flex items-center gap-3">
-      <Avatar tone="green" size="sm">{appt.patient.initials}</Avatar>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-bold text-ink">{appt.patient.name}</div>
-        <div className="text-[13px] text-ink-muted">{appt.reason}</div>
-      </div>
-      <Tag tone={appt.status === 'pending' ? 'amber' : 'slate'}>{appt.status === 'pending' ? 'Pending' : 'Upcoming'}</Tag>
-    </div>
-    <div className="mt-2.5 font-mono text-[11px] text-ink-muted">{appt.when} · {appt.day}</div>
-  </button>
-);
-
-const EmptyState = ({ label }: { label: string }) => (
-  <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">{label}</div>
-);
-
-/**
- * Appointments (PRD §9.8). Booked from a patient's profile — "Now" bookings are
- * pending today, scheduled ones are upcoming. Same shared store the encounters
- * hub and each profile read from, so it always reflects what's been booked.
- */
 export const AppointmentsScreen = () => {
   const navigate = useNavigate();
-  const { appointments } = useAppointments();
-
-  const today = appointments.filter((a) => a.status === 'pending');
-  const upcoming = appointments.filter((a) => a.status === 'scheduled');
-
-  // The patient has arrived → start their encounter.
-  const start = (appt: BookedAppointment) => navigate('/encounters/record', { state: { patientId: appt.patient.id } });
+  const context = useAuthorizationContext();
+  const { appointments, loading, error, reload } = useAppointments();
+  const [group, setGroup] = useState<AppointmentGroup>('today');
+  const canRecord = context.permissions.includes('encounter:record');
+  const open = (appointment: BookedAppointment) => canRecord
+    ? navigate('/encounters/record', { state: { patientId: appointment.patient.id, encounterId: appointment.encounterId, appointmentId: appointment.id } })
+    : navigate('/patients/profile', { state: { patientId: appointment.patient.id } });
+  const shown = appointments.filter((appointment) => appointment.group === group);
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Appointments" onBack={() => navigate('/encounters')} right={<SyncPill />} />
-      <div className="w-full px-5 py-2 md:px-8">
-        <div className="pb-1 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-strong">Appointments</div>
-        <h1 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em]">Today &amp; upcoming</h1>
-
-        <div className="grid gap-5 pb-24 lg:grid-cols-2">
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Today · pending</span>
-              <Tag tone="amber">To be seen</Tag>
-            </div>
-            <div className="space-y-2.5">
-              {today.length > 0 ? (
-                today.map((a) => <AppointmentRow key={a.id} appt={a} onOpen={() => start(a)} />)
-              ) : (
-                <EmptyState label="No patients waiting today." />
-              )}
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-3 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Upcoming</div>
-            <div className="space-y-2.5">
-              {upcoming.length > 0 ? (
-                upcoming.map((a) => <AppointmentRow key={a.id} appt={a} onOpen={() => start(a)} />)
-              ) : (
-                <EmptyState label="No upcoming appointments booked." />
-              )}
-            </div>
-            <p className="mt-4 text-xs leading-relaxed text-ink-muted">
-              An appointment booked from a patient's profile drops onto this list for its day, and onto the encounters
-              list, ready to be started when the patient arrives.
-            </p>
-          </section>
+      <AppBar title="Appointments" onBack={() => navigate('/home')} right={<SyncPill />} />
+      <div className="w-full space-y-4 px-5 py-3 md:px-8">
+        <h1 className="text-[24px] font-extrabold tracking-[-0.02em]">Appointments</h1>
+        <div className="flex flex-wrap gap-2" aria-label="Appointment groups">
+          {(Object.keys(APPOINTMENT_GROUP_LABELS) as AppointmentGroup[]).map((key) => (
+            <ChoiceChip key={key} selected={group === key} onClick={() => setGroup(key)}>
+              {APPOINTMENT_GROUP_LABELS[key]}{!loading && !error ? ` · ${appointments.filter((appointment) => appointment.group === key).length}` : ''}
+            </ChoiceChip>
+          ))}
         </div>
+        {loading ? <div role="status" className="h-32 animate-pulse rounded-card bg-surface-muted" aria-label="Loading appointments" /> : error ? (
+          <div role="alert" className="rounded-card border border-outline-soft bg-white p-4"><p>Appointments could not be read from this device.</p><Button variant="ghost" onClick={reload}>Try again</Button></div>
+        ) : shown.length === 0 ? (
+          <p className="rounded-card border border-dashed border-outline p-5 text-center text-[14px] text-ink-muted">No {APPOINTMENT_GROUP_LABELS[group].toLowerCase()} appointments.</p>
+        ) : <AppointmentWorklist appointments={shown} onOpen={open} actionLabel={canRecord ? 'Open encounter' : 'View patient'} />}
+        <p className="text-xs leading-relaxed text-ink-muted">Appointments are grouped by their local calendar date. A linked encounter moves to Completed when care is closed.</p>
       </div>
     </div>
   );

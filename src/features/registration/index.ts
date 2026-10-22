@@ -9,3 +9,5 @@ export {
 } from './registrationValues';
 export { useNextPatientNumber } from './useNextPatientNumber';
 export { useSavePatient } from './useSavePatient';
+
+export { RegistrationDraftProvider, useRegistrationDraft, useClearRegistrationDraft, useBeginRegistration } from './RegistrationDraftProvider';

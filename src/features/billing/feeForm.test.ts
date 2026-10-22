@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { emptyRule, feeDraftFromForm, feeFormValues, type FeeForm } from './feeForm';
+import { emptyRule, EXEMPTION_PRESETS, feeDraftFromForm, feeFormValues, type FeeForm } from './feeForm';
 
 const form = (): FeeForm => ({ ...feeFormValues(), name: ' Consultation ', amount: '1500.29', currency: 'ngn' });
 
 describe('fee schedule form', () => {
+  it('turns each optional preset into an editable rule accepted by the contract', () => {
+    for (const preset of EXEMPTION_PRESETS) {
+      const values = form(); values.exemptions = [preset.rule];
+      expect(feeDraftFromForm(values).exemptions[0].reason).toBe(preset.rule.reason);
+    }
+  });
   it('normalizes money and optional rule fields into the shared shape', () => {
     const values = form();
     values.exemptions = [{ ...emptyRule(), reason: ' Under-5 ', ageUnderYears: '5' }];

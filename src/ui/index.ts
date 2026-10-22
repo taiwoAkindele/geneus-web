@@ -16,6 +16,8 @@ export { PulseLoader } from './PulseLoader';
 export { SegmentedControl } from './SegmentedControl';
 export { SelectField } from './SelectField';
 export { Sheet } from './Sheet';
+export { DataTable } from './DataTable';
+export type { TableColumn } from './DataTable';
 export { Stat } from './Stat';
 export { StatusPill } from './StatusPill';
 export type { SyncStatus } from './StatusPill';

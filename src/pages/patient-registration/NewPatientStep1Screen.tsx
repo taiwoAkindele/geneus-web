@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Button, SegmentedControl, TextField } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { EMPTY_REGISTRATION, type RegistrationNavState, type RegistrationValues } from '@/features/registration';
+import { calendarDate } from '@/lib/calendarDate';
+import { EMPTY_REGISTRATION, useRegistrationDraft, type RegistrationNavState, type RegistrationValues } from '@/features/registration';
 
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
+const todayIso = (): string => calendarDate();
 
 type Step1Values = Pick<RegistrationValues, 'fullName' | 'sex' | 'age' | 'dateOfBirth' | 'phone' | 'address'>;
 
@@ -13,10 +15,9 @@ type Step1Values = Pick<RegistrationValues, 'fullName' | 'sex' | 'age' | 'dateOf
  * Nothing is saved yet: the values travel to step 2, which saves. Reused for
  * editing — opened with the patient's values and id from their profile.
  */
-export const NewPatientStep1Screen = () => {
+const Step1Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
   const navigate = useNavigate();
-  const state = (useLocation().state as RegistrationNavState) ?? {};
-  const values = { ...EMPTY_REGISTRATION, ...state.values };
+  const { values, keep, clear } = useRegistrationDraft(state);
   const editing = Boolean(state.patientId);
 
   const {
@@ -24,14 +25,25 @@ export const NewPatientStep1Screen = () => {
     register,
     handleSubmit,
     getValues,
+    watch,
+    reset,
     formState: { errors },
   } = useForm<Step1Values>({ defaultValues: values });
 
-  const next = (step1: Step1Values) =>
-    navigate('/patients/new/details', { state: { ...state, values: { ...values, ...step1 } } satisfies RegistrationNavState });
+  useEffect(() => {
+    const subscription = watch((partial) => keep(partial));
+    return () => subscription.unsubscribe();
+  }, [watch, keep]);
+
+  const next = (step1: Step1Values) => {
+    keep(step1);
+    navigate('/patients/new/details', { state: { patientId: state.patientId } satisfies RegistrationNavState });
+  };
 
   // Age or date of birth: an elderly patient with no records still gets registered (PRD §10).
   const ageOrBirth = () => (getValues('age').trim() || getValues('dateOfBirth') ? true : 'Give an age or a date of birth');
+
+  if (editing && (!values.fullName || !values.sex)) return <Navigate to="/patients/profile" state={{ patientId: state.patientId }} replace />;
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
@@ -51,6 +63,7 @@ export const NewPatientStep1Screen = () => {
         className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card"
       >
         <div className="flex-1 space-y-4 px-5 py-3">
+          {!editing ? <div className="flex items-center justify-between gap-3 text-xs text-ink-muted"><span>Your details are kept between these steps.</span><button type="button" onClick={() => { clear(); reset(EMPTY_REGISTRATION); }} className="font-bold text-brand">Clear form</button></div> : null}
           <TextField
             label="Full name"
             placeholder="e.g. Amaka Okoro"
@@ -65,6 +78,7 @@ export const NewPatientStep1Screen = () => {
               <Controller
                 control={control}
                 name="sex"
+                rules={{ required: 'Choose the patient’s sex' }}
                 render={({ field }) => (
                   <SegmentedControl
                     ariaLabel="Sex"
@@ -77,6 +91,7 @@ export const NewPatientStep1Screen = () => {
                   />
                 )}
               />
+              {errors.sex ? <p role="alert" className="mt-1.5 text-[13px] text-danger">{errors.sex.message}</p> : null}
             </div>
             <div className="w-24">
               <TextField
@@ -130,4 +145,9 @@ export const NewPatientStep1Screen = () => {
       </form>
     </div>
   );
+};
+
+export const NewPatientStep1Screen = () => {
+  const state = (useLocation().state as RegistrationNavState) ?? {};
+  return <Step1Form key={state.patientId ?? 'new'} state={state} />;
 };

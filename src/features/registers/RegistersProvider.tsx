@@ -16,6 +16,7 @@ type Value = {
   registers: RegisterDef[];
   loading: boolean;
   error: Error | undefined;
+  reload: () => void;
   getById: (registerId: string) => RegisterDef | undefined;
   publish: (draft: RegisterDraft, editingId: string | null) => Promise<void>;
   /** Returns validation issues; an empty list means the entry was saved. */
@@ -70,7 +71,7 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
     return project(definitions, entries);
   }, []);
 
-  const { data, loading, error } = useLiveQuery(load);
+  const { data, loading, error, reload } = useLiveQuery(load);
   const registers = useMemo(() => data ?? [], [data]);
 
   const getById = useCallback(
@@ -94,8 +95,8 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const value = useMemo<Value>(
-    () => ({ registers, loading, error, getById, publish, addEntry: record }),
-    [registers, loading, error, getById, publish, record],
+    () => ({ registers, loading, error, reload, getById, publish, addEntry: record }),
+    [registers, loading, error, reload, getById, publish, record],
   );
 
   return <RegistersContext.Provider value={value}>{children}</RegistersContext.Provider>;

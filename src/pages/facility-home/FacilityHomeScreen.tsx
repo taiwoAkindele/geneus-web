@@ -1,163 +1,62 @@
 import { useNavigate } from 'react-router-dom';
-import { Icon, type IconName, Stat, Tag } from '@/ui';
+import { Button, Icon, Tag, type IconName } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { useSession } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
+import { useLiveQuery, useSyncStatus } from '@/data';
+import { listEncounters, closingEntries } from '@/data/repos/encounters';
+import { useAppointments } from '@/features/appointments';
+import { calendarDate } from '@/lib/calendarDate';
 
-const ReferralRow = ({
-  name,
-  reason,
-  from,
-  status,
-  arrived,
-  onClick,
-}: {
-  name: string;
-  reason: string;
-  from: string;
-  status: string;
-  arrived?: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="w-full rounded-[13px] bg-white/10 p-3.5 text-left"
-  >
-    <div className="flex items-start justify-between gap-2">
-      <div className="text-[15px] font-bold">{name}</div>
-      <span
-        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-          arrived ? 'bg-brand-accent text-brand' : 'bg-white/20 text-white'
-        }`}
-      >
-        {status}
-      </span>
-    </div>
-    <div className="mt-1.5 text-[13px] text-white/80">{reason}</div>
-    <div className="mt-2 text-xs text-white/60">{from}</div>
-  </button>
-);
+const loadCounts = async () => {
+  const [encounters, closing] = await Promise.all([listEncounters(), closingEntries()]);
+  const closed = new Set(closing.map((entry) => entry.encounterId));
+  return { today: encounters.filter((encounter) => calendarDate(encounter.openedOn) === calendarDate()).length, open: encounters.filter((encounter) => !closed.has(encounter.id)).length };
+};
 
-const QuickAction = ({
-  label,
-  icon,
-  primary,
-  tall,
-  onClick,
-}: {
-  label: string;
-  icon: IconName;
-  primary?: boolean;
-  tall?: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`flex flex-col justify-between rounded-[18px] p-4 text-left ${
-      tall ? 'h-[104px]' : ''
-    } ${primary ? 'bg-brand text-white' : 'border border-outline-soft bg-white text-ink'}`}
-  >
-    <span
-      className={`flex h-[34px] w-[34px] items-center justify-center rounded-[10px] ${
-        primary ? 'bg-white/15 text-white' : 'bg-surface-container text-ink-soft'
-      }`}
-    >
-      <Icon name={icon} className="h-5 w-5" />
-    </span>
-    <span className="text-[15px] font-bold md:text-base">{label}</span>
-  </button>
-);
-
-/**
- * 4.1 Facility home — the CHC's daily hub. Incoming referrals sit at the top,
- * impossible to miss; quick actions and today's counts follow.
- */
 export const FacilityHomeScreen = () => {
   const navigate = useNavigate();
-  const { user, shift } = useSession();
+  const { user, facility, shift } = useSession();
+  const context = useAuthorizationContext();
+  const appointments = useAppointments();
+  const counts = useLiveQuery(loadCounts);
+  const sync = useSyncStatus();
+  const cashier = user.roleId === 'cashier';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const actions: { label: string; icon: IconName; to: string; primary?: boolean }[] = [];
+  if (context.permissions.includes('patient:create')) actions.push({ label: 'New patient', icon: 'plus', to: '/patients/new', primary: user.roleId === 'records_officer' });
+  actions.push({ label: 'Find patient', icon: 'search', to: '/patients/search', primary: cashier });
+  if (!cashier) actions.push({ label: "Today's appointments", icon: 'clock', to: '/appointments', primary: context.permissions.includes('encounter:record') });
+  if (context.permissions.includes('encounter:record')) actions.push({ label: 'Unit queue', icon: 'clock', to: '/units' });
+  if (!cashier) actions.push({ label: 'Register books', icon: 'registers', to: '/registers' });
+  if (user.roleId === 'facility_admin') actions.unshift({ label: 'Facility admin', icon: 'patients', to: '/admin', primary: true });
+
   return (
     <div className="min-h-screen bg-surface">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-2xl lg:max-w-5xl">
-        {/* Phone shows its own sync pill (no top header on mobile); sm+ uses the AppHeader. */}
-        <div className="flex justify-end px-5 pt-4 sm:hidden">
-          <SyncPill />
+      <div className="mx-auto w-full max-w-md px-5 py-4 md:max-w-4xl">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div><p className="text-[13px] text-ink-muted">{greeting},</p><h1 className="text-[24px] font-extrabold">{user.name.split(' ')[0]}</h1><p className="mt-1 text-[13px] text-ink-muted">{user.role} · {facility.name}</p></div>
+          <div className="flex flex-col items-end gap-2"><SyncPill /><Tag tone="amber">{shift ? `Shift ends ${shift.endsAtLabel}` : 'Admin access'}</Tag></div>
         </div>
-        <header className="flex items-center justify-between px-5 pb-3 pt-2">
-          <div>
-            <div className="text-[13px] text-ink-muted">Good morning,</div>
-            <div className="text-[22px] font-extrabold tracking-[-0.02em]">{user.name.split(' ')[0]}</div>
-          </div>
-          <Tag tone="amber">{shift ? `Shift ends ${shift.endsAtLabel}` : 'Admin access'}</Tag>
-        </header>
-
-        <main className="flex-1 space-y-4 px-5 pb-24 lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-5 lg:space-y-0">
-          {/* Incoming referrals */}
-          <div className="rounded-[20px] bg-slate p-4 text-white">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 text-sm font-bold">
-                <span className="h-2.5 w-2.5 rounded-full bg-brand-accent" />
-                Incoming referrals
-              </span>
-              <span className="rounded-full bg-brand-accent px-2.5 py-0.5 font-mono text-xs font-bold text-brand">
-                2
-              </span>
+        {cashier ? <section className="mb-5 rounded-card border border-outline-soft bg-white p-4"><h2 className="text-[17px] font-bold">Cashier workspace</h2><p className="mt-2 text-[14px] leading-relaxed text-ink-muted">Payment collection and receipts are being connected to patient booking. They are not available in this version. You can look up patients and check this device's sync status.</p></section> : null}
+        <div className="grid grid-cols-2 gap-3">
+          {actions.map((action) => <button key={action.to} type="button" onClick={() => navigate(action.to)} className={`flex min-h-[104px] flex-col justify-between gap-3 rounded-card border p-4 text-left ${action.primary ? 'border-brand bg-brand text-white' : 'border-outline-soft bg-white text-ink'}`}><Icon name={action.icon} className="h-6 w-6" /><span className="text-[15px] font-bold">{action.label}</span></button>)}
+        </div>
+        {!cashier ? (
+          <section className="mt-6">
+            <h2 className="mb-3 text-[15px] font-bold">On this device</h2>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                { label: 'Encounters today', value: counts.loading || counts.error ? '—' : String(counts.data?.today ?? 0), to: '/encounters' },
+                { label: 'Open encounters', value: counts.loading || counts.error ? '—' : String(counts.data?.open ?? 0), to: '/encounters' },
+                { label: "Today's appointments", value: appointments.loading || appointments.error ? '—' : String(appointments.appointments.filter((appointment) => appointment.group === 'today').length), to: '/appointments' },
+                { label: 'Changes to sync', value: String(sync.pending), to: '/sync' },
+              ].map((metric) => <button key={metric.label} type="button" onClick={() => navigate(metric.to)} className="rounded-card border border-outline-soft bg-white p-4 text-left"><div className="font-mono text-[25px] font-semibold text-brand">{metric.value}</div><div className="mt-1 text-[12px] text-ink-muted">{metric.label}</div></button>)}
             </div>
-            <div className="space-y-2.5">
-              <ReferralRow
-                name="Ibrahim Musa · 34 · M"
-                reason="Suspected severe malaria — needs admission"
-                from="From Alafia CHC · 12 min ago"
-                status="Arrived"
-                arrived
-                onClick={() => navigate('/referrals/track')}
-              />
-              <ReferralRow
-                name="Grace Eze · 28 · F"
-                reason="Obstructed labour — referred for C-section"
-                from="From Alafia CHC · just now"
-                status="New · Seen"
-                onClick={() => navigate('/referrals/track')}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-          {/* Quick actions */}
-          <div className="grid grid-cols-2 gap-3">
-            <QuickAction
-              label="New patient"
-              icon="plus"
-              primary
-              tall
-              onClick={() => navigate('/patients/new')}
-            />
-            <QuickAction
-              label="Find patient"
-              icon="search"
-              tall
-              onClick={() => navigate('/patients/search')}
-            />
-            <QuickAction
-              label="Register books"
-              icon="registers"
-              onClick={() => navigate('/registers')}
-            />
-            <QuickAction
-              label="This month"
-              icon="month"
-              onClick={() => navigate('/reports/month')}
-            />
-          </div>
-
-          {/* Today */}
-          <div className="flex gap-6 px-1 pt-1">
-            <Stat value="18" label="Seen today" />
-            <Stat value="5" label="Waiting" />
-            <Stat value="4" label="To sync" tone="amber" />
-          </div>
-          </div>
-        </main>
+            {counts.error || appointments.error ? <div role="alert" className="mt-3 rounded-card bg-white p-3 text-sm text-danger">Some counts could not be read. <Button variant="ghost" onClick={() => { counts.reload(); appointments.reload(); }}>Try again</Button></div> : null}
+            <p className="mt-3 text-xs leading-relaxed text-ink-muted">These are the records currently saved on this device. Other devices' changes arrive when it syncs.</p>
+          </section>
+        ) : null}
       </div>
     </div>
   );

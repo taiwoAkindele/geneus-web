@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, Sheet, useToast } from '@/ui';
 import { AuthorizationError } from '@/data';
-import { useSession } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
 import {
   AmendSheet,
   encounterLabel,
@@ -43,7 +43,7 @@ const Message = ({ children }: { children: React.ReactNode }) => (
  */
 export const EncounterScreen = () => {
   const navigate = useNavigate();
-  const { patientId, encounterId } = (useLocation().state as EncounterNavState) ?? {};
+  const { patientId, encounterId, appointmentId } = (useLocation().state as EncounterNavState) ?? {};
   if (!patientId) {
     return (
       <Message>
@@ -54,15 +54,17 @@ export const EncounterScreen = () => {
       </Message>
     );
   }
-  return <EncounterRecord patientId={patientId} encounterId={encounterId} />;
+  return <EncounterRecord key={`${patientId}|${encounterId ?? appointmentId ?? 'new'}`} patientId={patientId} encounterId={encounterId} appointmentId={appointmentId} />;
 };
 
-const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encounterId?: string }) => {
+const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId: string; encounterId?: string; appointmentId?: string }) => {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useSession();
+  const context = useAuthorizationContext();
+  const canRecord = context.permissions.includes('encounter:record');
   const patient = usePatient(patientId);
-  const ctl = useEncounter(patientId, encounterId);
+  const ctl = useEncounter(patientId, encounterId, appointmentId);
   const { enc } = ctl;
 
   const actor = { name: user.name, role: user.role };
@@ -163,7 +165,7 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
             <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">
               {enc.id ? `Opened ${enc.openedDate}` : 'Opens when the first step is saved'}
             </span>
-            {enc.closed ? null : (
+            {enc.closed || !context.permissions.includes('handoff:create') ? null : (
               <button
                 type="button"
                 onClick={() =>
@@ -187,6 +189,7 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
 
       <div>
         <EncounterSpine enc={enc} />
+        {!canRecord ? <p className="mx-5 my-3 rounded-card border border-outline-soft bg-white p-4 text-sm text-ink-muted">You have view access. A clinician records and saves encounter steps.</p> : null}
 
         {ctl.draftRestoredAt && !enc.closed ? (
           <div className="mx-5 mb-1 rounded-card border border-amber-border bg-amber-bg p-3.5 text-[13px] leading-relaxed text-amber-text md:mx-8">
@@ -234,6 +237,7 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
                 title={s.title}
                 hint={s.hint}
                 state={state}
+                readOnly={!canRecord}
                 summary={summarize(enc.data, s.key)}
                 signature={enc.sig[s.key]}
                 amendments={enc.amend[s.key]}
@@ -243,7 +247,7 @@ const EncounterRecord = ({ patientId, encounterId }: { patientId: string; encoun
                 onSkip={isClosingStep(s.key) ? undefined : () => ctl.skip(s.key)}
                 saving={saving}
               >
-                {active ? <StepForm stepKey={s.key} ctl={ctl} /> : null}
+                {active && canRecord ? <StepForm stepKey={s.key} ctl={ctl} /> : null}
               </SectionCard>
             );
           })}
