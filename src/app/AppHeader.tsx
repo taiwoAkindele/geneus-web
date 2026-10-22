@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon } from '@/ui';
+import { Button, Icon, useToast } from '@/ui';
+import { useAuthorizationContext } from '@/session';
 import { SyncPill } from './SyncPill';
 import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/session';
 import { NotificationList } from './NotificationList';
@@ -14,7 +15,7 @@ import { NotificationList } from './NotificationList';
  * via the `--app-header-h` offset.
  */
 const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
-  const { notifications } = useSession();
+  const { notifications, notificationsLoading, notificationsError } = useSession();
   return (
     <>
       {/* Backdrop — tap anywhere to dismiss. */}
@@ -30,7 +31,7 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
           <span className="text-xs text-ink-muted">{notifications.length}</span>
         </div>
         <div className="max-h-[60vh] overflow-auto">
-          <NotificationList notifications={notifications} onDone={onClose} />
+          <NotificationList notifications={notifications} loading={notificationsLoading} error={notificationsError} onDone={onClose} />
         </div>
       </div>
     </>
@@ -120,7 +121,6 @@ export const ShiftBanner = () => {
 };
 
 const ShiftBannerFor = ({ shift }: { shift: Shift }) => {
-  const { extendShift } = useSession();
   const [dismissed, setDismissed] = useState(false);
   const seconds = useShiftCountdown(shift.minutesLeft);
   const { minutesLeft, endsAtLabel } = shift;
@@ -138,13 +138,7 @@ const ShiftBannerFor = ({ shift }: { shift: Shift }) => {
           You'll be signed out at {endsAtLabel} on every device — finish and tidy up open records.
         </div>
       </div>
-      <button
-        type="button"
-        onClick={extendShift}
-        className="min-h-0 flex-none rounded-lg bg-white/70 px-3 py-2 text-[13px] font-bold"
-      >
-        Extend
-      </button>
+      <ExtendShiftAction />
       <button
         type="button"
         onClick={() => setDismissed(true)}
@@ -158,8 +152,8 @@ const ShiftBannerFor = ({ shift }: { shift: Shift }) => {
 };
 
 /**
- * Slim shift countdown for PHONES — sits just above the bottom nav on the home
- * screen (the only phone screen with persistent bottom chrome), so it never
+ * Slim shift countdown for PHONES — sits just above the bottom nav on every signed-in
+ * screen, so it never
  * pushes a screen's pinned footer action below the fold. Only appears in the
  * last 30 minutes of a shift; escalates and shows a live m:ss countdown.
  */
@@ -170,7 +164,6 @@ export const ShiftCountdownStrip = () => {
 
 const ShiftCountdownStripFor = ({ shift }: { shift: Shift }) => {
   const navigate = useNavigate();
-  const { extendShift } = useSession();
   const seconds = useShiftCountdown(shift.minutesLeft);
 
   if (shift.minutesLeft > 30) return null;
@@ -181,13 +174,24 @@ const ShiftCountdownStripFor = ({ shift }: { shift: Shift }) => {
       <button type="button" onClick={() => navigate('/sync')} className="min-h-0 flex-1 text-left text-[13px] font-bold">
         Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span>
       </button>
-      <button
-        type="button"
-        onClick={extendShift}
-        className="min-h-0 flex-none rounded-lg bg-white/70 px-2.5 py-1.5 text-[12px] font-bold"
-      >
-        Extend
-      </button>
+      <ExtendShiftAction />
     </div>
   );
+};
+
+const ExtendShiftAction = () => {
+  const { extendShift } = useSession();
+  const context = useAuthorizationContext();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const allowed = context.permissions.includes('roster:extend');
+  const extend = async () => {
+    if (busy) return;
+    if (!allowed) { toast('Ask a supervisor or facility admin to extend your shift before it ends.', { tone: 'info' }); return; }
+    setBusy(true);
+    try { await extendShift(); toast('Shift extended'); }
+    catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not extend the shift', { tone: 'error' }); }
+    finally { setBusy(false); }
+  };
+  return <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" loading={busy} onClick={() => void extend()}>{allowed ? 'Extend' : 'Ask supervisor'}</Button>;
 };

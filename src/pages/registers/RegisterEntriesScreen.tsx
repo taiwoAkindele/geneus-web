@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Icon, Sheet, useToast } from '@/ui';
-import { useSession } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
 import { RegisterField, useRegisters, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
 
 const fmtCell = (v: EntryValue | undefined): string => {
@@ -46,7 +46,7 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
   };
 
   return (
-    <Sheet onClose={onClose} eyebrow={`${register.category} · New entry`} title={register.name}>
+    <Sheet onClose={onClose} closeDisabled={saving} eyebrow={`${register.category} · New entry`} title={register.name}>
       <div className="flex flex-col gap-4">
         {register.fields.map((f) => (
           <RegisterField
@@ -73,7 +73,8 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
 export const RegisterEntriesScreen = () => {
   const navigate = useNavigate();
   const { id = '' } = useParams();
-  const { getById, loading } = useRegisters();
+  const { getById, loading, error, reload } = useRegisters();
+  const context = useAuthorizationContext();
   const register = getById(id);
   const [adding, setAdding] = useState(false);
 
@@ -85,6 +86,8 @@ export const RegisterEntriesScreen = () => {
       </div>
     );
   }
+
+  if (error) return <div role="alert" className="p-5">Registers could not be read from this device.<Button variant="ghost" onClick={reload}>Try again</Button></div>;
 
   if (!register) {
     return (
@@ -110,12 +113,8 @@ export const RegisterEntriesScreen = () => {
             <h1 className="mt-1.5 text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">{register.name}</h1>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <Button variant="outlined" fullWidth={false} className="px-4" onClick={() => navigate(`/registers/${register.id}/configure`)}>
-              Configure
-            </Button>
-            <Button variant="primary" fullWidth={false} className="px-4" onClick={() => setAdding(true)}>
-              ＋ Add entry
-            </Button>
+            {context.permissions.includes('register_definition:publish') ? <Button variant="outlined" fullWidth={false} className="px-4" onClick={() => navigate(`/registers/${register.id}/configure`)}>Configure</Button> : null}
+            {context.permissions.includes('register_entry:create') ? <Button variant="primary" fullWidth={false} className="px-4" onClick={() => setAdding(true)}>＋ Add entry</Button> : null}
           </div>
         </div>
 
@@ -137,16 +136,27 @@ export const RegisterEntriesScreen = () => {
 
         {register.rows.length > 0 ? (
           <>
-            <div className="mt-5 overflow-hidden rounded-card border border-outline-soft bg-white">
+            <div className="mt-5 space-y-2 lg:hidden">
+              {register.rows.map((row, index) => <details key={row.id} className="rounded-card border border-outline-soft bg-white p-4">
+                <summary className="cursor-pointer text-[14px] font-semibold text-ink">
+                  Entry {register.rows.length - index} · {row.when}
+                  <span className="mt-1 block text-[13px] font-normal text-ink-muted">{columns.slice(0, 2).map((field) => `${field.label}: ${fmtCell(row.values[field.id])}`).join(' · ')}</span>
+                </summary>
+                <dl className="mt-4 space-y-3">{columns.map((field) => <div key={field.id}><dt className="text-[12px] font-semibold text-ink-muted">{field.label || 'Field'}</dt><dd className="mt-1 break-words text-sm">{fmtCell(row.values[field.id])}</dd></div>)}</dl>
+                <p className="mt-4 border-t border-outline-soft pt-3 text-xs text-ink-muted">Recorded by {row.by} · {row.when}</p>
+              </details>)}
+            </div>
+            <div className="mt-5 hidden overflow-hidden rounded-card border border-outline-soft bg-white lg:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <caption className="sr-only">{register.name} entries</caption>
                   <thead>
                     <tr className="bg-brand-wash text-left text-[11px] font-extrabold uppercase tracking-[0.04em] text-brand-strong">
-                      <th className="whitespace-nowrap px-3.5 py-3">#</th>
+                      <th scope="col" className="whitespace-nowrap px-3.5 py-3">#</th>
                       {columns.map((c) => (
-                        <th key={c.id} className="whitespace-nowrap px-3.5 py-3">{c.label || 'Field'}</th>
+                        <th scope="col" key={c.id} className="whitespace-nowrap px-3.5 py-3">{c.label || 'Field'}</th>
                       ))}
-                      <th className="whitespace-nowrap px-3.5 py-3">Recorded by</th>
+                      <th scope="col" className="whitespace-nowrap px-3.5 py-3">Recorded by</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -180,9 +190,7 @@ export const RegisterEntriesScreen = () => {
             <div className="text-[15px] font-bold text-ink-soft">No entries yet</div>
             <div className="mt-1.5 text-[13px] text-ink-muted">Record the first entry against this register.</div>
             <div className="mt-4">
-              <Button variant="primary" fullWidth={false} className="px-5" onClick={() => setAdding(true)}>
-                ＋ Add entry
-              </Button>
+              {context.permissions.includes('register_entry:create') ? <Button variant="primary" fullWidth={false} className="px-5" onClick={() => setAdding(true)}>＋ Add entry</Button> : null}
             </div>
           </div>
         )}

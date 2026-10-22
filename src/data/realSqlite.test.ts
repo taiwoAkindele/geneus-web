@@ -108,6 +108,13 @@ describe('the write path against a real SQLite', () => {
     ).resolves.toMatchObject({ values: { diagnosis: 'Malaria' } });
   });
 
+  it('keeps the appointment linked when saving vitals opens its encounter', async () => {
+    const patient = await registerPatient({ fullName: 'Amaka', address: 'Ring Road', sex: 'female', ageYears: 32 }, contextFor('records_officer'));
+    const entry = await saveStep({ patientId: patient.patientId, appointmentId: 'appointment:1', step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'));
+    const row = await db.getOptional<{ appointmentId: string }>('SELECT appointmentId FROM encounters WHERE id = ?', [entry.encounterId]);
+    expect(row?.appointmentId).toBe('appointment:1');
+  });
+
   describe('offline billing', () => {
     const patientId = 'OOE-PHC-000047-K2';
     const otherPatientId = 'OOE-PHC-000048-AB';

@@ -4,6 +4,7 @@ import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
 import { authorizationFor, nobody } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
+import { listOpenRejections } from '@/data/repos/syncRejections';
 import { checkPin, needsLongerPin } from './credentials';
 import { approvePinSetup } from './pinApproval';
 import { accessFor, covers, mayStaySignedIn, shiftEnd, type Access } from './accessPolicy';
@@ -60,6 +61,8 @@ export type RosterEntry = { staff: Staff; shift: RosterShift | undefined };
 type AuthValue = {
   signedIn: boolean;
   loading: boolean;
+  error: Error | undefined;
+  reload: () => void;
   /** Staff on this facility's roster, for the login screen's picker. */
   roster: RosterEntry[];
   signIn: (staffId: string, pin: string) => Promise<SignInRefusal | undefined>;
@@ -77,7 +80,9 @@ type SessionValue = {
   authorization: AuthorizationContext;
   notifications: AppNotification[];
   unreadCount: number;
-  extendShift: () => void;
+  extendShift: () => Promise<void>;
+  notificationsLoading: boolean;
+  notificationsError: Error | undefined;
   markAllRead: () => void;
 };
 
@@ -95,33 +100,6 @@ const readLastActivity = (): number | undefined => {
   return Number.isFinite(stored) && stored > 0 ? stored : undefined;
 };
 const EXTENSION_MINUTES = 240;
-
-const INITIAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'n-ref-1',
-    kind: 'referral',
-    title: 'Incoming referral · Ibrahim Musa',
-    body: 'Suspected severe malaria — arrived, from Alafia CHC',
-    to: '/referrals/track',
-    read: false,
-  },
-  {
-    id: 'n-ref-2',
-    kind: 'referral',
-    title: 'Incoming referral · Grace Eze',
-    body: 'Obstructed labour — referred for C-section',
-    to: '/referrals/track',
-    read: false,
-  },
-  {
-    id: 'n-conflict-1',
-    kind: 'conflict',
-    title: '1 record needs review',
-    body: 'Two devices edited patient 47 offline — reconcile at sync',
-    to: '/sync',
-    read: false,
-  },
-];
 
 const initialsOf = (fullName: string): string =>
   fullName
@@ -147,7 +125,13 @@ const timeLabel = (iso: string): string =>
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const { facility, deviceId } = useDeviceContext();
   const [staffId, setStaffId] = useState<string | null>(() => localStorage.getItem(SIGNED_IN_KEY));
-  const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const rejections = useLiveQuery(listOpenRejections);
+  const notifications = useMemo<AppNotification[]>(() => (rejections.data ?? []).map((rejection) => ({
+    id: rejection.id, kind: 'conflict', title: 'A record needs review',
+    body: 'A queued change was refused. Open Sync & device to review it.', to: '/sync', read: readIds.has(rejection.id),
+  })), [rejections.data, readIds]);
+  useEffect(() => setReadIds(new Set()), [staffId]);
   const [now, setNow] = useState(() => Date.now());
   const lastActivity = useRef<number | undefined>(readLastActivity());
 
@@ -158,7 +142,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       .map<RosterEntry>((member) => ({ staff: member, shift: findShift(shifts, member.staffId) }));
   }, []);
 
-  const { data, loading } = useLiveQuery(load);
+  const { data, loading, error: rosterError, reload: reloadRoster } = useLiveQuery(load);
   const roster = useMemo(() => data ?? [], [data]);
 
   // Coarse on purpose: every consumer re-renders on this, and the visible
@@ -244,8 +228,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const auth = useMemo<AuthValue>(
-    () => ({ signedIn: active, loading, roster, signIn, signOut }),
-    [active, loading, roster, signIn, signOut],
+    () => ({ signedIn: active, loading, error: rosterError, reload: reloadRoster, roster, signIn, signOut }),
+    [active, loading, roster, signIn, signOut, rosterError, reloadRoster],
   );
 
   const authorization = useMemo<AuthorizationContext>(
@@ -258,16 +242,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   // Extending is a supervisor's permission (PRD §14.1); anyone else is refused
   // by the repository, and the refusal surfaces like any other write error.
-  const extend = useCallback(() => {
-    if (!entry?.shift) return;
-    void persistExtension(entry.shift, new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(), authorization).catch(
-      (cause: unknown) => console.warn('shift extension refused', cause),
-    );
+  const extend = useCallback(async () => {
+    if (!entry?.shift) throw new Error('There is no active shift to extend');
+    await persistExtension(entry.shift, new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(), authorization);
   }, [entry, authorization]);
 
   const markAllRead = useCallback(
-    () => setNotifications((list) => list.map((item) => ({ ...item, read: true }))),
-    [],
+    () => setReadIds(new Set(notifications.map((notification) => notification.id))),
+    [notifications],
   );
 
   const session = useMemo<SessionValue | null>(() => {
@@ -295,11 +277,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             }
           : undefined,
       notifications,
+      notificationsLoading: rejections.loading,
+      notificationsError: rejections.error,
       unreadCount: notifications.filter((item) => !item.read).length,
       extendShift: extend,
       markAllRead,
     };
-  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead]);
+  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead, rejections.loading, rejections.error]);
 
   return (
     <AuthContext.Provider value={auth}>

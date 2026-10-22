@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from './registrationValues';
 
 describe('registration values', () => {
+  it('requires an explicit sex choice instead of recording a default', () => {
+    expect(EMPTY_REGISTRATION.sex).toBe('');
+    expect(() => toPatientDetails(EMPTY_REGISTRATION)).toThrow(/Choose/);
+  });
   it('trims what was typed and leaves blanks out, so nothing unasked is recorded', () => {
     const details = toPatientDetails({
       ...EMPTY_REGISTRATION,
@@ -16,7 +20,7 @@ describe('registration values', () => {
   });
 
   it('keeps the paper folder number as the legacy reference (PRD §10.2)', () => {
-    expect(toPatientDetails({ ...EMPTY_REGISTRATION, folder: '2023/1187' }).legacyPaperRef).toBe('2023/1187');
+    expect(toPatientDetails({ ...EMPTY_REGISTRATION, sex: 'F', folder: '2023/1187' }).legacyPaperRef).toBe('2023/1187');
   });
 
   it('round-trips a registered patient through the form', () => {

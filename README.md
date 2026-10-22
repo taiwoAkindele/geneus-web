@@ -78,6 +78,23 @@ SQLite. Patient booking does **not yet raise fees**: booking integration, the nu
 payment bypass, cashier screens, printable receipts and billing reports are the next stages.
 Insurance and claims follow billing (PRD §9.14).
 
+## Frontend workflow and layout
+
+The phone navigation and shift warning remain available during daily work. Home shows
+actual local counts; alerts come from unresolved sync rejections. Features that still
+have prototype screens are labelled unavailable in the app.
+
+On desktop, patient search has a sortable table and a record preview beside it.
+Appointments, encounters, unit queues, staff and fees use tables; clinical record forms
+remain section cards. Phone register entries expand into their full field values.
+
+Registration drafts survive Back between steps in memory and are cleared at staff
+handover or completion. Form values stay out of browser history and do not survive
+ a cold reload. Appointments are grouped
+using the device's local calendar date; staff should configure its timezone to the
+facility's. Completion is derived from the closing step of a linked encounter. Older
+encounters without an appointmentId are not guessed to belong to a booking.
+
 ## How a write travels
 
 ```

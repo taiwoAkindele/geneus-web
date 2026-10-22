@@ -4,6 +4,7 @@ import { AuthorizationError } from '@/data';
 import { registerPatient, updatePatient } from '@/data/repos/patients';
 import { useAuthorizationContext } from '@/session';
 import { useToast } from '@/ui';
+import { useClearRegistrationDraft } from './RegistrationDraftProvider';
 import { toPatientDetails, type RegistrationValues } from './registrationValues';
 
 /**
@@ -15,6 +16,7 @@ export const useSavePatient = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();
+  const clearDraft = useClearRegistrationDraft();
 
   return useCallback(
     async (values: RegistrationValues, editingPatientId?: string) => {
@@ -24,6 +26,7 @@ export const useSavePatient = () => {
           ? await updatePatient(editingPatientId, details, context)
           : await registerPatient(details, context);
         toast(editingPatientId ? 'Patient details saved' : `Registered — ${patient.patientId}`);
+        clearDraft();
         navigate('/patients/profile', { state: { patientId: patient.patientId }, replace: true });
       } catch (cause) {
         toast(cause instanceof AuthorizationError ? cause.message : 'Could not save the patient — please try again', {
@@ -31,6 +34,6 @@ export const useSavePatient = () => {
         });
       }
     },
-    [context, navigate, toast],
+    [context, navigate, toast, clearDraft],
   );
 };

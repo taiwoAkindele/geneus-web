@@ -31,6 +31,18 @@ export type FeeForm = {
   exemptions: RuleForm[];
 };
 
+export const EXEMPTION_PRESETS: { label: string; rule: RuleForm }[] = [
+  { label: 'Under 5', rule: { reason: 'Under-5 policy', ageUnderYears: '5', ageFromYears: '', sex: '', visitTypes: [] } },
+  { label: 'Antenatal visits', rule: { reason: 'Antenatal policy', ageUnderYears: '', ageFromYears: '', sex: '', visitTypes: ['antenatal'] } },
+  { label: 'Immunisation', rule: { reason: 'Immunisation programme', ageUnderYears: '', ageFromYears: '', sex: '', visitTypes: ['immunisation'] } },
+];
+
+export const FEE_CURRENCIES = [
+  { value: 'NGN', label: 'Nigerian naira (NGN)' }, { value: 'GHS', label: 'Ghanaian cedi (GHS)' },
+  { value: 'KES', label: 'Kenyan shilling (KES)' }, { value: 'ZAR', label: 'South African rand (ZAR)' },
+  { value: 'USD', label: 'US dollar (USD)' }, { value: 'GBP', label: 'British pound (GBP)' }, { value: 'EUR', label: 'Euro (EUR)' },
+];
+
 export const emptyRule = (): RuleForm => ({ reason: '', ageUnderYears: '', ageFromYears: '', sex: '', visitTypes: [] });
 
 export const feeFormValues = (fee?: FeeItem, currency = ''): FeeForm => ({

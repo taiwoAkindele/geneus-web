@@ -5,6 +5,9 @@ import { SessionProvider } from '@/session';
 import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/features/appointments';
 import { RegistersProvider } from '@/features/registers';
+import { RegistrationDraftProvider } from '@/features/registration';
+import { UnavailableScreen } from './UnavailableScreen';
+import { RequireCapability } from './RequireCapability';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
 import { RequireFacility } from './RequireFacility';
@@ -107,19 +110,8 @@ const RegisterEntriesScreen = lazy(() =>
 const RegisterBuilderScreen = lazy(() =>
   import('@/pages/registers/RegisterBuilderScreen').then((m) => ({ default: m.RegisterBuilderScreen })),
 );
-const MonthlySummaryScreen = lazy(() =>
-  import('@/pages/monthly-summary/MonthlySummaryScreen').then((m) => ({
-    default: m.MonthlySummaryScreen,
-  })),
-);
-const ReferralScreen = lazy(() =>
-  import('@/pages/referral/ReferralScreen').then((m) => ({ default: m.ReferralScreen })),
-);
 const SyncCenterScreen = lazy(() =>
   import('@/pages/sync-center/SyncCenterScreen').then((m) => ({ default: m.SyncCenterScreen })),
-);
-const StockScreen = lazy(() =>
-  import('@/pages/stock/StockScreen').then((m) => ({ default: m.StockScreen })),
 );
 const EncountersScreen = lazy(() =>
   import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
@@ -152,6 +144,7 @@ const App = () => {
         <SessionProvider>
         <AppointmentsProvider>
         <RegistersProvider>
+        <RegistrationDraftProvider>
         <BrowserRouter>
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
@@ -182,17 +175,17 @@ const App = () => {
             <Route path="/encounters" element={<EncountersScreen />} />
             <Route path="/encounters/record" element={<EncounterScreen />} />
             <Route path="/appointments" element={<AppointmentsScreen />} />
-            <Route path="/patients/new" element={<NewPatientStep1Screen />} />
-            <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
+            <Route path="/patients/new" element={<RequireCapability permissions={['patient:create', 'patient:update']}><NewPatientStep1Screen /></RequireCapability>} />
+            <Route path="/patients/new/details" element={<RequireCapability permissions={['patient:create', 'patient:update']}><NewPatientStep2Screen /></RequireCapability>} />
             <Route path="/patients/send-to-unit" element={<SendToUnitScreen />} />
             <Route path="/units" element={<UnitQueueScreen />} />
             <Route path="/registers" element={<RegistersListScreen />} />
             <Route path="/registers/new" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id" element={<RegisterEntriesScreen />} />
-            <Route path="/reports/month" element={<MonthlySummaryScreen />} />
-            <Route path="/referrals/track" element={<ReferralScreen />} />
-            <Route path="/stock" element={<StockScreen />} />
+            <Route path="/reports/month" element={<UnavailableScreen title="Monthly reports" description="Monthly reporting is not available yet. The register books contain the entries saved by your facility; the summary will use those records when reporting is connected." />} />
+            <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
+            <Route path="/stock" element={<UnavailableScreen title="Medicine & stock" description="Stock tracking is not connected to facility records yet. Continue using your facility’s stock register." />} />
             <Route path="/sync" element={<SyncCenterScreen />} />
 
             {/* Facility admin — the same shell as daily use, reached from the
@@ -206,7 +199,7 @@ const App = () => {
             <Route path="/admin/devices" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
-          <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
+          <Route path="/patients/duplicate" element={<RequireCapability permissions={['patient:create']}><DuplicateCheckScreen /></RequireCapability>} />
           </Route>
           </Route>
 
@@ -217,6 +210,7 @@ const App = () => {
         </Routes>
           </Suspense>
         </BrowserRouter>
+        </RegistrationDraftProvider>
         </RegistersProvider>
         </AppointmentsProvider>
         </SessionProvider>

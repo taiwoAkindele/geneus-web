@@ -28,6 +28,7 @@ export type RecordedStep = Exclude<EncounterStep, 'amendment'>;
 export type StepSave = {
   /** Absent when this save opens the encounter (PRD §9.8.1, step 2). */
   encounterId?: string;
+  appointmentId?: string;
   patientId: string;
   step: RecordedStep;
   values: Record<string, unknown>;
@@ -49,7 +50,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
-      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', patientId: save.patientId, openedOn: savedOn },
+      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn },
     });
   }
 

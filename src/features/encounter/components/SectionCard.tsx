@@ -22,6 +22,7 @@ type Props = {
   /** Absent for a step that cannot be skipped (one that closes the encounter). */
   onSkip?: () => void;
   saving?: boolean;
+  readOnly?: boolean;
   children?: ReactNode;
 };
 
@@ -49,6 +50,7 @@ export const SectionCard = ({
   onAmend,
   onSkip,
   saving = false,
+  readOnly = false,
   children,
 }: Props) => {
   const active = state === 'active';
@@ -105,9 +107,7 @@ export const SectionCard = ({
                 </span>
               </span>
             ) : null}
-            <button type="button" onClick={onAmend} className="ml-auto min-h-0 text-[13px] font-bold text-brand">
-              ＋ Add amendment
-            </button>
+            {!readOnly ? <button type="button" onClick={onAmend} className="ml-auto min-h-[44px] text-[13px] font-bold text-brand">＋ Add amendment</button> : null}
           </div>
           {amendments.length > 0 ? (
             <div className="mt-3 space-y-2">
@@ -128,7 +128,7 @@ export const SectionCard = ({
       ) : (
         <div className="px-4 py-4">
           {children}
-          <div className="mt-4 space-y-1">
+          {readOnly ? <p className="text-sm text-ink-muted">This step has not been recorded yet.</p> : <div className="mt-4 space-y-1">
             <Button variant="primary" disabled={saving} loading={saving} onClick={onReview}>
               {reviewLabel}
             </Button>
@@ -137,7 +137,7 @@ export const SectionCard = ({
                 Skip — not needed for this patient
               </Button>
             ) : null}
-          </div>
+          </div>}
         </div>
       )}
     </div>

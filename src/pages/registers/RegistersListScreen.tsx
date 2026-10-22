@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuthorizationContext } from '@/session';
 import { Banner, Button, Icon, Tag } from '@/ui';
 import { CATEGORY_COLORS, monogram, useRegisters } from '@/features/registers';
 
@@ -15,7 +16,8 @@ const StatCard = ({ label, value, dot }: { label: string; value: number | string
 /** Registers index — the facility's configured registers, with a builder entry point (PRD §9.4). */
 export const RegistersListScreen = () => {
   const navigate = useNavigate();
-  const { registers, loading, error } = useRegisters();
+  const { registers, loading, error, reload } = useRegisters();
+  const canPublish = useAuthorizationContext().permissions.includes('register_definition:publish');
 
   const published = registers.filter((r) => r.status === 'published').length;
 
@@ -38,23 +40,23 @@ export const RegistersListScreen = () => {
               <h1 className="text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">Your registers</h1>
             </div>
           </div>
-          <Button variant="primary" fullWidth={false} className="px-4" onClick={() => navigate('/registers/new')}>
+          {canPublish ? <Button variant="primary" fullWidth={false} className="px-4" onClick={() => navigate('/registers/new')}>
             ＋ Create register
-          </Button>
+          </Button> : null}
         </div>
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <StatCard label="Registers" value={registers.length} dot="#006b3f" />
-          <StatCard label="Published" value={published} dot="#1b3a8f" />
-          <StatCard label="Draft" value={registers.length - published} dot="#e8a300" />
+          <StatCard label="Registers" value={loading || error ? '—' : registers.length} dot="#006b3f" />
+          <StatCard label="Published" value={loading || error ? '—' : published} dot="#1b3a8f" />
+          <StatCard label="Draft" value={loading || error ? '—' : registers.length - published} dot="#e8a300" />
         </div>
 
         {/* Cards */}
         <div className="mt-6 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Configured registers</div>
         {error ? (
           <Banner tone="amber" title="Could not read this device's registers" className="mt-3">
-            {error.message}
+            The register list could not be read. <Button variant="ghost" onClick={reload}>Try again</Button>
           </Banner>
         ) : null}
 
@@ -66,14 +68,14 @@ export const RegistersListScreen = () => {
           </div>
         ) : null}
 
-        {!loading && registers.length === 0 ? (
+        {!loading && !error && registers.length === 0 ? (
           <div className="mt-3 rounded-card border border-dashed border-outline p-10 text-center">
             <div className="text-[15px] font-bold text-ink-soft">No registers yet</div>
             <div className="mt-1.5 text-[13px] text-ink-muted">Create the first register this facility keeps.</div>
             <div className="mt-4">
-              <Button variant="primary" fullWidth={false} className="px-5" onClick={() => navigate('/registers/new')}>
+              {canPublish ? <Button variant="primary" fullWidth={false} className="px-5" onClick={() => navigate('/registers/new')}>
                 ＋ Create register
-              </Button>
+              </Button> : null}
             </div>
           </div>
         ) : null}
