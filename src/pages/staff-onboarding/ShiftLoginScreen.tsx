@@ -1,3 +1,5 @@
+import { hasRole } from '@shared';
+import { roleLabel } from '@/features/staff/staffAccess';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
@@ -32,20 +34,10 @@ const lastSyncedLabel = (iso: string): string =>
 
 const shiftLabel = (entry: RosterEntry): string => {
   // A facility admin signs in shift or no shift (accessPolicy.ts).
-  if (entry.staff.role === 'facility_admin') return 'Any time';
+  if (hasRole(entry.staff, 'facility_admin')) return 'Any time';
   if (!entry.shift) return 'No shift today';
   const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   return `${time(entry.shift.startsAt)}–${time(entry.shift.endsAt)}`;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  chew: 'CHEW',
-  nurse: 'Nurse',
-  doctor: 'Doctor',
-  records_officer: 'Records Officer',
-  facility_admin: 'Facility Admin',
-  supervisor: 'Supervisor',
-  cashier: 'Cashier',
 };
 
 /**
@@ -80,7 +72,7 @@ export const ShiftLoginScreen = () => {
       state: {
         staffId: entry.staff.staffId,
         fullName: entry.staff.fullName,
-        role: ROLE_LABELS[entry.staff.role] ?? entry.staff.role,
+        role: roleLabel(entry.staff),
         reset,
       },
     });
@@ -107,7 +99,7 @@ export const ShiftLoginScreen = () => {
         state: {
           staffId: selected.staff.staffId,
           fullName: selected.staff.fullName,
-          role: ROLE_LABELS[selected.staff.role] ?? selected.staff.role,
+          role: roleLabel(selected.staff),
           upgrade: true,
         },
       });
@@ -179,7 +171,7 @@ export const ShiftLoginScreen = () => {
                   <div className="flex-1">
                     <div className="text-base font-bold">{selected.staff.fullName}</div>
                     <div className="text-[13px] text-ink-muted">
-                      {ROLE_LABELS[selected.staff.role] ?? selected.staff.role}
+                      {roleLabel(selected.staff)}
                     </div>
                   </div>
                   <Tag tone={selected.shift ? 'green' : 'amber'} className="font-mono">
@@ -231,11 +223,11 @@ export const ShiftLoginScreen = () => {
                       <div className="min-w-0 flex-1">
                         <div className="text-[15px] font-bold">{entry.staff.fullName}</div>
                         <div className="text-[12px] text-ink-muted">
-                          {ROLE_LABELS[entry.staff.role] ?? entry.staff.role}
+                          {roleLabel(entry.staff)}
                         </div>
                       </div>
                       <Tag
-                        tone={hasPin(entry.staff.staffId) && (entry.shift || entry.staff.role === 'facility_admin') ? 'green' : 'amber'}
+                        tone={hasPin(entry.staff.staffId) && (entry.shift || hasRole(entry.staff, 'facility_admin')) ? 'green' : 'amber'}
                         className="font-mono"
                       >
                         {hasPin(entry.staff.staffId) ? shiftLabel(entry) : 'Set PIN'}

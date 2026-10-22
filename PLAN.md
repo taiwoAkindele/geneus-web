@@ -310,3 +310,29 @@ Target-phone usability and full offline/reconnect field testing remain outstandi
    screens can use real records.
 4. Measure the encrypted replica on the target phone (§7): first sync, a register list, sign-in
    time with 100,000-round PBKDF2.
+
+## Staff editing and combined duties (October 2026)
+
+- Staff → Edit staff updates the name, primary role, additional roles, extra action
+  permissions and read-only/read-write access. The same form adds new staff.
+- Effective access is the union of assigned-role permissions and additional grants.
+  Read-only suppresses every mutation. Primary role remains the clinical attribution;
+  old clinical entries, staff IDs, PINs and roster records are preserved.
+- Name changes require staff:manage; role/access changes require staff:permission.
+  Creating staff requires both. Every required permission is checked before writing.
+- Navigation and sign-in labels reflect combined duties. An additional administrator
+  role gets the same idle-limited admin login as a primary administrator.
+- PIN approval requires sufficient access for the target account; a name-management
+  delegate cannot take over an administrator. The last working administrator cannot
+  be demoted, made read-only or deactivated. The server enforces the final decision.
+- Requires the matching geneus-shared contract (policy v5) and server migration 0009.
+  Deploy the server and regenerated sync streams before the new frontend. Existing
+  single-role staff remain valid; optional access arrays need no schema-version bump.
+
+Validation for combined staff access: 178 frontend tests and 270 server/shared
+tests pass, including real SQLite persistence and PostgreSQL authorization,
+migration and concurrency checks. Seven isolated Chrome checks pass across phone
+and desktop layouts, with no browser exceptions. Both typechecks, the production
+frontend build, diff checks and the bundle budget pass (110.3 KB initial JS gzipped).
+The validated copies match the authoritative source files; consumer submodules
+remain pinned until the owner commits the contract and promotes both pointers.

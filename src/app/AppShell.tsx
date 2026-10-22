@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useAuthorizationContext, useSession } from '@/session';
-import { navigationFor } from './navigation';
+import { hasAdminWorkspace, navigationFor } from './navigation';
 import { AppHeader, ShiftBanner, ShiftCountdownStrip } from './AppHeader';
 import { NotificationList } from './NotificationList';
 
@@ -26,6 +26,7 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
   const navigate = useNavigate();
   const { user, facility, shift } = useSession();
   const { signOut } = useAuth();
+  const context = useAuthorizationContext();
 
   const go = (to: string) => {
     onClose();
@@ -46,7 +47,7 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
-        {user.roleId === 'facility_admin' ? (
+        {hasAdminWorkspace(context) ? (
           <button
             type="button"
             onClick={() => go('/admin')}

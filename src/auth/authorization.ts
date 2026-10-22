@@ -1,6 +1,7 @@
 import {
   decide,
-  permissionsFor,
+  staffPermissions,
+  rolesFor,
   POLICY_VERSION,
   type AuthorizationContext,
   type Denial,
@@ -58,7 +59,7 @@ export const isAllowed = (context: AuthorizationContext, permission: Permission)
 
 /** The context for a member of staff acting from this device at this facility. */
 export const authorizationFor = (input: {
-  staff: Pick<Staff, 'staffId' | 'role' | 'permission'>;
+  staff: Pick<Staff, 'staffId' | 'role' | 'permission' | 'additionalRoles' | 'additionalPermissions'>;
   facilityId: string;
   deviceId: string;
 }): AuthorizationContext => ({
@@ -66,7 +67,8 @@ export const authorizationFor = (input: {
   facilityId: input.facilityId,
   deviceId: input.deviceId,
   role: input.staff.role,
-  permissions: [...permissionsFor(input.staff.role, input.staff.permission)],
+  roles: rolesFor(input.staff),
+  permissions: staffPermissions(input.staff),
   policyVersion: POLICY_VERSION,
   lastServerContactOn: lastServerContactOn(),
 });

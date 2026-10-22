@@ -20,7 +20,7 @@ export const RecoveryEmailCard = () => {
   const [currentCode, setCurrentCode] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (user.roleId !== 'facility_admin') return null;
+  if (!user.roles.includes('facility_admin')) return null;
 
   const run = async (step: () => Promise<void>, fallback: string) => {
     if (busy) return;

@@ -1,4 +1,4 @@
-import type { RosterShift, Staff } from '@shared';
+import { hasRole, type RosterShift, type Staff } from '@shared';
 
 /**
  * Who may be signed in right now (PRD §14.1). The rule is "no shift, no
@@ -12,7 +12,7 @@ export const ADMIN_IDLE_MS = 30 * 60_000;
 
 export type Access = 'shift' | 'admin';
 
-export const accessFor = (staff: Pick<Staff, 'role'>): Access => (staff.role === 'facility_admin' ? 'admin' : 'shift');
+export const accessFor = (staff: Pick<Staff, 'role' | 'additionalRoles'>): Access => (hasRole(staff, 'facility_admin') ? 'admin' : 'shift');
 
 export const shiftEnd = (shift: RosterShift): number => new Date(shift.extendedUntil ?? shift.endsAt).getTime();
 
@@ -25,7 +25,7 @@ export const covers = (shift: RosterShift, at: number): boolean =>
  * treated as idle — it cannot be resumed without a PIN.
  */
 export const mayStaySignedIn = (
-  entry: { staff: Pick<Staff, 'role'>; shift: RosterShift | undefined },
+  entry: { staff: Pick<Staff, 'role' | 'additionalRoles'>; shift: RosterShift | undefined },
   now: number,
   lastActivityOn: number | undefined,
 ): boolean =>

@@ -1,21 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PinSetupCodeIssued } from '@shared';
+import { mayApprovePin, type PinSetupCodeIssued } from '@shared';
 import { AppBar, Button, DataTable, Sheet, Tag, TextField, useToast } from '@/ui';
+import { roleLabel } from '@/features/staff/staffAccess';
 import { SyncPill } from '@/app/SyncPill';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
 import { issuePinSetupCode } from '@/lib/api/staff';
 import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
-
-const ROLE_LABELS: Record<string, string> = {
-  chew: 'CHEW',
-  nurse: 'Nurse',
-  doctor: 'Doctor',
-  records_officer: 'Records',
-  facility_admin: 'Facility Admin',
-  supervisor: 'Supervisor',
-  cashier: 'Cashier',
-};
 
 const timeLabel = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -157,7 +148,9 @@ export const ManageStaffScreen = () => {
   const [issuingFor, setIssuingFor] = useState<RosterEntry | null>(null);
   const [removing, setRemoving] = useState<RosterEntry | null>(null);
   const [busy, setBusy] = useState(false);
+  const actor = roster.find((entry) => entry.staff.staffId === user.staffId);
   const canManage = context.permissions.includes('staff:manage');
+  const canEdit = canManage || context.permissions.includes('staff:permission');
   const onShift = roster.filter(onShiftNow), others = roster.filter((entry) => !onShiftNow(entry));
   const remove = async () => {
     if (!removing || busy) return;
@@ -169,15 +162,16 @@ export const ManageStaffScreen = () => {
   const access = (entry: RosterEntry) => navigate('/admin/staff/access', { state: { staffId: entry.staff.staffId } });
   const shift = (entry: RosterEntry) => entry.shift ? `${timeLabel(entry.shift.startsAt)}–${timeLabel(entry.shift.extendedUntil ?? entry.shift.endsAt)}` : 'No shift';
   const actions = (entry: RosterEntry) => <div className="flex flex-wrap gap-2">
+    {canEdit ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" aria-label={`Edit staff ${entry.staff.fullName}`} onClick={() => access(entry)}>Edit staff</Button> : null}
     {context.permissions.includes('roster:assign') ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" aria-label={`Edit shift for ${entry.staff.fullName}`} onClick={() => setEditing(entry)}>Shift</Button> : null}
-    {canManage && entry.staff.staffId !== user.staffId ? <Button variant="ghost" fullWidth={false} className="px-3 py-2" aria-label={`Issue PIN code for ${entry.staff.fullName}`} onClick={() => setIssuingFor(entry)}>PIN code</Button> : null}
+    {canManage && actor && mayApprovePin(actor.staff, entry.staff) && entry.staff.staffId !== user.staffId ? <Button variant="ghost" fullWidth={false} className="px-3 py-2" aria-label={`Issue PIN code for ${entry.staff.fullName}`} onClick={() => setIssuingFor(entry)}>PIN code</Button> : null}
     {context.permissions.includes('staff:deactivate') && entry.staff.staffId !== user.staffId ? <Button variant="danger" fullWidth={false} className="px-3 py-2" onClick={() => setRemoving(entry)}>Remove access</Button> : null}
   </div>;
   const list = (entries: RosterEntry[], caption: string) => <>
-    <div className="space-y-2 lg:hidden">{entries.map((entry) => <article key={entry.staff.staffId} className="rounded-card border border-outline-soft bg-white p-4"><button type="button" onClick={() => access(entry)} className="min-h-[44px] w-full text-left"><div className="text-[16px] font-bold">{entry.staff.fullName}</div><div className="mt-1 text-[13px] text-ink-muted">{ROLE_LABELS[entry.staff.role] ?? entry.staff.role} · {entry.staff.permission === 'read_only' ? 'Read only' : 'Read & write'}</div></button><div className="my-3 flex flex-wrap gap-2"><Tag tone={onShiftNow(entry) ? 'green' : 'amber'}>{shift(entry)}</Tag><Tag tone={hasPin(entry.staff.staffId) ? 'green' : 'neutral'}>{hasPin(entry.staff.staffId) ? 'PIN ready here' : 'PIN not set here'}</Tag></div>{actions(entry)}</article>)}</div>
+    <div className="space-y-2 lg:hidden">{entries.map((entry) => <article key={entry.staff.staffId} className="rounded-card border border-outline-soft bg-white p-4"><button type="button" onClick={() => access(entry)} className="min-h-[44px] w-full text-left"><div className="text-[16px] font-bold">{entry.staff.fullName}</div><div className="mt-1 text-[13px] text-ink-muted">{roleLabel(entry.staff)} · {entry.staff.permission === 'read_only' ? 'Read only' : 'Read & write'}</div></button><div className="my-3 flex flex-wrap gap-2"><Tag tone={onShiftNow(entry) ? 'green' : 'amber'}>{shift(entry)}</Tag><Tag tone={hasPin(entry.staff.staffId) ? 'green' : 'neutral'}>{hasPin(entry.staff.staffId) ? 'PIN ready here' : 'PIN not set here'}</Tag></div>{actions(entry)}</article>)}</div>
     <div className="hidden lg:block"><DataTable caption={caption} rows={entries} rowKey={(row) => row.staff.staffId} columns={[
       { key: 'name', label: 'Staff member', sortValue: (row) => row.staff.fullName, render: (row) => <button type="button" className="min-h-0 py-1 text-left font-bold text-brand hover:underline" onClick={() => access(row)}>{row.staff.fullName}</button> },
-      { key: 'role', label: 'Role', sortValue: (row) => row.staff.role, render: (row) => ROLE_LABELS[row.staff.role] ?? row.staff.role },
+      { key: 'role', label: 'Roles', sortValue: (row) => roleLabel(row.staff), render: (row) => roleLabel(row.staff) },
       { key: 'shift', label: "Today's shift", render: shift },
       { key: 'pin', label: 'PIN on this device', render: (row) => hasPin(row.staff.staffId) ? 'Ready' : 'Not set here' },
       { key: 'access', label: 'Access', render: (row) => row.staff.permission === 'read_only' ? 'Read only' : 'Read & write' },
@@ -188,7 +182,7 @@ export const ManageStaffScreen = () => {
     <div className="min-h-screen bg-surface">
       <AppBar title="Staff" onBack={() => navigate('/admin')} right={<SyncPill />} />
       <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
-        <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; shifts</h1>{canManage ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
+        <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; shifts</h1>{canManage && context.permissions.includes('staff:permission') ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
         {loading ? <div role="status" className="h-24 animate-pulse rounded-card bg-surface-muted" aria-label="Loading staff" /> : error ? <div role="alert">Staff could not be read from this device.<Button variant="ghost" onClick={reload}>Try again</Button></div> : <>
           {onShift.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">On shift now · {onShift.length}</h2>{list(onShift, 'Staff on shift')}</section> : null}
           {others.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">Off shift &amp; awaiting setup</h2>{list(others, 'Other staff')}</section> : null}

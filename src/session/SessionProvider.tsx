@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { AuthorizationContext, RosterShift, Staff } from '@shared';
+import { rolesFor, type AuthorizationContext, type RosterShift, type Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
 import { authorizationFor, nobody } from '@/auth/authorization';
@@ -27,6 +27,7 @@ export type SessionUser = {
   role: string;
   /** The contract value, for gating admin-only surfaces. */
   roleId: Staff['role'];
+  roles: Staff['role'][];
   canWrite: boolean;
 };
 export type Facility = { name: string; code: string };
@@ -261,7 +262,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         staffId: staff.staffId,
         name: staff.fullName,
         initials: initialsOf(staff.fullName),
-        role: ROLE_LABELS[staff.role] ?? staff.role,
+        role: rolesFor(staff).map((role) => ROLE_LABELS[role] ?? role).join(' + '),
+        roles: rolesFor(staff),
         roleId: staff.role,
         canWrite: staff.permission === 'read_write',
       },

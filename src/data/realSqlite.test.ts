@@ -7,6 +7,7 @@ import { recordServerContact } from './deviceCredential';
 import { setDatabaseForTests, type LocalDatabase } from './database';
 import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
+import { createStaff, editStaff, listStaff } from './repos/staff';
 import { registerPatient, updatePatient } from './repos/patients';
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
@@ -68,6 +69,46 @@ describe('the write path against a real SQLite', () => {
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await db.close();
+  });
+
+
+  describe('staff edits and combined access', () => {
+    it('keeps staff identity while editing names, roles and individual grants', async () => {
+      const admin = contextFor('facility_admin');
+      const staff = await createStaff({ fullName: 'Test Nurse', role: 'nurse', permission: 'read_write', additionalRoles: ['cashier'], additionalPermissions: ['fee_item:manage'] }, admin);
+      await editStaff(staff, { ...staff, fullName: 'Updated Nurse', additionalRoles: ['cashier', 'supervisor'] }, admin);
+      const saved = (await listStaff())[0];
+      expect(saved).toMatchObject({ id: staff.id, staffId: staff.staffId, fullName: 'Updated Nurse', role: 'nurse', additionalRoles: ['cashier', 'supervisor'], additionalPermissions: ['fee_item:manage'], updatedBy: admin.userId });
+      const context = authorizationFor({ staff: saved, facilityId: admin.facilityId, deviceId: admin.deviceId });
+      expect(context.permissions).toEqual(expect.arrayContaining(['encounter:record', 'payment:receive', 'fee_item:manage', 'roster:extend']));
+      await expect(createFeeItem({ name: 'Combined-role fee', category: 'consultation', amountMinor: 10000, currency: 'NGN', chargeWhen: 'every_visit', exemptions: [] }, context)).resolves.toHaveProperty('name', 'Combined-role fee');
+    });
+    it('checks all required permissions before applying any part of an edit', async () => {
+      const staff = await createStaff({ fullName: 'Original Name', role: 'nurse', permission: 'read_write' }, contextFor('facility_admin'));
+      const manager = authorizationFor({ staff: { ...staff, additionalPermissions: ['staff:manage'] }, facilityId: 'OOE-PHC', deviceId: 'device-1' });
+      await expect(editStaff(staff, { ...staff, fullName: 'Must not partially save', additionalRoles: ['facility_admin'] }, manager)).rejects.toThrow(/role doesn't allow/);
+      expect((await listStaff())[0].fullName).toBe('Original Name');
+      await editStaff(staff, { ...staff, fullName: 'Renamed by delegate' }, manager);
+      expect((await listStaff())[0].fullName).toBe('Renamed by delegate');
+      await expect(createStaff({ fullName: 'Escalated account', role: 'facility_admin', permission: 'read_write' }, manager)).rejects.toThrow(/role doesn't allow/);
+      expect(await listStaff()).toHaveLength(1);
+    });
+    it('blocks every mutation for read-only staff even with combined grants', async () => {
+      const staff = await createStaff({ fullName: 'View Only', role: 'nurse', additionalRoles: ['cashier'], additionalPermissions: ['fee_item:manage'], permission: 'read_only' }, contextFor('facility_admin'));
+      const context = authorizationFor({ staff, facilityId: 'OOE-PHC', deviceId: 'device-1' });
+      expect(context.permissions).toEqual([]);
+      await expect(editStaff(staff, { ...staff, permission: 'read_write' }, context)).rejects.toThrow(/role doesn't allow/);
+      expect((await listStaff())[0].permission).toBe('read_only');
+    });
+    it('retains a working admin, including an admin assigned as an additional role', async () => {
+      const admin = contextFor('facility_admin');
+      const secondary = await createStaff({ fullName: 'Secondary Admin', role: 'nurse', additionalRoles: ['facility_admin'], permission: 'read_write' }, admin);
+      await expect(editStaff(secondary, { ...secondary, additionalRoles: [] }, admin)).rejects.toThrow(/at least one active facility administrator/);
+      expect((await listStaff())[0].additionalRoles).toEqual(['facility_admin']);
+      await createStaff({ fullName: 'Backup Admin', role: 'facility_admin', permission: 'read_write' }, admin);
+      await editStaff(secondary, { ...secondary, additionalRoles: [] }, admin);
+      expect((await listStaff()).find((item) => item.id === secondary.id)?.additionalRoles).toEqual([]);
+    });
   });
 
   it('saves and reads back an encounter step, whose `values` column is an SQL keyword', async () => {

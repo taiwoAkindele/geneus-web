@@ -114,3 +114,21 @@ Registering a facility (or spending an enrollment code) stores a **device creden
 and nothing about *who*: who is signed in is the offline shift session (`src/session`).
 A device whose credential the server no longer accepts clears its local database and
 returns to onboarding.
+
+## Editing staff and assigning combined access
+
+From **Staff → Edit staff**, an administrator can change the name, select several
+roles, choose a primary role, and grant additional actions individually. Roles
+combine their permissions; **Read only** overrides them all. The primary role is
+stamped on new clinical contributions, while older contributions keep their
+original attribution. The same controls are available when adding staff.
+
+Name management and access assignment are separate permissions. A delegate who
+can edit names cannot change roles, create privileged accounts or reset an admin's
+PIN. The last administrator with write access is protected from removal or demotion.
+
+This feature requires the updated shared contract and server migration 0009.
+Update both shared submodule pointers after committing geneus-shared; deploy the
+server and regenerated sync streams before deploying this frontend. Validation
+copies can combine the uncommitted contract with the apps without modifying the
+pinned submodule checkouts.

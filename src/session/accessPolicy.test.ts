@@ -60,3 +60,9 @@ describe('who may stay signed in', () => {
     expect(mayStaySignedIn({ staff: { role: 'facility_admin' }, shift: undefined }, NOW, undefined)).toBe(false);
   });
 });
+
+it('keeps admin access and idle expiry when administrator is an additional role', () => {
+  const staff = { role: 'nurse' as const, additionalRoles: ['facility_admin' as const] };
+  expect(mayStaySignedIn({ staff, shift: undefined }, 1_000_000, 1_000_000)).toBe(true);
+  expect(mayStaySignedIn({ staff, shift: undefined }, 1_000_000 + ADMIN_IDLE_MS, 1_000_000)).toBe(false);
+});
