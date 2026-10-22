@@ -19,6 +19,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { to: '/patients/send-to-unit', label: 'Send to another unit', note: '' },
       { to: '/units', label: 'Unit queue', note: '' },
       { to: '/admin/units', label: 'Units & rooms (admin)', note: '' },
+      { to: '/admin/fees', label: 'Fee schedule (admin)', note: 'Fees and automatic exemptions' },
       { to: '/registers/malaria', label: 'Programme register — Malaria', note: '' },
       { to: '/reports/month', label: 'This month at a glance', note: '' },
       { to: '/referrals/track', label: 'Refer & track', note: '' },

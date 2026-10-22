@@ -14,6 +14,7 @@ const ROLE_LABELS: Record<string, string> = {
   records_officer: 'Records',
   facility_admin: 'Facility Admin',
   supervisor: 'Supervisor',
+  cashier: 'Cashier',
 };
 
 const timeLabel = (iso: string) =>

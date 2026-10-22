@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Stat, Tag } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { hasPin, useAuth, useSession, type RosterEntry } from '@/session';
+import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
 import { RecoveryEmailCard } from './RecoveryEmailCard';
 
 /** A setup-checklist row: done = filled amber check, todo = amber ring. */
@@ -46,6 +46,7 @@ const ROLE_LABELS: Record<string, string> = {
   records_officer: 'Records',
   facility_admin: 'Facility Admin',
   supervisor: 'Supervisor',
+  cashier: 'Cashier',
 };
 
 const initialsOf = (fullName: string) =>
@@ -64,6 +65,7 @@ export const AdminDashboardScreen = () => {
   const navigate = useNavigate();
   const { facility } = useSession();
   const { roster } = useAuth();
+  const context = useAuthorizationContext();
 
   const onShift = roster.filter(onShiftNow);
   const awaitingPin = roster.filter((entry) => !hasPin(entry.staff.staffId));
@@ -144,6 +146,7 @@ export const AdminDashboardScreen = () => {
       <ActionTile label="Roster & shifts" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Registers" onClick={() => navigate('/registers')} />
       <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} />
+      {context.permissions.includes('fee_item:manage') ? <ActionTile label="Fee schedule" onClick={() => navigate('/admin/fees')} /> : null}
       <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} />
     </div>
   );

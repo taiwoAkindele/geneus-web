@@ -130,6 +130,9 @@ const PatientProfileScreen = lazy(() =>
 const EncounterScreen = lazy(() =>
   import('@/pages/encounter/EncounterScreen').then((m) => ({ default: m.EncounterScreen })),
 );
+const FeeScheduleScreen = lazy(() =>
+  import('@/pages/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
+);
 const AppointmentsScreen = lazy(() =>
   import('@/pages/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
 );
@@ -199,6 +202,7 @@ const App = () => {
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
             <Route path="/admin/units" element={<UnitsScreen />} />
+            <Route path="/admin/fees" element={<FeeScheduleScreen />} />
             <Route path="/admin/devices" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
