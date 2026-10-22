@@ -12,6 +12,7 @@ const ROLES: { label: string; value: Role }[] = [
   { label: "Doctor", value: "doctor" },
   { label: "Records", value: "records_officer" },
   { label: "Admin", value: "facility_admin" },
+  { label: "Cashier", value: "cashier" },
 ];
 
 const PermissionCard = ({

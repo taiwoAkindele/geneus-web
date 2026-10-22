@@ -8,6 +8,11 @@ import { setDatabaseForTests, type LocalDatabase } from './database';
 import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { registerPatient, updatePatient } from './repos/patients';
+import {
+  balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
+  isAppointmentConfirmed, listFeeItems, paymentsForPatient, recordPayment, reversePayment,
+  setFeeItemActive, updateFeeItem, type FeeDraft,
+} from './repos/billing';
 import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { fakeDatabase } from './testing/fakeDatabase';
 
@@ -101,6 +106,128 @@ describe('the write path against a real SQLite', () => {
         values: { diagnosis: 'Malaria' },
       }),
     ).resolves.toMatchObject({ values: { diagnosis: 'Malaria' } });
+  });
+
+  describe('offline billing', () => {
+    const patientId = 'OOE-PHC-000047-K2';
+    const otherPatientId = 'OOE-PHC-000048-AB';
+    const draft = (): FeeDraft => ({
+      name: 'Consultation', category: 'consultation', amountMinor: 150000, currency: 'NGN',
+      chargeWhen: 'every_visit', exemptions: [{ reason: 'Under-5 policy', ageUnderYears: 5 }],
+    });
+    const charge = async (extra: Partial<FeeDraft> = {}, patient = patientId) => {
+      const fee = await createFeeItem({ ...draft(), ...extra }, contextFor('facility_admin'));
+      return createCharge(fee.id, { patientId: patient, facts: { ageYears: 32, sex: 'female' }, appointmentId: 'appointment:1' }, contextFor('records_officer'));
+    };
+
+    it('round-trips fee rules, amounts and retirement through SQLite', async () => {
+      const fee = await createFeeItem(draft(), contextFor('facility_admin'));
+      expect((await listFeeItems())[0]).toMatchObject({ amountMinor: 150000, active: true, exemptions: draft().exemptions });
+      await setFeeItemActive(fee.id, false, contextFor('facility_admin'));
+      expect((await listFeeItems())[0].active).toBe(false);
+      await expect(createCharge(fee.id, { patientId, facts: { sex: 'female' } }, contextFor('nurse'))).rejects.toThrow(/retired/);
+      expect(await chargesForPatient(patientId)).toEqual([]);
+      await setFeeItemActive(fee.id, true, contextFor('facility_admin'));
+      expect((await listFeeItems())[0].active).toBe(true);
+    });
+
+    it('keeps the old bill at its original price after editing a fee', async () => {
+      const first = await charge();
+      await updateFeeItem(first.feeItemId, { ...draft(), name: 'New consultation', amountMinor: 200000 }, contextFor('facility_admin'));
+      const second = await createCharge(first.feeItemId, { patientId, facts: { sex: 'female' } }, contextFor('nurse'));
+      expect((await chargesForPatient(patientId)).find((bill) => bill.id === first.id)).toMatchObject({ description: 'Consultation', amountMinor: 150000 });
+      expect(second).toMatchObject({ description: 'New consultation', amountMinor: 200000 });
+    });
+
+    it('records an exemption at zero, but never assumes an unknown age qualifies', async () => {
+      const fee = await createFeeItem(draft(), contextFor('facility_admin'));
+      const exempt = await createCharge(fee.id, { patientId, facts: { ageYears: 4, sex: 'female' } }, contextFor('nurse'));
+      const unknownAge = await createCharge(fee.id, { patientId, facts: { sex: 'female' } }, contextFor('nurse'));
+      expect(exempt).toMatchObject({ listPriceMinor: 150000, amountMinor: 0, exemptionReason: 'Under-5 policy' });
+      expect(unknownAge).toMatchObject({ amountMinor: 150000, exemptionReason: undefined });
+    });
+
+    it('enforces the cashier and admin permissions before storing money or fees', async () => {
+      await expect(createFeeItem(draft(), contextFor('cashier'))).rejects.toThrow(/role/);
+      expect(await listFeeItems()).toEqual([]);
+      const bill = await charge();
+      await expect(recordPayment({ patientId, method: 'cash', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 10000 }] }, contextFor('nurse'))).rejects.toThrow(/role/);
+      await expect(recordPayment({ patientId, method: 'waiver', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 10000 }], reason: 'Indigent' }, contextFor('cashier'))).rejects.toThrow(/role/);
+      expect(await paymentsForPatient(patientId)).toEqual([]);
+    });
+
+    it('confirms only after every appointment charge is settled, including part payments', async () => {
+      const bill = await charge();
+      const card = await charge({ name: 'Card', category: 'card', amountMinor: 50000 });
+      expect(isAppointmentConfirmed('appointment:1', [], [])).toBe(true);
+      const part = await recordPayment({ patientId, method: 'cash', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 100000 }] }, contextFor('cashier'));
+      expect(isAppointmentConfirmed('appointment:1', [bill, card], [part])).toBe(false);
+      await recordPayment({ patientId, method: 'pos', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 50000 }, { chargeId: card.id, amountMinor: 50000 }] }, contextFor('cashier'));
+      expect(isAppointmentConfirmed('appointment:1', await chargesForPatient(patientId), await paymentsForPatient(patientId))).toBe(true);
+      expect((await paymentsForPatient(patientId)).map((payment) => payment.receiptNumber)).toEqual([
+        expect.stringMatching(/^OOE-PHC-R-000001-/), expect.stringMatching(/^OOE-PHC-R-000002-/),
+      ]);
+    });
+
+    it('preserves an overpayment as credit and keeps currencies separate', async () => {
+      const bill = await charge();
+      const usd = await charge({ currency: 'USD', amountMinor: 2500 });
+      for (let i = 0; i < 2; i += 1) {
+        await recordPayment({ patientId, method: 'cash', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 150000 }] }, contextFor('cashier'));
+      }
+      const payments = await paymentsForPatient(patientId);
+      expect(chargeBalances([bill], payments)[0].balanceMinor).toBe(-150000);
+      expect(balancesByCurrency([bill, usd], payments)).toEqual(new Map([['NGN', -150000], ['USD', 2500]]));
+      expect(isAppointmentConfirmed('appointment:1', [bill, usd], payments)).toBe(false);
+    });
+
+    it('refuses allocations to another patient, a missing charge or another currency', async () => {
+      const bill = await charge();
+      const other = await charge({}, otherPatientId);
+      for (const bad of [
+        { chargeId: other.id, currency: 'NGN' },
+        { chargeId: 'charge:missing', currency: 'NGN' },
+        { chargeId: bill.id, currency: 'USD' },
+      ]) {
+        await expect(recordPayment({ patientId, method: 'cash', currency: bad.currency, allocations: [{ chargeId: bad.chargeId, amountMinor: 10000 }] }, contextFor('cashier'))).rejects.toThrow();
+      }
+      expect(await paymentsForPatient(patientId)).toEqual([]);
+    });
+
+    it('rejects duplicate allocations and a waiver without a reason before inserting', async () => {
+      const bill = await charge();
+      const allocation = { chargeId: bill.id, amountMinor: 10000 };
+      await expect(recordPayment({ patientId, method: 'cash', currency: 'NGN', allocations: [allocation, allocation] }, contextFor('cashier'))).rejects.toThrow(/Allocate to each charge once/);
+      await expect(recordPayment({ patientId, method: 'waiver', currency: 'NGN', allocations: [allocation] }, contextFor('supervisor'))).rejects.toThrow(/reason/);
+      expect(await paymentsForPatient(patientId)).toEqual([]);
+    });
+
+    it('settles a fee by waiver, with the supervisor and reason kept', async () => {
+      const bill = await charge();
+      const waiver = await recordPayment({ patientId, method: 'waiver', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 150000 }], reason: 'Indigent patient' }, contextFor('supervisor'));
+      expect(waiver).toMatchObject({ method: 'waiver', reason: 'Indigent patient', createdBy: 'staff:supervisor' });
+      expect(isAppointmentConfirmed('appointment:1', [bill], [waiver])).toBe(true);
+    });
+
+    it('reverses by adding an exact copy of the allocations and restores the debt', async () => {
+      const bill = await charge();
+      const original = await recordPayment({ patientId, method: 'transfer', currency: 'NGN', reference: 'BANK-1', allocations: [{ chargeId: bill.id, amountMinor: 150000 }] }, contextFor('cashier'));
+      await expect(reversePayment(original.id, 'Wrong patient', contextFor('cashier'))).rejects.toThrow(/role/);
+      await expect(reversePayment(original.id, ' ', contextFor('supervisor'))).rejects.toThrow(/reason/);
+      const reversal = await reversePayment(original.id, 'Payment returned', contextFor('supervisor'));
+      expect(reversal).toMatchObject({ reverses: original.id, allocations: original.allocations, amountMinor: original.amountMinor, reference: 'BANK-1', method: 'transfer' });
+      const payments = await paymentsForPatient(patientId);
+      expect(payments.find((payment) => payment.id === original.id)).toEqual(original);
+      expect(chargeBalances([bill], payments)[0].balanceMinor).toBe(150000);
+      await expect(reversePayment(original.id, 'Again', contextFor('supervisor'))).rejects.toThrow(/already been reversed/);
+      await expect(reversePayment(reversal.id, 'Undo', contextFor('supervisor'))).rejects.toThrow(/cannot itself/);
+      expect(await paymentsForPatient(patientId)).toHaveLength(2);
+    });
+
+    it('rejects amounts PostgreSQL cannot store before creating a local fee', async () => {
+      await expect(createFeeItem({ ...draft(), amountMinor: 2147483648 }, contextFor('facility_admin'))).rejects.toThrow(/supported range/);
+      expect(await listFeeItems()).toEqual([]);
+    });
   });
 
   describe('unsaved encounter work', () => {

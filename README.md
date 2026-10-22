@@ -66,6 +66,18 @@ missing. The development backend is described in the geneus-server README,
   builds against **production**. `public/_headers` carries the same cache rules; Pages
   serves `index.html` for unknown paths by itself.
 
+## Billing implementation status
+
+The admin's **Fee schedule** (`/admin/fees`) works offline: add or edit prices,
+configure automatic exemptions by age, sex and visit type, and retire or restore fees.
+The cashier role is available when adding staff. Fee changes do not rewrite old bills.
+
+The local schema and billing repository also support charges, payments, receipt numbers,
+waivers, reversals and balances kept separate by currency. These are tested against real
+SQLite. Patient booking does **not yet raise fees**: booking integration, the nursing
+payment bypass, cashier screens, printable receipts and billing reports are the next stages.
+Insurance and claims follow billing (PRD §9.14).
+
 ## How a write travels
 
 ```

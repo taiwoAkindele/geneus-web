@@ -240,6 +240,25 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 - **Manual smoke on the real target phone** each milestone — the only true test of the
   <60-min and low-end-perf goals.
 
+## Billing progress (PRD §9.13, October 2026)
+
+- The shared billing contract is consumed by both apps; the server migration and upload
+  rules are implemented. PostgreSQL billing tests still need the Docker-backed test stack.
+- **Frontend foundation implemented:** local fee/charge/payment tables and lookup indexes,
+  cashier role labels and staff invitation, fee schedule at `/admin/fees`, automatic
+  exemption editor, and typed billing repositories. Writes use the same authorization
+  and contract-validation boundary as clinical records. Prices and receipts use exact
+  minor units; amounts respect the database integer limit. Balances stay per currency,
+  and accepted overpayments remain visible as credit. Reversals add history.
+- **Next:** booking raises fees with its appointment; nursing saves vitals to open the
+  linked encounter, with an attributed "See now — collect later" reason when needed.
+  Then cashier queue/payment UI, receipts, daily cash and outstanding-balance reports.
+  Payment confirmation is derived from charges and payments; it is never an appointment
+  status edit. Free facilities have nothing to pay. Insurance follows billing.
+- Real SQLite tests cover persistence, permissions, exemptions, part payments, waivers,
+  reversals, overpayments and allocation checks. Field proof on the target phone remains
+  required before launch.
+
 ## 9. Immediate next steps
 
 1. ~~Add vite-plugin-pwa so the shell — and the SQLite WASM — are precached~~ (done

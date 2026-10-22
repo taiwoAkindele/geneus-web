@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { StaffPermission } from '@shared';
+import { permissionsFor, type Role, type StaffPermission } from '@shared';
 import { AppBar, Avatar, Button, Card, Icon, ToggleSwitch, useToast } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { setPermission } from '@/data/repos/staff';
@@ -13,15 +13,22 @@ const ROLE_LABELS: Record<string, string> = {
   records_officer: 'Records',
   facility_admin: 'Facility Admin',
   supervisor: 'Supervisor',
+  cashier: 'Cashier',
 };
 
 /** What each role may reach, beyond recording care. Derived, not stored. */
-const roleCapabilities = (role: string): { label: string; allowed: boolean }[] => [
-  { label: 'View patient records', allowed: true },
-  { label: 'Refer to other facilities', allowed: true },
-  { label: 'Manage medicine stock', allowed: role === 'facility_admin' || role === 'records_officer' },
-  { label: 'Invite & manage staff', allowed: role === 'facility_admin' },
-];
+const roleCapabilities = (role: Role): { label: string; allowed: boolean }[] => {
+  const permissions = permissionsFor(role, 'read_write');
+  return [
+    { label: 'View patient records', allowed: true },
+    { label: 'Refer to other facilities', allowed: permissions.includes('referral:create') },
+    { label: 'Manage medicine stock', allowed: permissions.includes('stock_item:manage') },
+    { label: 'Invite & manage staff', allowed: permissions.includes('staff:manage') },
+    { label: 'Manage the fee schedule', allowed: permissions.includes('fee_item:manage') },
+    { label: 'Take payments', allowed: permissions.includes('payment:receive') },
+    { label: 'Waive fees & reverse payments', allowed: permissions.includes('payment:waive') && permissions.includes('payment:reverse') },
+  ];
+};
 
 export const RolesPermissionsScreen = () => {
   const navigate = useNavigate();
