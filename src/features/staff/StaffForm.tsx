@@ -18,6 +18,7 @@ export const StaffForm = ({ initial, canEditName, canEditAccess, submitLabel, on
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(initial ? rolesFor(initial) : []);
   const [primaryRole, setPrimaryRole] = useState<Role>(initial?.role ?? 'chew');
   const [additionalPermissions, setAdditionalPermissions] = useState<AssignablePermission[]>(initial?.additionalPermissions ?? []);
+  const [loginAccess, setLoginAccess] = useState<NonNullable<Staff['loginAccess']>>(initial?.loginAccess ?? 'shift');
   const [permission, setPermission] = useState<Staff['permission']>(initial?.permission ?? 'read_write');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -41,6 +42,7 @@ export const StaffForm = ({ initial, canEditName, canEditAccess, submitLabel, on
     try {
       await onSave({
         fullName: fullName.trim(), role: primaryRole, permission,
+        loginAccess: canEditAccess ? loginAccess : initial?.loginAccess,
         additionalRoles: canEditAccess ? selectedRoles.filter((role) => role !== primaryRole) : initial?.additionalRoles,
         additionalPermissions: canEditAccess ? additionalPermissions.filter((item) => !inherited.has(item)) : initial?.additionalPermissions,
       });
@@ -67,6 +69,15 @@ export const StaffForm = ({ initial, canEditName, canEditAccess, submitLabel, on
             {selectedRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
           </select><span className="mt-1 block text-xs font-normal text-ink-muted">This role appears on new clinical records. All selected roles still contribute access.</span>
         </label> : null}
+        <fieldset disabled={selectedRoles.includes('facility_admin')} className="space-y-2">
+          <legend className="mb-2 text-[15px] font-bold">Sign-in access</legend>
+          {([{ value: 'shift', label: 'Scheduled shifts', detail: 'A new PIN sign-in needs an active roster window.' }, { value: 'always', label: '24-hour access', detail: 'Sign in at any time, every day, without a roster.' }] as const).map((option) => <label key={option.value} className="flex min-h-[60px] items-center gap-3 rounded-card border border-outline-soft bg-white p-3">
+            <input type="radio" name="staff_login_access" value={option.value} checked={(selectedRoles.includes('facility_admin') ? 'always' : loginAccess) === option.value}
+              onChange={() => setLoginAccess(option.value)} className="h-5 w-5 flex-none accent-brand" />
+            <span><span className="block text-sm font-semibold">{option.label}</span><span className="text-xs text-ink-muted">{option.detail}</span></span>
+          </label>)}
+          <p className="text-xs text-ink-muted">{selectedRoles.includes('facility_admin') ? 'Facility administrators can always sign in. Their existing inactivity sign-out still applies.' : 'Shift end does not sign this person out. They should sign out when finished.'}</p>
+        </fieldset>
         <div className="flex items-center justify-between gap-3 rounded-card border border-outline-soft bg-white p-4">
           <div><div className="font-semibold">Read &amp; write</div><p className="mt-1 text-xs text-ink-muted">Turn off for view-only access. Roles and extra permissions stay configured.</p></div>
           <ToggleSwitch checked={permission === 'read_write'} ariaLabel="Read and write access" onChange={(on) => setPermission(on ? 'read_write' : 'read_only')} />

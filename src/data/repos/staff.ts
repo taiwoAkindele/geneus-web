@@ -1,9 +1,11 @@
 import { hasRole, type AuthorizationContext, type RosterShift, type Staff, type StaffPermission } from '@shared';
 import { allOfType, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 
+import { calendarDate } from '@/lib/calendarDate';
+import { shiftEnd } from '@/session/accessPolicy';
 import { assertAllowed } from '@/auth/authorization';
 
-export type StaffDetails = Pick<Staff, 'fullName' | 'role' | 'additionalRoles' | 'additionalPermissions' | 'permission'>;
+export type StaffDetails = Pick<Staff, 'fullName' | 'role' | 'additionalRoles' | 'additionalPermissions' | 'permission' | 'loginAccess'>;
 
 export const listStaff = () => allOfType<Staff>('staff');
 export const listShifts = () => allOfType<RosterShift>('roster_shift');
@@ -25,6 +27,7 @@ export const createStaff = async (
     additionalRoles: staff.additionalRoles,
     additionalPermissions: staff.additionalPermissions,
     permission: staff.permission,
+    loginAccess: staff.loginAccess,
     active: true,
   });
 };
@@ -45,6 +48,7 @@ export const editStaff = async (staff: Staff, details: StaffDetails, context: Au
   if (details.fullName.trim() !== staff.fullName) changes.fullName = details.fullName.trim();
   if (details.role !== staff.role) changes.role = details.role;
   if (details.permission !== staff.permission) changes.permission = details.permission;
+  if ((details.loginAccess ?? 'shift') !== (staff.loginAccess ?? 'shift')) changes.loginAccess = details.loginAccess ?? 'shift';
   if (JSON.stringify(details.additionalRoles ?? []) !== JSON.stringify(staff.additionalRoles ?? [])) changes.additionalRoles = details.additionalRoles ?? [];
   if (JSON.stringify(details.additionalPermissions ?? []) !== JSON.stringify(staff.additionalPermissions ?? [])) changes.additionalPermissions = details.additionalPermissions ?? [];
   const accessChanged = Object.keys(changes).some((field) => field !== 'fullName');
@@ -71,12 +75,19 @@ export const removeStaff = async (staff: Staff, context: AuthorizationContext): 
   await updateRecord<Staff>(context, 'staff:deactivate', 'staff', staff.id, { active: false });
 };
 
-export const today = (): string => new Date().toISOString().slice(0, 10);
+export const today = (): string => calendarDate();
 
 const shiftId = (staffId: string, day: string) => `roster_shift:${staffId}:${day}`;
 
-export const findShift = (shifts: RosterShift[], staffId: string, day = today()): RosterShift | undefined =>
-  shifts.find((shift) => shift.id === shiftId(staffId, day));
+/** Search instants first so a shift still works after crossing local midnight. */
+export const findShift = (shifts: RosterShift[], staffId: string, at = Date.now()): RosterShift | undefined => {
+  const staffShifts = shifts.filter((shift) => shift.staffId === staffId).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+  const active = staffShifts.find((shift) => Date.parse(shift.startsAt) <= at && at < shiftEnd(shift));
+  if (active) return active;
+  const day = calendarDate(new Date(at));
+  const sameDay = staffShifts.filter((shift) => calendarDate(shift.startsAt) === day);
+  return [...sameDay].reverse().find((shift) => Date.parse(shift.startsAt) > at) ?? sameDay[0];
+};
 
 /**
  * Sets the staff member's window for that day, replacing an existing one.
@@ -84,15 +95,19 @@ export const findShift = (shifts: RosterShift[], staffId: string, day = today())
  * (server PLAN §4.1), and a shift grants access either way.
  */
 export const assignShift = async (
-  shift: { staffId: string; day: string; startsAt: string; endsAt: string },
+  shift: { id?: string; staffId: string; day: string; startsAt: string; endsAt: string },
   context: AuthorizationContext,
 ): Promise<void> => {
-  const id = shiftId(shift.staffId, shift.day);
+  assertAllowed(context, 'roster:assign');
+  const id = shift.id ?? shiftId(shift.staffId, shift.day);
   const existing = await findRecord<RosterShift>('roster_shift', id);
+  if (shift.id && (!existing || existing.staffId !== shift.staffId)) throw new Error('This shift is no longer available for that staff member');
   if (existing) {
     await updateRecord<RosterShift>(context, 'roster:assign', 'roster_shift', id, {
       startsAt: shift.startsAt,
       endsAt: shift.endsAt,
+      // A previous extension must not override the newly assigned window.
+      extendedUntil: shift.endsAt,
     });
     return;
   }

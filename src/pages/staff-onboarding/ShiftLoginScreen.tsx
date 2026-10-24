@@ -1,4 +1,5 @@
-import { hasRole } from '@shared';
+import { accessFor, covers } from '@/session/accessPolicy';
+import { shiftRangeLabel } from '@/session/shiftLabels';
 import { roleLabel } from '@/features/staff/staffAccess';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +20,7 @@ const failureMessage = ({ reason, retryAt }: SignInRefusal): string => {
     case 'locked':
       return `Too many wrong PINs — try again in ${minutesUntil(retryAt ?? Date.now())} min`;
     case 'off-shift':
-      return 'You are not on shift right now — no shift, no access';
+      return 'You are outside your scheduled sign-in window. Ask an admin for a shift or 24-hour access';
     case 'sync-required':
       return 'Sign-in is paused until this phone syncs — see above';
     case 'shift-altered':
@@ -33,11 +34,11 @@ const lastSyncedLabel = (iso: string): string =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const shiftLabel = (entry: RosterEntry): string => {
-  // A facility admin signs in shift or no shift (accessPolicy.ts).
-  if (hasRole(entry.staff, 'facility_admin')) return 'Any time';
+  const access = accessFor(entry.staff);
+  if (access === 'admin') return 'Any time · admin';
+  if (access === 'always') return '24-hour access';
   if (!entry.shift) return 'No shift today';
-  const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  return `${time(entry.shift.startsAt)}–${time(entry.shift.endsAt)}`;
+  return shiftRangeLabel(entry.shift);
 };
 
 /**
@@ -204,7 +205,7 @@ export const ShiftLoginScreen = () => {
               </>
             ) : (
               <>
-                <div className="mb-3 text-[13px] font-semibold text-ink-soft">Who is starting a shift?</div>
+                <div className="mb-3 text-[13px] font-semibold text-ink-soft">Who is signing in?</div>
                 <div className="flex flex-col gap-2">
                   {roster.map((entry) => (
                     <button
@@ -227,7 +228,7 @@ export const ShiftLoginScreen = () => {
                         </div>
                       </div>
                       <Tag
-                        tone={hasPin(entry.staff.staffId) && (entry.shift || hasRole(entry.staff, 'facility_admin')) ? 'green' : 'amber'}
+                        tone={hasPin(entry.staff.staffId) && (accessFor(entry.staff) !== 'shift' || (entry.shift && covers(entry.shift, Date.now()))) ? 'green' : 'amber'}
                         className="font-mono"
                       >
                         {hasPin(entry.staff.staffId) ? shiftLabel(entry) : 'Set PIN'}

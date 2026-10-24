@@ -7,7 +7,7 @@ import { recordServerContact } from './deviceCredential';
 import { setDatabaseForTests, type LocalDatabase } from './database';
 import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
-import { createStaff, editStaff, listStaff } from './repos/staff';
+import { assignShift, createStaff, editStaff, extendShift, findShift, listShifts, listStaff } from './repos/staff';
 import { registerPatient, updatePatient } from './repos/patients';
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
@@ -71,6 +71,35 @@ describe('the write path against a real SQLite', () => {
     await db.close();
   });
 
+
+
+  describe('staff sign-in access and full-day rosters', () => {
+    it('persists 24-hour access without changing roles or write capabilities', async () => {
+      const admin = contextFor('facility_admin');
+      const staff = await createStaff({ fullName: 'Always Available', role: 'cashier', permission: 'read_write', loginAccess: 'always' }, admin);
+      const loaded = (await listStaff()).find((item) => item.id === staff.id)!;
+      expect(loaded.loginAccess).toBe('always');
+      expect(authorizationFor({ staff: loaded, facilityId: admin.facilityId, deviceId: admin.deviceId }).permissions).toEqual(['payment:receive']);
+      const delegate = authorizationFor({ staff: { ...loaded, additionalPermissions: ['staff:manage'] }, facilityId: admin.facilityId, deviceId: admin.deviceId });
+      await expect(editStaff(loaded, { ...loaded, loginAccess: 'shift' }, delegate)).rejects.toThrow(/role doesn't allow/);
+      expect((await listStaff()).find((item) => item.id === staff.id)?.loginAccess).toBe('always');
+      await editStaff(loaded, { ...loaded, loginAccess: 'shift' }, admin);
+      expect((await listStaff()).find((item) => item.id === staff.id)?.loginAccess).toBe('shift');
+    });
+    it('keeps a full-day shift after midnight and resets an earlier extension on reassignment', async () => {
+      const admin = contextFor('facility_admin');
+      await assignShift({ staffId: 'staff:nurse', day: '2026-10-24', startsAt: '2026-10-24T08:00:00Z', endsAt: '2026-10-24T16:00:00Z' }, admin);
+      let shifts = await listShifts();
+      const id = shifts[0].id;
+      await extendShift(shifts[0], '2026-10-24T20:00:00Z', admin);
+      await assignShift({ id, staffId: 'staff:nurse', day: '2026-10-24', startsAt: '2026-10-24T08:00:00Z', endsAt: '2026-10-25T08:00:00Z' }, admin);
+      shifts = await listShifts();
+      expect(shifts).toHaveLength(1);
+      expect(shifts[0]).toMatchObject({ id, endsAt: '2026-10-25T08:00:00Z', extendedUntil: '2026-10-25T08:00:00Z' });
+      expect(findShift(shifts, 'staff:nurse', Date.parse('2026-10-25T07:00:00Z'))?.id).toBe(id);
+      await expect(assignShift({ id, staffId: 'staff:other', day: '2026-10-24', startsAt: shifts[0].startsAt, endsAt: shifts[0].endsAt }, admin)).rejects.toThrow(/no longer available/);
+    });
+  });
 
   describe('staff edits and combined access', () => {
     it('keeps staff identity while editing names, roles and individual grants', async () => {

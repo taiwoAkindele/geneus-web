@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useAuthorizationContext, useSession } from '@/session';
+import { accessLabel } from '@/session/accessPolicy';
 import { hasAdminWorkspace, navigationFor } from './navigation';
 import { AppHeader, ShiftBanner, ShiftCountdownStrip } from './AppHeader';
 import { NotificationList } from './NotificationList';
@@ -24,7 +25,7 @@ const isActive = (pathname: string, match: string) =>
  */
 const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
   const navigate = useNavigate();
-  const { user, facility, shift } = useSession();
+  const { user, facility, shift, access } = useSession();
   const { signOut } = useAuth();
   const context = useAuthorizationContext();
 
@@ -40,7 +41,7 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold">{user.role}</div>
           <div className="text-[13px] text-ink-muted">
-            {shift ? `Shift ${shift.label} · ends ${shift.endsAtLabel}` : 'Admin access · signs out after 30 minutes idle'}
+            {shift ? `Shift ${shift.label} · ${shift.ended ? 'ended' : 'ends'} ${shift.endsAtLabel} · sign-out is manual` : access === 'admin' ? 'Admin access · signs out after 30 minutes idle' : `${accessLabel(access)} · sign out when finished`}
             {user.canWrite ? '' : ' · read only'}
           </div>
         </div>

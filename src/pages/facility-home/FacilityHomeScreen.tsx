@@ -5,6 +5,7 @@ import { useAuthorizationContext, useSession } from '@/session';
 import { useLiveQuery, useSyncStatus } from '@/data';
 import { listEncounters, closingEntries } from '@/data/repos/encounters';
 import { useAppointments } from '@/features/appointments';
+import { accessLabel } from '@/session/accessPolicy';
 import { hasAdminWorkspace } from '@/app/navigation';
 import { calendarDate } from '@/lib/calendarDate';
 
@@ -16,7 +17,7 @@ const loadCounts = async () => {
 
 export const FacilityHomeScreen = () => {
   const navigate = useNavigate();
-  const { user, facility, shift } = useSession();
+  const { user, facility, shift, access } = useSession();
   const context = useAuthorizationContext();
   const appointments = useAppointments();
   const counts = useLiveQuery(loadCounts);
@@ -38,7 +39,7 @@ export const FacilityHomeScreen = () => {
       <div className="mx-auto w-full max-w-md px-5 py-4 md:max-w-4xl">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div><p className="text-[13px] text-ink-muted">{greeting},</p><h1 className="text-[24px] font-extrabold">{user.name.split(' ')[0]}</h1><p className="mt-1 text-[13px] text-ink-muted">{user.role} · {facility.name}</p></div>
-          <div className="flex flex-col items-end gap-2"><SyncPill /><Tag tone="amber">{shift ? `Shift ends ${shift.endsAtLabel}` : 'Admin access'}</Tag></div>
+          <div className="flex flex-col items-end gap-2"><SyncPill /><Tag tone="amber">{shift ? shift.ended ? 'Shift ended · still signed in' : `Shift ends ${shift.endsAtLabel}` : accessLabel(access)}</Tag></div>
         </div>
         {cashier || takesPayments ? <section className="mb-5 rounded-card border border-outline-soft bg-white p-4"><h2 className="text-[17px] font-bold">Cashier workspace</h2><p className="mt-2 text-[14px] leading-relaxed text-ink-muted">Payment collection and receipts are being connected to patient booking. They are not available in this version. You can look up patients and check this device's sync status.</p></section> : null}
         <div className="grid grid-cols-2 gap-3">

@@ -132,3 +132,21 @@ Update both shared submodule pointers after committing geneus-shared; deploy the
 server and regenerated sync streams before deploying this frontend. Validation
 copies can combine the uncommitted contract with the apps without modifying the
 pinned submodule checkouts.
+
+## 24-hour access and overnight shifts
+
+Choose **Staff → Edit staff → Sign-in access → 24-hour access** for someone who
+can sign in every day without a roster. Their roles and write permissions stay
+separate. Scheduled staff still need an active window for a fresh PIN sign-in.
+
+In **Staff → Shift**, choose **Next day** for overnight duty, or **Make a 24-hour
+shift** for a full-day window. The following-day end appears in roster labels.
+
+Shift end never signs staff out automatically. Existing sessions survive the end
+of a roster, midnight and reload; staff sign out when finished. Deactivation closes
+access after the device receives the change, and reactivation needs a new sign-in.
+Administrator sessions still expire after 30 minutes without activity.
+
+This change uses shared policy v6 and server migration 0010. Commit the shared
+contract and update both consumer submodules; deploy the server migration and
+regenerated staff sync stream before the matching frontend.
