@@ -1,21 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PinSetupCodeIssued } from '@shared';
-import { AppBar, Button, DataTable, Sheet, Tag, TextField, useToast } from '@/ui';
+import { mayApprovePin, type PinSetupCodeIssued } from '@shared';
+import { AppBar, Button, DataTable, Sheet, Tag, TextField, SegmentedControl, useToast } from '@/ui';
+import { accessFor, accessLabel } from '@/session/accessPolicy';
+import { shiftRangeLabel } from '@/session/shiftLabels';
+import { calendarDate } from '@/lib/calendarDate';
+import { fullDayEnd, shiftWindow } from '@/features/staff/shiftWindow';
+import { roleLabel } from '@/features/staff/staffAccess';
 import { SyncPill } from '@/app/SyncPill';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
 import { issuePinSetupCode } from '@/lib/api/staff';
 import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
-
-const ROLE_LABELS: Record<string, string> = {
-  chew: 'CHEW',
-  nurse: 'Nurse',
-  doctor: 'Doctor',
-  records_officer: 'Records',
-  facility_admin: 'Facility Admin',
-  supervisor: 'Supervisor',
-  cashier: 'Cashier',
-};
 
 const timeLabel = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -26,64 +21,45 @@ const onShiftNow = (entry: RosterEntry): boolean => {
   return new Date(entry.shift.startsAt).getTime() <= now && now < new Date(entry.shift.extendedUntil ?? entry.shift.endsAt).getTime();
 };
 
-/** Turns "14:30" on today's date into an instant. */
-const atToday = (time: string): string => {
-  const [hours, minutes] = time.split(':').map(Number);
-  const when = new Date();
-  when.setHours(hours ?? 0, minutes ?? 0, 0, 0);
-  return when.toISOString();
-};
-
 const ShiftSheet = ({ entry, onClose }: { entry: RosterEntry; onClose: () => void }) => {
   const toast = useToast();
   const context = useAuthorizationContext();
+  const [day] = useState(entry.shift ? calendarDate(entry.shift.startsAt) : today());
+  const effectiveEnd = entry.shift?.extendedUntil ?? entry.shift?.endsAt;
   const [start, setStart] = useState(entry.shift ? timeLabel(entry.shift.startsAt) : '08:00');
-  const [end, setEnd] = useState(entry.shift ? timeLabel(entry.shift.endsAt) : '16:00');
+  const [end, setEnd] = useState(effectiveEnd ? timeLabel(effectiveEnd) : '16:00');
+  const [endDay, setEndDay] = useState<'same' | 'next'>(effectiveEnd && calendarDate(effectiveEnd) !== day ? 'next' : 'same');
   const [saving, setSaving] = useState(false);
-
+  const makeFullDay = () => {
+    try { const result = fullDayEnd(day, start); setEnd(result.end); setEndDay(result.endsNextDay ? 'next' : 'same'); }
+    catch (cause) { toast(cause instanceof Error ? cause.message : 'Choose a start time'); }
+  };
   const save = async () => {
     if (saving) return;
-    if (atToday(end) <= atToday(start)) {
-      toast('The shift must end after it starts');
-      return;
-    }
     setSaving(true);
     try {
-      await assignShift(
-        { staffId: entry.staff.staffId, day: today(), startsAt: atToday(start), endsAt: atToday(end) },
-        context,
-      );
-      toast(`${entry.staff.fullName} is rostered ${start}–${end} today`);
+      const window = shiftWindow(day, start, end, endDay === 'next');
+      await assignShift({ ...window, id: entry.shift?.id, staffId: entry.staff.staffId }, context);
+      toast(`${entry.staff.fullName} is rostered ${start}–${end}${endDay === 'next' ? ' next day' : ''}`);
       onClose();
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : 'Could not save the shift');
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
-
-  return (
-    <Sheet onClose={onClose} eyebrow="Today's shift" title={entry.staff.fullName} closeDisabled={saving}>
+  return <Sheet onClose={onClose} eyebrow="Roster window" title={entry.staff.fullName} closeDisabled={saving}>
+    <p className="mb-3 text-sm text-ink-muted">Starts on {new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+    <fieldset disabled={saving} className="space-y-4">
       <div className="flex gap-3">
-        <div className="flex-1">
-          <TextField label="Starts" name="shift_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-        <div className="flex-1">
-          <TextField label="Ends" name="shift_end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-        </div>
+        <div className="flex-1"><TextField label="Starts" name="shift_start" type="time" value={start} onChange={(event) => setStart(event.target.value)} /></div>
+        <div className="flex-1"><TextField label="Ends" name="shift_end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} /></div>
       </div>
-      <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
-        They can only sign in inside this window, and are signed out automatically when it ends.
-      </p>
-      <div className="mt-5 flex flex-wrap gap-2.5">
-        <Button variant="primary" fullWidth={false} className="flex-1" loading={saving} onClick={save}>
-          Save shift
-        </Button>
-        <Button variant="outlined" fullWidth={false} className="px-6" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
-    </Sheet>
-  );
+      <SegmentedControl ariaLabel="Shift end day" value={endDay} onChange={setEndDay} options={[{ value: 'same', label: 'Same day' }, { value: 'next', label: 'Next day' }]} />
+      <Button variant="outlined" onClick={makeFullDay}>Make a 24-hour shift</Button>
+    </fieldset>
+    <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">This window controls new sign-ins for shift-based staff. Their session stays open when it ends; signing out is manual.</p>
+    <p className="mt-2 text-xs leading-relaxed text-ink-muted">For access every day without a roster, choose 24-hour access in Edit staff.</p>
+    <div className="mt-5 flex gap-2.5"><Button fullWidth={false} className="flex-1" loading={saving} disabled={saving} onClick={() => void save()}>Save shift</Button><Button variant="outlined" fullWidth={false} className="px-6" disabled={saving} onClick={onClose}>Cancel</Button></div>
+  </Sheet>;
 };
 
 /**
@@ -157,8 +133,12 @@ export const ManageStaffScreen = () => {
   const [issuingFor, setIssuingFor] = useState<RosterEntry | null>(null);
   const [removing, setRemoving] = useState<RosterEntry | null>(null);
   const [busy, setBusy] = useState(false);
+  const actor = roster.find((entry) => entry.staff.staffId === user.staffId);
   const canManage = context.permissions.includes('staff:manage');
-  const onShift = roster.filter(onShiftNow), others = roster.filter((entry) => !onShiftNow(entry));
+  const canEdit = canManage || context.permissions.includes('staff:permission');
+  const onShift = roster.filter((entry) => accessFor(entry.staff) === 'shift' && onShiftNow(entry));
+  const anytime = roster.filter((entry) => accessFor(entry.staff) !== 'shift');
+  const others = roster.filter((entry) => accessFor(entry.staff) === 'shift' && !onShiftNow(entry));
   const remove = async () => {
     if (!removing || busy) return;
     setBusy(true);
@@ -167,18 +147,19 @@ export const ManageStaffScreen = () => {
     finally { setBusy(false); }
   };
   const access = (entry: RosterEntry) => navigate('/admin/staff/access', { state: { staffId: entry.staff.staffId } });
-  const shift = (entry: RosterEntry) => entry.shift ? `${timeLabel(entry.shift.startsAt)}–${timeLabel(entry.shift.extendedUntil ?? entry.shift.endsAt)}` : 'No shift';
+  const shift = (entry: RosterEntry) => accessFor(entry.staff) !== 'shift' ? accessLabel(accessFor(entry.staff)) : entry.shift ? shiftRangeLabel(entry.shift) : 'No shift today';
   const actions = (entry: RosterEntry) => <div className="flex flex-wrap gap-2">
+    {canEdit ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" aria-label={`Edit staff ${entry.staff.fullName}`} onClick={() => access(entry)}>Edit staff</Button> : null}
     {context.permissions.includes('roster:assign') ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" aria-label={`Edit shift for ${entry.staff.fullName}`} onClick={() => setEditing(entry)}>Shift</Button> : null}
-    {canManage && entry.staff.staffId !== user.staffId ? <Button variant="ghost" fullWidth={false} className="px-3 py-2" aria-label={`Issue PIN code for ${entry.staff.fullName}`} onClick={() => setIssuingFor(entry)}>PIN code</Button> : null}
+    {canManage && actor && mayApprovePin(actor.staff, entry.staff) && entry.staff.staffId !== user.staffId ? <Button variant="ghost" fullWidth={false} className="px-3 py-2" aria-label={`Issue PIN code for ${entry.staff.fullName}`} onClick={() => setIssuingFor(entry)}>PIN code</Button> : null}
     {context.permissions.includes('staff:deactivate') && entry.staff.staffId !== user.staffId ? <Button variant="danger" fullWidth={false} className="px-3 py-2" onClick={() => setRemoving(entry)}>Remove access</Button> : null}
   </div>;
   const list = (entries: RosterEntry[], caption: string) => <>
-    <div className="space-y-2 lg:hidden">{entries.map((entry) => <article key={entry.staff.staffId} className="rounded-card border border-outline-soft bg-white p-4"><button type="button" onClick={() => access(entry)} className="min-h-[44px] w-full text-left"><div className="text-[16px] font-bold">{entry.staff.fullName}</div><div className="mt-1 text-[13px] text-ink-muted">{ROLE_LABELS[entry.staff.role] ?? entry.staff.role} · {entry.staff.permission === 'read_only' ? 'Read only' : 'Read & write'}</div></button><div className="my-3 flex flex-wrap gap-2"><Tag tone={onShiftNow(entry) ? 'green' : 'amber'}>{shift(entry)}</Tag><Tag tone={hasPin(entry.staff.staffId) ? 'green' : 'neutral'}>{hasPin(entry.staff.staffId) ? 'PIN ready here' : 'PIN not set here'}</Tag></div>{actions(entry)}</article>)}</div>
+    <div className="space-y-2 lg:hidden">{entries.map((entry) => <article key={entry.staff.staffId} className="rounded-card border border-outline-soft bg-white p-4"><button type="button" onClick={() => access(entry)} className="min-h-[44px] w-full text-left"><div className="text-[16px] font-bold">{entry.staff.fullName}</div><div className="mt-1 text-[13px] text-ink-muted">{roleLabel(entry.staff)} · {entry.staff.permission === 'read_only' ? 'Read only' : 'Read & write'}</div></button><div className="my-3 flex flex-wrap gap-2"><Tag tone={onShiftNow(entry) || accessFor(entry.staff) !== 'shift' ? 'green' : 'amber'}>{shift(entry)}</Tag><Tag tone={hasPin(entry.staff.staffId) ? 'green' : 'neutral'}>{hasPin(entry.staff.staffId) ? 'PIN ready here' : 'PIN not set here'}</Tag></div>{actions(entry)}</article>)}</div>
     <div className="hidden lg:block"><DataTable caption={caption} rows={entries} rowKey={(row) => row.staff.staffId} columns={[
       { key: 'name', label: 'Staff member', sortValue: (row) => row.staff.fullName, render: (row) => <button type="button" className="min-h-0 py-1 text-left font-bold text-brand hover:underline" onClick={() => access(row)}>{row.staff.fullName}</button> },
-      { key: 'role', label: 'Role', sortValue: (row) => row.staff.role, render: (row) => ROLE_LABELS[row.staff.role] ?? row.staff.role },
-      { key: 'shift', label: "Today's shift", render: shift },
+      { key: 'role', label: 'Roles', sortValue: (row) => roleLabel(row.staff), render: (row) => roleLabel(row.staff) },
+      { key: 'shift', label: "Sign-in access / roster", render: shift },
       { key: 'pin', label: 'PIN on this device', render: (row) => hasPin(row.staff.staffId) ? 'Ready' : 'Not set here' },
       { key: 'access', label: 'Access', render: (row) => row.staff.permission === 'read_only' ? 'Read only' : 'Read & write' },
       { key: 'actions', label: 'Actions', render: actions },
@@ -188,9 +169,10 @@ export const ManageStaffScreen = () => {
     <div className="min-h-screen bg-surface">
       <AppBar title="Staff" onBack={() => navigate('/admin')} right={<SyncPill />} />
       <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
-        <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; shifts</h1>{canManage ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
+        <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; shifts</h1>{canManage && context.permissions.includes('staff:permission') ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
         {loading ? <div role="status" className="h-24 animate-pulse rounded-card bg-surface-muted" aria-label="Loading staff" /> : error ? <div role="alert">Staff could not be read from this device.<Button variant="ghost" onClick={reload}>Try again</Button></div> : <>
           {onShift.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">On shift now · {onShift.length}</h2>{list(onShift, 'Staff on shift')}</section> : null}
+          {anytime.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">Any-time access · {anytime.length}</h2>{list(anytime, 'Staff with any-time access')}</section> : null}
           {others.length ? <section className="space-y-3"><h2 className="text-[15px] font-bold">Off shift &amp; awaiting setup</h2>{list(others, 'Other staff')}</section> : null}
           {!roster.length ? <p className="rounded-card border border-dashed border-outline p-5 text-sm text-ink-muted">No staff yet. Add the first staff member above.</p> : null}
         </>}

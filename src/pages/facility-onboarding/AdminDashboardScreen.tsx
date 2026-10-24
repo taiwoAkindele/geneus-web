@@ -1,3 +1,4 @@
+import { roleLabel } from '@/features/staff/staffAccess';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Stat, Tag } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
@@ -37,16 +38,6 @@ const onShiftNow = (entry: RosterEntry): boolean => {
     new Date(entry.shift.startsAt).getTime() <= now &&
     now < new Date(entry.shift.extendedUntil ?? entry.shift.endsAt).getTime()
   );
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  chew: 'CHEW',
-  nurse: 'Nurse',
-  doctor: 'Doctor',
-  records_officer: 'Records',
-  facility_admin: 'Facility Admin',
-  supervisor: 'Supervisor',
-  cashier: 'Cashier',
 };
 
 const initialsOf = (fullName: string) =>
@@ -123,7 +114,7 @@ export const AdminDashboardScreen = () => {
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-bold">{entry.staff.fullName}</div>
                 <div className="text-xs text-ink-muted">
-                  {ROLE_LABELS[entry.staff.role] ?? entry.staff.role} ·{' '}
+                  {roleLabel(entry.staff)} ·{' '}
                   {entry.staff.permission === 'read_write' ? 'Read & write' : 'Read only'}
                 </div>
               </div>
@@ -141,13 +132,13 @@ export const AdminDashboardScreen = () => {
 
   const Tiles = () => (
     <div className="grid grid-cols-2 gap-3">
-      <ActionTile label="＋ Invite staff" primary onClick={() => navigate('/admin/staff/invite')} />
+      {context.permissions.includes('staff:manage') && context.permissions.includes('staff:permission') ? <ActionTile label="＋ Invite staff" primary onClick={() => navigate('/admin/staff/invite')} /> : null}
       <ActionTile label="Manage staff" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Roster & shifts" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Registers" onClick={() => navigate('/registers')} />
-      <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} />
+      {context.permissions.includes('unit:manage') ? <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} /> : null}
       {context.permissions.includes('fee_item:manage') ? <ActionTile label="Fee schedule" onClick={() => navigate('/admin/fees')} /> : null}
-      <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} />
+      {context.permissions.includes('device:enroll') ? <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} /> : null}
     </div>
   );
 

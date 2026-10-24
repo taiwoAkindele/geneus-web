@@ -1,3 +1,4 @@
+import { hasRole, mayApprovePin } from '@shared';
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, PinDots, PinKeypad, TextField } from '@/ui';
@@ -16,9 +17,6 @@ type ApprovalState = { staffId?: string; fullName?: string; role?: string; reset
  * may therefore approve clinical staff, but only a facility admin may approve
  * a facility admin — otherwise a supervisor could take over admin rights.
  */
-const approverRolesFor = (role: string): ReadonlySet<string> =>
-  role === 'facility_admin' ? new Set(['facility_admin']) : new Set(['facility_admin', 'supervisor']);
-
 const initials = (fullName: string) =>
   fullName
     .split(' ')
@@ -52,10 +50,9 @@ export const PinApprovalScreen = () => {
   if (loading) return null;
   if (!state.staffId || !person) return <Navigate to="/login" replace />;
 
-  const approverRoles = approverRolesFor(person.staff.role);
   const approvers = roster.filter(
     (entry) =>
-      approverRoles.has(entry.staff.role) && entry.staff.staffId !== person.staff.staffId && hasPin(entry.staff.staffId),
+      mayApprovePin(entry.staff, person.staff) && entry.staff.staffId !== person.staff.staffId && hasPin(entry.staff.staffId),
   );
 
   const approved = () => {
@@ -152,16 +149,16 @@ export const PinApprovalScreen = () => {
               I have a code from my admin
             </Button>
             <Button variant="outlined" onClick={() => setMode('approver')}>
-              {person.staff.role === 'facility_admin' ? 'Another facility admin is here' : 'An admin or supervisor is here'}
+              {hasRole(person.staff, 'facility_admin') ? 'Another facility admin is here' : 'An admin or supervisor is here'}
             </Button>
-            {person.staff.role === 'facility_admin' ? (
+            {hasRole(person.staff, 'facility_admin') ? (
               <Button variant="ghost" loading={emailing} onClick={emailMeACode}>
                 Email me a code
               </Button>
             ) : null}
             {error ? <p className="text-center text-[13px] font-semibold text-danger">{error}</p> : null}
             <p className="mt-2 text-center text-[13px] leading-relaxed text-ink-muted">
-              {person.staff.role === 'facility_admin'
+              {hasRole(person.staff, 'facility_admin')
                 ? 'No other admin to ask? We can email a code to the address you registered with. This phone needs an internet connection.'
                 : 'No code? Ask your facility admin to create one for you under Staff. They can do it from their own phone and read it to you.'}
             </p>
@@ -210,14 +207,14 @@ export const PinApprovalScreen = () => {
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-bold">{entry.staff.fullName}</div>
                     <div className="text-[12px] text-ink-muted">
-                      {entry.staff.role === 'facility_admin' ? 'Facility Admin' : 'Supervisor'}
+                      {hasRole(entry.staff, 'facility_admin') ? 'Facility Admin' : 'Supervisor'}
                     </div>
                   </div>
                 </button>
               ))}
               {approvers.length === 0 ? (
                 <p className="py-4 text-center text-[13px] leading-relaxed text-ink-muted">
-                  {person.staff.role === 'facility_admin'
+                  {hasRole(person.staff, 'facility_admin')
                     ? 'Only another facility admin can approve an admin’s PIN, and none has a PIN on this phone. Ask another admin for a code instead.'
                     : 'No admin or supervisor has a PIN on this phone yet. Ask your admin for a code instead.'}
                 </p>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { AuthorizationContext, RosterShift, Staff } from '@shared';
+import { rolesFor, type AuthorizationContext, type RosterShift, type Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
 import { authorizationFor, nobody } from '@/auth/authorization';
@@ -7,7 +7,8 @@ import { lastServerContactOn } from '@/data/deviceCredential';
 import { listOpenRejections } from '@/data/repos/syncRejections';
 import { checkPin, needsLongerPin } from './credentials';
 import { approvePinSetup } from './pinApproval';
-import { accessFor, covers, mayStaySignedIn, shiftEnd, type Access } from './accessPolicy';
+import { accessFor, maySignIn, mayStaySignedIn, shiftEnd, type Access } from './accessPolicy';
+import { shiftEndLabel, shiftRangeLabel } from './shiftLabels';
 import { checkShiftSignature, isFrozen } from './signInChecks';
 
 /**
@@ -15,7 +16,7 @@ import { checkShiftSignature, isFrozen } from './signInChecks';
  * the roster and staff documents already in the replica, so a facility with no
  * signal can still start its day. Sign-out never waits for the network.
  *
- * Beyond the PIN and the shift window, sign-in refuses a device that has not
+ * Beyond the PIN and configured sign-in access, sign-in refuses a device that has not
  * synced in 7 days (root §4.3) and a shift whose server signature no longer
  * matches it (signInChecks.ts).
  */
@@ -27,10 +28,11 @@ export type SessionUser = {
   role: string;
   /** The contract value, for gating admin-only surfaces. */
   roleId: Staff['role'];
+  roles: Staff['role'][];
   canWrite: boolean;
 };
 export type Facility = { name: string; code: string };
-export type Shift = { label: string; endsAtLabel: string; minutesLeft: number };
+export type Shift = { label: string; endsAtLabel: string; endsOn: string; minutesLeft: number; ended: boolean };
 
 export type NotificationKind = 'referral' | 'conflict' | 'shift';
 export type AppNotification = {
@@ -72,9 +74,9 @@ type AuthValue = {
 type SessionValue = {
   user: SessionUser;
   facility: Facility;
-  /** How this session is held: by a shift, or by a facility admin's any-time access (accessPolicy.ts). */
+  /** Whether fresh sign-in is shift-based, available 24 hours, or administrator access. */
   access: Access;
-  /** The shift holding the session; absent for an admin, whom no shift signs out. */
+  /** Informational roster window; its end never expires the signed-in session. */
   shift: Shift | undefined;
   /** Who is acting, from where, with what rights — what every repository write is checked against. */
   authorization: AuthorizationContext;
@@ -119,9 +121,6 @@ const ROLE_LABELS: Record<string, string> = {
   cashier: 'Cashier',
 };
 
-const timeLabel = (iso: string): string =>
-  new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const { facility, deviceId } = useDeviceContext();
   const [staffId, setStaffId] = useState<string | null>(() => localStorage.getItem(SIGNED_IN_KEY));
@@ -137,13 +136,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const load = useCallback(async () => {
     const [staff, shifts] = await Promise.all([listStaff(), listShifts()]);
-    return staff
-      .filter((member) => member.active)
-      .map<RosterEntry>((member) => ({ staff: member, shift: findShift(shifts, member.staffId) }));
+    return { staff: staff.filter((member) => member.active), shifts };
   }, []);
 
   const { data, loading, error: rosterError, reload: reloadRoster } = useLiveQuery(load);
-  const roster = useMemo(() => data ?? [], [data]);
+  const roster = useMemo<RosterEntry[]>(() => (data?.staff ?? []).map((member) => ({ staff: member, shift: findShift(data?.shifts ?? [], member.staffId, now) })), [data, now]);
 
   // Coarse on purpose: every consumer re-renders on this, and the visible
   // per-second countdown is derived locally by useShiftCountdown.
@@ -189,11 +186,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setStaffId(null);
   }, []);
 
-  // Auto-logout is the system's job, not the user's (PRD §14.1): at shift end,
-  // or after 30 idle minutes for a facility admin.
+  // Shift end never expires an authenticated session. Deactivation and admin
+  // inactivity still clear the saved identity so reactivation cannot revive it.
   useEffect(() => {
-    if (staffId && !loading && entry && !active) signOut();
-  }, [staffId, loading, entry, active, signOut]);
+    if (staffId && !loading && !rosterError && data && (!entry || !active)) signOut();
+  }, [staffId, loading, rosterError, data, entry, active, signOut]);
 
   const signIn = useCallback(
     async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
@@ -209,22 +206,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         approvePinSetup(candidateId);
         return { reason: 'pin-upgrade' };
       }
-      // A facility admin signs in shift or no shift (accessPolicy.ts); everyone else needs a genuine one.
-      if (accessFor(candidate.staff) === 'shift') {
-        if (!candidate.shift || !covers(candidate.shift, Date.now())) return { reason: 'off-shift' };
-        if ((await checkShiftSignature(candidate.shift)) === 'invalid') return { reason: 'shift-altered' };
-      }
+      const currentShift = findShift(data?.shifts ?? [], candidateId, Date.now());
+      if (!maySignIn({ staff: candidate.staff, shift: currentShift }, Date.now())) return { reason: 'off-shift' };
+      if (accessFor(candidate.staff) === 'shift' && currentShift && (await checkShiftSignature(currentShift)) === 'invalid') return { reason: 'shift-altered' };
       const signedInAt = Date.now();
       lastActivity.current = signedInAt;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(signedInAt));
       localStorage.setItem(SIGNED_IN_KEY, candidateId);
-      // Re-anchor the clock: the coarse tick could still be behind a shift that
-      // began seconds ago, which would read as off-shift and sign them out.
+      // Refresh roster display immediately after a successful PIN sign-in.
       setNow(Date.now());
       setStaffId(candidateId);
       return undefined;
     },
-    [roster],
+    [roster, data],
   );
 
   const auth = useMemo<AuthValue>(
@@ -261,7 +255,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         staffId: staff.staffId,
         name: staff.fullName,
         initials: initialsOf(staff.fullName),
-        role: ROLE_LABELS[staff.role] ?? staff.role,
+        role: rolesFor(staff).map((role) => ROLE_LABELS[role] ?? role).join(' + '),
+        roles: rolesFor(staff),
         roleId: staff.role,
         canWrite: staff.permission === 'read_write',
       },
@@ -271,8 +266,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       shift:
         access === 'shift' && shift
           ? {
-              label: `${timeLabel(shift.startsAt)}–${timeLabel(shift.endsAt)}`,
-              endsAtLabel: timeLabel(shift.extendedUntil ?? shift.endsAt),
+              label: shiftRangeLabel(shift),
+              endsAtLabel: shiftEndLabel(shift),
+              endsOn: shift.extendedUntil ?? shift.endsAt,
+              ended: now >= shiftEnd(shift),
               minutesLeft: Math.max(0, Math.ceil((shiftEnd(shift) - now) / 60_000)),
             }
           : undefined,
@@ -315,6 +312,6 @@ export const useAuthorizationContext = (): AuthorizationContext => {
 /** Only valid behind the shift guard — screens outside it have no signed-in staff. */
 export const useSession = (): SessionValue => {
   const session = useContext(SessionContext);
-  if (!session) throw new Error('useSession requires a signed-in shift (render inside RequireShift)');
+  if (!session) throw new Error('useSession requires signed-in staff (render inside RequireShift)');
   return session;
 };

@@ -63,7 +63,7 @@
 │ UI layer — screens, large-touch component kit │  React + Tailwind
 ├─────────────────────────────────────────────┤
 │ Session/auth layer — offline shift login,     │  Zustand + local roster
-│   30/15/5 warnings, auto-logout, enrollment   │
+│   roster reminders, manual sign-out, enrollment   │
 ├─────────────────────────────────────────────┤
 │ Authorization — AuthorizationContext from the  │  shared permission matrix + offline policy
 │   session; assertAllowed before every write    │
@@ -121,7 +121,7 @@ geneus-web/
   src/
     app/            # app shell, routing, providers, service-worker registration
     ui/             # large-touch component kit (Button, Field, Card, Banner, Sheet…)
-    session/        # offline shift login, roster eval, warnings, auto-logout, enrollment
+    session/        # offline PIN login, roster eval, manual sign-out, enrollment
     auth/           # AuthorizationContext, assertAllowed — the rule before every write
     data/
       database.ts   # the PowerSync database, opened lazily once a credential exists
@@ -164,9 +164,9 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
   indicator** shell.
 
 ### FE-M1 — Single-facility core (the milestone that matters)
-- **Offline shift login** — evaluate local roster, 30/15/5-min warnings, hard auto-logout
-  that closes any open record; supervisor extend; enrollment-gated offline replica (root
-  §4.3/§4.3c).
+- **Offline staff login** — scheduled or 24-hour access, overnight/full-day rosters,
+  informational reminders and manual sign-out; administrator inactivity expiry and
+  enrollment-gated offline replica (root §4.3/§4.3c).
 - **Registration** — NASADOR form, offline dedup prompt ("Is this the same person?"),
   Patient ID generation `FACILITYCODE-SEQ-XX` (root §4.2), legacy paper-ref field.
 - **Search** — fast local search with duplicate check.
@@ -213,7 +213,7 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
   from FE-M0, not retrofitted.
 - **Print:** referral note and monthly summary must print cleanly from a cheap browser —
   design print stylesheets early.
-- **Session security:** encrypted sensitive fields at rest; auto-logout wipes on-screen state;
+- **Session security:** encrypted sensitive fields at rest; sign-out wipes on-screen state;
   un-enrolled devices keep **nothing** durable and wipe session data at logout (root §4.3c).
 - **Encryption at rest (decided, October 2026)** — the whole SQLite replica is encrypted
   (ChaCha20, PowerSync's `encryptionKey`) with a random key; that key, the device credential
@@ -310,3 +310,46 @@ Target-phone usability and full offline/reconnect field testing remain outstandi
    screens can use real records.
 4. Measure the encrypted replica on the target phone (§7): first sync, a register list, sign-in
    time with 100,000-round PBKDF2.
+
+## Staff editing and combined duties (October 2026)
+
+- Staff → Edit staff updates the name, primary role, additional roles, extra action
+  permissions and read-only/read-write access. The same form adds new staff.
+- Effective access is the union of assigned-role permissions and additional grants.
+  Read-only suppresses every mutation. Primary role remains the clinical attribution;
+  old clinical entries, staff IDs, PINs and roster records are preserved.
+- Name changes require staff:manage; role/access changes require staff:permission.
+  Creating staff requires both. Every required permission is checked before writing.
+- Navigation and sign-in labels reflect combined duties. An additional administrator
+  role gets the same idle-limited admin login as a primary administrator.
+- PIN approval requires sufficient access for the target account; a name-management
+  delegate cannot take over an administrator. The last working administrator cannot
+  be demoted, made read-only or deactivated. The server enforces the final decision.
+- Requires the matching geneus-shared contract (policy v5) and server migration 0009.
+  Deploy the server and regenerated sync streams before the new frontend. Existing
+  single-role staff remain valid; optional access arrays need no schema-version bump.
+
+Validation for combined staff access: 178 frontend tests and 270 server/shared
+tests pass, including real SQLite persistence and PostgreSQL authorization,
+migration and concurrency checks. Seven isolated Chrome checks pass across phone
+and desktop layouts, with no browser exceptions. Both typechecks, the production
+frontend build, diff checks and the bundle budget pass (110.3 KB initial JS gzipped).
+The validated copies match the authoritative source files; consumer submodules
+remain pinned until the owner commits the contract and promotes both pointers.
+
+## Flexible staff sign-in and manual sign-out (October 2026)
+
+The user's updated policy supersedes roster-end logout in the earlier design.
+Optional staff.loginAccess selects scheduled fresh sign-in or ongoing 24-hour
+sign-in without a roster. Existing staff default to scheduled access. This field
+requires staff:permission to edit, not merely permission to edit names or shifts.
+
+A successful staff session survives shift end, midnight and reload. Manual sign-out
+or deactivation clears the saved identity; reactivation never revives it.
+Administrator inactivity expiry, PIN checks and offline freshness checks remain.
+The roster is reselected as time changes and searches actual windows across
+midnight. The editor supports next-day and full 24-hour duty, preserving record IDs.
+Reassigning a window replaces a previous extension with the newly chosen end.
+
+Reminders, profile/home labels, sign-in and Sync & device describe the same policy.
+Around-the-clock access never appears as administrator access for ordinary staff.

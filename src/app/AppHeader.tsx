@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Icon, useToast } from '@/ui';
-import { useAuthorizationContext } from '@/session';
+import { useAuth, useAuthorizationContext } from '@/session';
+import { accessLabel } from '@/session/accessPolicy';
 import { SyncPill } from './SyncPill';
 import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/session';
 import { NotificationList } from './NotificationList';
@@ -40,7 +41,7 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
 
 export const AppHeader = () => {
   const navigate = useNavigate();
-  const { facility, shift, unreadCount, markAllRead } = useSession();
+  const { facility, shift, access, unreadCount, markAllRead } = useSession();
   const [open, setOpen] = useState(false);
 
   const toggle = () => {
@@ -74,10 +75,10 @@ export const AppHeader = () => {
           type="button"
           onClick={() => navigate('/sync')}
           className="flex min-h-0 items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1.5 text-xs font-bold text-ink-soft"
-          aria-label={shift ? `Shift ends at ${shift.endsAtLabel}` : 'Admin access — signs out after 30 minutes idle'}
+          aria-label={shift ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}; sign-out is manual` : accessLabel(access)}
         >
           <Icon name={shift ? 'clock' : 'lock'} className="h-4 w-4" />
-          {shift ? <span className="font-mono">{shift.endsAtLabel}</span> : <span>Admin access</span>}
+          {shift ? <span className="font-mono">{shift.ended ? 'Shift ended' : shift.endsAtLabel}</span> : <span>{accessLabel(access)}</span>}
         </button>
 
         {/* Notification bell */}
@@ -104,79 +105,31 @@ export const AppHeader = () => {
 };
 
 /** Colour ramp shared by the desktop banner and the mobile strip. */
-const shiftTone = (minutesLeft: number) => {
-  if (minutesLeft <= 5) return 'bg-danger-bg border-danger text-danger-strong';
-  if (minutesLeft <= 15) return 'bg-amber-bg border-amber text-amber-text';
-  return 'bg-amber-bg border-amber-border text-amber-text';
+/** Roster reminders are informational. Shift end never closes the session. */
+const ShiftNotice = ({ shift, compact }: { shift: Shift; compact: boolean }) => {
+  const [dismissed, setDismissed] = useState(false);
+  const seconds = useShiftCountdown(shift.minutesLeft, shift.endsOn);
+  const { signOut } = useAuth();
+  if (dismissed || shift.minutesLeft > 30) return null;
+  return <div role="status" className={`items-center gap-2 border-amber-border bg-amber-bg px-4 py-2 text-amber-text ${compact ? 'flex border-t sm:hidden' : 'hidden border-b sm:flex'}`}>
+    <Icon name="clock" className="h-[18px] w-[18px] flex-none" />
+    <div className="min-w-0 flex-1">
+      <div className="text-[13px] font-bold">{seconds === 0 ? 'Shift ended' : <>Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span></>}</div>
+      <p className="text-xs">You stay signed in. Sign out when finished.</p>
+    </div>
+    <ExtendShiftAction />
+    <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" onClick={signOut}>Sign out</Button>
+    {!compact ? <button type="button" aria-label="Dismiss shift reminder" onClick={() => setDismissed(true)} className="flex h-9 w-9 min-h-0 flex-none items-center justify-center"><Icon name="close" className="h-4 w-4" /></button> : null}
+  </div>;
 };
 
-/**
- * Escalating shift banner — TABLET & DESKTOP ONLY. Auto-logout closes any open
- * record (PRD §14.1), so the warning escalates calm → amber → red and shows a
- * live countdown. On phones the slim ShiftCountdownStrip does this job instead.
- */
 export const ShiftBanner = () => {
   const { shift } = useSession();
-  return shift ? <ShiftBannerFor shift={shift} /> : null;
+  return shift ? <ShiftNotice key={shift.endsOn} shift={shift} compact={false} /> : null;
 };
-
-const ShiftBannerFor = ({ shift }: { shift: Shift }) => {
-  const [dismissed, setDismissed] = useState(false);
-  const seconds = useShiftCountdown(shift.minutesLeft);
-  const { minutesLeft, endsAtLabel } = shift;
-
-  if (dismissed || minutesLeft > 30) return null;
-
-  return (
-    <div className={`hidden items-center gap-3 border-b px-4 py-2.5 sm:flex ${shiftTone(minutesLeft)}`} role="alert">
-      <Icon name={minutesLeft <= 5 ? 'warning' : 'clock'} className="h-5 w-5" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-bold">
-          Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span>
-        </div>
-        <div className="text-[12px] opacity-90">
-          You'll be signed out at {endsAtLabel} on every device — finish and tidy up open records.
-        </div>
-      </div>
-      <ExtendShiftAction />
-      <button
-        type="button"
-        onClick={() => setDismissed(true)}
-        aria-label="Dismiss"
-        className="flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-lg"
-      >
-        <Icon name="close" className="h-4 w-4" />
-      </button>
-    </div>
-  );
-};
-
-/**
- * Slim shift countdown for PHONES — sits just above the bottom nav on every signed-in
- * screen, so it never
- * pushes a screen's pinned footer action below the fold. Only appears in the
- * last 30 minutes of a shift; escalates and shows a live m:ss countdown.
- */
 export const ShiftCountdownStrip = () => {
   const { shift } = useSession();
-  return shift ? <ShiftCountdownStripFor shift={shift} /> : null;
-};
-
-const ShiftCountdownStripFor = ({ shift }: { shift: Shift }) => {
-  const navigate = useNavigate();
-  const seconds = useShiftCountdown(shift.minutesLeft);
-
-  if (shift.minutesLeft > 30) return null;
-
-  return (
-    <div className={`flex items-center gap-2 border-t px-4 py-2 sm:hidden ${shiftTone(shift.minutesLeft)}`} role="alert">
-      <Icon name={shift.minutesLeft <= 5 ? 'warning' : 'clock'} className="h-[18px] w-[18px]" />
-      <button type="button" onClick={() => navigate('/sync')} className="min-h-0 flex-1 text-left text-[13px] font-bold">
-        Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span>
-      </button>
-      <ExtendShiftAction />
-    </div>
-  );
+  return shift ? <ShiftNotice key={shift.endsOn} shift={shift} compact /> : null;
 };
 
 const ExtendShiftAction = () => {
@@ -186,12 +139,11 @@ const ExtendShiftAction = () => {
   const [busy, setBusy] = useState(false);
   const allowed = context.permissions.includes('roster:extend');
   const extend = async () => {
-    if (busy) return;
-    if (!allowed) { toast('Ask a supervisor or facility admin to extend your shift before it ends.', { tone: 'info' }); return; }
+    if (busy || !allowed) return;
     setBusy(true);
     try { await extendShift(); toast('Shift extended'); }
     catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not extend the shift', { tone: 'error' }); }
     finally { setBusy(false); }
   };
-  return <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" loading={busy} onClick={() => void extend()}>{allowed ? 'Extend' : 'Ask supervisor'}</Button>;
+  return allowed ? <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" loading={busy} onClick={() => void extend()}>Extend</Button> : null;
 };

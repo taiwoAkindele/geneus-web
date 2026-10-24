@@ -112,7 +112,7 @@ export const SendToUnitScreen = () => {
           ) : active.length < 2 ? (
             <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] leading-relaxed text-ink-muted">
               This facility needs at least two units to send patients between them.{' '}
-              {user.roleId === 'facility_admin' ? (
+              {user.roles.includes('facility_admin') ? (
                 <button type="button" className="font-bold text-brand" onClick={() => navigate('/admin/units')}>
                   Set up units
                 </button>

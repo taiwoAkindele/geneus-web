@@ -114,3 +114,39 @@ Registering a facility (or spending an enrollment code) stores a **device creden
 and nothing about *who*: who is signed in is the offline shift session (`src/session`).
 A device whose credential the server no longer accepts clears its local database and
 returns to onboarding.
+
+## Editing staff and assigning combined access
+
+From **Staff → Edit staff**, an administrator can change the name, select several
+roles, choose a primary role, and grant additional actions individually. Roles
+combine their permissions; **Read only** overrides them all. The primary role is
+stamped on new clinical contributions, while older contributions keep their
+original attribution. The same controls are available when adding staff.
+
+Name management and access assignment are separate permissions. A delegate who
+can edit names cannot change roles, create privileged accounts or reset an admin's
+PIN. The last administrator with write access is protected from removal or demotion.
+
+This feature requires the updated shared contract and server migration 0009.
+Update both shared submodule pointers after committing geneus-shared; deploy the
+server and regenerated sync streams before deploying this frontend. Validation
+copies can combine the uncommitted contract with the apps without modifying the
+pinned submodule checkouts.
+
+## 24-hour access and overnight shifts
+
+Choose **Staff → Edit staff → Sign-in access → 24-hour access** for someone who
+can sign in every day without a roster. Their roles and write permissions stay
+separate. Scheduled staff still need an active window for a fresh PIN sign-in.
+
+In **Staff → Shift**, choose **Next day** for overnight duty, or **Make a 24-hour
+shift** for a full-day window. The following-day end appears in roster labels.
+
+Shift end never signs staff out automatically. Existing sessions survive the end
+of a roster, midnight and reload; staff sign out when finished. Deactivation closes
+access after the device receives the change, and reactivation needs a new sign-in.
+Administrator sessions still expire after 30 minutes without activity.
+
+This change uses shared policy v6 and server migration 0010. Commit the shared
+contract and update both consumer submodules; deploy the server migration and
+regenerated staff sync stream before the matching frontend.

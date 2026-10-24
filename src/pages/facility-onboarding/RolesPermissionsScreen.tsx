@@ -1,145 +1,34 @@
-import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { permissionsFor, type Role, type StaffPermission } from '@shared';
-import { AppBar, Avatar, Button, Card, Icon, ToggleSwitch, useToast } from '@/ui';
+import { AppBar, Button, useToast } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { setPermission } from '@/data/repos/staff';
+import { editStaff, type StaffDetails } from '@/data/repos/staff';
 import { useAuth, useAuthorizationContext } from '@/session';
-
-const ROLE_LABELS: Record<string, string> = {
-  chew: 'CHEW',
-  nurse: 'Nurse',
-  doctor: 'Doctor',
-  records_officer: 'Records',
-  facility_admin: 'Facility Admin',
-  supervisor: 'Supervisor',
-  cashier: 'Cashier',
-};
-
-/** What each role may reach, beyond recording care. Derived, not stored. */
-const roleCapabilities = (role: Role): { label: string; allowed: boolean }[] => {
-  const permissions = permissionsFor(role, 'read_write');
-  return [
-    { label: 'View patient records', allowed: true },
-    { label: 'Refer to other facilities', allowed: permissions.includes('referral:create') },
-    { label: 'Manage medicine stock', allowed: permissions.includes('stock_item:manage') },
-    { label: 'Invite & manage staff', allowed: permissions.includes('staff:manage') },
-    { label: 'Manage the fee schedule', allowed: permissions.includes('fee_item:manage') },
-    { label: 'Take payments', allowed: permissions.includes('payment:receive') },
-    { label: 'Waive fees & reverse payments', allowed: permissions.includes('payment:waive') && permissions.includes('payment:reverse') },
-  ];
-};
+import { StaffForm } from '@/features/staff/StaffForm';
 
 export const RolesPermissionsScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { staffId } = (useLocation().state ?? {}) as { staffId?: string };
-  const { roster } = useAuth();
+  const { roster, loading, error, reload } = useAuth();
   const context = useAuthorizationContext();
-  const [saving, setSaving] = useState(false);
-  const [permission, setLocalPermission] = useState<StaffPermission>();
-
-  const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
   if (!staffId) return <Navigate to="/admin/staff" replace />;
-  if (!entry) {
-    return (
-      <div className="min-h-screen bg-surface">
-        <AppBar title="Access" onBack={() => navigate(-1)} />
-        <p className="px-5 py-6 text-ink-muted">That staff member is no longer on the roster.</p>
-      </div>
-    );
-  }
-
-  const { staff } = entry;
-  const current = permission ?? staff.permission;
-  const firstName = staff.fullName.split(' ')[0];
-
-  const save = async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await setPermission(staff, current, context);
-      toast(
-        current === 'read_write'
-          ? `${firstName} can record and change records`
-          : `${firstName} can view records only`,
-      );
-      navigate('/admin/staff');
-    } catch (cause) {
-      toast(cause instanceof Error ? cause.message : 'Could not save that change');
-      setSaving(false);
-    }
+  const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
+  const save = async (details: StaffDetails) => {
+    if (!entry) return;
+    await editStaff(entry.staff, details, context);
+    toast(`${details.fullName} updated`);
+    navigate('/admin/staff');
   };
-
-  return (
-    <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title={`${firstName}'s access`} onBack={() => navigate(-1)} right={<SyncPill />} />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
-        <div className="flex-1 space-y-4 px-5 py-3">
-          <Card className="flex items-center gap-3">
-            <Avatar tone="green">
-              {staff.fullName
-                .split(' ')
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join('')}
-            </Avatar>
-            <div>
-              <div className="text-base font-bold">{staff.fullName}</div>
-              <div className="text-[13px] text-ink-muted">
-                {ROLE_LABELS[staff.role] ?? staff.role} ·{' '}
-                {staff.permission === 'read_write' ? 'Read & write' : 'Read only'}
-              </div>
-            </div>
-          </Card>
-
-          <div className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Recording care</div>
-          <Card className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[15px] font-semibold">Create &amp; edit records</div>
-              <div className="mt-0.5 text-[13px] text-ink-muted">
-                Turn off to let {firstName} view records without changing anything.
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={current === 'read_write'}
-              ariaLabel="Create and edit records"
-              onChange={(on) => setLocalPermission(on ? 'read_write' : 'read_only')}
-            />
-          </Card>
-
-          <div className="text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">
-            Comes with the {ROLE_LABELS[staff.role] ?? staff.role} role
-          </div>
-          <Card padded={false} className="divide-y divide-outline-soft">
-            {roleCapabilities(staff.role).map((capability) => (
-              <div key={capability.label} className="flex items-center justify-between px-4 py-3.5">
-                <span className={`text-[15px] ${capability.allowed ? 'font-semibold text-ink' : 'text-ink-muted'}`}>
-                  {capability.label}
-                </span>
-                <Icon
-                  name={capability.allowed ? 'check' : 'lock'}
-                  className={`h-4 w-4 ${capability.allowed ? 'text-brand' : 'text-ink-muted'}`}
-                />
-              </div>
-            ))}
-          </Card>
-          <p className="text-xs leading-relaxed text-ink-muted">
-            These follow the role and cannot be set per person — change the role to change them.
-          </p>
-        </div>
-
-        <footer className="px-5 pb-6 pt-4">
-          <Button
-            variant="primary"
-            disabled={current === staff.permission || saving}
-            loading={saving}
-            onClick={save}
-          >
-            Save access
-          </Button>
-        </footer>
-      </div>
+  return <div className="min-h-screen bg-surface">
+    <AppBar title="Edit staff" onBack={() => navigate('/admin/staff')} right={<SyncPill />} />
+    <div className="mx-auto w-full max-w-xl px-5 py-4">
+      {loading ? <div role="status" aria-label="Loading staff member" className="h-32 animate-pulse rounded-card bg-surface-muted" />
+        : error ? <div role="alert">Staff could not be read.<Button variant="ghost" onClick={reload}>Try again</Button></div>
+        : !entry ? <p className="text-sm text-ink-muted">That staff member is no longer on the active roster.</p>
+        : <StaffForm key={entry.staff.id} initial={entry.staff}
+          canEditName={context.permissions.includes('staff:manage')}
+          canEditAccess={context.permissions.includes('staff:permission')}
+          submitLabel="Save staff changes" onSave={save} />}
     </div>
-  );
+  </div>;
 };

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Button, Stat, StatusPill } from '@/ui';
 import { indicatorFor, useSyncStatus } from '@/data';
-import { useAuth } from '@/session';
+import { accessLabel } from '@/session/accessPolicy';
+import { useAuth, useSession } from '@/session';
 import { ReconcileQueue } from '@/features/reconcile';
 
 const lastSyncedLabel = (at: Date | undefined): string => {
@@ -16,12 +17,13 @@ const lastSyncedLabel = (at: Date | undefined): string => {
 
 /**
  * 4.10 Sync center & shift warning. Sync state is honest — nothing is lost when
- * the internet drops — and the system closes access on time, fairly. The
+ * the internet drops — and staff can sign out without waiting for sync. The
  * numbers are PowerSync's own: the upload queue and the last completed sync.
  */
 export const SyncCenterScreen = () => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { shift, access } = useSession();
   const sync = useSyncStatus();
   const indicator = indicatorFor(sync);
   const headline =
@@ -60,33 +62,11 @@ export const SyncCenterScreen = () => {
             </p>
           </div>
 
-          {/* Shift warning */}
-          <div className="rounded-[18px] border border-amber-border bg-amber-bg p-4">
-            <div className="mb-2.5 flex items-center gap-3">
-              <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-amber font-mono text-[13px] font-bold text-white">
-                30
-              </span>
-              <span className="text-[17px] font-extrabold text-amber-text">Your shift ends in 30 min</span>
-            </div>
-            <p className="text-sm leading-relaxed text-amber-text">
-              Please finish and tidy up any open records. At 15:00 you&rsquo;ll be logged out
-              automatically, on every device.
-            </p>
-            <div className="mt-4 flex gap-2.5">
-              <button
-                type="button"
-                className="flex-1 rounded-xl border border-amber-border bg-white px-3 py-3 text-sm font-bold text-amber-text"
-              >
-                Ask supervisor to extend
-              </button>
-              <button
-                type="button"
-                className="flex-none rounded-xl bg-amber px-5 py-3 text-sm font-bold text-white"
-              >
-                OK
-              </button>
-            </div>
-          </div>
+          {/* Roster information does not close the signed-in session. */}
+          <section className="rounded-[18px] border border-outline-soft bg-white p-4" aria-label="Sign-in and shift status">
+            <h2 className="text-[17px] font-extrabold">{shift ? shift.ended ? 'Shift ended' : `Shift ends ${shift.endsAtLabel}` : accessLabel(access)}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{access === 'admin' ? 'You can sign in at any time. Administrator sessions still close after 30 minutes without activity.' : access === 'always' ? 'You can sign in at any time, every day, without a roster window. Sign out when finished.' : 'Your shift controls new sign-ins. An existing session stays open after the shift ends. Sign out when finished.'}</p>
+          </section>
 
           {/* Reconcile queue — refused uploads wait here for a person, never silently dropped */}
           <div className="lg:col-span-2">
@@ -96,13 +76,13 @@ export const SyncCenterScreen = () => {
 
           <div className="flex items-center gap-2.5 px-1 lg:col-span-2">
             <span className="h-2 w-2 rounded-full bg-brand-strong" />
-            <span className="text-[13px] text-ink-soft">Roster attendance recorded automatically</span>
+            <span className="text-[13px] text-ink-soft">Sign out before sharing this device</span>
           </div>
         </div>
 
         <footer className="px-5 pb-6 pt-4">
           <Button variant="danger-outline" onClick={signOut}>
-            End shift now
+            Sign out
           </Button>
         </footer>
       </div>
