@@ -3,6 +3,7 @@ import { useLiveQuery, type LiveQuery } from '@/data';
 import { closingEntries, encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters } from '@/data/repos/encounters';
 import { summariseEncounter, type EncounterSummary } from './encounterSummary';
 import { QUEUE_STEPS, stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
+import { patientIdentityIds } from '@/data/repos/patientIdentity';
 
 /** How many finished encounters the hub lists; older ones live on each patient's profile. */
 const RECENTLY_CLOSED = 20;
@@ -33,7 +34,7 @@ export const useEncounterList = (): LiveQuery<{ open: EncounterSummary[]; closed
 /** One patient's encounters, newest first — their history on the profile (PRD §9.8.1, step 7). */
 export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSummary[]> => {
   const load = useCallback(async () => {
-    const encounters = await encountersForPatient(patientId);
+    const encounters = (await Promise.all((await patientIdentityIds(patientId)).map(encountersForPatient))).flat();
     const summaries = await Promise.all(
       encounters.map(async (encounter) => summariseEncounter(encounter, await entriesForEncounter(encounter.id))),
     );

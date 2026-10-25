@@ -2,6 +2,7 @@ import { CLOSING_STEPS, type AuthorizationContext, type Encounter, type Encounte
 import { allOfType, allWhere, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
 import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient } from './billing';
+import { patientIdentityIds } from './patientIdentity';
 
 /**
  * Encounters (PRD §9.8, SCHEMA.md §13): a header and add-only entries, one per
@@ -49,7 +50,9 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
 
   const encounterId = save.encounterId ?? newId('encounter');
   if (!save.encounterId) {
-    const [charges, payments, adjustments, appointments] = await Promise.all([chargesForPatient(save.patientId), paymentsForPatient(save.patientId), adjustmentsForPatient(save.patientId), listAppointments()]);
+    const ids = await patientIdentityIds(save.patientId);
+    const [chargeGroups, paymentGroups, adjustmentGroups, appointments] = await Promise.all([Promise.all(ids.map(chargesForPatient)), Promise.all(ids.map(paymentsForPatient)), Promise.all(ids.map(adjustmentsForPatient)), listAppointments()]);
+    const charges = chargeGroups.flat(), payments = paymentGroups.flat(), adjustments = adjustmentGroups.flat();
     const appointment = appointments.find((a) => a.id === save.appointmentId);
     const unpaid = save.appointmentId ? !isAppointmentConfirmed(save.appointmentId, charges, payments, adjustments, appointment?.chargeIds) : false;
     if (unpaid && !save.collectLaterReason?.trim()) throw new Error('Give a See now — collect later reason to continue care');

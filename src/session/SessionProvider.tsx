@@ -191,7 +191,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [staffId]);
 
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
-  const active = Boolean(entry && mayStaySignedIn(entry, now, lastActivity.current));
+  // `now` is a coarse display tick. Input can update lastActivity between
+  // ticks, so comparing it with `now` mistakes fresh activity for a clock
+  // rollback when a database/sync refresh renders this provider again.
+  const active = Boolean(entry && mayStaySignedIn(entry, Date.now(), lastActivity.current));
 
   const signOut = useCallback(() => {
     localStorage.removeItem(SIGNED_IN_KEY);

@@ -8,7 +8,9 @@ import { setDatabaseForTests, type LocalDatabase } from './database';
 import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { assignShift, createStaff, editStaff, extendShift, findShift, listShifts, listStaff } from './repos/staff';
-import { registerPatient, updatePatient } from './repos/patients';
+import { registerPatient, updatePatient, getPatient } from './repos/patients';
+import { fromPatient, toPatientDetails } from '@/features/registration/registrationValues';
+import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from './repos/patientIdentity';
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
   isAppointmentConfirmed, listFeeItems, paymentsForPatient, recordPayment, reversePayment,
@@ -168,6 +170,43 @@ describe('the write path against a real SQLite', () => {
     );
 
     expect(updated.address).toBe('Mokola');
+  });
+
+  it('clears optional fields through real SQLite and preserves the original age anchor on unrelated edits', async () => {
+    const context = contextFor('records_officer');
+    const patient = await registerPatient({ fullName: 'Test Patient', address: 'Test address', sex: 'female', ageYears: 30, ageObservedOn: '2020-06-01', phone: '08035550147', nin: '12345678901' }, context);
+    const form = fromPatient(patient);
+    const updated = await updatePatient(patient.id, toPatientDetails({ ...form, phone: '', nin: '', address: 'New address' }), context);
+    expect(updated.ageYears).toBe(30); expect(updated.ageObservedOn).toBe('2020-06-01');
+    expect(updated.phone).toBeUndefined(); expect(updated.nin).toBeUndefined();
+    expect((await getPatient(patient.id))?.phone).toBeUndefined();
+  });
+
+  it('persists registration review decisions with the patient and resolves aliases only after server confirmation', async () => {
+    const context = contextFor('records_officer');
+    const first = await registerPatient({ fullName: 'Test Patient', address: 'Test', sex: 'female', ageYears: 30 }, context);
+    const second = await registerPatient({ fullName: 'Test Patient', address: 'Test', sex: 'female', ageYears: 30 }, context, (id) => identityReviewRecords(id, { candidateIds: [first.id], outcome: 'review_requested', reason: 'Identity uncertain at registration' }, context));
+    expect((await listIdentityEvents())[0].otherPatientId).toBe(first.id);
+    expect(await patientIdentityIds(second.id)).toEqual([second.id]);
+    // A downloaded server event, inserted directly to stand in for sync, not a local mutation.
+    await db.execute('INSERT INTO patient_identity_events (id, facilityId, schemaVersion, createdBy, createdOn, deviceId, patientId, otherPatientId, outcome, reason, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['server-link', context.facilityId, 3, context.userId, new Date().toISOString(), context.deviceId, first.id, second.id, 'linked', 'Confirmed by records officer', 1]);
+    expect((await patientIdentityIds(second.id)).sort()).toEqual([first.id, second.id].sort());
+  });
+
+  it('recognises linked registration fees at booking and keeps collect-later attribution on the original appointment', async () => {
+    const context = contextFor('records_officer');
+    const primary = await registerPatient({ fullName: 'Linked Patient', address: 'Test', sex: 'female', ageYears: 30 }, context);
+    const alias = await registerPatient({ fullName: 'Linked Patient', address: 'Test', sex: 'female', ageYears: 30 }, context);
+    const fee = await createFeeItem({ name: 'Registration', category: 'registration', amountMinor: 100000, currency: 'NGN', chargeWhen: 'first_visit', exemptions: [] }, contextFor('facility_admin'));
+    const charge = await createCharge(fee.id, { patientId: primary.id, facts: { sex: 'female', ageYears: 30 } }, context);
+    await db.execute('INSERT INTO patient_identity_events (id, facilityId, schemaVersion, createdBy, createdOn, deviceId, patientId, otherPatientId, outcome, reason, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['server-link', context.facilityId, 3, context.userId, new Date().toISOString(), context.deviceId, primary.id, alias.id, 'linked', 'Confirmed same person', 1]);
+    const appointment = await book({ patientId: alias.id, reason: 'Review' }, context);
+    expect(await chargesForPatient(alias.id)).toEqual([]);
+    expect(appointment.chargeIds).toEqual([charge.id]);
+    await expect(saveStep({ patientId: alias.id, appointmentId: appointment.id, step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'))).rejects.toThrow(/collect later/);
+    const entry = await saveStep({ patientId: alias.id, appointmentId: appointment.id, step: 'vitals', values: { temperatureC: 37 }, collectLaterReason: 'Urgent care authorised' }, contextFor('nurse'));
+    expect(entry.patientId).toBe(alias.id);
+    expect((await getPatient(primary.id))?.patientId).toBe(primary.id);
   });
 
   it('saves a register entry, which also keeps its answers in `values`', async () => {

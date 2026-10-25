@@ -32,6 +32,11 @@ describe('connector', () => {
   });
 
   describe('toMutation', () => {
+    it('carries explicit patient clears and null base values through the upload boundary', () => {
+      const clear = toMutation(entry({ op: 'PATCH' as CrudEntry['op'], table: 'patients', id: 'OOE-000001-K2', opData: { phone: null, dateOfBirth: null, ageYears: 30 }, previousValues: { phone: '0801', dateOfBirth: null } }));
+      expect(clear.data.phone).toBeNull(); expect(clear.data.dateOfBirth).toBeNull();
+      expect(clear.previous?.dateOfBirth).toBeNull();
+    });
     it('maps an insert to a put with contract values', () => {
       const mutation = toMutation(entry({ op: 'PUT' as CrudEntry['op'], table: 'patients', id: 'X-Y-000001-K2', opData: { fullName: 'Amaka', dobEstimated: 1, allergies: '["a"]' } }));
 

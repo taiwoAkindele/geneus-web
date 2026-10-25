@@ -9,6 +9,7 @@ export const roleLabel = (staff: Pick<Staff, 'role' | 'additionalRoles'>): strin
 
 export const PERMISSION_LABELS: Record<AssignablePermission, string> = {
   'patient:create': 'Register patients', 'patient:update': 'Edit patient details',
+  'patient_identity:review': 'Flag patient identity reviews', 'patient_identity:resolve': 'Resolve patient identities',
   'appointment:create': 'Book appointments', 'visit:create': 'Record visits',
   'encounter:record': 'Record clinical encounter steps',
   'handoff:create': 'Send patients to another unit', 'handoff:update': 'Update unit handoffs',

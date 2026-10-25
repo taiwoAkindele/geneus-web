@@ -96,6 +96,7 @@ const DuplicateCheckScreen = lazy(() =>
     default: m.DuplicateCheckScreen,
   })),
 );
+const IdentityReviewScreen = lazy(() => import('@/pages/patient-registration/IdentityReviewScreen').then((m) => ({ default: m.IdentityReviewScreen })));
 const SendToUnitScreen = lazy(() =>
   import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
@@ -173,6 +174,7 @@ const App = () => {
           <Route element={<AppShell />}>
             <Route path="/home" element={<FacilityHomeScreen />} />
             <Route path="/patients/search" element={<PatientSearchScreen />} />
+            <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
             <Route path="/encounters" element={<EncountersScreen />} />
             <Route path="/encounters/record" element={<EncounterScreen />} />

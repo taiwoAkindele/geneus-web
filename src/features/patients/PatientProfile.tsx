@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { Patient } from '@shared';
 import { AppBar, Avatar, Button, Tag } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
-import { useAuthorizationContext } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
+import { PatientCard } from './PatientCard';
+import { PatientIdentityPanel } from './PatientIdentityPanel';
 import { APPOINTMENT_GROUP_LABELS, BookAppointmentSheet, useAppointments, type AppointmentPatient, type BookedAppointment } from '@/features/appointments';
 import { EncounterCard, usePatientEncounters, type EncounterNavState } from '@/features/encounter';
 import { fromPatient, useBeginRegistration, type RegistrationNavState } from '@/features/registration';
@@ -45,12 +47,14 @@ const Message = ({ children }: { children: React.ReactNode }) => (
 export const PatientProfile = ({ patientId, embedded = false }: { patientId?: string; embedded?: boolean }) => {
   const navigate = useNavigate();
   const context = useAuthorizationContext();
+  const { facility } = useSession();
   const beginEdit = useBeginRegistration();
   const canRecord = context.permissions.includes('encounter:record');
   const patient = usePatient(patientId);
   const encounters = usePatientEncounters(patientId ?? '');
   const { forPatient, loading: appointmentsLoading, error: appointmentsError, reload: reloadAppointments } = useAppointments();
   const [booking, setBooking] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
 
   if (!patientId) {
     return (
@@ -95,9 +99,9 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
 
   // The patient has arrived for their appointment — continue their open encounter, or start one.
   const startEncounter = () => navigate('/encounters/record', { state: { patientId: record.patientId } satisfies EncounterNavState });
-  const startAppointment = (appointment: BookedAppointment) => canRecord ? navigate('/encounters/record', { state: { patientId: record.patientId, encounterId: appointment.encounterId, appointmentId: appointment.id } }) : navigate('/appointments');
+  const startAppointment = (appointment: BookedAppointment) => canRecord ? navigate('/encounters/record', { state: { patientId: appointment.patient.id, encounterId: appointment.encounterId, appointmentId: appointment.id } }) : navigate('/appointments');
   const openEncounter = (encounterId: string) =>
-    navigate('/encounters/record', { state: { patientId: record.patientId, encounterId } satisfies EncounterNavState });
+    navigate('/encounters/record', { state: { patientId: history.find((card) => card.id === encounterId)?.patientId ?? record.patientId, encounterId } satisfies EncounterNavState });
   const history = encounters.data ?? [];
   const canBill = context.permissions.some((p) => ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(p));
 
@@ -139,6 +143,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2.5">
+            <Button variant="secondary" fullWidth={false} onClick={() => setCardOpen(true)}>Print / reprint patient card</Button>
             {canBill ? <Button variant="secondary" fullWidth={false} onClick={() => navigate(`/billing?patient=${encodeURIComponent(record.patientId)}`)}>Patient billing account</Button> : null}
             {context.permissions.includes('appointment:create') ? <Button
               variant="secondary"
@@ -165,6 +170,9 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
             </Button> : null}
           </div>
         </div>
+
+        <p className="mt-3 text-xs text-ink-muted">Identity information: {record.identityEvidence === 'document_seen' ? 'Document checked by staff' : 'Reported by patient / representative'}{record.dobEstimated || !record.dateOfBirth ? ' · Age / birth date estimated' : ''}. {record.nin && context.permissions.includes('patient:update') ? `NIN: •••••••${record.nin.slice(-4)}.` : ''}</p>
+        <PatientIdentityPanel patientId={record.patientId} />
 
         {/* appointments — this patient's upcoming / pending bookings */}
         <div className="mb-3 mt-6 flex items-center justify-between">
@@ -211,7 +219,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
             </div>
           ) : (
             history.map((card) => (
-              <EncounterCard key={card.id} card={card} patient={record} onOpen={() => openEncounter(card.id)} />
+              <div key={card.id}>{card.patientId !== record.patientId ? <p className="mb-1 text-xs text-ink-muted">Recorded under linked ID {card.patientId}</p> : null}<EncounterCard card={card} patient={record} onOpen={() => openEncounter(card.id)} /></div>
             ))
           )}
           {canRecord && !encounters.loading && !encounters.error && history.every((card) => card.status !== 'Open') ? (
@@ -223,6 +231,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
       </div>
 
       {booking ? <BookAppointmentSheet patient={reference} onClose={() => setBooking(false)} /> : null}
+      {cardOpen ? <PatientCard patient={record} facilityName={facility.name} onClose={() => setCardOpen(false)} /> : null}
     </div>
   );
 };

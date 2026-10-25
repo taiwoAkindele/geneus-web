@@ -4,6 +4,10 @@ import { Avatar, Button, DataTable, Icon, PatientIdToken } from '@/ui';
 import { currentAge, searchPatients, usePatients } from '@/features/search';
 import { PatientProfile } from '@/features/patients/PatientProfile';
 import { useAuthorizationContext } from '@/session';
+import { useLiveQuery } from '@/data';
+import { listIdentityEvents } from '@/data/repos/patientIdentity';
+import { canonicalPatientId } from '@shared';
+import { ScanPatientCard } from '@/features/patients/ScanPatientCard';
 
 const MAX_SHOWN = 50;
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('');
@@ -12,10 +16,17 @@ export const PatientSearchScreen = () => {
   const navigate = useNavigate();
   const context = useAuthorizationContext();
   const patients = usePatients();
+  const identities = useLiveQuery(listIdentityEvents);
   const [query, setQuery] = useState('');
   const [mobileLimit, setMobileLimit] = useState(MAX_SHOWN);
   const [selectedId, setSelectedId] = useState<string>();
-  const found = useMemo(() => searchPatients(patients.data ?? [], query, context.facilityId), [patients.data, query, context.facilityId]);
+  const found = useMemo(() => {
+    const list = patients.data ?? [];
+    const searchable = context.permissions.includes('patient:update') ? list : list.map((p) => ({ ...p, nin: undefined }));
+    const results = searchPatients(searchable, query, context.facilityId);
+    const byId = new Map(list.map((p) => [p.id, p]));
+    return [...new Map(results.map((p) => { const root = canonicalPatientId(p.id, identities.data ?? []); const primary = byId.get(root) ?? p; return [primary.id, primary] as const; })).values()];
+  }, [patients.data, query, context.facilityId, context.permissions, identities.data]);
   const shown = found.slice(0, mobileLimit);
   const open = (patientId: string) => navigate('/patients/profile', { state: { patientId } });
 
@@ -26,6 +37,9 @@ export const PatientSearchScreen = () => {
           <div className="flex items-center gap-2"><button type="button" aria-label="Back" onClick={() => navigate('/home')} className="-ml-2 flex h-11 w-11 min-h-0 items-center justify-center"><Icon name="back" className="h-6 w-6" /></button><h1 className="text-[24px] font-extrabold tracking-[-0.02em]">Find a patient</h1></div>
           {context.permissions.includes('patient:create') ? <Button fullWidth={false} className="px-4" onClick={() => navigate('/patients/new')}>＋ Add patient</Button> : null}
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><ScanPatientCard onRead={setQuery} />{context.permissions.some((p) => ['patient_identity:review', 'patient_identity:resolve'].includes(p)) ? <Button variant="outlined" fullWidth={false} onClick={() => navigate('/patients/identity')}>Review duplicate patients</Button> : null}</div>
+        <p className="text-xs text-ink-muted">Search covers records currently on this device, including old folder numbers{context.permissions.includes('patient:update') ? ' and exact NIN' : ''}. A missing result may still be waiting to synchronise.</p>
+        {identities.error ? <p role="alert" className="text-sm text-danger">Linked identities could not be read. <button onClick={identities.reload}>Try again</button></p> : null}
         <div className="flex items-center gap-3 rounded-field border-[1.5px] border-outline bg-white px-4 py-3">
           <Icon name="search" className="h-5 w-5 text-ink-muted" /><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setMobileLimit(MAX_SHOWN); }} aria-label="Search patients" placeholder="Name, phone or Patient ID…" autoComplete="off" className="min-h-0 min-w-0 flex-1 border-0 p-0 text-base outline-none" />
         </div>

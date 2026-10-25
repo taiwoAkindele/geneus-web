@@ -188,3 +188,21 @@ Git promotion and production configuration remain with the owner.
 All staff accounts, including 24-hour access, now expire after 30 minutes without
 activity. Shift end still does not end an active session. Sleep, reload and the first
 input after expiry cannot revive an expired session; sync is independent of sign-out.
+
+
+## Patient registration and identity
+
+Use Patients -> Add patient for registration, and Patients -> Review duplicate
+patients for identity review. NIN is optional; a document checked by staff is not
+verification by an identity provider. Patient profiles offer card print/reprint.
+QR photo scanning uses browser BarcodeDetector support; manual ID entry works on
+all supported browsers. No patient information is sent to a QR-generation service.
+
+Clinical staff can flag uncertain identities. Records officers/admins can preview
+and confirm links, mark different people and correct mistaken links online. Linked
+history identifies the original patient ID; billing accounts stay separate and
+accessible. Linking never cancels a fee or rewrites a receipt.
+
+This build needs migration 0012, policy v8 and the matching generated sync streams.
+Promote the authoritative geneus-shared changes to both consumer submodules through
+the owner-managed Git workflow before deployment. See ../docs/PATIENT-IDENTITY-PLAN.md.

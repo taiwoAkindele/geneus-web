@@ -1,6 +1,6 @@
-import { Patient, type AuthorizationContext } from '@shared';
+import { Patient, patientAge, type AuthorizationContext } from '@shared';
 import { mintPatientId } from '@/lib/patientId';
-import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord } from '../db';
+import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
 import { listFeeItems, newCharge, patientBillingFacts } from './billing';
 
 export const listPatients = () => allOfType<Patient>('patient');
@@ -12,13 +12,13 @@ export const getPatient = (patientId: string) => findRecord<Patient>('patient', 
 export type PatientDetails = Pick<
   Patient,
   'fullName' | 'address' | 'sex' | 'ageYears' | 'dateOfBirth' | 'phone' | 'occupation' | 'religion' | 'legacyPaperRef'
->;
+> & Partial<Pick<Patient, 'dobEstimated' | 'ageObservedOn' | 'nin' | 'identityEvidence' | 'identityEvidenceNote'>>;
 
 /**
  * Registers a new patient under a Patient ID minted here, offline. The
  * facility's code is its id — the server holds the two equal (SCHEMA.md §4).
  */
-export const registerPatient = async (details: PatientDetails, context: AuthorizationContext): Promise<Patient> => {
+export const registerPatient = async (details: PatientDetails, context: AuthorizationContext, extraRecords?: (patientId: string) => NewRecord[]): Promise<Patient> => {
   const existing = await listPatients();
   const patientId = mintPatientId(
     context.facilityId,
@@ -36,15 +36,15 @@ export const registerPatient = async (details: PatientDetails, context: Authoriz
   const fees = (await listFeeItems()).filter((fee) => fee.active && fee.chargeWhen === 'first_visit' && !fee.exemptions.some((rule) => rule.visitTypes));
   await insertRecords(context, [{ permission: 'patient:create', type: 'patient', record: patient }, ...fees.map((fee) => ({
     permission: 'charge:create' as const, type: 'charge' as const, record: newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context),
-  }))]);
+  })), ...(extraRecords?.(patientId) ?? [])]);
   return patient;
 };
 
 /**
  * Saves only the fields that changed, so another device's edit to a different
  * field merges cleanly on the server and the same field raises a conflict
- * rather than being overwritten (SCHEMA.md §7). A cleared optional field is
- * left as it was: the contract records absence, and a patch cannot express it.
+ * rather than being overwritten (SCHEMA.md §7). Explicit null patches clear
+ * optional values; the shared contract normalises those back to absence.
  */
 export const updatePatient = async (
   patientId: string,
@@ -53,10 +53,14 @@ export const updatePatient = async (
 ): Promise<Patient> => {
   const current = await findRecord<Patient>('patient', patientId);
   if (!current) throw new Error(`no patient ${patientId} to change`);
+  const next: Record<string, unknown> = { ...details };
+  if (details.ageYears === patientAge(current) && details.dateOfBirth === current.dateOfBirth) {
+    next.ageYears = current.ageYears;
+    next.ageObservedOn = current.ageObservedOn;
+  }
   const changes = Object.fromEntries(
-    Object.entries(details).filter(
-      ([field, value]) => value !== undefined && value !== current[field as keyof Patient],
-    ),
+    Object.entries(next).filter(([field, value]) => value !== current[field as keyof Patient])
+      .map(([field, value]) => [field, value === undefined ? null : value]),
   ) as Partial<Patient>;
   if (Object.keys(changes).length === 0) return current;
   return updateRecord<Patient>(context, 'patient:update', 'patient', patientId, changes);

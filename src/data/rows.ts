@@ -9,6 +9,11 @@ import { fieldKindsFor } from './contractShape';
  */
 export type Row = Record<string, unknown>;
 
+const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
+  patient: ['dateOfBirth', 'ageYears', 'ageObservedOn', 'phone', 'nin', 'occupation', 'religion', 'legacyPaperRef', 'identityEvidenceNote'],
+  fee_item: ['departmentId'],
+};
+
 /** Record → row values, ready to bind. `undefined` becomes NULL. */
 export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
   const kinds = fieldKindsFor(type);
@@ -42,7 +47,10 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
   const kinds = fieldKindsFor(type);
   const record: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(row)) {
-    if (value === null || value === undefined) continue;
+    if (value === null || value === undefined) {
+      if (value === null && CLEARABLE[type]?.includes(field)) record[field] = null;
+      continue;
+    }
     // PowerSync's own columns (`_metadata`) are not part of the record.
     if (field.startsWith('_')) continue;
     switch (kinds[field]) {

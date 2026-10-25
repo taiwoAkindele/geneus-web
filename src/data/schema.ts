@@ -13,7 +13,8 @@ import { DRAFTS_TABLE, TABLE_FOR } from './tables';
  * cheap phone, so each one names the query it serves.
  */
 const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
-  patient: { name: ['fullName'], phone: ['phone'] },
+  patient: { name: ['fullName'], phone: ['phone'], folder: ['legacyPaperRef'], nin: ['nin'] },
+  patient_identity_event: { patient: ['patientId'], other: ['otherPatientId'] },
   appointment: { patient: ['patientId'], scheduled: ['scheduledFor'] },
   charge: { patient: ['patientId'], appointment: ['appointmentId'] },
   payment: { patient: ['patientId'], transfer: ['incomingTransferId'] },

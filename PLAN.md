@@ -399,3 +399,43 @@ against the 300 KB budget. The build used temporary public validation settings.
 Paystack responses were mocked; live provider activation, credentials, webhook delivery
 and target-phone field proof remain deployment checks. All 297 source/test files match
 the isolated validated copies. Consumer submodules stay pinned until owner promotion.
+
+
+## Patient registration and identity - first delivery (25 October 2026)
+
+Steps 1-3 of docs/PATIENT-IDENTITY-PLAN.md are implemented. Patient demographics
+support estimated birth/age, observation dates, optional NIN and staff-reported
+identity evidence. Explicit null patches clear optional patient values through
+SQLite, PowerSync upload and PostgreSQL; unrelated edits preserve age anchors.
+
+The patient workspace adds old-folder/NIN lookup, local QR cards, supported-browser
+card-photo scanning and an identity review queue. Offline decisions are review
+requests or registration observations. Only online records-officer/admin confirmation
+can link records, mark distinct identities or remove mistaken links. Preview hashes,
+facility locks, rechecked permissions and idempotent requests protect final decisions.
+Exact patient-ID collisions remain in Sync reconciliation and block linking.
+
+Aliases aggregate patient history/appointments and expose the original billing
+accounts. First-visit charges are recognised across linked IDs. No original clinical
+or financial records are rewritten or deleted by identity resolution.
+
+Deploy additive migration 0012 and the generated sync configuration with the matching
+shared contract and frontend. Policy version is 8. Git promotion is owner-controlled.
+Patient consent/documents, cross-facility identity and portal access remain later work.
+Camera decoding and printer/low-memory-phone field acceptance still require supported
+hardware. Source/test validation uses isolated copies with authoritative shared source.
+
+
+Validation: 205 frontend tests and 302 server/shared tests pass. Both typechecks
+and the production build pass. Seven identity browser workflows and four session
+regressions pass with real Chrome mouse input and no browser exceptions. Initial
+JavaScript is 119.3 KB gzipped against the 300 KB budget. All 324 source/test files
+match the isolated validated copies. The browser fixture contains synthetic data;
+no production database was migrated and no live identity provider was called.
+
+Session regression found during acceptance: lastActivity updated immediately on
+pointer input, but active-session checks compared it with a display clock refreshed
+every 30 seconds. Database refreshes then mistook fresh activity for clock rollback
+and cleared login. SessionProvider now uses Date.now() for session validity while
+retaining the coarse display tick. Link confirmation and review requests retain
+login; genuine 30-minute inactivity still expires and reload cannot revive it.

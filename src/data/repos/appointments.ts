@@ -2,6 +2,7 @@ import { Appointment, type AuthorizationContext, type Patient, type VisitType } 
 import { assertAllowed } from '@/auth/authorization';
 import { allOfType, ContractError, envelope, findRecord, insertRecords, newId, type NewRecord } from '../db';
 import { chargesForPatient, listFeeItems, newCharge, patientBillingFacts } from './billing';
+import { patientIdentityIds } from './patientIdentity';
 
 export const listAppointments = () => allOfType<Appointment>('appointment');
 
@@ -30,14 +31,16 @@ export const bookingRecords = async (draft: AppointmentDraft, context: Authoriza
   const appointment = newAppointment(draft, context, createdOn);
   const parsed = Appointment.safeParse(appointment);
   if (!parsed.success) throw new ContractError(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
-  const [patient, fees, priorCharges, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), chargesForPatient(draft.patientId), listAppointments()]);
+  const [patient, fees, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), listAppointments()]);
   if (!patient) throw new Error('The patient is not available on this device');
-  const firstVisit = !appointments.some((a) => a.patientId === draft.patientId);
-  const selected = fees.filter((f) => f.active && (f.chargeWhen === 'every_visit' || (firstVisit && f.chargeWhen === 'first_visit' && !priorCharges.some((c) => c.feeItemId === f.id))));
+  const identityIds = await patientIdentityIds(draft.patientId);
+  const linkedCharges = (await Promise.all(identityIds.map(chargesForPatient))).flat();
+  const firstVisit = !appointments.some((a) => identityIds.includes(a.patientId));
+  const selected = fees.filter((f) => f.active && (f.chargeWhen === 'every_visit' || (firstVisit && f.chargeWhen === 'first_visit' && !linkedCharges.some((c) => c.feeItemId === f.id))));
   const raised = selected.map((fee): NewRecord => ({
     permission: 'charge:create', type: 'charge', record: newCharge(fee, { patientId: draft.patientId, appointmentId: appointment.id, facts: patientBillingFacts(patient, draft.visitType) }, context),
   }));
-  const firstVisitIds = firstVisit ? priorCharges.filter((c) => fees.some((f) => f.id === c.feeItemId && f.chargeWhen === 'first_visit')).map((c) => c.id) : [];
+  const firstVisitIds = firstVisit ? linkedCharges.filter((c) => fees.some((f) => f.id === c.feeItemId && f.chargeWhen === 'first_visit')).map((c) => c.id) : [];
   return [{ permission: 'appointment:create', type: 'appointment', record: { ...appointment, chargeIds: [...firstVisitIds, ...raised.map((r) => (r.record as { id: string }).id)] } }, ...raised];
 };
 export const book = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<Appointment> =>

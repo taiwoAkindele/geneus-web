@@ -13,6 +13,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     items: [
       { to: '/home', label: 'Facility home', note: 'Signed-in hub' },
       { to: '/patients/search', label: 'Patient search', note: '' },
+      { to: '/patients/identity', label: 'Patient identity review', note: 'Compare duplicates and review linked IDs' },
       { to: '/patients/new', label: 'New patient · step 1', note: '' },
       { to: '/patients/new/details', label: 'New patient · step 2', note: '' },
       { to: '/patients/duplicate', label: 'Duplicate check', note: 'Bottom sheet' },

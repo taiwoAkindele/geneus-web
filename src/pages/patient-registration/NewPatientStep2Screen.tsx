@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Button, ChoiceChip, SegmentedControl, TextField } from '@/ui';
@@ -17,7 +17,7 @@ import type { DuplicateNavState } from './DuplicateCheckScreen';
 
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
 
-type Step2Values = Pick<RegistrationValues, 'occupation' | 'religion' | 'folder'>;
+type Step2Values = Pick<RegistrationValues, 'occupation' | 'religion' | 'folder' | 'nin' | 'identityEvidence' | 'identityEvidenceNote'>;
 
 /**
  * 4.4 New patient — step 2. Occupation, religion & old folder number, then the
@@ -33,6 +33,7 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
   const nextNumber = useNextPatientNumber();
   const { values, keep } = useRegistrationDraft(state);
   const editing = Boolean(state.patientId);
+  const [saveError, setSaveError] = useState('');
 
   const {
     control,
@@ -40,7 +41,7 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
     handleSubmit,
     setValue,
     watch,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<Step2Values>({ defaultValues: values });
   const occupation = watch('occupation');
   useEffect(() => {
@@ -49,8 +50,11 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
   }, [watch, keep]);
 
   const save = async (step2: Step2Values) => {
+    setSaveError('');
     const complete = { ...values, ...step2 };
     keep(step2);
+    try {
+    toPatientDetails(complete);
     if (state.patientId) return savePatient(complete, state.patientId);
 
     const matches = findLikelyMatches(toPatientDetails(complete), await listPatients());
@@ -59,6 +63,7 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
       return navigate('/patients/duplicate', { state: duplicate });
     }
     return savePatient(complete);
+    } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'The duplicate check could not be completed. Try again.'); }
   };
 
   if (!values.fullName || !values.sex || !values.address || (!values.age && !values.dateOfBirth)) return <Navigate to="/patients/new" state={{ patientId: state.patientId }} replace />;
@@ -124,6 +129,15 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
             autoComplete="off"
             {...register('folder')}
           />
+          <TextField label="NIN (optional)" inputMode="numeric" autoComplete="off" hint="11 digits. Registration does not require a NIN." error={errors.nin?.message} {...register('nin', { validate: (value) => !value.trim() || /^\d{11}$/.test(value.replace(/\s/g, '')) || 'Enter 11 digits or leave blank' })} />
+          <label className="block text-sm font-semibold">Identity information
+            <select className="mt-2 w-full rounded-field border border-outline bg-white p-3" {...register('identityEvidence')}>
+              <option value="reported">Reported by patient / representative</option>
+              <option value="document_seen">Staff checked an identity document</option>
+            </select>
+          </label>
+          {watch('identityEvidence') === 'document_seen' ? <TextField label="Evidence checked" hint="Document type and what was checked. Do not copy the full identifier here." error={errors.identityEvidenceNote?.message} {...register('identityEvidenceNote', { validate: (value) => watch('identityEvidence') !== 'document_seen' || Boolean(value.trim()) || 'Describe the evidence checked' })} /> : null}
+          <p className="text-xs text-ink-muted">A checked document is a staff observation, not verification by an identity provider.</p>
 
           {/* Patient ID preview — only when creating; an existing patient keeps its ID. */}
           {!editing && nextNumber ? (
@@ -137,6 +151,7 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
         </div>
 
         <footer className="border-t border-outline-soft bg-surface px-5 pb-6 pt-4">
+          {saveError ? <p role="alert" className="mb-3 text-sm text-danger">{saveError}</p> : null}
           <Button variant="primary" type="submit" disabled={isSubmitting} loading={isSubmitting}>
             {editing ? 'Save changes' : 'Register patient'}
           </Button>
