@@ -76,7 +76,7 @@ export const StaffForm = ({ initial, canEditName, canEditAccess, submitLabel, on
               onChange={() => setLoginAccess(option.value)} className="h-5 w-5 flex-none accent-brand" />
             <span><span className="block text-sm font-semibold">{option.label}</span><span className="text-xs text-ink-muted">{option.detail}</span></span>
           </label>)}
-          <p className="text-xs text-ink-muted">{selectedRoles.includes('facility_admin') ? 'Facility administrators can always sign in. Their existing inactivity sign-out still applies.' : 'Shift end does not sign this person out. They should sign out when finished.'}</p>
+          <p className="text-xs text-ink-muted">All staff sign out after 30 minutes without activity. Shift end does not end an active session.</p>
         </fieldset>
         <div className="flex items-center justify-between gap-3 rounded-card border border-outline-soft bg-white p-4">
           <div><div className="font-semibold">Read &amp; write</div><p className="mt-1 text-xs text-ink-muted">Turn off for view-only access. Roles and extra permissions stay configured.</p></div>

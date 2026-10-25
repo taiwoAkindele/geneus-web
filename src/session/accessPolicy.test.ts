@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RosterShift } from '@shared';
-import { accessFor, ADMIN_IDLE_MS, maySignIn, mayStaySignedIn } from './accessPolicy';
+import { accessFor, SESSION_IDLE_MS, maySignIn, mayStaySignedIn } from './accessPolicy';
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');
 const MINUTE = 60_000;
@@ -40,12 +40,20 @@ describe('fresh sign-in access', () => {
 
 describe('authenticated session lifetime', () => {
   it('keeps staff signed in after the exact end and after their roster disappears at midnight', () => {
-    expect(mayStaySignedIn({ staff: nurse, shift: onNow }, Date.parse(onNow.endsAt), NOW)).toBe(true);
+    expect(mayStaySignedIn({ staff: nurse, shift: onNow }, Date.parse(onNow.endsAt), Date.parse(onNow.endsAt) - MINUTE)).toBe(true);
     expect(mayStaySignedIn({ staff: nurse, shift: ended }, NOW, NOW - MINUTE)).toBe(true);
-    expect(mayStaySignedIn({ staff: nurse, shift: undefined }, NOW + 24 * 60 * MINUTE, NOW)).toBe(true);
+    expect(mayStaySignedIn({ staff: nurse, shift: undefined }, NOW + 24 * 60 * MINUTE, NOW + 24 * 60 * MINUTE - MINUTE)).toBe(true);
   });
-  it('keeps around-the-clock staff signed in until manual sign-out', () => {
-    expect(mayStaySignedIn({ staff: { ...nurse, loginAccess: 'always' }, shift: undefined }, NOW, NOW - 10 * 60 * MINUTE)).toBe(true);
+  it('expires every role and access mode after thirty minutes idle', () => {
+    for (const role of ['nurse', 'cashier', 'records_officer', 'facility_admin'] as const) {
+      for (const loginAccess of ['always', 'shift'] as const) {
+        const entry = { staff: { role, loginAccess }, shift: onNow };
+        expect(mayStaySignedIn(entry, NOW, NOW - 29 * MINUTE)).toBe(true);
+        expect(mayStaySignedIn(entry, NOW, NOW - SESSION_IDLE_MS)).toBe(false);
+        expect(mayStaySignedIn(entry, NOW, NOW - 24 * 60 * MINUTE)).toBe(false);
+        expect(mayStaySignedIn(entry, NOW, NOW + MINUTE)).toBe(false);
+      }
+    }
   });
   it('does not restore a saved identity after its session marker was cleared', () => {
     expect(mayStaySignedIn({ staff: nurse, shift: onNow }, NOW, undefined)).toBe(false);
@@ -54,12 +62,12 @@ describe('authenticated session lifetime', () => {
   it('preserves administrator inactivity expiry independently of shift end', () => {
     const admin = { role: 'facility_admin' as const };
     expect(mayStaySignedIn({ staff: admin, shift: ended }, NOW, NOW - MINUTE)).toBe(true);
-    expect(mayStaySignedIn({ staff: admin, shift: undefined }, NOW, NOW - ADMIN_IDLE_MS)).toBe(false);
+    expect(mayStaySignedIn({ staff: admin, shift: undefined }, NOW, NOW - SESSION_IDLE_MS)).toBe(false);
     expect(mayStaySignedIn({ staff: admin, shift: onNow }, NOW, undefined)).toBe(false);
   });
   it('also retains inactivity expiry for an additional administrator role', () => {
     const staff = { ...nurse, additionalRoles: ['facility_admin' as const] };
     expect(mayStaySignedIn({ staff, shift: undefined }, NOW, NOW - 29 * MINUTE)).toBe(true);
-    expect(mayStaySignedIn({ staff, shift: undefined }, NOW, NOW - ADMIN_IDLE_MS)).toBe(false);
+    expect(mayStaySignedIn({ staff, shift: undefined }, NOW, NOW - SESSION_IDLE_MS)).toBe(false);
   });
 });

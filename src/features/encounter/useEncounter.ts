@@ -265,7 +265,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
 
   /** Saves the section, locked to the signed-in staff member. */
   const lockStep = useCallback(
-    async (key: StepKey) => {
+    async (key: StepKey, collectLaterReason?: string) => {
       const followUpOn = key === 'follow_up' ? enc.data.follow_up.when : '';
       const entry = await saveStep(
         {
@@ -274,6 +274,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
           patientId,
           step: key,
           values: toStepValues(key, enc.data),
+          collectLaterReason,
           followUp: followUpOn
             ? {
                 reason: enc.data.follow_up.reason.trim() || 'Follow-up review',

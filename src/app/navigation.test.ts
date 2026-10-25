@@ -14,7 +14,7 @@ describe('role workspaces', () => {
     expect(navigationFor({ role: 'nurse', roles: ['nurse', 'facility_admin'], permissions: [] }).map((item) => item.key)).toContain('admin');
   });
   it('keeps clinical and configuration work out of the cashier navigation', () => {
-    expect(keys('cashier')).toEqual(['home', 'patients']);
+    expect(keys('cashier')).toEqual(['home', 'patients', 'billing']);
   });
   it('makes appointments a primary task for records staff and unit queues one for clinicians', () => {
     const records = navigationFor({ role: 'records_officer', permissions: [...permissionsFor('records_officer', 'read_write')] });

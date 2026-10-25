@@ -99,6 +99,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
   const openEncounter = (encounterId: string) =>
     navigate('/encounters/record', { state: { patientId: record.patientId, encounterId } satisfies EncounterNavState });
   const history = encounters.data ?? [];
+  const canBill = context.permissions.some((p) => ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(p));
 
   const edit = () => {
     beginEdit(record.patientId, fromPatient(record));
@@ -138,6 +139,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2.5">
+            {canBill ? <Button variant="secondary" fullWidth={false} onClick={() => navigate(`/billing?patient=${encodeURIComponent(record.patientId)}`)}>Patient billing account</Button> : null}
             {context.permissions.includes('appointment:create') ? <Button
               variant="secondary"
               fullWidth={false}

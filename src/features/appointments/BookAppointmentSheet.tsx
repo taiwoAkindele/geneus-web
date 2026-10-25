@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Button, SegmentedControl, Sheet, TextField, useToast } from '@/ui';
+import { Button, SegmentedControl, SelectField, Sheet, TextField, useToast } from '@/ui';
+import { VisitType } from '@shared';
+import { VISIT_TYPE_LABELS } from '@/features/billing/feeForm';
 import { useAppointments } from './AppointmentsProvider';
 import type { AppointmentPatient } from './types';
 
@@ -18,6 +20,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [reason, setReason] = useState('Consultation');
+  const [visitType, setVisitType] = useState<VisitType>('general');
   const [booking, setBooking] = useState(false);
 
   const canBook = mode === 'now' || Boolean(date && time);
@@ -27,7 +30,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
     setBooking(true);
     const scheduledFor = mode === 'scheduled' ? new Date(`${date}T${time}`).toISOString() : undefined;
     try {
-      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor });
+      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType });
       toast(
         scheduledFor
           ? `Appointment booked for ${fmtDay(date)} — added to the encounters list`
@@ -68,6 +71,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
       )}
 
       <div className="mt-4">
+        <SelectField label="Visit type" value={visitType} options={VisitType.options.map((value) => ({ value, label: VISIT_TYPE_LABELS[value] }))} onChange={(e) => setVisitType(e.target.value as VisitType)} />
         <TextField label="Reason" name="appt_reason" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
 

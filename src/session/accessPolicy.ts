@@ -1,7 +1,7 @@
 import { hasRole, type RosterShift, type Staff } from '@shared';
 
-/** Admin inactivity expiry is independent of a roster ending. */
-export const ADMIN_IDLE_MS = 30 * 60_000;
+/** Every staff session expires after inactivity, independently of sign-in hours. */
+export const SESSION_IDLE_MS = 30 * 60_000;
 export type Access = 'shift' | 'always' | 'admin';
 type StaffLogin = Pick<Staff, 'role' | 'additionalRoles' | 'loginAccess'>;
 
@@ -21,9 +21,10 @@ export const maySignIn = (entry: { staff: StaffLogin; shift: RosterShift | undef
 
 /** A shift ending, or disappearing at midnight, never signs staff out. */
 export const mayStaySignedIn = (
-  entry: { staff: StaffLogin; shift: RosterShift | undefined },
+  _entry: { staff: StaffLogin; shift: RosterShift | undefined },
   now: number,
   lastActivityOn: number | undefined,
 ): boolean =>
   lastActivityOn !== undefined &&
-  (accessFor(entry.staff) !== 'admin' || now - lastActivityOn < ADMIN_IDLE_MS);
+  Number.isFinite(lastActivityOn) &&
+  now >= lastActivityOn && now - lastActivityOn < SESSION_IDLE_MS;

@@ -29,6 +29,9 @@ export const TABLE_FOR: Record<DocType, string> = {
   fee_item: 'fee_items',
   charge: 'charges',
   payment: 'payments',
+  billing_adjustment: 'billing_adjustments',
+  incoming_transfer: 'incoming_transfers',
+  billing_department: 'billing_departments',
 };
 
 /**

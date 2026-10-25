@@ -1,6 +1,7 @@
 import { CLOSING_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
 import { allOfType, allWhere, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
-import { newAppointment, type AppointmentDraft } from './appointments';
+import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
+import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient } from './billing';
 
 /**
  * Encounters (PRD §9.8, SCHEMA.md §13): a header and add-only entries, one per
@@ -34,6 +35,7 @@ export type StepSave = {
   values: Record<string, unknown>;
   /** A follow-up review to book in the same save (PRD §9.8.1, step 7). */
   followUp?: Omit<AppointmentDraft, 'patientId'>;
+  collectLaterReason?: string;
 };
 
 /**
@@ -47,17 +49,22 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
 
   const encounterId = save.encounterId ?? newId('encounter');
   if (!save.encounterId) {
+    const [charges, payments, adjustments, appointments] = await Promise.all([chargesForPatient(save.patientId), paymentsForPatient(save.patientId), adjustmentsForPatient(save.patientId), listAppointments()]);
+    const appointment = appointments.find((a) => a.id === save.appointmentId);
+    const unpaid = save.appointmentId ? !isAppointmentConfirmed(save.appointmentId, charges, payments, adjustments, appointment?.chargeIds) : false;
+    if (unpaid && !save.collectLaterReason?.trim()) throw new Error('Give a See now — collect later reason to continue care');
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
-      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn },
+      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined },
     });
   }
 
   let values = save.values;
   if (save.followUp) {
-    const appointment = newAppointment({ ...save.followUp, patientId: save.patientId }, context, savedOn);
-    records.push({ permission: 'appointment:create', type: 'appointment', record: appointment });
+    const followUp = await bookingRecords({ ...save.followUp, patientId: save.patientId, visitType: 'follow_up' }, context, savedOn);
+    records.push(...followUp);
+    const appointment = followUp[0].record as { id: string };
     values = { ...values, appointmentId: appointment.id };
   }
 

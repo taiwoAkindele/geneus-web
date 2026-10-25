@@ -1,6 +1,7 @@
-import type { AuthorizationContext, Patient } from '@shared';
+import { Patient, type AuthorizationContext } from '@shared';
 import { mintPatientId } from '@/lib/patientId';
-import { allOfType, envelope, findRecord, insertRecord, updateRecord } from '../db';
+import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord } from '../db';
+import { listFeeItems, newCharge, patientBillingFacts } from './billing';
 
 export const listPatients = () => allOfType<Patient>('patient');
 
@@ -23,13 +24,20 @@ export const registerPatient = async (details: PatientDetails, context: Authoriz
     context.facilityId,
     existing.map((patient) => patient.patientId),
   );
-  return insertRecord<Patient>(context, 'patient:create', 'patient', {
+  const patient = Patient.parse({
     ...envelope(context),
     ...details,
     id: patientId,
     type: 'patient',
     patientId,
+    allergies: [],
   });
+  // Visit-dependent policy cannot be decided until booking supplies the visit type.
+  const fees = (await listFeeItems()).filter((fee) => fee.active && fee.chargeWhen === 'first_visit' && !fee.exemptions.some((rule) => rule.visitTypes));
+  await insertRecords(context, [{ permission: 'patient:create', type: 'patient', record: patient }, ...fees.map((fee) => ({
+    permission: 'charge:create' as const, type: 'charge' as const, record: newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context),
+  }))]);
+  return patient;
 };
 
 /**

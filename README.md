@@ -68,14 +68,15 @@ missing. The development backend is described in the geneus-server README,
 
 ## Billing implementation status
 
-The admin's **Fee schedule** (`/admin/fees`) works offline: add or edit prices,
+The admin's **Manage fees** (`/billing/fees`) works offline: add or edit prices,
 configure automatic exemptions by age, sex and visit type, and retire or restore fees.
 The cashier role is available when adding staff. Fee changes do not rewrite old bills.
 
 The local schema and billing repository also support charges, payments, receipt numbers,
 waivers, reversals and balances kept separate by currency. These are tested against real
-SQLite. Patient booking does **not yet raise fees**: booking integration, the nursing
-payment bypass, cashier screens, printable receipts and billing reports are the next stages.
+SQLite. Registration and booking raise configured fees atomically. Patient billing,
+cash collection, printable receipts, discounts, waivers, reports and the nursing
+See now — collect later flow are available in the Billing workspace.
 Insurance and claims follow billing (PRD §9.14).
 
 ## Frontend workflow and layout
@@ -142,11 +143,48 @@ separate. Scheduled staff still need an active window for a fresh PIN sign-in.
 In **Staff → Shift**, choose **Next day** for overnight duty, or **Make a 24-hour
 shift** for a full-day window. The following-day end appears in roster labels.
 
-Shift end never signs staff out automatically. Existing sessions survive the end
-of a roster, midnight and reload; staff sign out when finished. Deactivation closes
+Shift end never signs staff out automatically. Active sessions survive the end
+of a roster, midnight and reload; all sessions expire after 30 minutes without activity. Deactivation closes
 access after the device receives the change, and reactivation needs a new sign-in.
-Administrator sessions still expire after 30 minutes without activity.
+All staff sessions expire after 30 minutes without activity, including 24-hour access.
 
 This change uses shared policy v6 and server migration 0010. Commit the shared
 contract and update both consumer submodules; deploy the server migration and
 regenerated staff sync stream before the matching frontend.
+
+## Hospital billing workspace (October 2026)
+
+Billing now has department summaries, fee-category ledgers, patient accounts, cash
+collection and receipts. Manage fees lives at /billing/fees; /admin/fees redirects.
+Departments such as Pharmacy, Oncology, Dental and GS are configurable, independent
+of fee categories. Fee and charge ownership is explicit; historical prices persist.
+Registration and booking write applicable charges atomically with their record.
+The first booking includes registration charges in its payment confirmation.
+Unpaid appointments can proceed with an attributed See now - collect later reason.
+
+Discounts and waivers are append-only reductions requiring payment:waive. Reports
+separate money received from free care; one payment can cover several fee categories.
+Daily handover uses payment dates, while fee ledgers filter by charge dates.
+
+Each hospital connects its own Paystack account. Receiving accounts or named virtual
+terminals are linked to departments, not patients. Paystack webhooks are authenticated
+against exact raw bytes and transactions are verified server-side. Unlinked-account
+receipts are retained for reconciliation. Transfers can be allocated only to synced
+bills in the receiving department, patient and currency; row locks and request IDs
+prevent double allocation and duplicate retries. Test receipts remain visible but
+cannot settle real patient bills. Cash remains offline-capable.
+
+Paystack connection keys are encrypted with a deployment-supplied 32-byte hex
+BILLING_ENCRYPTION_KEY and kept outside the sync publication. Do not put keys in
+VITE variables. An administrator connects Paystack and configures the backend webhook
+URL under Billing -> Departments & accounts. Existing department accounts can be
+linked; a named department Virtual Terminal can also be created through the API.
+Provider feature activation and real bank-account validation remain deployment steps.
+
+Release order: commit geneus-shared and promote both consumer submodule pointers;
+deploy migration 0011 and generated sync streams; deploy the matching frontend.
+Git promotion and production configuration remain with the owner.
+
+All staff accounts, including 24-hour access, now expire after 30 minutes without
+activity. Shift end still does not end an active session. Sleep, reload and the first
+input after expiry cannot revive an expired session; sync is independent of sign-out.

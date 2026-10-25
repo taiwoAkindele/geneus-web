@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Button, Icon, Sheet, useToast } from '@/ui';
+import { Avatar, Button, Icon, Sheet, TextField, useToast } from '@/ui';
 import { AuthorizationError } from '@/data';
 import { useAuthorizationContext, useSession } from '@/session';
 import {
@@ -19,6 +19,7 @@ import {
   type StepKey,
 } from '@/features/encounter';
 import { usePatient } from '@/features/search';
+import { useAppointments } from '@/features/appointments';
 
 const initialsOf = (fullName: string): string =>
   fullName
@@ -65,6 +66,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
   const canRecord = context.permissions.includes('encounter:record');
   const patient = usePatient(patientId);
   const ctl = useEncounter(patientId, encounterId, appointmentId);
+  const appointments = useAppointments();
   const { enc } = ctl;
 
   const actor = { name: user.name, role: user.role };
@@ -73,6 +75,8 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
   const [amendKey, setAmendKey] = useState<StepKey | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collectLaterReason, setCollectLaterReason] = useState('');
+  const awaitingPayment = !enc.id && appointments.appointments.find((a) => a.id === appointmentId)?.paymentStatus === 'Awaiting payment';
 
   if (patient.loading || ctl.loading) return <Message>Opening the encounter…</Message>;
   if (patient.error || ctl.error) {
@@ -107,7 +111,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
     if (!reviewKey) return;
     setSaving(true);
     try {
-      await ctl.lockStep(reviewKey);
+      await ctl.lockStep(reviewKey, collectLaterReason);
       if (reviewKey === 'follow_up') {
         toast(enc.data.follow_up.when ? 'Encounter closed & locked · follow-up booked' : 'Encounter closed & locked');
       } else if (reviewKey === 'admission') toast('Patient admitted · encounter locked as inpatient');
@@ -188,6 +192,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
       </header>
 
       <div>
+        {awaitingPayment && canRecord ? <section className="mx-5 my-3 space-y-2 rounded-card border border-amber-border bg-amber-bg p-4 md:mx-8"><h2 className="font-bold">Awaiting payment · See now — collect later</h2><p className="text-sm">Care can continue. Record a reason with your first saved step; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" value={collectLaterReason} onChange={(e) => setCollectLaterReason(e.target.value)} placeholder="e.g. Emergency or collect after consultation" /></section> : null}
         <EncounterSpine enc={enc} />
         {!canRecord ? <p className="mx-5 my-3 rounded-card border border-outline-soft bg-white p-4 text-sm text-ink-muted">You have view access. A clinician records and saves encounter steps.</p> : null}
 

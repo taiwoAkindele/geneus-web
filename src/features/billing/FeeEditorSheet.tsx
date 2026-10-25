@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { ChargeWhen, FeeCategory, VisitType, type FeeItem } from '@shared';
 import type { FeeDraft } from '@/data/repos/billing';
+import { listBillingDepartments } from '@/data/repos/billing';
+import { useLiveQuery } from '@/data';
 import { Button, SelectField, Sheet, TextField } from '@/ui';
 import { CATEGORY_LABELS, CHARGE_WHEN_LABELS, emptyRule, EXEMPTION_PRESETS, FEE_CURRENCIES, feeDraftFromForm, feeFormValues, VISIT_TYPE_LABELS, type FeeForm } from './feeForm';
 
@@ -13,6 +15,7 @@ type Props = {
 };
 
 export const FeeEditorSheet = ({ fee, defaultCurrency, onSave, onClose }: Props) => {
+  const departments = useLiveQuery(listBillingDepartments);
   const { register, control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FeeForm>({
     defaultValues: feeFormValues(fee, defaultCurrency),
   });
@@ -35,11 +38,13 @@ export const FeeEditorSheet = ({ fee, defaultCurrency, onSave, onClose }: Props)
   });
 
   return (
-    <Sheet title={fee ? 'Edit fee' : 'Add a fee'} eyebrow="Fee schedule" onClose={close} closeDisabled={isSubmitting}>
+    <Sheet title={fee ? 'Edit fee' : 'Add a fee'} eyebrow="Manage fees" onClose={close} closeDisabled={isSubmitting}>
       <form onSubmit={save} className="space-y-4">
         <fieldset disabled={isSubmitting} className="space-y-4">
           <TextField label="Fee name" placeholder="e.g. Consultation" required {...register('name', { required: true })} />
           <SelectField label="Category" options={FeeCategory.options.map((value) => ({ value, label: CATEGORY_LABELS[value] }))} {...register('category')} />
+          <SelectField label="Receiving department" options={[{ value: '', label: 'Hospital / general' }, ...(departments.data ?? []).filter((d) => d.active || d.id === fee?.departmentId).map((d) => ({ value: d.id, label: d.name }))]} {...register('departmentId')} />
+          {departments.error ? <p role="alert" className="text-sm text-danger">Departments could not be read. <button type="button" onClick={departments.reload}>Try again</button></p> : null}
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Amount" inputMode="decimal" placeholder="0.00" required {...register('amount', { required: true })} />
             <Controller name="currency" control={control} rules={{ required: 'Choose a currency' }} render={({ field }) => <div className="space-y-2"><SelectField label="Currency" name="fee_currency_choice" required value={customCurrency ? 'other' : field.value} error={errors.currency?.message} options={[{ value: '', label: 'Choose currency' }, ...FEE_CURRENCIES, { value: 'other', label: 'Other currency' }]} onChange={(event) => { const value = event.target.value; setCustomCurrency(value === 'other'); field.onChange(value === 'other' ? '' : value); }} />{customCurrency ? <TextField label="Currency code" placeholder="Three-letter code" required maxLength={3} minLength={3} pattern="[A-Za-z]{3}" name={field.name} ref={field.ref} value={field.value} onBlur={field.onBlur} onChange={(event) => field.onChange(event.target.value.toUpperCase())} /> : null}</div>} />
