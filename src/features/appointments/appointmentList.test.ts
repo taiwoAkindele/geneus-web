@@ -31,4 +31,9 @@ describe('the working appointment day', () => {
     expect(projectAppointments([booking], [patient], [encounter], [], now)[0]).toMatchObject({ group: 'today', encounterId: encounter.id });
     expect(projectAppointments([booking], [patient], [encounter], [closing], now)[0].group).toBe('completed');
   });
+  it('does not confirm a booking before its linked charges have downloaded', () => {
+    const booking = { ...appointment('appointment:pending-sync', 22), chargeIds: ['charge:registration'] };
+    expect(projectAppointments([booking], [patient], [], [], now)[0].paymentStatus).toBe('Awaiting payment');
+    expect(projectAppointments([{ ...booking, chargeIds: [] }], [patient], [], [], now)[0].paymentStatus).toBe('Confirmed');
+  });
 });

@@ -7,7 +7,7 @@ import { lastServerContactOn } from '@/data/deviceCredential';
 import { listOpenRejections } from '@/data/repos/syncRejections';
 import { checkPin, needsLongerPin } from './credentials';
 import { approvePinSetup } from './pinApproval';
-import { accessFor, maySignIn, mayStaySignedIn, shiftEnd, type Access } from './accessPolicy';
+import { accessFor, maySignIn, mayStaySignedIn, SESSION_IDLE_MS, shiftEnd, type Access } from './accessPolicy';
 import { shiftEndLabel, shiftRangeLabel } from './shiftLabels';
 import { checkShiftSignature, isFrozen } from './signInChecks';
 
@@ -92,7 +92,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 const SessionContext = createContext<SessionValue | null>(null);
 
 const SIGNED_IN_KEY = 'geneus.signedInStaffId';
-/** When the signed-in person last touched the app, so a reload cannot reset an admin's idle time. */
+/** Persist inactivity across reloads for every signed-in staff member. */
 const LAST_ACTIVITY_KEY = 'geneus.lastActivityOn';
 /** Activity is written down at most this often; the idle limit is 30 minutes, so this is precise enough. */
 const ACTIVITY_WRITE_MS = 15_000;
@@ -157,22 +157,36 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Any touch or key counts as activity — the measure of an admin's idle time.
+  // Check expiry before accepting input: a sleeping tab must not revive an expired session.
   useEffect(() => {
     if (!staffId) return;
     let written = 0;
-    const touched = () => {
+    const touched = (event: Event) => {
       const at = Date.now();
+      if (lastActivity.current === undefined || at - lastActivity.current >= SESSION_IDLE_MS || at < lastActivity.current) {
+        if ((event.type === 'pointerdown' || event.type === 'keydown') && event.cancelable) event.preventDefault();
+        event.stopImmediatePropagation();
+        localStorage.removeItem(SIGNED_IN_KEY);
+        localStorage.removeItem(LAST_ACTIVITY_KEY);
+        lastActivity.current = undefined;
+        setStaffId(null);
+        setNow(at);
+        return;
+      }
       lastActivity.current = at;
       if (at - written < ACTIVITY_WRITE_MS) return;
       written = at;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
     };
-    window.addEventListener('pointerdown', touched, { passive: true });
-    window.addEventListener('keydown', touched);
+    window.addEventListener('pointerdown', touched, true);
+    window.addEventListener('keydown', touched, true);
+    window.addEventListener('wheel', touched, { passive: true });
+    window.addEventListener('touchmove', touched, { passive: true });
     return () => {
-      window.removeEventListener('pointerdown', touched);
-      window.removeEventListener('keydown', touched);
+      window.removeEventListener('pointerdown', touched, true);
+      window.removeEventListener('keydown', touched, true);
+      window.removeEventListener('wheel', touched);
+      window.removeEventListener('touchmove', touched);
     };
   }, [staffId]);
 
@@ -186,7 +200,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setStaffId(null);
   }, []);
 
-  // Shift end never expires an authenticated session. Deactivation and admin
+  // Shift end never expires an authenticated session. Deactivation and staff
   // inactivity still clear the saved identity so reactivation cannot revive it.
   useEffect(() => {
     if (staffId && !loading && !rosterError && data && (!entry || !active)) signOut();

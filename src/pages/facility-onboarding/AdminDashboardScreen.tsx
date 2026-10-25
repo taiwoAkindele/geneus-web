@@ -137,7 +137,7 @@ export const AdminDashboardScreen = () => {
       <ActionTile label="Roster & shifts" onClick={() => navigate('/admin/staff')} />
       <ActionTile label="Registers" onClick={() => navigate('/registers')} />
       {context.permissions.includes('unit:manage') ? <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} /> : null}
-      {context.permissions.includes('fee_item:manage') ? <ActionTile label="Fee schedule" onClick={() => navigate('/admin/fees')} /> : null}
+      {context.permissions.includes('fee_item:manage') ? <ActionTile label="Billing" onClick={() => navigate('/billing')} /> : null}
       {context.permissions.includes('device:enroll') ? <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} /> : null}
     </div>
   );

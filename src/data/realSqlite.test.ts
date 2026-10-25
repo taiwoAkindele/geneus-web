@@ -13,7 +13,9 @@ import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
   isAppointmentConfirmed, listFeeItems, paymentsForPatient, recordPayment, reversePayment,
   setFeeItemActive, updateFeeItem, type FeeDraft,
+  adjustCharge, adjustmentsForPatient,
 } from './repos/billing';
+import { book } from './repos/appointments';
 import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { fakeDatabase } from './testing/fakeDatabase';
 
@@ -44,6 +46,11 @@ const sqliteDatabase = (): LocalDatabase & { close: () => Promise<void> } => {
   const bind = (parameters: unknown[]) => parameters.map((value) => (value === undefined ? null : value)) as Bindable[];
   return {
     ...fakeDatabase(),
+    writeTransaction: async (callback) => {
+      sqlite.exec('BEGIN');
+      try { const result = await callback({ execute: async (sql, parameters = []) => sqlite.prepare(sql).run(...bind(parameters)) }); sqlite.exec('COMMIT'); return result; }
+      catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+    },
     execute: async (sql, parameters = []) => {
       sqlite.prepare(sql).run(...bind(parameters));
     },
@@ -188,9 +195,10 @@ describe('the write path against a real SQLite', () => {
   describe('offline billing', () => {
     const patientId = 'OOE-PHC-000047-K2';
     const otherPatientId = 'OOE-PHC-000048-AB';
-    const draft = (): FeeDraft => ({
+    const draft = (extra: Partial<FeeDraft> = {}): FeeDraft => ({
       name: 'Consultation', category: 'consultation', amountMinor: 150000, currency: 'NGN',
       chargeWhen: 'every_visit', exemptions: [{ reason: 'Under-5 policy', ageUnderYears: 5 }],
+      ...extra,
     });
     const charge = async (extra: Partial<FeeDraft> = {}, patient = patientId) => {
       const fee = await createFeeItem({ ...draft(), ...extra }, contextFor('facility_admin'));
@@ -304,6 +312,53 @@ describe('the write path against a real SQLite', () => {
     it('rejects amounts PostgreSQL cannot store before creating a local fee', async () => {
       await expect(createFeeItem({ ...draft(), amountMinor: 2147483648 }, contextFor('facility_admin'))).rejects.toThrow(/supported range/);
       expect(await listFeeItems()).toEqual([]);
+    });
+
+    it('keeps discounts and waivers beside the original charge and settles only the reduced debt', async () => {
+      const bill = await charge();
+      await expect(adjustCharge(bill.id, 'discount', 20000, 'Not authorised', contextFor('cashier'))).rejects.toThrow(/role/);
+      await adjustCharge(bill.id, 'discount', 20000, 'Staff concession', contextFor('supervisor'));
+      await recordPayment({ patientId, method: 'cash', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 100000 }] }, contextFor('cashier'));
+      await adjustCharge(bill.id, 'waiver', 30000, 'Approved remaining balance', contextFor('supervisor'));
+      const payments = await paymentsForPatient(patientId); const adjustments = await adjustmentsForPatient(patientId);
+      expect(chargeBalances([bill], payments, adjustments)[0]).toMatchObject({ discountMinor: 20000, waivedMinor: 30000, dueMinor: 100000, balanceMinor: 0 });
+      expect((await chargesForPatient(patientId)).find((c) => c.id === bill.id)?.amountMinor).toBe(150000);
+      await expect(adjustCharge(bill.id, 'discount', 1, 'Too much', contextFor('supervisor'))).rejects.toThrow(/unpaid balance/);
+      expect(adjustments.map((a) => a.createdBy)).toEqual(['staff:supervisor', 'staff:supervisor']);
+    });
+
+    it('raises first-visit fees at registration once, then consultation fees for each booking', async () => {
+      await createFeeItem(draft({ name: 'Registration', category: 'registration', chargeWhen: 'first_visit', amountMinor: 50000, exemptions: [] }), contextFor('facility_admin'));
+      await createFeeItem(draft({ name: 'Consultation', chargeWhen: 'every_visit', amountMinor: 100000, exemptions: [] }), contextFor('facility_admin'));
+      const patient = await registerPatient({ fullName: 'New Patient', address: 'Test road', sex: 'female', ageYears: 30 }, contextFor('records_officer'));
+      const initial = await chargesForPatient(patient.patientId); expect(initial).toHaveLength(1);
+      const first = await book({ patientId: patient.patientId, reason: 'Consultation', visitType: 'general' }, contextFor('records_officer'));
+      const second = await book({ patientId: patient.patientId, reason: 'Review', visitType: 'follow_up' }, contextFor('records_officer'));
+      const charges = await chargesForPatient(patient.patientId);
+      expect(charges.filter((c) => c.category === 'registration')).toHaveLength(1);
+      expect(charges.filter((c) => c.category === 'consultation')).toHaveLength(2);
+      expect(first.chargeIds).toContain(initial[0].id);
+      expect(second.chargeIds).not.toContain(initial[0].id);
+      expect(isAppointmentConfirmed(first.id, charges, [], [], first.chargeIds)).toBe(false);
+    });
+
+    it('rolls back a whole multi-record save when SQLite rejects a later insert', async () => {
+      const { insertRecords } = await import('./db');
+      const fee = await createFeeItem(draft(), contextFor('facility_admin'));
+      const bill = { ...envelope(contextFor('records_officer')), id: 'charge:duplicate', type: 'charge', patientId, feeItemId: fee.id, category: 'consultation', description: 'Consultation', listPriceMinor: 10000, amountMinor: 10000, currency: 'NGN' };
+      await expect(insertRecords(contextFor('records_officer'), [{ type: 'charge', permission: 'charge:create', record: bill }, { type: 'charge', permission: 'charge:create', record: bill }])).rejects.toThrow();
+      expect(await chargesForPatient(patientId)).toEqual([]);
+    });
+
+    it('waits for visit type before assessing a first-visit fee with programme exemptions', async () => {
+      await createFeeItem(draft({ name: 'Registration', category: 'registration', chargeWhen: 'first_visit', exemptions: [{ reason: 'Antenatal programme', visitTypes: ['antenatal'] }] }), contextFor('facility_admin'));
+      const patient = await registerPatient({ fullName: 'ANC Patient', address: 'Test road', sex: 'female', ageYears: 30 }, contextFor('records_officer'));
+      expect(await chargesForPatient(patient.patientId)).toEqual([]);
+      const appointment = await book({ patientId: patient.patientId, reason: 'ANC', visitType: 'antenatal' }, contextFor('records_officer'));
+      const bills = await chargesForPatient(patient.patientId);
+      expect(bills).toHaveLength(1);
+      expect(bills[0]).toMatchObject({ amountMinor: 0, listPriceMinor: 150000, exemptionReason: 'Antenatal programme' });
+      expect(isAppointmentConfirmed(appointment.id, bills, [], [], appointment.chargeIds)).toBe(true);
     });
   });
 

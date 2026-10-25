@@ -129,7 +129,7 @@ describe('repositories', () => {
 
       await expect(setPermission(existingNurse, 'read_only', admin)).rejects.toBeInstanceOf(AuthorizationError);
       expect(db.statements).toEqual([]);
-      await expect(book({ patientId: 'OOE-PHC-000001-K2', reason: 'Review' }, admin)).resolves.toBeTruthy();
+      await expect(book({ patientId: existingPatient.patientId, reason: 'Review' }, admin)).resolves.toBeTruthy();
       expect(db.statements).toHaveLength(1);
     });
 

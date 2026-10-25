@@ -5,6 +5,7 @@ import { book, listAppointments } from '@/data/repos/appointments';
 import { listPatients } from '@/data/repos/patients';
 import { closingEntries, listEncounters } from '@/data/repos/encounters';
 import { projectAppointments } from './appointmentList';
+import { listCharges, listPayments, listAdjustments } from '@/data/repos/billing';
 import type { BookedAppointment, NewAppointment } from './types';
 
 type Value = {
@@ -29,10 +30,11 @@ export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
 
   const load = useCallback(async () => {
     const [appointments, patients, encounters, closing] = await Promise.all([listAppointments(), listPatients(), listEncounters(), closingEntries()]);
-    return { appointments, patients, encounters, closing };
+    const [charges, payments, adjustments] = await Promise.all([listCharges(), listPayments(), listAdjustments()]);
+    return { appointments, patients, encounters, closing, charges, payments, adjustments };
   }, []);
   const { data, loading, error, reload } = useLiveQuery(load);
-  const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now) : [], [data, now]);
+  const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments) : [], [data, now]);
   const bookAppointment = useCallback(async (appointment: NewAppointment) => { await book(appointment, context); }, [context]);
   const forPatient = useCallback((patientId: string) => appointments.filter((appointment) => appointment.patient.id === patientId), [appointments]);
   const value = useMemo(() => ({ appointments, loading, error, reload, book: bookAppointment, forPatient }), [appointments, loading, error, reload, bookAppointment, forPatient]);

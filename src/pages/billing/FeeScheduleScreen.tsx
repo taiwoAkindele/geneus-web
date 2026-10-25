@@ -43,8 +43,8 @@ export const FeeScheduleScreen = () => {
   if (!context.permissions.includes('fee_item:manage')) {
     return (
       <div className="min-h-screen bg-surface">
-        <AppBar title="Fee schedule" onBack={() => navigate('/home')} />
-        <p className="px-5 py-6 text-[15px] text-ink-muted">Only a facility admin with write access can manage fees.</p>
+        <AppBar title="Manage fees" onBack={() => navigate('/home')} />
+        <p className="px-5 py-6 text-[15px] text-ink-muted">Your account needs fee-management permission to change prices.</p>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export const FeeScheduleScreen = () => {
   const all = [...(fees.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Fee schedule" onBack={() => navigate('/admin')} right={<SyncPill />} />
+      <AppBar title="Manage fees" onBack={() => navigate('/billing')} right={<SyncPill />} />
       <div className="mx-auto w-full max-w-md space-y-4 px-5 pb-24 pt-2 md:max-w-2xl lg:max-w-none lg:px-8">
         <p className="text-[13px] leading-relaxed text-ink-muted">
           Set the fees this facility charges and who receives care free of charge. Changes save on this device and sync when connected.

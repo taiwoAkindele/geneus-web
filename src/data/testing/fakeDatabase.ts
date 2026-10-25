@@ -24,6 +24,7 @@ export const fakeDatabase = (seed: Record<string, Record<string, unknown>[]> = {
     statements,
     rows,
     transactions,
+    writeTransaction: async (callback) => callback({ execute: async (sql, parameters = []) => { statements.push({ sql, parameters }); } }),
     execute: async (sql, parameters = []) => {
       statements.push({ sql, parameters });
     },

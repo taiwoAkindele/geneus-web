@@ -96,14 +96,16 @@ export type NewRecord = { permission: Permission; type: DocType; record: unknown
 export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[]): Promise<AnyDocument[]> => {
   for (const { permission } of records) assertAllowed(context, permission);
   const validated = records.map(({ type, record }) => ({ type, record: validate(record) }));
-  for (const { type, record } of validated) {
-    const row = toRow(type, record);
-    const columns = Object.keys(row);
-    await getDatabase().execute(
-      `INSERT INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
-      columns.map((column) => row[column]),
-    );
-  }
+  await getDatabase().writeTransaction(async (transaction) => {
+    for (const { type, record } of validated) {
+      const row = toRow(type, record);
+      const columns = Object.keys(row);
+      await transaction.execute(
+        `INSERT INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
+        columns.map((column) => row[column]),
+      );
+    }
+  });
   return validated.map(({ record }) => record);
 };
 

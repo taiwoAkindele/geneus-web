@@ -25,6 +25,7 @@ export type RuleForm = {
 export type FeeForm = {
   name: string;
   category: FeeCategory;
+  departmentId?: string;
   amount: string;
   currency: string;
   chargeWhen: ChargeWhen;
@@ -48,6 +49,7 @@ export const emptyRule = (): RuleForm => ({ reason: '', ageUnderYears: '', ageFr
 export const feeFormValues = (fee?: FeeItem, currency = ''): FeeForm => ({
   name: fee?.name ?? '',
   category: fee?.category ?? 'consultation',
+  departmentId: fee?.departmentId ?? '',
   amount: fee ? amountInput(fee.amountMinor, fee.currency) : '',
   currency: fee?.currency ?? currency,
   chargeWhen: fee?.chargeWhen ?? 'every_visit',
@@ -60,7 +62,7 @@ export const feeFormValues = (fee?: FeeItem, currency = ''): FeeForm => ({
   })) ?? [],
 });
 
-const draftSchema = FeeItem.pick({ name: true, category: true, amountMinor: true, currency: true, chargeWhen: true, exemptions: true });
+const draftSchema = FeeItem.pick({ name: true, category: true, departmentId: true, amountMinor: true, currency: true, chargeWhen: true, exemptions: true });
 
 /** Forms hold strings; the shared schema remains the authority for the saved shape. */
 export const feeDraftFromForm = (form: FeeForm): FeeDraft => {
@@ -68,6 +70,7 @@ export const feeDraftFromForm = (form: FeeForm): FeeDraft => {
   const result = draftSchema.safeParse({
     name: form.name.trim(),
     category: form.category,
+    departmentId: form.departmentId || undefined,
     amountMinor: parseAmount(form.amount, currency),
     currency,
     chargeWhen: form.chargeWhen,

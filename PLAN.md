@@ -165,7 +165,7 @@ Frontend work is sequenced to the root roadmap. Each item ships only when it wor
 
 ### FE-M1 — Single-facility core (the milestone that matters)
 - **Offline staff login** — scheduled or 24-hour access, overnight/full-day rosters,
-  informational reminders and manual sign-out; administrator inactivity expiry and
+  informational reminders and manual sign-out; staff inactivity expiry and
   enrollment-gated offline replica (root §4.3/§4.3c).
 - **Registration** — NASADOR form, offline dedup prompt ("Is this the same person?"),
   Patient ID generation `FACILITYCODE-SEQ-XX` (root §4.2), legacy paper-ref field.
@@ -305,9 +305,9 @@ Target-phone usability and full offline/reconnect field testing remain outstandi
    day offline, reconnect; watch the Sync Center and the reconcile queue (this is the field
    proof of the migration; the connector and the stack are proven by tests, the browser
    wiring is not yet).
-3. Finish booking fees, the nursing payment bypass, cashier collection, receipts and
-   billing reports. Stock, referrals and monthly reporting stay unavailable until their
-   screens can use real records.
+3. Configure each hospital's Paystack account and department payment points, then
+   prove bank-transfer reconciliation with provider test notifications before live use.
+   Stock, referrals and monthly reporting remain separate future work.
 4. Measure the encrypted replica on the target phone (§7): first sync, a register list, sign-in
    time with 100,000-round PBKDF2.
 
@@ -346,10 +346,56 @@ requires staff:permission to edit, not merely permission to edit names or shifts
 
 A successful staff session survives shift end, midnight and reload. Manual sign-out
 or deactivation clears the saved identity; reactivation never revives it.
-Administrator inactivity expiry, PIN checks and offline freshness checks remain.
+All staff sessions expire after 30 minutes of inactivity. PIN and offline freshness checks remain.
 The roster is reselected as time changes and searches actual windows across
 midnight. The editor supports next-day and full 24-hour duty, preserving record IDs.
 Reassigning a window replaces a previous extension with the newly chosen end.
 
 Reminders, profile/home labels, sign-in and Sync & device describe the same policy.
 Around-the-clock access never appears as administrator access for ordinary staff.
+
+## Hospital billing workspace (October 2026)
+
+Billing now has department summaries, fee-category ledgers, patient accounts, cash
+collection and receipts. Manage fees lives at /billing/fees; /admin/fees redirects.
+Departments such as Pharmacy, Oncology, Dental and GS are configurable, independent
+of fee categories. Fee and charge ownership is explicit; historical prices persist.
+Registration and booking write applicable charges atomically with their record.
+The first booking includes registration charges in its payment confirmation.
+Unpaid appointments can proceed with an attributed See now - collect later reason.
+
+Discounts and waivers are append-only reductions requiring payment:waive. Reports
+separate money received from free care; one payment can cover several fee categories.
+Daily handover uses payment dates, while fee ledgers filter by charge dates.
+
+Each hospital connects its own Paystack account. Receiving accounts or named virtual
+terminals are linked to departments, not patients. Paystack webhooks are authenticated
+against exact raw bytes and transactions are verified server-side. Unlinked-account
+receipts are retained for reconciliation. Transfers can be allocated only to synced
+bills in the receiving department, patient and currency; row locks and request IDs
+prevent double allocation and duplicate retries. Test receipts remain visible but
+cannot settle real patient bills. Cash remains offline-capable.
+
+Paystack connection keys are encrypted with a deployment-supplied 32-byte hex
+BILLING_ENCRYPTION_KEY and kept outside the sync publication. Do not put keys in
+VITE variables. An administrator connects Paystack and configures the backend webhook
+URL under Billing -> Departments & accounts. Existing department accounts can be
+linked; a named department Virtual Terminal can also be created through the API.
+Provider feature activation and real bank-account validation remain deployment steps.
+
+Release order: commit geneus-shared and promote both consumer submodule pointers;
+deploy migration 0011 and generated sync streams; deploy the matching frontend.
+Git promotion and production configuration remain with the owner.
+
+All staff accounts, including 24-hour access, now expire after 30 minutes without
+activity. Shift end still does not end an active session. Sleep, reload and the first
+input after expiry cannot revive an expired session; sync is independent of sign-out.
+
+Validation for hospital billing: The 194-test frontend suite and the final 28 SQLite regressions pass (195 tests total),
+as do all 291 server/shared tests.
+Eight isolated Chrome checks pass across desktop and phone layouts with no exceptions.
+Both typechecks and the production build pass; initial JavaScript is 114.7 KB gzipped
+against the 300 KB budget. The build used temporary public validation settings.
+Paystack responses were mocked; live provider activation, credentials, webhook delivery
+and target-phone field proof remain deployment checks. All 297 source/test files match
+the isolated validated copies. Consumer submodules stay pinned until owner promotion.

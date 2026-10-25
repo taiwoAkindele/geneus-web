@@ -6,21 +6,54 @@ import {
   type ExemptionFacts,
   type FeeItem,
   type Payment,
+  type BillingAdjustment,
+  type IncomingTransfer,
+  type BillingDepartment,
+  type Patient,
+  type VisitType,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { assertAmountMinor } from '@/lib/money';
 import { mintReceiptNumber } from '@/lib/receiptNumber';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 
-export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions'>;
+export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
 
 export const listFeeItems = () => allOfType<FeeItem>('fee_item');
 export const chargesForPatient = (patientId: string) => allWhere<Charge>('charge', 'patientId', patientId);
 export const paymentsForPatient = (patientId: string) => allWhere<Payment>('payment', 'patientId', patientId);
+export const adjustmentsForPatient = (patientId: string) => allWhere<BillingAdjustment>('billing_adjustment', 'patientId', patientId);
+export const listCharges = () => allOfType<Charge>('charge');
+export const listPayments = () => allOfType<Payment>('payment');
+export const listAdjustments = () => allOfType<BillingAdjustment>('billing_adjustment');
+export const listIncomingTransfers = () => allOfType<IncomingTransfer>('incoming_transfer');
+export const listBillingDepartments = () => allOfType<BillingDepartment>('billing_department');
+export const patientBillingFacts = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'sex'>, visitType?: VisitType): ExemptionFacts => {
+  const now = new Date(); const birth = patient.dateOfBirth ? new Date(`${patient.dateOfBirth}T00:00:00`) : undefined;
+  const ageYears = birth ? now.getFullYear() - birth.getFullYear() - Number(now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) : patient.ageYears;
+  return { sex: patient.sex, ageYears, visitType };
+};
+export const createBillingDepartment = (name: string, context: AuthorizationContext) => insertRecord<BillingDepartment>(context, 'fee_item:manage', 'billing_department', {
+  ...envelope(context), id: newId('billing_department'), type: 'billing_department', name: name.trim(), active: true,
+});
+
+export const adjustCharge = async (chargeId: string, kind: BillingAdjustment['kind'], amountMinor: number, reason: string, context: AuthorizationContext) => {
+  assertAllowed(context, 'payment:waive');
+  const charge = await findRecord<Charge>('charge', chargeId);
+  if (!charge || charge.facilityId !== context.facilityId) throw new Error('This bill is not available');
+  const [payments, adjustments] = await Promise.all([paymentsForPatient(charge.patientId), adjustmentsForPatient(charge.patientId)]);
+  const [{ balanceMinor }] = chargeBalances([charge], payments, adjustments);
+  assertAmountMinor(amountMinor);
+  if (amountMinor <= 0 || amountMinor > balanceMinor) throw new Error('The reduction must fit the unpaid balance');
+  return insertRecord<BillingAdjustment>(context, 'payment:waive', 'billing_adjustment', {
+    ...envelope(context), id: newId('billing_adjustment'), type: 'billing_adjustment',
+    chargeId, patientId: charge.patientId, kind, amountMinor, reason: reason.trim(),
+  });
+};
 
 const feeValues = (draft: FeeDraft): FeeDraft => {
   assertAmountMinor(draft.amountMinor);
-  return { name: draft.name.trim(), category: draft.category, amountMinor: draft.amountMinor, currency: draft.currency.trim().toUpperCase(), chargeWhen: draft.chargeWhen, exemptions: draft.exemptions };
+  return { name: draft.name.trim(), category: draft.category, departmentId: draft.departmentId || null, amountMinor: draft.amountMinor, currency: draft.currency.trim().toUpperCase(), chargeWhen: draft.chargeWhen, exemptions: draft.exemptions };
 };
 
 export const createFeeItem = async (draft: FeeDraft, context: AuthorizationContext): Promise<FeeItem> =>
@@ -50,12 +83,13 @@ export const newCharge = (fee: FeeItem, draft: ChargeDraft, context: Authorizati
   const exemption = findExemption(fee.exemptions, draft.facts);
   return {
     ...envelope(context),
-    id: newId('charge'),
+    id: fee.chargeWhen === 'first_visit' ? `charge:first:${draft.patientId}:${fee.id}` : newId('charge'),
     type: 'charge',
     patientId: draft.patientId,
     feeItemId: fee.id,
     description: fee.name,
     category: fee.category,
+    departmentId: fee.departmentId ?? undefined,
     listPriceMinor: fee.amountMinor,
     amountMinor: exemption ? 0 : fee.amountMinor,
     currency: fee.currency,
@@ -132,35 +166,42 @@ export const reversePayment = async (paymentId: string, reason: string, context:
   });
 };
 
-export type ChargeBalance = { charge: Charge; settledMinor: number; balanceMinor: number };
+export type ChargeBalance = { charge: Charge; settledMinor: number; balanceMinor: number; discountMinor: number; waivedMinor: number; dueMinor: number };
 
 /** One pass over allocations; reversals subtract instead of removing history. */
-export const chargeBalances = (charges: readonly Charge[], payments: readonly Payment[]): ChargeBalance[] => {
+export const chargeBalances = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = []): ChargeBalance[] => {
   const byId = new Map(charges.map((charge) => [charge.id, charge]));
   const settled = new Map<string, number>();
+  const legacyWaivers = new Map<string, number>();
   for (const payment of payments) {
     for (const allocation of payment.allocations) {
       const charge = byId.get(allocation.chargeId);
       if (!charge || charge.patientId !== payment.patientId || charge.currency !== payment.currency || charge.facilityId !== payment.facilityId) continue;
       const amount = allocation.amountMinor * (payment.reverses ? -1 : 1);
-      settled.set(charge.id, (settled.get(charge.id) ?? 0) + amount);
+      const target = payment.method === 'waiver' ? legacyWaivers : settled;
+      target.set(charge.id, (target.get(charge.id) ?? 0) + amount);
     }
   }
   return charges.map((charge) => {
     const settledMinor = settled.get(charge.id) ?? 0;
-    return { charge, settledMinor, balanceMinor: charge.amountMinor - settledMinor };
+    const reductions = adjustments.filter((a) => a.chargeId === charge.id && a.patientId === charge.patientId && a.facilityId === charge.facilityId);
+    const discountMinor = reductions.filter((a) => a.kind === 'discount').reduce((n, a) => n + a.amountMinor, 0);
+    const waivedMinor = (legacyWaivers.get(charge.id) ?? 0) + reductions.filter((a) => a.kind === 'waiver').reduce((n, a) => n + a.amountMinor, 0);
+    const dueMinor = charge.amountMinor - discountMinor - waivedMinor;
+    return { charge, settledMinor, discountMinor, waivedMinor, dueMinor, balanceMinor: dueMinor - settledMinor };
   });
 };
 
 /** Never add different currencies into a single patient balance. */
-export const balancesByCurrency = (charges: readonly Charge[], payments: readonly Payment[]): Map<string, number> => {
+export const balancesByCurrency = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = []): Map<string, number> => {
   const totals = new Map<string, number>();
-  for (const { charge, balanceMinor } of chargeBalances(charges, payments)) {
+  for (const { charge, balanceMinor } of chargeBalances(charges, payments, adjustments)) {
     totals.set(charge.currency, (totals.get(charge.currency) ?? 0) + balanceMinor);
   }
   return totals;
 };
 
 /** With no fees configured there is nothing to pay, so care continues immediately. */
-export const isAppointmentConfirmed = (appointmentId: string, charges: readonly Charge[], payments: readonly Payment[]): boolean =>
-  chargeBalances(charges.filter((charge) => charge.appointmentId === appointmentId), payments).every(({ balanceMinor }) => balanceMinor <= 0);
+export const isAppointmentConfirmed = (appointmentId: string, charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = [], chargeIds: readonly string[] = []): boolean =>
+  chargeIds.every((id) => charges.some((charge) => charge.id === id)) &&
+  chargeBalances(charges.filter((charge) => charge.appointmentId === appointmentId || chargeIds.includes(charge.id)), payments, adjustments).every(({ balanceMinor }) => balanceMinor <= 0);

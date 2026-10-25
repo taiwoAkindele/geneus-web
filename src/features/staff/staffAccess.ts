@@ -15,7 +15,7 @@ export const PERMISSION_LABELS: Record<AssignablePermission, string> = {
   'referral:create': 'Create referrals', 'referral:update': 'Update referrals',
   'register_entry:create': 'Add register entries', 'stock_movement:create': 'Record stock movements',
   'charge:create': 'Raise patient charges', 'payment:receive': 'Receive payments',
-  'payment:waive': 'Waive fees', 'payment:reverse': 'Reverse payments',
+  'payment:waive': 'Discount or waive fees', 'payment:reverse': 'Reverse payments',
   'register_definition:publish': 'Configure registers', 'unit:manage': 'Manage units',
   'stock_item:manage': 'Manage stock items', 'fee_item:manage': 'Manage the fee schedule',
   'staff:manage': 'Add staff and edit names', 'staff:permission': 'Assign staff roles and permissions',

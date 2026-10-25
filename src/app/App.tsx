@@ -125,6 +125,8 @@ const EncounterScreen = lazy(() =>
 const FeeScheduleScreen = lazy(() =>
   import('@/pages/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
 );
+const BillingScreen = lazy(() => import('@/pages/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
+const BillingSettingsScreen = lazy(() => import('@/pages/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const AppointmentsScreen = lazy(() =>
   import('@/pages/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
 );
@@ -195,7 +197,10 @@ const App = () => {
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
             <Route path="/admin/units" element={<UnitsScreen />} />
-            <Route path="/admin/fees" element={<FeeScheduleScreen />} />
+            <Route path="/billing" element={<BillingScreen />} />
+            <Route path="/billing/fees" element={<FeeScheduleScreen />} />
+            <Route path="/billing/settings" element={<BillingSettingsScreen />} />
+            <Route path="/admin/fees" element={<Navigate to="/billing/fees" replace />} />
             <Route path="/admin/devices" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
