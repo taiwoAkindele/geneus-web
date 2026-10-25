@@ -16,11 +16,22 @@ describe('registration values', () => {
       phone: '   ',
     });
 
-    expect(details).toEqual({ fullName: 'Amaka Okoro', address: 'Odo-Ona', sex: 'female', ageYears: 32 });
+    expect(details).toEqual({ fullName: 'Amaka Okoro', address: 'Odo-Ona', sex: 'female', ageYears: 32, ageObservedOn: new Date().toISOString().slice(0, 10), dobEstimated: true, identityEvidence: 'reported' });
   });
 
   it('keeps the paper folder number as the legacy reference (PRD §10.2)', () => {
     expect(toPatientDetails({ ...EMPTY_REGISTRATION, sex: 'F', folder: '2023/1187' }).legacyPaperRef).toBe('2023/1187');
+  });
+
+  it('validates optional NIN and distinguishes document checks from reported identity', () => {
+    const values = { ...EMPTY_REGISTRATION, sex: 'F' as const, age: '20', nin: '123 456 78901' };
+    expect(toPatientDetails(values).nin).toBe('12345678901');
+    expect(() => toPatientDetails({ ...values, nin: '123' })).toThrow(/11 digits/);
+    expect(() => toPatientDetails({ ...values, identityEvidence: 'document_seen' })).toThrow(/document checked/);
+    expect(toPatientDetails({ ...values, identityEvidence: 'document_seen', identityEvidenceNote: 'Paper identity card, name and birth date checked' }).identityEvidence).toBe('document_seen');
+  });
+  it('refuses contradictory birth dates and ages before saving', () => {
+    expect(() => toPatientDetails({ ...EMPTY_REGISTRATION, sex: 'M', age: '2', dateOfBirth: '1980-01-01' })).toThrow(/do not agree/);
   });
 
   it('round-trips a registered patient through the form', () => {

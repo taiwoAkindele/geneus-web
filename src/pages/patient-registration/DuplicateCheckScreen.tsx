@@ -3,6 +3,8 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Sheet } from '@/ui';
 import { toPatientDetails, useSavePatient, useClearRegistrationDraft, useRegistrationDraft } from '@/features/registration';
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/features/search';
+import { recordExistingSelection } from '@/data/repos/patientIdentity';
+import { useAuthorizationContext } from '@/session';
 
 export type DuplicateNavState = { matchIds: string[] } | null;
 
@@ -39,6 +41,10 @@ export const DuplicateCheckScreen = () => {
   const [index, setIndex] = useState(0);
   const [comparing, setComparing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reason, setReason] = useState('');
+  const [uncertain, setUncertain] = useState(false);
+  const [error, setError] = useState('');
+  const context = useAuthorizationContext();
 
   if (!state || !values.fullName || !values.sex) return <Navigate to="/patients/new" replace />;
 
@@ -47,9 +53,18 @@ export const DuplicateCheckScreen = () => {
   const match = matches[Math.min(index, matches.length - 1)];
 
   const registerAsNew = async () => {
+    if (saving || reason.trim().length < 3) { setError('Explain why this is a different person or why review is needed'); return; }
     setSaving(true);
-    await savePatient(values);
+    await savePatient(values, undefined, { candidateIds: state.matchIds, outcome: uncertain ? 'review_requested' : 'registration_distinct', reason });
     setSaving(false);
+  };
+
+  const useExisting = async () => {
+    if (!match || saving) return;
+    setSaving(true); setError('');
+    try { await recordExistingSelection(match.patient.patientId, context); clearDraft(); navigate('/patients/profile', { state: { patientId: match.patient.patientId }, replace: true }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not record the identity decision'); }
+    finally { setSaving(false); }
   };
 
   const typedAge = values.age || (values.dateOfBirth ? `born ${values.dateOfBirth}` : '—');
@@ -136,14 +151,17 @@ export const DuplicateCheckScreen = () => {
           <Button
             variant="primary"
             disabled={!match || saving}
-            onClick={() => { if (match) { clearDraft(); navigate('/patients/profile', { state: { patientId: match.patient.patientId }, replace: true }); } }}
+            onClick={() => void useExisting()}
           >
             Yes — open this record
           </Button>
         </div>
         <div className="pt-1">
+          <label className="my-3 block text-sm font-semibold">Reason for a new record<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} className="mt-2 w-full rounded-field border border-outline p-3" placeholder="Explain the distinguishing details or uncertainty" /></label>
+          <label className="mb-3 flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={uncertain} onChange={(event) => setUncertain(event.target.checked)} />Identity is uncertain — flag for records review</label>
+          {error ? <p role="alert" className="mb-2 text-sm text-danger">{error}</p> : null}
           <Button variant="outlined" disabled={saving || patients.loading || Boolean(patients.error)} loading={saving} onClick={registerAsNew}>
-            No — register as a new person
+            {uncertain ? 'Register and request identity review' : 'No — register as a new person'}
           </Button>
         </div>
         {/* Not every match is clear-cut; don't force a guess between the two. */}

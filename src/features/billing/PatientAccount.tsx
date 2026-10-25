@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import type { IncomingTransfer, Payment } from '@shared';
+import { linkedPatientIds, type IncomingTransfer, type Payment } from '@shared';
+import { useLiveQuery } from '@/data';
+import { listIdentityEvents } from '@/data/repos/patientIdentity';
 import { adjustCharge, createCharge, patientBillingFacts, recordPayment } from '@/data/repos/billing';
 import { useAuthorizationContext } from '@/session';
 import { Button, SelectField, Sheet, TextField } from '@/ui';
@@ -8,11 +10,14 @@ import { billingRequest, matchTransfer, type ReceivingAccount } from '@/lib/api/
 import { billingRows, transferAllocated } from './ledger';
 import type { BillingData } from './useBilling';
 
-export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved }: {
+export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved, onSelectAccount }: {
   patientId: string; transfer?: IncomingTransfer; data: BillingData; onClose: () => void;
   onReceipt: (p: Payment) => void; onSaved: () => void;
+  onSelectAccount: (patientId: string) => void;
 }) => {
   const context = useAuthorizationContext();
+  const identities = useLiveQuery(listIdentityEvents);
+  const linkedIds = linkedPatientIds(patientId, identities.data ?? []);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [feeId, setFeeId] = useState('');
   const [adjusting, setAdjusting] = useState('');
@@ -67,6 +72,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   });
   return <Sheet title={patient?.fullName ?? patientId} eyebrow={transfer ? 'Match bank transfer' : 'Patient billing account'} onClose={onClose} closeDisabled={busy}>
     <p className="mb-3 font-mono text-xs text-ink-muted">{patientId}</p>
+    {linkedIds.length > 1 ? <section className="mb-3 space-y-2 rounded-field border border-outline p-3"><h3 className="text-sm font-bold">Accounts under linked patient IDs</h3><p className="text-xs text-ink-muted">Each bill and receipt keeps its original patient ID. Review the other accounts before raising another fee.</p>{linkedIds.filter((id) => id !== patientId).map((id) => <Button key={id} variant="ghost" onClick={() => onSelectAccount(id)}>{data.patients.find((p) => p.id === id)?.fullName ?? id} · {id}</Button>)}</section> : null}
     {transfer ? <p className="mb-3 rounded-card bg-brand-wash p-3 text-sm">Available to match: <strong>{formatMoney(transfer.amountMinor - transferAllocated(transfer.id, data.payments), transfer.currency)}</strong>. Matching needs a connection; bills must have synced.</p> : null}
     <fieldset disabled={busy} className="space-y-3">
       {!transfer && context.permissions.includes('payment:receive') ? <div className="space-y-2"><Button variant="outlined" onClick={() => void perform(async () => setAccounts(await billingRequest<ReceivingAccount[]>('accounts/list', { actorStaffId: context.userId })))}>Show bank details for transfer</Button>{accounts?.filter((a) => !a.departmentId || rows.some((r) => r.charge.departmentId === a.departmentId)).map((a) => <div key={a.id} className="rounded-field bg-brand-wash p-3 text-sm"><strong>{data.departments.find((d) => d.id === a.departmentId)?.name ?? 'Hospital / general'} · {a.mode}</strong><p>{a.bankName} · {a.accountName}</p><p className="font-mono text-lg">{a.accountNumber}</p></div>)}{accounts?.length === 0 ? <p className="text-sm">No receiving accounts are connected. Ask an administrator to configure Departments &amp; accounts.</p> : null}</div> : null}

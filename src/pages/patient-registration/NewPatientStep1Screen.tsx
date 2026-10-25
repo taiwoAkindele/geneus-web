@@ -4,11 +4,12 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Button, SegmentedControl, TextField } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { calendarDate } from '@/lib/calendarDate';
+import { validCalendarDate, yearsBetween } from '@shared';
 import { EMPTY_REGISTRATION, useRegistrationDraft, type RegistrationNavState, type RegistrationValues } from '@/features/registration';
 
 const todayIso = (): string => calendarDate();
 
-type Step1Values = Pick<RegistrationValues, 'fullName' | 'sex' | 'age' | 'dateOfBirth' | 'phone' | 'address'>;
+type Step1Values = Pick<RegistrationValues, 'fullName' | 'sex' | 'age' | 'dateOfBirth' | 'phone' | 'address' | 'dobEstimated'>;
 
 /**
  * 4.3 New patient — step 1. Only the fields Nigerian facilities already use.
@@ -114,13 +115,15 @@ const Step1Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
           <TextField
             label="Date of birth"
             type="date"
-            hint="Approximate is fine"
+            hint="Leave blank if only an estimated age is known"
             max={todayIso()}
             error={errors.dateOfBirth?.message}
             {...register('dateOfBirth', {
-              validate: (date) => !date || date <= todayIso() || 'A date of birth cannot be in the future',
+              validate: (date) => !date || (validCalendarDate(date) && date <= todayIso() && (!getValues('age').trim() || yearsBetween(date, todayIso()) === Number(getValues('age')))) || 'Check the birth date and age; they must agree',
             })}
           />
+          <label className="flex min-h-[44px] items-center gap-3 text-sm"><input type="checkbox" {...register('dobEstimated')} />The date of birth is estimated</label>
+          <p className="text-xs text-ink-muted">An age recorded without a birth date is treated as estimated.</p>
           <TextField
             label="Phone"
             type="tel"
@@ -139,7 +142,7 @@ const Step1Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
 
         <footer className="border-t border-outline-soft bg-surface px-5 pb-6 pt-4">
           <Button variant="primary" type="submit">
-            Continue — Occupation &amp; Religion
+            Continue — Additional details
           </Button>
         </footer>
       </form>

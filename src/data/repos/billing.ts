@@ -1,5 +1,6 @@
 import {
   findExemption,
+  patientAge,
   paymentPermission,
   type AuthorizationContext,
   type Charge,
@@ -28,9 +29,8 @@ export const listPayments = () => allOfType<Payment>('payment');
 export const listAdjustments = () => allOfType<BillingAdjustment>('billing_adjustment');
 export const listIncomingTransfers = () => allOfType<IncomingTransfer>('incoming_transfer');
 export const listBillingDepartments = () => allOfType<BillingDepartment>('billing_department');
-export const patientBillingFacts = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'sex'>, visitType?: VisitType): ExemptionFacts => {
-  const now = new Date(); const birth = patient.dateOfBirth ? new Date(`${patient.dateOfBirth}T00:00:00`) : undefined;
-  const ageYears = birth ? now.getFullYear() - birth.getFullYear() - Number(now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) : patient.ageYears;
+export const patientBillingFacts = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'sex'> & Partial<Pick<Patient, 'createdOn' | 'ageObservedOn'>>, visitType?: VisitType): ExemptionFacts => {
+  const ageYears = patientAge({ ...patient, createdOn: patient.createdOn ?? new Date().toISOString() });
   return { sex: patient.sex, ageYears, visitType };
 };
 export const createBillingDepartment = (name: string, context: AuthorizationContext) => insertRecord<BillingDepartment>(context, 'fee_item:manage', 'billing_department', {

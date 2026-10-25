@@ -79,6 +79,14 @@ describe('the duplicate check', () => {
 describe('patient search', () => {
   const everyone = [amaka, mother, ibrahim];
 
+  it('finds an old paper folder and an exact NIN, and keeps ambiguous short numbers visible', () => {
+    const alias = patient({ id: 'OOE-PHC-000047-AB', patientId: 'OOE-PHC-000047-AB', legacyPaperRef: '2023/1187', nin: '12345678901' });
+    expect(searchPatients([amaka, alias], '2023/1187', 'OOE-PHC')).toEqual([alias]);
+    expect(searchPatients([amaka, alias], '12345678901', 'OOE-PHC')).toEqual([alias]);
+    expect(searchPatients([amaka, alias], '47', 'OOE-PHC')).toHaveLength(2);
+    expect(searchPatients([amaka], '+2348035550147', 'OOE-PHC')).toEqual([amaka]);
+  });
+
   it('finds "patient 47" by the number staff say aloud', () => {
     expect(searchPatients(everyone, '47', 'OOE-PHC')).toEqual([amaka]);
   });

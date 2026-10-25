@@ -12,6 +12,7 @@ export type FieldKind = 'text' | 'number' | 'boolean' | 'json';
 interface ZodDef {
   type?: string;
   innerType?: ZodLike;
+  in?: ZodLike;
 }
 interface ZodLike {
   _zod?: { def?: ZodDef };
@@ -27,8 +28,8 @@ const kindOf = (schema: ZodLike): FieldKind => {
     if (def.type === 'boolean') return 'boolean';
     if (def.type === 'number') return 'number';
     if (def.type && JSON_TYPES.has(def.type)) return 'json';
-    if (!def.innerType) return 'text';
-    current = def.innerType;
+    if (!def.innerType && !def.in) return 'text';
+    current = def.innerType ?? def.in;
   }
   return 'text';
 };

@@ -1,4 +1,4 @@
-import type { Patient } from '@shared';
+import { patientAge, type Patient } from '@shared';
 import type { PatientDetails } from '@/data/repos/patients';
 import { sequenceOf } from '@/lib/patientId';
 
@@ -7,8 +7,6 @@ import { sequenceOf } from '@/lib/patientId';
  * staff say aloud ("patient 47"), phone or name, and the duplicate check run
  * before a new registration. Pure, so both are tested without a database.
  */
-
-const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
 
 /** Ages within this many years count as the same person's — many ages are estimates. */
 const AGE_TOLERANCE_YEARS = 2;
@@ -62,11 +60,8 @@ export const namesMatch = (a: string, b: string): boolean => {
 };
 
 /** Age today: from the date of birth, else the age given at registration plus the years since. */
-export const currentAge = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'createdOn'>, now = Date.now()): number | undefined => {
-  if (patient.dateOfBirth) return Math.floor((now - Date.parse(patient.dateOfBirth)) / YEAR_MS);
-  if (patient.ageYears === undefined) return undefined;
-  return patient.ageYears + Math.floor((now - Date.parse(patient.createdOn)) / YEAR_MS);
-};
+export const currentAge = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'createdOn' | 'ageObservedOn'>, now = Date.now()): number | undefined =>
+  patientAge(patient, new Date(now).toISOString().slice(0, 10));
 
 const candidateAge = (details: PatientDetails, now: number): number | undefined =>
   currentAge({ ...details, createdOn: new Date(now).toISOString() }, now);
@@ -119,9 +114,11 @@ export const searchPatients = (patients: readonly Patient[], query: string, faci
   const onlyDigits = /^[\d\s+()-]+$/.test(text);
   const rank = (patient: Patient): number | undefined => {
     if (patient.patientId === upper) return 0;
+    if (patient.legacyPaperRef?.toUpperCase() === upper) return 0;
+    if (onlyDigits && digits.length === 11 && patient.nin === digits) return 0;
     if (onlyDigits && digits && sequenceOf(patient.patientId, facilityCode) === Number(digits)) return 1;
     if (patient.patientId.includes(upper)) return 2;
-    if (onlyDigits && digits.length >= 4 && (patient.phone ?? '').replace(/\D/g, '').includes(digits)) return 3;
+    if (onlyDigits && digits.length >= 4 && ((patient.phone ?? '').replace(/\D/g, '').includes(digits) || phoneKey(patient.phone) === phoneKey(text))) return 3;
     if (!onlyDigits && namesMatchPrefix(text, patient.fullName)) return 4;
     return undefined;
   };
