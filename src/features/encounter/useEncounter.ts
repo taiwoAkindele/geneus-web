@@ -8,7 +8,7 @@ import { useAuthorizationContext } from '@/session';
 import { EMPTY_ENCOUNTER_DATA, projectEncounter } from './encounterRecord';
 import { isClosingStep, STEP_DEFS, stepsFor } from './steps';
 import { stepProblems, toStepValues } from './stepValues';
-import type { EncounterData, StepKey } from './types';
+import type { EncounterData, RxLine, StepKey } from './types';
 
 /** Plain-text summary rows for a step — used by both the Review sheet and the locked view. */
 export const summarize = (data: EncounterData, key: StepKey): { label: string; value: string }[] => {
@@ -20,11 +20,14 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
         { label: 'Pulse', value: data.vitals.pulse ? `${data.vitals.pulse} bpm` : '—' },
         { label: 'Weight', value: data.vitals.weight ? `${data.vitals.weight} kg` : '—' },
         { label: 'SpO₂', value: data.vitals.spo2 ? `${data.vitals.spo2} %` : '—' },
+        ...(data.vitals.height ? [{ label: 'Height', value: `${data.vitals.height} cm` }] : []),
+        ...(data.vitals.respiratoryRate ? [{ label: 'Respiratory rate', value: `${data.vitals.respiratoryRate} /min` }] : []),
       ];
     case 'complaint':
       return [
         { label: 'Complaints', value: data.complaint.text.trim() || '—' },
         { label: 'Clinical note', value: data.complaint.note || '—' },
+        ...(['historyOfPresentIllness', 'examination', 'assessment', 'plan'] as const).flatMap((key) => data.complaint[key] ? [{ label: { historyOfPresentIllness: 'History of presenting illness', examination: 'Examination', assessment: 'Assessment', plan: 'Clinical plan / advice' }[key], value: data.complaint[key]! }] : []),
       ];
     case 'lab_order':
       return [{ label: 'Investigations', value: data.lab_order.tests.join(', ') || 'None' }];
@@ -38,7 +41,9 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
       else plan.push('Send home');
       return [
         { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
-        { label: 'Prescription', value: data.diagnosis.rx.map((m) => `${m.name} — ${m.dose}`).join('; ') || 'None' },
+        ...(data.diagnosis.code || data.diagnosis.certainty ? [{ label: 'Diagnosis details', value: [data.diagnosis.codingSystem, data.diagnosis.code, data.diagnosis.certainty].filter(Boolean).join(' · ') }] : []),
+        ...(data.diagnosis.diagnoses ?? []).map((diagnosis, index) => ({ label: `Additional diagnosis ${index + 1}`, value: [diagnosis.label, diagnosis.codingSystem, diagnosis.code, diagnosis.certainty].filter(Boolean).join(' · ') })),
+        { label: 'Prescription', value: data.diagnosis.rx.map((m) => `${m.name} — ${[m.dose, m.frequency, m.duration, m.route, m.quantity ? `Quantity ${m.quantity}` : ''].filter(Boolean).join(' · ')}`).join('; ') || 'None' },
         { label: 'Plan', value: plan.join(' · ') },
       ];
     }
@@ -230,7 +235,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     setDraft((d) => ({ ...d, diagnosis: { ...d.diagnosis, rx: [...d.diagnosis.rx, { name: '', dose: '' }] } }));
   }, []);
 
-  const setRx = useCallback((idx: number, field: 'name' | 'dose', value: string) => {
+  const setRx = useCallback((idx: number, field: keyof RxLine, value: string) => {
     setDraft((d) => ({
       ...d,
       diagnosis: { ...d.diagnosis, rx: d.diagnosis.rx.map((line, i) => (i === idx ? { ...line, [field]: value } : line)) },
@@ -310,7 +315,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     [setField, toggleIn, setResult, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
   );
 
-  return { enc, draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, ...actions };
+  return { enc, rawEntries: live.data?.entries ?? [], draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, ...actions };
 };
 
 export type EncounterController = ReturnType<typeof useEncounter>;

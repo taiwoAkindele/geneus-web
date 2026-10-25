@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Appointment, Encounter, EncounterEntry, Patient } from '@shared';
+import { Appointment, ClinicalEvent, Encounter, EncounterEntry, Patient } from '@shared';
 import { projectAppointments } from './appointmentList';
 
 const now = new Date(2026, 9, 22, 14);
@@ -12,6 +12,14 @@ const appointment = (id: string, day: number, scheduled = false) => Appointment.
 });
 
 describe('the working appointment day', () => {
+  it('uses structured allergy reviews in the worklist while retaining unreviewed legacy allergies', () => {
+    const withLegacy = { ...patient, allergies: ['Penicillin', 'Sulfa'] };
+    const review = ClinicalEvent.parse({ ...envelope, id: 'allergy:review', recordId: 'allergy:review', type: 'clinical_event', patientId: patient.patientId, actorRole: 'doctor', kind: 'allergy', values: { allergen: 'Penicillin', reaction: 'Reviewed', severity: 'unknown', verification: 'refuted', status: 'inactive' } });
+    const rows = projectAppointments([appointment('allergy-booking', 22)], [withLegacy], [], [], now, [], [], [], [review]);
+    expect(rows[0].patient.allergy).toBe('Sulfa');
+    expect(withLegacy.allergies).toEqual(['Penicillin', 'Sulfa']);
+  });
+
   it('puts yesterday in Overdue and a scheduled booking for today in Today', () => {
     const rows = projectAppointments([appointment('old', 21), appointment('today', 22, true), appointment('future', 23, true)], [patient], [], [], now);
     expect(rows.map(({ id, group }) => [id, group])).toEqual([['old', 'overdue'], ['today', 'today'], ['future', 'upcoming']]);

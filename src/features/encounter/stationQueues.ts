@@ -1,4 +1,4 @@
-import { CLOSING_STEPS, ENCOUNTER_STEP_VALUES, type EncounterEntry, type EncounterStep } from '@shared';
+import { CLOSING_STEPS, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type EncounterEntry, type EncounterStep } from '@shared';
 
 /**
  * The station queues (PRD §9.8.1): who is waiting for the laboratory, whose
@@ -12,7 +12,7 @@ export type StationQueue = 'lab' | 'results' | 'pharmacy';
 export const STATION_QUEUES: readonly StationQueue[] = ['lab', 'results', 'pharmacy'];
 
 /** The steps the queues are decided from — read by step, through the index. */
-export const QUEUE_STEPS: readonly EncounterStep[] = ['lab_order', 'lab_results', 'diagnosis', 'dispense', ...CLOSING_STEPS];
+export const QUEUE_STEPS: readonly EncounterStep[] = ['lab_order', 'lab_results', 'diagnosis', 'dispense', 'amendment', ...CLOSING_STEPS];
 
 export type QueuedPatient = {
   encounterId: string;
@@ -26,12 +26,12 @@ export type QueuedPatient = {
 const firstAt = (entries: readonly EncounterEntry[], step: EncounterStep) =>
   entries
     .filter((entry) => entry.step === step)
-    .sort((a, b) => a.createdOn.localeCompare(b.createdOn))[0];
+    .sort((a, b) => b.createdOn.localeCompare(a.createdOn))[0];
 
 /** Each open encounter in the queue it is waiting in, oldest first — the order patients arrived. */
 export const stationQueues = (entries: readonly EncounterEntry[]): Record<StationQueue, QueuedPatient[]> => {
   const byEncounter = new Map<string, EncounterEntry[]>();
-  for (const entry of entries) byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
+  for (const entry of effectiveEncounterEntries(entries)) byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
 
   const queues: Record<StationQueue, QueuedPatient[]> = { lab: [], results: [], pharmacy: [] };
   for (const [encounterId, saved] of byEncounter) {

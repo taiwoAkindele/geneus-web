@@ -18,6 +18,7 @@ import {
   adjustCharge, adjustmentsForPatient,
 } from './repos/billing';
 import { book } from './repos/appointments';
+import { clinicalEventsForPatient, patientClinicalRecord, saveClinicalRecord } from './repos/clinical';
 import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { fakeDatabase } from './testing/fakeDatabase';
 
@@ -398,6 +399,56 @@ describe('the write path against a real SQLite', () => {
       expect(bills).toHaveLength(1);
       expect(bills[0]).toMatchObject({ amountMinor: 0, listPriceMinor: 150000, exemptionReason: 'Antenatal programme' });
       expect(isAppointmentConfirmed(appointment.id, bills, [], [], appointment.chargeIds)).toBe(true);
+    });
+  });
+
+  describe('longitudinal care', () => {
+    const patientId = 'OOE-PHC-000047-K2';
+    const values = { label: 'Hypertension', status: 'active', certainty: 'confirmed' };
+    it('saves and resolves a problem as an attributed append-only chain', async () => {
+      const original = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
+      const revision = await saveClinicalRecord(patientId, 'problem', { ...values, status: 'resolved' }, contextFor('doctor'), original);
+      const record = await patientClinicalRecord(patientId);
+      expect(record.events).toHaveLength(2);
+      expect(record.current).toEqual([revision]);
+      expect((await clinicalEventsForPatient(patientId))[0].values.status).toBe('active');
+      await expect(saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'), original)).rejects.toThrow(/changed/);
+    });
+    it('refuses unauthorized, malformed and cross-patient clinical writes', async () => {
+      await expect(saveClinicalRecord(patientId, 'problem', values, contextFor('cashier'))).rejects.toThrow();
+      await expect(saveClinicalRecord(patientId, 'allergy', values, contextFor('doctor'))).rejects.toThrow();
+      const original = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
+      await expect(saveClinicalRecord('OOE-PHC-000048-K2', 'problem', values, contextFor('doctor'), original)).rejects.toThrow(/original patient/);
+      expect(await clinicalEventsForPatient(patientId)).toHaveLength(1);
+    });
+    it('links a care plan to this patient’s problem and retains review outcomes', async () => {
+      const problem = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
+      const plan = await saveClinicalRecord(patientId, 'care_plan', { title: 'Review', goal: 'Assess progress', actions: 'Review observations', status: 'active', problemId: problem.recordId }, contextFor('doctor'));
+      const reviewed = await saveClinicalRecord(patientId, 'care_plan', { ...plan.values, outcome: 'Reviewed', status: 'completed' }, contextFor('doctor'), plan);
+      expect(reviewed.previousId).toBe(plan.id);
+      await expect(saveClinicalRecord(patientId, 'care_plan', { ...plan.values, problemId: 'other-patient-problem' }, contextFor('doctor'))).rejects.toThrow(/belonging/);
+    });
+    it('records repeated vitals and structured corrections without rewriting saved entries', async () => {
+      const original = await saveStep({ patientId, step: 'vitals', values: { temperatureC: 39 } }, contextFor('nurse'));
+      const repeat = await saveStep({ patientId, encounterId: original.encounterId, step: 'vitals', values: { temperatureC: 38 } }, contextFor('nurse'));
+      const correction = await amendEntry(original, 'Transcription correction', contextFor('nurse'), { temperatureC: 37 }, null);
+      expect(await entriesForEncounter(original.encounterId)).toHaveLength(3);
+      expect(correction.values.correctedValues).toEqual({ temperatureC: 37 });
+      await expect(amendEntry(original, 'Stale correction', contextFor('nurse'), { temperatureC: 36 }, null)).rejects.toThrow(/corrected while/);
+      await saveStep({ patientId, encounterId: original.encounterId, step: 'follow_up', values: {} }, contextFor('doctor'));
+      await expect(saveStep({ patientId, encounterId: repeat.encounterId, step: 'vitals', values: { temperatureC: 36 } }, contextFor('nurse'))).rejects.toThrow(/closed/);
+    });
+    it('protects dispositions and the current dispensed prescription before an offline correction is written', async () => {
+      const original = await saveStep({ patientId, step: 'diagnosis', values: { diagnosis: 'Initial', prescription: [{ drug: 'Original medicine', dose: '1 tablet' }] } }, contextFor('doctor'));
+      const correctedPrescription = { diagnosis: 'Reviewed', prescription: [{ drug: 'Reviewed medicine', dose: '1 tablet' }] };
+      const revision = await amendEntry(original, 'Reviewed before dispensing', contextFor('doctor'), correctedPrescription, null);
+      await saveStep({ patientId, encounterId: original.encounterId, step: 'dispense', values: { lines: [{ drug: 'Reviewed medicine', dispensed: true }] } }, contextFor('nurse'));
+      await expect(amendEntry(original, 'Change disposition', contextFor('doctor'), { ...correctedPrescription, admit: true }, revision.id)).rejects.toThrow(/disposition/);
+      await expect(amendEntry(original, 'Change prescription', contextFor('doctor'), { diagnosis: 'Reviewed', prescription: [] }, revision.id)).rejects.toThrow(/dispensed/);
+      const textCorrection = await amendEntry(original, 'Clarify diagnosis only', contextFor('doctor'), { ...correctedPrescription, diagnosis: 'Clarified diagnosis' }, revision.id);
+      expect(textCorrection.values.previousAmendmentId).toBe(revision.id);
+      expect(await entriesForEncounter(original.encounterId)).toHaveLength(4);
+      await expect(saveStep({ patientId, encounterId: original.encounterId, step: 'diagnosis', values: { diagnosis: 'Second diagnosis' } }, contextFor('doctor'))).rejects.toThrow(/already saved/);
     });
   });
 

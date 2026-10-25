@@ -1,10 +1,11 @@
-import { Button, ChoiceChip, Icon, TextField } from '@/ui';
+import { Button, ChoiceChip, Icon, SelectField, TextField } from '@/ui';
 import { followUpOptions, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
+export type StepFormController = Pick<EncounterController, 'setField' | 'toggleIn' | 'setResult' | 'addRx' | 'setRx' | 'removeRx' | 'setDispenseReason' | 'toggleDispense'> & { enc: Pick<EncounterController['enc'], 'data'> };
 
 /** The active-state input form for a given section. Reads/writes through the hook. */
-export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterController }) => {
+export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKey; ctl: StepFormController; correcting?: boolean }) => {
   const { enc, setField, toggleIn, setResult, addRx, setRx, removeRx, setDispenseReason } = ctl;
   const d = enc.data;
 
@@ -16,6 +17,8 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
         <TextField label="Pulse (bpm)" name="v_pulse" value={d.vitals.pulse} inputMode="numeric" onChange={(e) => setField('vitals', 'pulse', e.target.value)} />
         <TextField label="Weight (kg)" name="v_weight" value={d.vitals.weight} inputMode="decimal" onChange={(e) => setField('vitals', 'weight', e.target.value)} />
         <TextField label="SpO₂ (%)" name="v_spo2" value={d.vitals.spo2} inputMode="numeric" onChange={(e) => setField('vitals', 'spo2', e.target.value)} />
+        <TextField label="Height (cm)" name="v_height" value={d.vitals.height ?? ''} inputMode="decimal" onChange={(e) => setField('vitals', 'height', e.target.value)} />
+        <TextField label="Respiratory rate (/min)" name="v_resp" value={d.vitals.respiratoryRate ?? ''} inputMode="numeric" onChange={(e) => setField('vitals', 'respiratoryRate', e.target.value)} />
       </div>
     );
   }
@@ -38,6 +41,7 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
           onChange={(e) => setField('complaint', 'note', e.target.value)}
           className="w-full rounded-field border-[1.5px] border-outline bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand"
         />
+        <div className="mt-4 space-y-3">{(['historyOfPresentIllness', 'examination', 'assessment', 'plan'] as const).map((key) => <label key={key} className="block text-sm font-semibold">{{ historyOfPresentIllness: 'History of presenting illness', examination: 'Examination', assessment: 'Assessment', plan: 'Clinical plan / advice' }[key]}<textarea rows={3} value={d.complaint[key] ?? ''} onChange={(event) => setField('complaint', key, event.target.value)} className="mt-1 w-full rounded-field border border-outline p-3 font-normal" /></label>)}</div>
       </>
     );
   }
@@ -80,13 +84,30 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
     return (
       <>
         <TextField label="Diagnosis" name="dx" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => setField('diagnosis', 'dx', e.target.value)} />
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <TextField label="Diagnosis code (optional)" value={d.diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'code', e.target.value)} />
+          <SelectField label="Coding system" value={d.diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'codingSystem', e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined)} />
+          <SelectField label="Diagnostic certainty" value={d.diagnosis.certainty ?? 'unknown'} options={['unknown', 'suspected', 'confirmed'].map((value) => ({ value, label: value }))} onChange={(e) => setField('diagnosis', 'certainty', e.target.value as 'unknown' | 'confirmed' | 'suspected')} />
+        </div>
+        {(d.diagnosis.diagnoses ?? []).map((diagnosis, index) => <div key={index} className="mt-3 space-y-2 rounded-field border border-outline p-3">
+          <TextField label={`Additional diagnosis ${index + 1}`} value={diagnosis.label} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, label: e.target.value } : line))} />
+          <TextField label="Code (optional)" value={diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, code: e.target.value.trim() || undefined } : line))} />
+          <SelectField label="Coding system" value={diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, codingSystem: e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined } : line))} />
+          <SelectField label="Certainty" value={diagnosis.certainty ?? 'unknown'} options={['unknown', 'suspected', 'confirmed'].map((value) => ({ value, label: value }))} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, certainty: e.target.value as 'unknown' | 'confirmed' | 'suspected' } : line))} />
+          <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.filter((_, i) => i !== index))}>Remove diagnosis</Button>
+        </div>)}
+        <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', [...(d.diagnosis.diagnoses ?? []), { label: '', certainty: 'unknown' }])}>Add another diagnosis</Button>
         <div className="mb-2 mt-4 text-[13px] font-semibold text-ink-soft">Prescription</div>
         <div className="space-y-2">
           {d.diagnosis.rx.map((m, idx) => (
             <div key={idx} className="flex items-end gap-2.5 rounded-field border border-outline-soft bg-white p-3">
               <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
                 <TextField label="Drug" name={`rx_${idx}_drug`} value={m.name} placeholder="e.g. Artemether-Lumefantrine" onChange={(e) => setRx(idx, 'name', e.target.value)} />
-                <TextField label="Dose · frequency · duration" name={`rx_${idx}_dose`} value={m.dose} placeholder="1 tab · twice daily · 3 days" onChange={(e) => setRx(idx, 'dose', e.target.value)} />
+                <TextField label="Dose" name={`rx_${idx}_dose`} value={m.dose} placeholder="e.g. 1 tablet" onChange={(e) => setRx(idx, 'dose', e.target.value)} />
+                <TextField label="Frequency" name={`rx_${idx}_frequency`} value={m.frequency ?? ''} placeholder="e.g. twice daily" onChange={(e) => setRx(idx, 'frequency', e.target.value)} />
+                <TextField label="Duration" name={`rx_${idx}_duration`} value={m.duration ?? ''} placeholder="e.g. 3 days" onChange={(e) => setRx(idx, 'duration', e.target.value)} />
+                <TextField label="Route" name={`rx_${idx}_route`} value={m.route ?? ''} onChange={(e) => setRx(idx, 'route', e.target.value)} />
+                <TextField label="Quantity" name={`rx_${idx}_quantity`} value={m.quantity ?? ''} inputMode="decimal" onChange={(e) => setRx(idx, 'quantity', e.target.value)} />
               </div>
               <button
                 type="button"
@@ -103,7 +124,7 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
           <Button variant="outlined" onClick={addRx}>＋ Add medication</Button>
         </div>
 
-        <div className="mb-2 mt-5 text-[13px] font-semibold text-ink-soft">Plan / disposition</div>
+        {correcting ? <p className="mt-4 text-sm text-ink-muted">The saved disposition stays unchanged. Medication changes after dispensing belong in medication reconciliation.</p> : <><div className="mb-2 mt-5 text-[13px] font-semibold text-ink-soft">Plan / disposition</div>
         <div className="flex flex-wrap gap-2">
           <ChoiceChip selected={d.diagnosis.injection} onClick={() => setField('diagnosis', 'injection', !d.diagnosis.injection)}>
             Give injection{d.diagnosis.injection ? ' ✓' : ''}
@@ -116,6 +137,7 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
           Prescribing adds a pharmacy step. Injection adds a nurse-administered step. Admitting keeps the patient as an
           inpatient instead of closing with a follow-up — the matching sections appear below once you lock this step.
         </p>
+        </>}
       </>
     );
   }
@@ -228,6 +250,7 @@ export const StepForm = ({ stepKey, ctl }: { stepKey: StepKey; ctl: EncounterCon
           </ChoiceChip>
         ))}
       </div>
+      <TextField label="Other review date" type="date" name="follow_up_date" value={d.follow_up.when} onChange={(e) => setField('follow_up', 'when', e.target.value)} />
       <TextField label="Reason for review" name="fu_reason" value={d.follow_up.reason} onChange={(e) => setField('follow_up', 'reason', e.target.value)} />
       <div className="mt-4 rounded-card border border-amber-border bg-amber-bg p-3.5 text-[13px] leading-relaxed text-amber-text">
         Saving this step <b>closes the encounter</b> — every section becomes permanent. A follow-up is added to the

@@ -36,6 +36,7 @@ lerna-debug.log*
 
 # Testing / coverage
 coverage/
+qa/artifacts/
 .nyc_output/
 
 # TypeScript

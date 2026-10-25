@@ -7,6 +7,20 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Outpatient longitudinal extension (25 October 2026)
+
+The patient profile and encounter workspace now include versioned clinical records:
+problems, structured history, medications, allergies, care-plan reviews and initial
+specialty assessments. The local `clinical_events` table follows the shared contract
+and existing repository/PowerSync write boundary. Encounter screens support repeat
+observations, progress notes, multiple diagnoses, separate prescription fields and
+structured corrections. Legacy allergies remain visible until reviewed; combined
+alerts also feed the appointment worklist. Browser acceptance uses synthetic local
+records under `qa/`, never a production device or application route.
+
+Release requires migration 0013, the regenerated sync configuration and matching
+shared-contract promotion. See [implementation and remaining depth](../docs/EMR-OUTPATIENT-IMPLEMENTATION.md).
+
 ---
 
 ## 0. What this repo is (and is not)

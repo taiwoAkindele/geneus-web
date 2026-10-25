@@ -121,6 +121,18 @@ describe('restoring a patient who lost their ID', () => {
   let counter = 0;
   const mint = (type: string) => `${type}:new-${(counter += 1)}`;
 
+  it('restores clinical version chains in dependency order despite clock skew', () => {
+    const root = rejection({ entityType: 'clinical_event', entityId: 'clinical:root', refusedRecord: { ...envelope, id: 'clinical:root', type: 'clinical_event', patientId: 'OOE-PHC-000047-K2', recordId: 'clinical:root', kind: 'problem', actorRole: 'doctor', createdOn: '2026-10-02T10:00:00Z', values: { label: 'Condition', certainty: 'unknown', status: 'active' } } });
+    const revision = rejection({ entityType: 'clinical_event', entityId: 'clinical:revision', refusedRecord: { ...root.refusedRecord, id: 'clinical:revision', previousId: 'clinical:root', createdOn: '2026-10-02T09:00:00Z' } });
+    const plan = planRestore(refusedPatient, [revision, root], 'OOE-PHC-000048-AB', 'device-3', mint as never);
+    const restoredRoot = plan[1].record;
+    const restoredRevision = plan[2].record;
+    expect(restoredRoot.recordId).toBe(restoredRoot.id);
+    expect(restoredRevision.recordId).toBe(restoredRoot.id);
+    expect(restoredRevision.previousId).toBe(restoredRoot.id);
+    expect(restoredRevision.patientId).toBe('OOE-PHC-000048-AB');
+  });
+
   it('gives everything new ids, follows every link, and keeps who recorded it and when', () => {
     counter = 0;
     const plan = planRestore(refusedPatient, [amendment, vitals, heldEncounter], 'OOE-PHC-000048-AB', 'device-3', mint as never);

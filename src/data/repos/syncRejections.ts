@@ -39,6 +39,7 @@ const CREATE_PERMISSION: Partial<Record<DocType, Permission>> = {
   visit: 'visit:create',
   encounter: 'encounter:record',
   encounter_entry: 'encounter:record',
+  clinical_event: 'encounter:record',
   handoff: 'handoff:create',
   appointment: 'appointment:create',
   register_definition: 'register_definition:publish',
@@ -112,7 +113,7 @@ export const applyAgain = async (rejection: SyncRejection, context: Authorizatio
       createdBy: context.userId,
       createdOn: isHighRisk(permission) || typeof original.createdOn !== 'string' ? nowIso() : original.createdOn,
       deviceId: context.deviceId,
-      ...(type === 'encounter_entry' ? { actorRole: context.role } : {}),
+      ...(['encounter_entry', 'clinical_event'].includes(type) ? { actorRole: context.role } : {}),
     };
     await insertRecords(context, [{ permission, type, record }]);
   } else if (rejection.refusedChanges) {
@@ -179,7 +180,7 @@ export const withHeldEdits = (patientRejection: SyncRejection, edits: readonly S
 /** Within one moment, a record goes before the records that point at it. */
 const TYPE_ORDER: Partial<Record<string, number>> = { patient: 0, encounter: 1, appointment: 2, encounter_entry: 3, handoff: 4 };
 
-const LINKS = ['encounterId', 'amends'] as const;
+const LINKS = ['encounterId', 'amends', 'recordId', 'previousId'] as const;
 
 /**
  * The refused registration and everything held with it, rewritten for the new
@@ -197,13 +198,24 @@ export const planRestore = (
   const patient = patientRejection.refusedRecord;
   if (!patient) throw new Error('this rejection kept no record to restore');
 
-  const records = held
+  const pending = held
     .map((rejection) => ({ type: rejection.entityType, record: rejection.refusedRecord ?? {} }))
     .sort(
       (a, b) =>
         String(a.record.createdOn).localeCompare(String(b.record.createdOn)) ||
         (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9),
     );
+  const records: typeof pending = [];
+  // Restore dependencies before their revisions even if an offline clock moved backwards.
+  while (pending.length) {
+    const index = pending.findIndex(({ record }) => {
+      const values = record.values as Record<string, unknown> | undefined;
+      const links = [...LINKS.map((key) => record[key]), values?.appointmentId, values?.problemId, values?.previousAmendmentId];
+      return !links.some((link) => link !== record.id && pending.some((candidate) => candidate.record.id === link));
+    });
+    if (index < 0) throw new Error('The held records have circular links. Review them before restoring');
+    records.push(...pending.splice(index, 1));
+  }
   const renamed = new Map<string, string>([[patientRejection.entityId, newPatientId]]);
   for (const { type, record } of records) renamed.set(String(record.id), mintId(type));
 
@@ -215,7 +227,11 @@ export const planRestore = (
       const restored: Record<string, unknown> = { ...record, id: renamed.get(String(record.id)), patientId: newPatientId, deviceId };
       for (const link of LINKS) if (restored[link] !== undefined) restored[link] = relink(restored[link]);
       const values = restored.values as Record<string, unknown> | undefined;
-      if (values?.appointmentId) restored.values = { ...values, appointmentId: relink(values.appointmentId) };
+      if (values) restored.values = { ...values,
+        ...(values.appointmentId ? { appointmentId: relink(values.appointmentId) } : {}),
+        ...(values.problemId ? { problemId: relink(values.problemId) } : {}),
+        ...(values.previousAmendmentId ? { previousAmendmentId: relink(values.previousAmendmentId) } : {}),
+      };
       return { type, record: restored };
     }),
   ];
