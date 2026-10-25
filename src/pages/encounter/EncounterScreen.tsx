@@ -23,6 +23,7 @@ import { useAppointments } from '@/features/appointments';
 import { ClinicalWorkspace, AllergyAlert } from '@/features/clinical';
 import { EntryEditorSheet } from '@/features/encounter/components/EntryEditorSheet';
 import { conflictingCorrections, type EncounterEntry } from '@shared';
+import { ENCOUNTER_FIELD_HELP } from '@/features/encounter/fieldHelp';
 
 const initialsOf = (fullName: string): string =>
   fullName
@@ -192,7 +193,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
       </header>
 
       <div>
-        {awaitingPayment && canRecord ? <section className="mx-5 my-3 space-y-2 rounded-card border border-amber-border bg-amber-bg p-4 md:mx-8"><h2 className="font-bold">Awaiting payment · See now — collect later</h2><p className="text-sm">Care can continue. Record a reason with your first saved step; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" value={collectLaterReason} onChange={(e) => setCollectLaterReason(e.target.value)} placeholder="e.g. Emergency or collect after consultation" /></section> : null}
+        {awaitingPayment && canRecord ? <section className="mx-5 my-3 space-y-2 rounded-card border border-amber-border bg-amber-bg p-4 md:mx-8"><h2 className="font-bold">Awaiting payment · See now — collect later</h2><p className="text-sm">Care can continue. Record a reason with your first saved step; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" help={ENCOUNTER_FIELD_HELP.collectLater} value={collectLaterReason} onChange={(e) => setCollectLaterReason(e.target.value)} placeholder="e.g. Emergency or collect after consultation" /></section> : null}
         <EncounterSpine enc={enc} />
         {conflictingCorrections(ctl.rawEntries).length ? <p role="alert" className="mx-5 rounded-card bg-amber-bg p-4 text-sm text-amber-text">Competing corrections are awaiting reconciliation. Review the original entries, amendments, and Sync Center.</p> : null}
         {!canRecord ? <p className="mx-5 my-3 rounded-card border border-outline-soft bg-white p-4 text-sm text-ink-muted">You have view access. A clinician records and saves encounter steps.</p> : null}

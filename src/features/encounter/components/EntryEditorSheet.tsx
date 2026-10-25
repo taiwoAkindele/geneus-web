@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { effectiveEncounterEntries, type EncounterEntry } from '@shared';
 import { amendEntry, saveStep } from '@/data/repos/encounters';
 import { useAuthorizationContext } from '@/session';
-import { Button, Sheet, useToast } from '@/ui';
+import { Button, Sheet, TextAreaField, useToast } from '@/ui';
+import { ENCOUNTER_FIELD_HELP } from '../fieldHelp';
 import { EMPTY_ENCOUNTER_DATA } from '../encounterRecord';
 import { fromStepValues, stepProblems, toStepValues } from '../stepValues';
 import { STEP_DEFS } from '../steps';
@@ -61,7 +62,8 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     <fieldset disabled={saving}>
       {reviewing ? <dl className="space-y-2 text-sm">{summarize(data, step).map((row) => <div key={row.label}><dt className="font-bold">{row.label}</dt><dd className="whitespace-pre-wrap">{row.value}</dd></div>)}{target ? <p className="mt-2">Reason: {note}</p> : null}</dl> : <>
         <StepForm stepKey={step} ctl={ctl} correcting={Boolean(target)} />
-        {target ? <label className="mt-4 block text-sm font-bold">Reason for correction<textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 w-full rounded-field border border-outline p-3 font-normal" /></label> : null}
+        {target ? <div className="mt-4"><TextAreaField label="Reason for correction" name="correction_reason"
+          help={ENCOUNTER_FIELD_HELP.correction} value={note} onChange={(event) => setNote(event.target.value)} /></div> : null}
       </>}
     </fieldset>
     {target ? <details className="mt-4 text-sm"><summary>Original recorded values</summary><dl>{Object.entries(target.values).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl></details> : null}

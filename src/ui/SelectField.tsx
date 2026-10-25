@@ -1,4 +1,5 @@
-import { forwardRef, type SelectHTMLAttributes } from 'react';
+import { forwardRef, useId, type SelectHTMLAttributes } from 'react';
+import { FieldLabel, type FieldExplanation } from './FieldHelp';
 
 type Option = { value: string; label: string };
 
@@ -6,6 +7,7 @@ type Props = SelectHTMLAttributes<HTMLSelectElement> & {
   label: string;
   options: Option[];
   error?: string;
+  help?: FieldExplanation;
 };
 
 /**
@@ -15,18 +17,22 @@ type Props = SelectHTMLAttributes<HTMLSelectElement> & {
  * TextField (1.5px outline, 12px radius, 16px text) plus a caret.
  */
 export const SelectField = forwardRef<HTMLSelectElement, Props>(function SelectField(
-  { label, options, error, id, className = '', ...props },
+  { label, options, error, help, id, className = '', 'aria-describedby': describedBy, ...props },
   ref,
 ) {
-  const selectId = id ?? props.name;
+  const generatedId = useId();
+  const selectId = id ?? props.name ?? generatedId;
+  const helpId = `${selectId}-help`;
+  const errorId = `${selectId}-error`;
   return (
-    <label htmlFor={selectId} className="block">
-      <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">{label}</span>
+    <div className="block">
+      <FieldLabel label={label} htmlFor={selectId} help={help} descriptionId={helpId} required={props.required} />
       <div className="relative">
         <select
           ref={ref}
           id={selectId}
           aria-invalid={error ? true : undefined}
+          aria-describedby={[describedBy, help ? helpId : '', error ? errorId : ''].filter(Boolean).join(' ') || undefined}
           className={`w-full appearance-none rounded-field border-[1.5px] bg-white px-4 py-3.5 pr-10 text-base text-ink outline-none focus:border-2 focus:border-brand ${
             error ? 'border-2 border-danger' : 'border-outline'
           } ${className}`}
@@ -46,8 +52,8 @@ export const SelectField = forwardRef<HTMLSelectElement, Props>(function SelectF
         </span>
       </div>
       {error ? (
-        <span className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>
+        <span id={errorId} className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>
       ) : null}
-    </label>
+    </div>
   );
 });

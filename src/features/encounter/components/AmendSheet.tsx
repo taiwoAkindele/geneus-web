@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Button, Sheet } from '@/ui';
+import { Button, Sheet, TextAreaField } from '@/ui';
+import { ENCOUNTER_FIELD_HELP } from '../fieldHelp';
 
 /**
  * Add an amendment to a locked section (PRD §9.8.3). The original is never
@@ -20,13 +21,12 @@ export const AmendSheet = ({ onSave, onClose }: { onSave: (note: string) => Prom
       <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         The original record stays locked and unchanged. Your amendment is appended and logged against your name.
       </p>
-      <textarea
+      <TextAreaField label="Amendment note" name="amendment_note" help={ENCOUNTER_FIELD_HELP.amendment}
         rows={4}
         value={note}
         disabled={saving}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Describe the correction or addition…"
-        className="w-full rounded-field border-[1.5px] border-outline bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:border-2 focus:border-brand placeholder:text-ink-muted"
       />
       <div className="mt-4 space-y-2">
         <Button variant="primary" disabled={!note.trim() || saving} loading={saving} onClick={save}>

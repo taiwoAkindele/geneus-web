@@ -23,4 +23,8 @@ export { StatusPill } from './StatusPill';
 export type { SyncStatus } from './StatusPill';
 export { Tag } from './Tag';
 export { TextField } from './TextField';
+export { TextAreaField } from './TextAreaField';
+export { SelectOrTextField } from './SelectOrTextField';
+export { FieldLabel } from './FieldHelp';
+export type { FieldExplanation } from './FieldHelp';
 export { ToggleSwitch } from './ToggleSwitch';

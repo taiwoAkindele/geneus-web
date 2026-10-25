@@ -7,6 +7,16 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Encounter field guidance
+
+Encounter inputs and embedded clinical forms provide purpose/example help through
+shared field controls. Help opens on hover, keyboard focus or tap, fits the viewport
+and closes with Escape without closing an enclosing dialog. Screen-reader
+descriptions remain associated with the inputs. Narrative notes remain free text;
+examples are placeholders only. Prescription frequency, duration and route offer
+common choices plus exact custom wording, including historical values. This is a
+frontend-only change; persisted record shapes and clinical validation are unchanged.
+
 ### Outpatient longitudinal extension (25 October 2026)
 
 The patient profile and encounter workspace now include versioned clinical records:

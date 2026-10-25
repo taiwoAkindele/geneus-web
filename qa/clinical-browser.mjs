@@ -66,8 +66,8 @@ try {
     await pause(120);
   };
   const fill = async (label, value) => evaluate(`(() => {
-    const wrapper = [...document.querySelectorAll('dialog[open] label')].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}));
-    const input = wrapper?.querySelector('input,textarea,select'); if (!input) throw new Error('Missing field: ' + ${JSON.stringify(label)});
+    const wrapper = [...document.querySelectorAll(document.querySelector('dialog[open]') ? 'dialog[open] label' : 'label')].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}));
+    const input = wrapper?.control ?? wrapper?.querySelector('input,textarea,select'); if (!input) throw new Error('Missing field: ' + ${JSON.stringify(label)});
     const proto = input.tagName === 'SELECT' ? HTMLSelectElement.prototype : input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, 'value').set.call(input, ${JSON.stringify(value)});
     input.dispatchEvent(new Event('input', {bubbles:true})); input.dispatchEvent(new Event('change', {bubbles:true}));
@@ -80,10 +80,87 @@ try {
   await cdp('Runtime.enable'); await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await cdp('Page.navigate', { url: 'http://127.0.0.1:5194/qa/clinical.html' });
+  if (process.argv.includes('--field-help')) {
+    await cdp('Page.navigate', { url: 'http://127.0.0.1:5194/qa/clinical.html?field-help=1' });
+    await waitFor('Boolean(document.querySelector(\'button[aria-label="Help for Temp (°C)"]\'))');
+    const helpPoint = async (label) => evaluate(`(() => {
+      const button = [...document.querySelectorAll('button')].find(n => n.getAttribute('aria-label') === ${JSON.stringify('Help for ' + label)});
+      if (!button) throw new Error('Missing help for ' + ${JSON.stringify(label)});
+      button.scrollIntoView({block:'center'}); const r = button.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2};
+    })()`);
+    const tapHelp = async (label) => {
+      const point = await helpPoint(label);
+      await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, radiusX: 1, radiusY: 1, force: 1 }] });
+      await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await waitFor('Boolean(document.querySelector(\'[role="tooltip"]\'))');
+    };
+    const tooltipFits = async () => assert.equal(await evaluate(`(() => {
+      const r = document.querySelector('[role="tooltip"]').getBoundingClientRect();
+      return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+    })()`), true, 'Tooltip leaves the viewport');
+    const dismiss = async () => {
+      await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+      await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+      await waitFor('!document.querySelector(\'[role="tooltip"]\')');
+    };
+    const coverage = async () => assert.deepEqual(await evaluate(`(() => [...document.querySelectorAll('input,select,textarea')].filter(n => n.id !== 'preview-section').filter(n => {
+      const ids = (n.getAttribute('aria-describedby') ?? '').split(' ');
+      return !ids.some(id => document.getElementById(id)?.textContent.trim());
+    }).map(n => n.name || n.id))()`), [], 'Field lacks an accessible description');
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: true });
+    await coverage(); await tapHelp('Temp (°C)'); await tooltipFits(); await dismiss();
+    results.push('Vitals help opens on touch and stays in the phone viewport');
+    await fill('Preview encounter section', 'complaint'); await pause(150); await coverage();
+    assert.equal(await evaluate('[...document.querySelectorAll("textarea")].every(n => n.value === "")'), true, 'An example was inserted as a finding');
+    await tapHelp('History of presenting illness'); await tooltipFits();
+    assert.equal(await evaluate('document.querySelector(\'[role="tooltip"]\').textContent.includes("Sore throat began two days ago")'), true);
+    await writeFile(join(output, 'encounter-help-mobile.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+    await dismiss(); results.push('Narrative examples explain the fields without entering findings');
+    await fill('Preview encounter section', 'lab_order'); await pause(150); await click('FBC');
+    await fill('Preview encounter section', 'lab_results'); await pause(150); await coverage();
+    await tapHelp('FBC'); await tooltipFits(); await dismiss(); results.push('Ordered result fields include help');
+    await fill('Preview encounter section', 'diagnosis'); await pause(150); await click('＋ Add medication'); await click('Add another diagnosis'); await coverage();
+    await fill('Frequency', 'twice daily'); await fill('Duration', '7 days'); await fill('Route', 'oral'); await pause(150);
+    assert.deepEqual(await evaluate('(({frequency,duration,route})=>({frequency,duration,route}))(window.fieldHelpQa.data.diagnosis.rx[0])'), { frequency: 'twice daily', duration: '7 days', route: 'oral' });
+    await fill('Frequency', '__custom_entry__'); await pause(150); await fill('Custom frequency', 'Exact custom schedule'); await pause(150);
+    assert.equal(await evaluate('window.fieldHelpQa.data.diagnosis.rx[0].frequency'), 'Exact custom schedule');
+    await fill('Preview encounter section', 'complaint'); await pause(150); await fill('Preview encounter section', 'diagnosis'); await pause(150);
+    assert.equal(await evaluate('document.querySelector(\'input[name="rx_0_frequency"]\').value'), 'Exact custom schedule');
+    results.push('Prescription dropdowns preserve common choices and custom wording');
+    for (const step of ['injection', 'admission', 'dispense', 'follow_up']) {
+      await fill('Preview encounter section', step); await pause(150); await coverage();
+    }
+    results.push('All remaining encounter inputs have accessible field explanations');
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await fill('Preview encounter section', 'complaint'); await pause(150);
+    const point = await helpPoint('Examination');
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await waitFor('Boolean(document.querySelector(\'[role="tooltip"]\'))'); await tooltipFits();
+    await writeFile(join(output, 'encounter-help-desktop.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+    await dismiss();
+    await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await evaluate('document.querySelector(\'button[aria-label="Help for Assessment"]\').focus()');
+    await waitFor('Boolean(document.querySelector(\'[role="tooltip"]\'))'); await dismiss();
+    results.push('Desktop hover and keyboard focus expose help; Escape dismisses it');
+    assert.deepEqual(errors, []);
+    await writeFile(join(output, 'field-help-results.json'), JSON.stringify({ passed: results, browserExceptions: errors }, null, 2));
+    console.log(JSON.stringify({ passed: results, browserExceptions: errors }, null, 2));
+  } else {
   await waitFor('document.body.innerText.includes("Add problem")');
   await click('Add problem'); await fill('Condition / problem', 'Synthetic hypertension'); await save();
   results.push('Problem creation');
-  await expand('Clinical history'); await click('Add history / examination'); await fill('Past medical history', 'Synthetic history for acceptance'); await save();
+  await expand('Clinical history'); await click('Add history / examination');
+  await click('?', 'button[aria-label="Help for Past medical history"]');
+  await waitFor('Boolean(document.querySelector(\'dialog[open] [role="tooltip"]\'))');
+  await writeFile(join(output, 'field-help-dialog-mobile.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await waitFor('!document.querySelector(\'[role="tooltip"]\')');
+  assert.equal(await evaluate('Boolean(document.querySelector("dialog[open]"))'), true, 'Dismissing help closed the clinical form');
+  results.push('Field help works inside dialogs without closing unsaved forms');
+  await fill('Past medical history', 'Synthetic history for acceptance'); await save();
   results.push('Structured clinical history');
   await expand('Medication reconciliation'); await click('Add medication');
   await fill('Medication', 'Synthetic medicine'); await fill('Dose', '1 tablet'); await fill('Frequency', 'daily'); await save();
@@ -127,6 +204,7 @@ try {
   assert.deepEqual(errors, []);
   await writeFile(join(output, 'results.json'), JSON.stringify({ passed: results, browserExceptions: errors }, null, 2));
   console.log(JSON.stringify({ passed: results, browserExceptions: errors }, null, 2));
+  }
 } finally {
   socket?.close(); chrome.kill(); await server.close();
   // This is the exact profile freshly created by this script, never a user's browser profile.
