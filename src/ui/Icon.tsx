@@ -5,12 +5,14 @@ import {
   BookText,
   Check,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Clock,
   Home,
   Lock,
   type LucideIcon,
   Minus,
+  MoreVertical,
   Package,
   Plus,
   Printer,
@@ -58,7 +60,9 @@ export type IconName =
   | 'lock'
   | 'trend-up'
   | 'trend-down'
-  | 'trend-flat';
+  | 'trend-flat'
+  | 'more'
+  | 'chevron-down';
 
 const ICONS: Record<IconName, LucideIcon> = {
   home: Home,
@@ -84,6 +88,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   'trend-up': TrendingUp,
   'trend-down': TrendingDown,
   'trend-flat': Minus,
+  more: MoreVertical,
+  'chevron-down': ChevronDown,
 };
 
 type Props = {

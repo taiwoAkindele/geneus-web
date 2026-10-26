@@ -1,28 +1,19 @@
 import { useCallback } from 'react';
 import { useLiveQuery, type LiveQuery } from '@/data';
-import { closingEntries, encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters } from '@/data/repos/encounters';
+import { encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters, listEncounterEntries } from '@/data/repos/encounters';
 import { summariseEncounter, type EncounterSummary } from './encounterSummary';
 import { QUEUE_STEPS, stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
 import { patientIdentityIds } from '@/data/repos/patientIdentity';
-
-/** How many finished encounters the hub lists; older ones live on each patient's profile. */
-const RECENTLY_CLOSED = 20;
 
 const newestFirst = (a: EncounterSummary, b: EncounterSummary) => b.openedOn.localeCompare(a.openedOn);
 
 /** Every open encounter anyone on shift can pick up, and the most recently finished. */
 export const useEncounterList = (): LiveQuery<{ open: EncounterSummary[]; closed: EncounterSummary[] }> => {
   const load = useCallback(async () => {
-    const [encounters, closing] = await Promise.all([listEncounters(), closingEntries()]);
-    const closedIds = new Set(closing.map((entry) => entry.encounterId));
-    const open = encounters.filter((encounter) => !closedIds.has(encounter.id));
-    const closed = encounters
-      .filter((encounter) => closedIds.has(encounter.id))
-      .sort((a, b) => b.openedOn.localeCompare(a.openedOn))
-      .slice(0, RECENTLY_CLOSED);
-    const summaries = await Promise.all(
-      [...open, ...closed].map(async (encounter) => summariseEncounter(encounter, await entriesForEncounter(encounter.id))),
-    );
+    const [encounters, entries] = await Promise.all([listEncounters(), listEncounterEntries()]);
+    const byEncounter = new Map<string, typeof entries>();
+    for (const entry of entries) { const group = byEncounter.get(entry.encounterId) ?? []; group.push(entry); byEncounter.set(entry.encounterId, group); }
+    const summaries = encounters.map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
     return {
       open: summaries.filter((summary) => summary.status === 'Open').sort(newestFirst),
       closed: summaries.filter((summary) => summary.status !== 'Open').sort(newestFirst),

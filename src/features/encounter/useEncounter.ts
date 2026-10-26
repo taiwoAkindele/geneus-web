@@ -91,6 +91,7 @@ const REVIEW_HOUR = 9;
 
 /** How long typing must pause before the section being recorded is written to the device. */
 const DRAFT_PAUSE_MS = 800;
+const NAVIGATION_DRAFT = '_navigation';
 
 const ownerKey = (owner: DraftOwner) => `${owner.staffId}|${owner.patientId}|${owner.encounterKey}`;
 
@@ -115,7 +116,7 @@ type Loaded = { encounter: Encounter | undefined; entries: EncounterEntry[]; sta
  * Forms hold what is being typed; a save writes a locked entry and the section
  * is read back from it from then on.
  */
-export const useEncounter = (patientId: string, encounterId?: string, appointmentId?: string) => {
+export const useEncounter = (patientId: string, encounterId?: string, appointmentId?: string, recordingStep?: StepKey) => {
   const context = useAuthorizationContext();
   // Once known (named, found open, or created by the first save) the screen stays on this encounter.
   const [currentId, setCurrentId] = useState(encounterId);
@@ -144,6 +145,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
         }
       }
     }
+    if (currentId && !encounter) throw new Error('This visit is not available for this patient on this device. Return to the patient record or sync before continuing.');
     return { encounter, entries: encounter ? await entriesForEncounter(encounter.id) : [], staffNames };
   }, [patientId, currentId, appointmentId]);
 
@@ -177,6 +179,9 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     readDrafts(owner).then(
       (drafts) => {
         if (cancelled) return;
+        const navigation = drafts.find((stored) => stored.step === NAVIGATION_DRAFT)?.data;
+        const skipped = typeof navigation === 'object' && navigation !== null && 'skipped' in navigation ? navigation.skipped : undefined;
+        setSkippedNow(Array.isArray(skipped) ? skipped.filter((key): key is StepKey => typeof key === 'string' && Object.keys(STEP_DEFS).includes(key) && !isClosingStep(key as StepKey) && !saved.has(key)) : []);
         const unsaved = drafts.filter((stored) => !saved.has(stored.step) && fitsSection(stored.step, stored.data));
         if (unsaved.length > 0) {
           setDraft((current) => unsaved.reduce((data, stored) => ({ ...data, [stored.step]: stored.data }), current));
@@ -194,7 +199,13 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     };
   }, [settled, owner, restoredFor, savedSteps]);
 
-  const activeKey = stepsFor(enc.data)[enc.activeIndex]?.key;
+  // A skip is private navigation state, not a signed clinical finding or a synced record.
+  useEffect(() => {
+    if (restoredFor !== ownerKey(owner) || enc.closed) return;
+    (skippedNow.length ? writeDraft(owner, NAVIGATION_DRAFT, { skipped: skippedNow }) : discardDraft(owner, NAVIGATION_DRAFT)).catch(keepDraftWarning);
+  }, [skippedNow, restoredFor, owner, enc.closed]);
+
+  const activeKey = recordingStep && !enc.sig[recordingStep] ? recordingStep : stepsFor(enc.data)[enc.activeIndex]?.key;
 
   // Keep the section being recorded on the device after each pause in typing.
   useEffect(() => {
@@ -254,15 +265,14 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     setDraft((d) => ({ ...d, dispense: { ...d.dispense, reasons: { ...d.dispense.reasons, [idx]: reason } } }));
   }, []);
 
-  /** Moves past a section without writing anything for it (PRD §9.8.2). Closing steps cannot be skipped. */
+  /** Keep the navigation choice with this staff member's device draft. No clinical entry is created. */
   const skip = useCallback(
     (key: StepKey) => {
       if (isClosingStep(key)) return;
-      pendingDraft.current = undefined;
-      discardDraft(owner, key).catch(keepDraftWarning);
-      setSkippedNow((keys) => [...keys, key]);
+      pendingDraft.current?.();
+      setSkippedNow((keys) => keys.includes(key) ? keys : [...keys, key]);
     },
-    [owner],
+    [],
   );
 
   /** What must be fixed before the section may be reviewed; empty when it can be saved. */
@@ -295,10 +305,16 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
       if (isClosingStep(key)) {
         discardDrafts({ ...owner, encounterKey: entry.encounterId }).catch(keepDraftWarning);
         discardDrafts({ ...owner, encounterKey: 'new' }).catch(keepDraftWarning);
+      } else if (owner.encounterKey !== entry.encounterId && skippedNow.length) {
+        // The first signature gives a new visit its ID; carry its private navigation draft forward.
+        await writeDraft({ ...owner, encounterKey: entry.encounterId }, NAVIGATION_DRAFT, { skipped: skippedNow.filter((skipped) => skipped !== key) }).catch(keepDraftWarning);
+        discardDraft(owner, NAVIGATION_DRAFT).catch(keepDraftWarning);
       }
+      setSkippedNow((keys) => isClosingStep(key) ? [] : keys.filter((skipped) => skipped !== key));
       setCurrentId(entry.encounterId);
+      live.reload();
     },
-    [context, enc.data, enc.id, owner, patientId, appointmentId],
+    [context, enc.data, enc.id, owner, patientId, appointmentId, live.reload, skippedNow],
   );
 
   const amendStep = useCallback(
@@ -315,7 +331,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     [setField, toggleIn, setResult, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
   );
 
-  return { enc, rawEntries: live.data?.entries ?? [], draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, ...actions };
+  return { enc, rawEntries: live.data?.entries ?? [], draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, flushDraft: () => pendingDraft.current?.(), ...actions };
 };
 
 export type EncounterController = ReturnType<typeof useEncounter>;

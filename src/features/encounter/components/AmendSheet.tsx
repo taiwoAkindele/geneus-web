@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Sheet, TextAreaField } from '@/ui';
+import { Button, Sheet, SheetCancelButton, TextAreaField } from '@/ui';
 import { ENCOUNTER_FIELD_HELP } from '../fieldHelp';
 
 /**
@@ -17,7 +17,7 @@ export const AmendSheet = ({ onSave, onClose }: { onSave: (note: string) => Prom
     finally { busy.current = false; setSaving(false); }
   };
   return (
-    <Sheet onClose={onClose} title="Add an amendment" closeDisabled={saving}>
+    <Sheet onClose={onClose} title="Add an amendment" closeDisabled={saving} placement="side" hasUnsavedChanges={Boolean(note.trim())}>
       <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         The original record stays locked and unchanged. Your amendment is appended and logged against your name.
       </p>
@@ -32,9 +32,7 @@ export const AmendSheet = ({ onSave, onClose }: { onSave: (note: string) => Prom
         <Button variant="primary" disabled={!note.trim() || saving} loading={saving} onClick={save}>
           Save amendment
         </Button>
-        <Button variant="outlined" disabled={saving} onClick={onClose}>
-          Cancel
-        </Button>
+        <SheetCancelButton disabled={saving} />
       </div>
     </Sheet>
   );

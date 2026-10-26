@@ -104,6 +104,7 @@ const Sidebar = ({ onProfile }: { onProfile: () => void }) => {
               key={item.key}
               type="button"
               onClick={() => navigate(item.to)}
+              aria-current={active ? 'page' : undefined}
               className={`flex min-h-0 flex-col items-center gap-1 rounded-xl px-2 py-3 lg:flex-row lg:gap-3 lg:px-3 ${
                 active ? 'bg-white/15' : ''
               }`}
@@ -164,6 +165,7 @@ const BottomBar = ({
             key={item.key}
             type="button"
             onClick={() => navigate(item.to)}
+            aria-current={active ? 'page' : undefined}
             className="flex min-h-[52px] flex-col items-center justify-center gap-1"
           >
             <Icon name={item.icon} className={`h-[22px] w-[22px] ${active ? 'text-brand' : 'text-ink-muted'}`} />
@@ -215,6 +217,8 @@ const MobileNotificationSheet = ({ onClose }: { onClose: () => void }) => {
 
 export const AppShell = () => {
   const { pathname } = useLocation();
+  // The billing workspace already owns its main landmark.
+  const Content = pathname === '/billing' ? 'div' : 'main';
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }); }, [pathname]);
   const { unreadCount, markAllRead, shift } = useSession();
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -230,13 +234,14 @@ export const AppShell = () => {
 
   return (
     <div className="flex min-h-screen bg-surface">
+      <a href="#main-content" className="sr-only z-50 rounded-field bg-white p-3 font-bold text-brand focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
       <Sidebar onProfile={() => setProfileOpen(true)} />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col [--app-header-h:0px] sm:[--app-header-h:46px]">
         <AppHeader />
         <ShiftBanner />
-        <div className={`flex-1 ${ending ? 'pb-44' : 'pb-28'} sm:pb-0`}>
+        <Content id="main-content" tabIndex={-1} className={`flex-1 outline-none ${ending ? 'pb-44' : 'pb-28'} sm:pb-0`}>
           <Outlet />
-        </div>
+        </Content>
         <div className="fixed inset-x-0 bottom-0 z-30 sm:hidden">
           <ShiftCountdownStrip />
           <BottomBar onAlerts={openAlerts} onProfile={() => setProfileOpen(true)} unread={unreadCount} />

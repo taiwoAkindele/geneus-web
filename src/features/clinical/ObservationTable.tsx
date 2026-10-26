@@ -3,9 +3,9 @@ import { Button } from '@/ui';
 import type { observationHistory } from './clinicalSummary';
 
 const COLUMNS = ['Recorded', 'BP (mmHg)', 'Temp (°C)', 'Pulse (/min)', 'Weight (kg)', 'Height (cm)', 'BMI', 'SpO₂ (%)', 'Resp. (/min)'];
-export const ObservationTable = ({ observations }: { observations: ReturnType<typeof observationHistory> }) => {
+export const ObservationTable = ({ observations, compact = false }: { observations: ReturnType<typeof observationHistory>; compact?: boolean }) => {
   const [limit, setLimit] = useState(10);
-  return <details className="rounded-card border border-outline-soft bg-white p-4">
+  return <details className={compact ? 'text-sm' : 'rounded-card border border-outline-soft bg-white p-4'}>
     <summary className="cursor-pointer font-bold">Vitals across visits · {observations.length}</summary>
     {!observations.length ? <p className="mt-3 text-sm text-ink-muted">No observations recorded.</p> : <div className="mt-3 overflow-x-auto">
       <table className="w-full text-left text-xs">

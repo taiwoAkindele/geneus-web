@@ -19,6 +19,19 @@ const encounter: Encounter = {
   setting: 'facility',
 };
 
+describe('visit list next actions', () => {
+  it('matches the current task after earlier sections were skipped', () => {
+    const diagnosis = entry('diagnosis', { diagnosis: 'Recorded diagnosis', prescription: [], giveInjection: false, admit: false });
+    const summary = summariseEncounter(encounter, [diagnosis]);
+    expect(summary.nextAction).toBe('Follow-up');
+    expect(summary.hasSignedEntries).toBe(true);
+  });
+  it('shows the presenting complaint rather than a storage step name', () => {
+    const complaint = entry('complaint', { complaints: ['Fever and sore throat'] });
+    expect(summariseEncounter(encounter, [complaint]).title).toBe('Fever and sore throat');
+  });
+});
+
 let minute = 0;
 const entry = (step: EncounterEntry['step'], values: Record<string, unknown>, extra: Partial<EncounterEntry> = {}): EncounterEntry => {
   minute += 1;

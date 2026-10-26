@@ -13,5 +13,5 @@ export const AllergyAlert = ({ patientId }: { patientId: string }) => {
   }, [patientId]));
   if (live.loading) return <span role="status" className="text-xs">Reading allergy records…</span>;
   if (live.error) return <button type="button" onClick={live.reload} className="rounded bg-amber-bg p-2 text-xs text-amber-text">Allergy records unavailable · retry</button>;
-  return live.data?.length ? <span role="status" className="rounded-full bg-danger-bg px-3 py-1 text-xs font-bold text-danger-strong">Allergy: {live.data.map((allergy) => `${allergy.allergen} — ${allergy.reaction} (${allergy.severity})`).join('; ')}</span> : null;
+  return live.data?.length ? <span role="status" className="inline-block rounded-field bg-danger-bg px-3 py-2 text-sm font-bold text-danger-strong">{live.data.some((allergy) => allergy.verification === 'reported') ? 'Reported allergy' : 'Allergy'}: {live.data.map((allergy) => `${allergy.allergen} — ${allergy.reaction} (${allergy.severity})`).join('; ')} · {live.data.length} recorded{live.data.some((allergy) => allergy.legacy || allergy.verification === 'reported') ? ' · needs review' : ''}</span> : <span role="status" className="inline-block rounded-field bg-amber-bg px-3 py-2 text-sm text-amber-text">Allergy status needs clinical review</span>;
 };

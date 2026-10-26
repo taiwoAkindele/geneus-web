@@ -11,6 +11,7 @@ import { patientIdentityIds } from './patientIdentity';
  */
 
 export const listEncounters = () => allOfType<Encounter>('encounter');
+export const listEncounterEntries = () => allOfType<EncounterEntry>('encounter_entry');
 
 export const encountersForPatient = (patientId: string) => allWhere<Encounter>('encounter', 'patientId', patientId);
 

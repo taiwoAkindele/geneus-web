@@ -25,7 +25,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
   }
   if (dailyWork) items.push(
     { key: 'appointments', label: 'Appointments', to: '/appointments', match: '/appointments', icon: 'clock', bottom: frontDesk },
-    { key: 'encounters', label: 'Encounters', to: '/encounters', match: '/encounters', icon: 'encounter', bottom: clinical },
+    { key: 'encounters', label: 'Visits', to: '/encounters', match: '/encounters', icon: 'encounter', bottom: clinical },
     { key: 'registers', label: 'Registers', to: '/registers', match: '/registers', icon: 'registers', bottom: frontDesk },
     { key: 'units', label: 'Unit queue', to: '/units', match: '/units', icon: 'clock', bottom: clinical },
   );

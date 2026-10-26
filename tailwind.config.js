@@ -49,7 +49,7 @@ export default {
         ink: {
           DEFAULT: '#191c1d', // on-surface
           soft: '#3f4941', // on-surface-variant
-          muted: '#6f7a71', // labels, secondary text
+          muted: '#556259', // secondary text: normal-text contrast on all neutral surfaces
         },
         // Borders
         outline: {
