@@ -12,6 +12,7 @@ export const TABLE_FOR: Record<DocType, string> = {
   visit: 'visits',
   encounter: 'encounters',
   encounter_entry: 'encounter_entries',
+  clinical_event: 'clinical_events',
   handoff: 'handoffs',
   appointment: 'appointments',
   register_definition: 'register_definitions',

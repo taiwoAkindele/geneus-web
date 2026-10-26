@@ -8,18 +8,19 @@ import type { EncounterEntry, EncounterStep } from '@shared';
  */
 export type StepKey = Exclude<EncounterStep, 'amendment'>;
 
-export type RxLine = { name: string; dose: string };
+export type RxLine = { name: string; dose: string; frequency?: string; duration?: string; route?: string; quantity?: string };
+export type DiagnosisLine = { label: string; code?: string; codingSystem?: 'ICD-10' | 'SNOMED CT' | 'local'; certainty?: 'unknown' | 'suspected' | 'confirmed' };
 
 /** What each section's form holds while it is being recorded — strings as typed. */
 export type EncounterData = {
-  vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string };
+  vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string; height?: string; respiratoryRate?: string };
   /** The complaints as typed, in the patient's words — free text, not a fixed list. */
-  complaint: { text: string; note: string };
+  complaint: { text: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
   lab_order: { tests: string[] };
   lab_results: Record<string, string>;
   // `injection` / `admit` are the doctor's disposition — they decide which tail
   // sections the encounter grows (see stepsFor). `rx` presence adds the pharmacy step.
-  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean };
+  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean; code?: string; codingSystem?: DiagnosisLine['codingSystem']; certainty?: DiagnosisLine['certainty']; diagnoses?: DiagnosisLine[] };
   injection: { drug: string; dose: string; route: string; site: string; note: string };
   /** Per prescription line: handed over, or the reason it was not. */
   dispense: { done: Record<number, boolean>; reasons: Record<number, string> };

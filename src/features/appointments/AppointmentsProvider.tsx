@@ -9,6 +9,7 @@ import { listCharges, listPayments, listAdjustments } from '@/data/repos/billing
 import type { BookedAppointment, NewAppointment } from './types';
 import { linkedPatientIds } from '@shared';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
+import { listAllergyEvents } from '@/data/repos/clinical';
 
 type Value = {
   appointments: BookedAppointment[];
@@ -32,11 +33,11 @@ export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
 
   const load = useCallback(async () => {
     const [appointments, patients, encounters, closing] = await Promise.all([listAppointments(), listPatients(), listEncounters(), closingEntries()]);
-    const [charges, payments, adjustments] = await Promise.all([listCharges(), listPayments(), listAdjustments()]);
-    return { appointments, patients, encounters, closing, charges, payments, adjustments, identityEvents: await listIdentityEvents() };
+    const [charges, payments, adjustments, identityEvents, clinicalEvents] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listIdentityEvents(), listAllergyEvents()]);
+    return { appointments, patients, encounters, closing, charges, payments, adjustments, identityEvents, clinicalEvents };
   }, []);
   const { data, loading, error, reload } = useLiveQuery(load);
-  const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments) : [], [data, now]);
+  const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments, data.clinicalEvents, data.identityEvents) : [], [data, now]);
   const bookAppointment = useCallback(async (appointment: NewAppointment) => { await book(appointment, context); }, [context]);
   const forPatient = useCallback((patientId: string) => { const ids = linkedPatientIds(patientId, data?.identityEvents ?? []); return appointments.filter((appointment) => ids.includes(appointment.patient.id)); }, [appointments, data]);
   const value = useMemo(() => ({ appointments, loading, error, reload, book: bookAppointment, forPatient }), [appointments, loading, error, reload, bookAppointment, forPatient]);

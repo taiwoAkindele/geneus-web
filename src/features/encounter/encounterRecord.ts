@@ -1,4 +1,4 @@
-import type { Encounter, EncounterEntry, Role } from '@shared';
+import { effectiveEncounterEntries, type Encounter, type EncounterEntry, type Role } from '@shared';
 import { AUDIT_LABEL, STEP_DEFS, isClosingStep, stepsFor } from './steps';
 import { fromStepValues } from './stepValues';
 import type { Amendment, AuditRow, EncounterData, EncounterState, Signature, StepKey } from './types';
@@ -60,8 +60,8 @@ export const projectEncounter = ({ patientId, encounter, entries, draft, skipped
   const nameOf = (staffId: string) => staffNames.get(staffId) ?? staffId;
 
   const saved: Partial<Record<StepKey, EncounterEntry>> = {};
-  for (const entry of byTime) {
-    if (entry.step !== 'amendment' && !saved[entry.step]) saved[entry.step] = entry;
+  for (const entry of effectiveEncounterEntries(byTime)) {
+    if (entry.step !== 'amendment') saved[entry.step] = entry;
   }
 
   let data = draft;
@@ -88,7 +88,7 @@ export const projectEncounter = ({ patientId, encounter, entries, draft, skipped
         amend[target] = [...(amend[target] ?? []), { by: who.actor, role: who.role, time: who.time, date: who.date, note }];
         audit.push({ ...who, action: `Amendment added to ${STEP_DEFS[target].title}` });
       }
-    } else if (saved[entry.step] === entry) {
+    } else if (saved[entry.step]?.id === entry.id) {
       audit.push({ ...who, action: AUDIT_LABEL[entry.step] });
     } else {
       audit.push({ ...who, action: `${STEP_DEFS[entry.step].title} recorded again` });

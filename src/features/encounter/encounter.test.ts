@@ -50,6 +50,19 @@ const project = (entries: EncounterEntry[], draft: EncounterData = EMPTY_ENCOUNT
   });
 
 describe('section values', () => {
+  it('round-trips separate prescription fields and structured diagnoses without flattening them', () => {
+    const data: EncounterData = { ...EMPTY_ENCOUNTER_DATA, diagnosis: { dx: 'Hypertension', code: 'I10', codingSystem: 'ICD-10', certainty: 'suspected', diagnoses: [{ label: 'Other condition', certainty: 'unknown' }], rx: [{ name: 'Medicine', dose: '1 tablet', frequency: 'daily', duration: '7 days', route: 'oral', quantity: '7' }], injection: false, admit: false } };
+    const values = toStepValues('diagnosis', data);
+    expect(values.prescription).toEqual([{ drug: 'Medicine', dose: '1 tablet', frequency: 'daily', duration: '7 days', route: 'oral', quantity: 7 }]);
+    expect(fromStepValues('diagnosis', values, EMPTY_ENCOUNTER_DATA).diagnosis).toEqual(data.diagnosis);
+    expect(stepProblems('diagnosis', data)).toEqual([]);
+  });
+  it('allows a structured progress note without forcing a duplicate free-text note', () => {
+    const data = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: '', note: '', assessment: 'Symptoms improving', plan: 'Review progress' } };
+    expect(stepProblems('complaint', data)).toEqual([]);
+    expect(fromStepValues('complaint', toStepValues('complaint', data), EMPTY_ENCOUNTER_DATA).complaint.assessment).toBe('Symptoms improving');
+  });
+
   it('reads blood pressure as two numbers and leaves blank vitals out', () => {
     const data = { ...EMPTY_ENCOUNTER_DATA, vitals: { temp: '38.9', bp: '118 / 76', pulse: '', weight: '', spo2: '' } };
 
@@ -162,6 +175,24 @@ describe('the encounter on screen', () => {
 });
 
 describe('encounter list cards', () => {
+  it('uses corrected values in the record, encounter summary and pharmacy queue', () => {
+    const diagnosis = entry('diagnosis', { diagnosis: 'Initial', prescription: [{ drug: 'Old medicine', dose: '1' }] });
+    const correction = entry('amendment', { note: 'Corrected diagnosis and prescription', correctedValues: { diagnosis: 'Corrected', prescription: [{ drug: 'Correct medicine', dose: '2' }] } }, { amends: diagnosis.id });
+    expect(project([diagnosis, correction]).data.diagnosis.dx).toBe('Corrected');
+    expect(summariseEncounter(encounter, [diagnosis, correction]).title).toBe('Corrected');
+    expect(stationQueues([diagnosis, correction]).pharmacy[0].detail).toBe('Correct medicine');
+    expect(diagnosis.values.diagnosis).toBe('Initial');
+  });
+
+  it('shows the latest repeat observation while retaining all saves in the activity log', () => {
+    const first = entry('vitals', { temperatureC: 39 });
+    const repeat = entry('vitals', { temperatureC: 37 });
+    const state = project([first, repeat]);
+    expect(state.data.vitals.temp).toBe('37');
+    expect(state.audit).toHaveLength(3);
+    expect(summariseEncounter(encounter, [first, repeat]).chips).toContain('37°C');
+  });
+
   it('headlines the diagnosis and the key findings', () => {
     const card = summariseEncounter(encounter, [
       entry('vitals', { temperatureC: 38.9, systolicMmHg: 118, diastolicMmHg: 76 }),

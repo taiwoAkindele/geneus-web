@@ -1,4 +1,4 @@
-import { CLOSING_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
+import { CLOSING_STEPS, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
 import { allOfType, allWhere, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
 import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient } from './billing';
@@ -45,6 +45,11 @@ export type StepSave = {
  * refused save leaves no half-opened encounter or stray booking behind.
  */
 export const saveStep = async (save: StepSave, context: AuthorizationContext): Promise<EncounterEntry> => {
+  if (save.encounterId) {
+    const prior = await entriesForEncounter(save.encounterId);
+    if (prior.some((entry) => (CLOSING_STEPS as readonly string[]).includes(entry.step))) throw new Error('This encounter is closed. Add an amendment instead');
+    if (!(REPEATABLE_STEPS as readonly string[]).includes(save.step) && prior.some((entry) => entry.step === save.step)) throw new Error('This section is already saved. Add an amendment instead');
+  }
   const savedOn = nowIso();
   const records: NewRecord[] = [];
 
@@ -88,8 +93,28 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
 };
 
 /** Adds a correction beside a saved entry; the original is never touched (PRD §9.8.3). */
-export const amendEntry = (entry: EncounterEntry, note: string, context: AuthorizationContext) =>
-  insertRecord<EncounterEntry>(context, 'encounter:record', 'encounter_entry', {
+export const amendEntry = async (entry: EncounterEntry, note: string, context: AuthorizationContext, correctedValues?: Record<string, unknown>, expectedCorrectionId?: string | null) => {
+  let previousAmendmentId: string | undefined;
+  if (correctedValues) {
+    if (!['vitals', 'complaint', 'lab_results', 'diagnosis', 'injection'].includes(entry.step)) throw new Error('This section supports explanatory amendments only');
+    ENCOUNTER_STEP_VALUES[entry.step].parse(correctedValues);
+    const entries = await entriesForEncounter(entry.encounterId);
+    const corrections = entries.filter((e) => e.step === 'amendment' && e.amends === entry.id && e.values.correctedValues);
+    const replaced = new Set(corrections.map((e) => e.values.previousAmendmentId));
+    const latest = corrections.find((e) => !replaced.has(e.id));
+    previousAmendmentId = latest?.id;
+    if (expectedCorrectionId !== undefined && expectedCorrectionId !== (previousAmendmentId ?? null)) throw new Error('This entry was corrected while you were editing. Reopen it to review the correction');
+    if (entry.step === 'diagnosis') {
+      const original = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values);
+      const current = ENCOUNTER_STEP_VALUES.diagnosis.parse(latest?.values.correctedValues ?? entry.values);
+      const corrected = ENCOUNTER_STEP_VALUES.diagnosis.parse(correctedValues);
+      if (corrected.admit !== original.admit || corrected.giveInjection !== original.giveInjection) throw new Error('Correcting a diagnosis cannot change the saved disposition');
+      if (entries.some((e) => e.step === 'dispense') && JSON.stringify(corrected.prescription) !== JSON.stringify(current.prescription)) {
+        throw new Error('Medication has been dispensed. Record the medication change in the longitudinal medication list');
+      }
+    }
+  }
+  return insertRecord<EncounterEntry>(context, 'encounter:record', 'encounter_entry', {
     ...envelope(context),
     id: newId('encounter_entry'),
     type: 'encounter_entry',
@@ -98,5 +123,6 @@ export const amendEntry = (entry: EncounterEntry, note: string, context: Authori
     step: 'amendment',
     actorRole: context.role,
     amends: entry.id,
-    values: { note },
+    values: { note, ...(correctedValues ? { correctedValues, ...(previousAmendmentId ? { previousAmendmentId } : {}) } : {}) },
   });
+};

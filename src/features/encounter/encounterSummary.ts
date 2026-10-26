@@ -1,4 +1,4 @@
-import { ENCOUNTER_STEP_VALUES, type Encounter, type EncounterEntry } from '@shared';
+import { effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type Encounter, type EncounterEntry } from '@shared';
 import { encounterLabel, stamp } from './encounterRecord';
 import { STEP_DEFS } from './steps';
 
@@ -18,11 +18,11 @@ export type EncounterSummary = {
 };
 
 const firstOf = (entries: readonly EncounterEntry[], step: EncounterEntry['step']) =>
-  entries.find((entry) => entry.step === step);
+  [...entries].reverse().find((entry) => entry.step === step);
 
 /** Status, headline and key findings, read from the saved entries alone. */
 export const summariseEncounter = (encounter: Encounter, entries: readonly EncounterEntry[]): EncounterSummary => {
-  const steps = [...entries].filter((entry) => entry.step !== 'amendment').sort((a, b) => a.createdOn.localeCompare(b.createdOn));
+  const steps = effectiveEncounterEntries(entries);
   const status: EncounterStatus = firstOf(steps, 'admission') ? 'Admitted' : firstOf(steps, 'follow_up') ? 'Closed' : 'Open';
 
   const chips: string[] = [];

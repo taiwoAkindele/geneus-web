@@ -27,10 +27,15 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         pulseBpm: measured(data.vitals.pulse),
         weightKg: measured(data.vitals.weight),
         spo2Percent: measured(data.vitals.spo2),
+        ...(data.vitals.height ? { heightCm: measured(data.vitals.height) } : {}),
+        ...(data.vitals.respiratoryRate ? { respiratoryRate: measured(data.vitals.respiratoryRate) } : {}),
       };
     case 'complaint':
       // Saved as one item: the complaints are free text, written as the patient put them.
-      return { complaints: data.complaint.text.trim() ? [data.complaint.text.trim()] : [], note: text(data.complaint.note) };
+      return { complaints: data.complaint.text.trim() ? [data.complaint.text.trim()] : [], note: text(data.complaint.note), ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => {
+        const value = data.complaint[key as keyof EncounterData['complaint']];
+        return value?.trim() ? [[key, value.trim()]] : [];
+      })) };
     case 'lab_order':
       return { tests: data.lab_order.tests };
     case 'lab_results':
@@ -42,9 +47,17 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
     case 'diagnosis':
       return {
         diagnosis: data.diagnosis.dx.trim(),
+        ...(data.diagnosis.dx.trim() ? {
+          diagnoses: [{ label: data.diagnosis.dx.trim(), code: text(data.diagnosis.code ?? ''), codingSystem: data.diagnosis.codingSystem, certainty: data.diagnosis.certainty ?? 'unknown' }, ...(data.diagnosis.diagnoses ?? [])],
+        } : {}),
         prescription: data.diagnosis.rx
           .filter((line) => line.name.trim() || line.dose.trim())
-          .map((line) => ({ drug: line.name.trim(), dose: line.dose.trim() })),
+          .map((line) => ({ drug: line.name.trim(), dose: line.dose.trim(),
+            ...(text(line.frequency ?? '') ? { frequency: line.frequency!.trim() } : {}),
+            ...(text(line.duration ?? '') ? { duration: line.duration!.trim() } : {}),
+            ...(text(line.route ?? '') ? { route: line.route!.trim() } : {}),
+            ...(text(line.quantity ?? '') ? { quantity: measured(line.quantity!) } : {}),
+          })),
         giveInjection: data.diagnosis.injection,
         admit: data.diagnosis.admit,
       };
@@ -78,6 +91,9 @@ const FIELD_LABEL: Record<string, string> = {
   pulseBpm: 'pulse',
   weightKg: 'weight',
   spo2Percent: 'SpO₂ (0–100)',
+  heightCm: 'height',
+  respiratoryRate: 'respiratory rate',
+  quantity: 'quantity',
   tests: 'the investigations — choose at least one, or skip this step',
   results: 'the results — enter at least one',
   diagnosis: 'the diagnosis',
@@ -112,12 +128,12 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
       const bp = v.systolicMmHg !== undefined && v.diastolicMmHg !== undefined ? `${v.systolicMmHg}/${v.diastolicMmHg}` : '';
       return {
         ...data,
-        vitals: { temp: shown(v.temperatureC), bp, pulse: shown(v.pulseBpm), weight: shown(v.weightKg), spo2: shown(v.spo2Percent) },
+        vitals: { temp: shown(v.temperatureC), bp, pulse: shown(v.pulseBpm), weight: shown(v.weightKg), spo2: shown(v.spo2Percent), ...(v.heightCm ? { height: shown(v.heightCm) } : {}), ...(v.respiratoryRate ? { respiratoryRate: shown(v.respiratoryRate) } : {}) },
       };
     }
     case 'complaint': {
       const v = ENCOUNTER_STEP_VALUES.complaint.parse(values) as EncounterStepValues['complaint'];
-      return { ...data, complaint: { text: v.complaints.join(', '), note: v.note ?? '' } };
+      return { ...data, complaint: { text: v.complaints.join(', '), note: v.note ?? '', ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => v[key as keyof typeof v] ? [[key, v[key as keyof typeof v]]] : [])) } };
     }
     case 'lab_order':
       return { ...data, lab_order: { tests: ENCOUNTER_STEP_VALUES.lab_order.parse(values).tests } };
@@ -131,7 +147,8 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
         ...data,
         diagnosis: {
           dx: v.diagnosis,
-          rx: v.prescription.map((line) => ({ name: line.drug, dose: [line.dose, line.frequency, line.duration].filter(Boolean).join(' · ') })),
+          rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })),
+          ...(v.diagnoses?.length ? { code: v.diagnoses[0].code, codingSystem: v.diagnoses[0].codingSystem, certainty: v.diagnoses[0].certainty, diagnoses: v.diagnoses.slice(1) } : {}),
           injection: v.giveInjection,
           admit: v.admit,
         },

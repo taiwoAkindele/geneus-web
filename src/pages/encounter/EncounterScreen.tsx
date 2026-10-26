@@ -20,6 +20,10 @@ import {
 } from '@/features/encounter';
 import { usePatient } from '@/features/search';
 import { useAppointments } from '@/features/appointments';
+import { ClinicalWorkspace, AllergyAlert } from '@/features/clinical';
+import { EntryEditorSheet } from '@/features/encounter/components/EntryEditorSheet';
+import { conflictingCorrections, type EncounterEntry } from '@shared';
+import { ENCOUNTER_FIELD_HELP } from '@/features/encounter/fieldHelp';
 
 const initialsOf = (fullName: string): string =>
   fullName
@@ -76,6 +80,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
   const [activityOpen, setActivityOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [collectLaterReason, setCollectLaterReason] = useState('');
+  const [entryEditor, setEntryEditor] = useState<{ step: StepKey; target?: EncounterEntry }>();
   const awaitingPayment = !enc.id && appointments.appointments.find((a) => a.id === appointmentId)?.paymentStatus === 'Awaiting payment';
 
   if (patient.loading || ctl.loading) return <Message>Opening the encounter…</Message>;
@@ -161,11 +166,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
             </div>
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {record.allergies.length > 0 ? (
-              <span className="rounded-full bg-danger-bg px-2.5 py-1 text-[11px] font-bold text-danger-strong">
-                ⚠ Allergy: {record.allergies.join(', ')}
-              </span>
-            ) : null}
+            <AllergyAlert patientId={record.patientId} />
             <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">
               {enc.id ? `Opened ${enc.openedDate}` : 'Opens when the first step is saved'}
             </span>
@@ -192,8 +193,9 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
       </header>
 
       <div>
-        {awaitingPayment && canRecord ? <section className="mx-5 my-3 space-y-2 rounded-card border border-amber-border bg-amber-bg p-4 md:mx-8"><h2 className="font-bold">Awaiting payment · See now — collect later</h2><p className="text-sm">Care can continue. Record a reason with your first saved step; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" value={collectLaterReason} onChange={(e) => setCollectLaterReason(e.target.value)} placeholder="e.g. Emergency or collect after consultation" /></section> : null}
+        {awaitingPayment && canRecord ? <section className="mx-5 my-3 space-y-2 rounded-card border border-amber-border bg-amber-bg p-4 md:mx-8"><h2 className="font-bold">Awaiting payment · See now — collect later</h2><p className="text-sm">Care can continue. Record a reason with your first saved step; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" help={ENCOUNTER_FIELD_HELP.collectLater} value={collectLaterReason} onChange={(e) => setCollectLaterReason(e.target.value)} placeholder="e.g. Emergency or collect after consultation" /></section> : null}
         <EncounterSpine enc={enc} />
+        {conflictingCorrections(ctl.rawEntries).length ? <p role="alert" className="mx-5 rounded-card bg-amber-bg p-4 text-sm text-amber-text">Competing corrections are awaiting reconciliation. Review the original entries, amendments, and Sync Center.</p> : null}
         {!canRecord ? <p className="mx-5 my-3 rounded-card border border-outline-soft bg-white p-4 text-sm text-ink-muted">You have view access. A clinician records and saves encounter steps.</p> : null}
 
         {ctl.draftRestoredAt && !enc.closed ? (
@@ -231,12 +233,15 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
         ) : null}
 
         <div className="space-y-3 px-5 py-3 pb-24 md:px-8">
+          <details className="rounded-card border border-outline-soft bg-white p-4"><summary className="cursor-pointer font-bold">Patient clinical summary & ongoing care</summary><ClinicalWorkspace key={record.patientId} patientId={record.patientId} encounterId={enc.id} /></details>
+          {canRecord && enc.id && !enc.closed ? <div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} onClick={() => setEntryEditor({ step: 'vitals' })}>Record another observation</Button><Button variant="outlined" fullWidth={false} onClick={() => setEntryEditor({ step: 'complaint' })}>Add progress note</Button></div> : null}
+          {ctl.rawEntries.filter((entry) => ['vitals', 'complaint'].includes(entry.step)).length > 1 ? <details className="rounded-card border border-outline-soft bg-white p-4"><summary className="cursor-pointer font-bold">Observations & progress notes</summary>{ctl.rawEntries.filter((entry) => ['vitals', 'complaint'].includes(entry.step)).map((entry) => <div key={entry.id} className="mt-3 border-t border-outline-soft pt-3 text-sm"><b>{STEP_DEFS[entry.step as StepKey].title}</b> · {new Date(entry.createdOn).toLocaleString('en-GB')} · {entry.createdBy}<dl>{Object.entries(entry.values).map(([label, value]) => <div key={label}>{label}: {Array.isArray(value) ? value.join(', ') : String(value)}</div>)}</dl>{canRecord ? <Button variant="ghost" onClick={() => setEntryEditor({ step: entry.step as StepKey, target: entry })}>Correct this entry</Button> : null}</div>)}</details> : null}
           {steps.map((s, i) => {
             const locked = Boolean(enc.sig[s.key]);
             const active = i === enc.activeIndex;
             const state = locked ? 'locked' : enc.skipped.includes(s.key) ? 'skipped' : active ? 'active' : 'pending';
             return (
-              <SectionCard
+              <div key={s.key}><SectionCard
                 key={s.key}
                 index={i}
                 title={s.title}
@@ -253,7 +258,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
                 saving={saving}
               >
                 {active && canRecord ? <StepForm stepKey={s.key} ctl={ctl} /> : null}
-              </SectionCard>
+              </SectionCard>{locked && canRecord && ['vitals', 'complaint', 'lab_results', 'diagnosis', 'injection'].includes(s.key) ? <Button variant="ghost" onClick={() => setEntryEditor({ step: s.key, target: ctl.rawEntries.find((entry) => entry.id === enc.entries[s.key]?.id) })}>Correct recorded values</Button> : null}</div>
             );
           })}
         </div>
@@ -274,6 +279,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId }: { patientId:
       ) : null}
 
       {amendKey ? <AmendSheet onSave={saveAmend} onClose={() => setAmendKey(null)} /> : null}
+      {entryEditor && enc.id ? <EntryEditorSheet patientId={patientId} encounterId={enc.id} entries={ctl.rawEntries} {...entryEditor} onClose={() => setEntryEditor(undefined)} /> : null}
 
       {activityOpen ? (
         <Sheet onClose={() => setActivityOpen(false)} title="Activity log" eyebrow={encounterLabel(enc.id)}>

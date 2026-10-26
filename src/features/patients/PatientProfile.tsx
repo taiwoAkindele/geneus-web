@@ -6,6 +6,7 @@ import { SyncPill } from '@/app/SyncPill';
 import { useAuthorizationContext, useSession } from '@/session';
 import { PatientCard } from './PatientCard';
 import { PatientIdentityPanel } from './PatientIdentityPanel';
+import { ClinicalWorkspace, AllergyAlert } from '@/features/clinical';
 import { APPOINTMENT_GROUP_LABELS, BookAppointmentSheet, useAppointments, type AppointmentPatient, type BookedAppointment } from '@/features/appointments';
 import { EncounterCard, usePatientEncounters, type EncounterNavState } from '@/features/encounter';
 import { fromPatient, useBeginRegistration, type RegistrationNavState } from '@/features/registration';
@@ -124,13 +125,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
               <div className="text-[22px] font-extrabold tracking-[-0.02em]">{record.fullName}</div>
               <div className="font-mono text-[13px] text-brand-accent-soft">{record.patientId}</div>
             </div>
-            {record.allergies.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-danger-bg px-3 py-1.5 text-[12px] font-bold text-danger-strong">
-                  ⚠ Allergy: {record.allergies.join(', ')}
-                </span>
-              </div>
-            ) : null}
+            <AllergyAlert patientId={record.patientId} />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-x-8 gap-y-4">
@@ -173,6 +168,7 @@ export const PatientProfile = ({ patientId, embedded = false }: { patientId?: st
 
         <p className="mt-3 text-xs text-ink-muted">Identity information: {record.identityEvidence === 'document_seen' ? 'Document checked by staff' : 'Reported by patient / representative'}{record.dobEstimated || !record.dateOfBirth ? ' · Age / birth date estimated' : ''}. {record.nin && context.permissions.includes('patient:update') ? `NIN: •••••••${record.nin.slice(-4)}.` : ''}</p>
         <PatientIdentityPanel patientId={record.patientId} />
+        <ClinicalWorkspace key={record.patientId} patientId={record.patientId} />
 
         {/* appointments — this patient's upcoming / pending bookings */}
         <div className="mb-3 mt-6 flex items-center justify-between">

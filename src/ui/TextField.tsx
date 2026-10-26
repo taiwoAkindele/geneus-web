@@ -1,9 +1,11 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes } from 'react';
+import { FieldLabel, type FieldExplanation } from './FieldHelp';
 
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   hint?: string;
   error?: string;
+  help?: FieldExplanation;
 };
 
 /**
@@ -15,30 +17,31 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
  * 16px text; focus is a 2px primary ring; error is a 2px red border.
  */
 export const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
-  { label, hint, error, id, className = '', ...props },
+  { label, hint, error, help, id, className = '', 'aria-describedby': describedBy, ...props },
   ref,
 ) {
-  const inputId = id ?? props.name;
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
+  const helpId = `${inputId}-help`;
+  const feedbackId = `${inputId}-feedback`;
   return (
-    <label htmlFor={inputId} className="block">
-      <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
-        {label}
-        {props.required ? <span className="text-danger" aria-hidden> *</span> : null}
-      </span>
+    <div className="block">
+      <FieldLabel label={label} htmlFor={inputId} help={help} descriptionId={helpId} required={props.required} />
       <input
         ref={ref}
         id={inputId}
         aria-invalid={error ? true : undefined}
+        aria-describedby={[describedBy, help ? helpId : '', error || hint ? feedbackId : ''].filter(Boolean).join(' ') || undefined}
         className={`w-full rounded-field border-[1.5px] bg-white px-4 py-3.5 text-base text-ink outline-none focus:border-2 focus:border-brand ${
           error ? 'border-2 border-danger' : 'border-outline'
         } ${className}`}
         {...props}
       />
       {error ? (
-        <span className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>
+        <span id={feedbackId} className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>
       ) : hint ? (
-        <span className="mt-1.5 block text-[13px] text-ink-muted">{hint}</span>
+        <span id={feedbackId} className="mt-1.5 block text-[13px] text-ink-muted">{hint}</span>
       ) : null}
-    </label>
+    </div>
   );
 });
