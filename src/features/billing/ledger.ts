@@ -1,5 +1,23 @@
 import type { BillingAdjustment, Charge, Payment } from '@shared';
 import { chargeBalances } from '@/data/repos/billing';
+import { calendarDate } from '@/lib/calendarDate';
+import type { BillingData } from './useBilling';
+
+/** Each allocation is filtered before summing, so reports and their scope agree. */
+export const collectionAllocations = (data: BillingData, filters: { currency: string; from: string; to: string; departmentId: string; search: string }) => {
+  const charges = new Map(data.charges.map((charge) => [charge.id, charge]));
+  const names = new Map(data.patients.map((patient) => [patient.patientId, patient.fullName]));
+  const term = filters.search.trim().toLowerCase();
+  return data.payments.flatMap((payment) => {
+    if (payment.method === 'waiver' || payment.currency !== filters.currency || (filters.from && calendarDate(payment.createdOn) < filters.from) || (filters.to && calendarDate(payment.createdOn) > filters.to)) return [];
+    return payment.allocations.flatMap((allocation) => {
+      const charge = charges.get(allocation.chargeId);
+      if (!charge || (filters.departmentId && (filters.departmentId === '__general__' ? Boolean(charge.departmentId) : charge.departmentId !== filters.departmentId))) return [];
+      if (term && !`${names.get(payment.patientId) ?? ''} ${payment.patientId} ${charge.description} ${payment.receiptNumber} ${payment.reference ?? ''}`.toLowerCase().includes(term)) return [];
+      return [{ payment, charge, amountMinor: (payment.reverses ? -1 : 1) * allocation.amountMinor }];
+    });
+  });
+};
 
 export const billingRows = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[]) =>
   chargeBalances(charges, payments, adjustments).map((row) => {

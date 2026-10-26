@@ -1,5 +1,5 @@
 import type { AuthorizationContext, Handoff } from '@shared';
-import { allWhere, envelope, insertRecord, newId, updateRecord } from '../db';
+import { allWhere, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 
 /** Patients sent to a unit, as its incoming list reads them. */
 export const handoffsTo = (unitId: string) => allWhere<Handoff>('handoff', 'toUnitId', unitId);
@@ -30,5 +30,9 @@ export const sendHandoff = (draft: HandoffDraft, context: AuthorizationContext) 
 };
 
 /** The receiving unit marks the patient arrived, then the instruction carried out. */
-export const markHandoff = (handoff: Handoff, status: 'received' | 'done', context: AuthorizationContext) =>
-  updateRecord<Handoff>(context, 'handoff:update', 'handoff', handoff.id, { status });
+export const markHandoff = async (handoff: Handoff, status: 'received' | 'done', context: AuthorizationContext) => {
+  const current = await findRecord<Handoff>('handoff', handoff.id);
+  if (!current) throw new Error('This handoff is not available on this device.');
+  if (current.status === 'done' && status !== 'done') throw new Error('This handoff is already complete. Review the visit instead of reopening it.');
+  return updateRecord<Handoff>(context, 'handoff:update', 'handoff', handoff.id, { status });
+};

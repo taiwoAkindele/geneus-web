@@ -15,6 +15,8 @@ export type SyncState = {
   downloading: boolean;
   /** Local writes not yet accepted by the server. */
   pending: number;
+  /** False when the queue has not been read, or that read failed. */
+  pendingKnown?: boolean;
   error: string | undefined;
 };
 
@@ -28,6 +30,7 @@ const IDLE: SyncState = {
   uploading: false,
   downloading: false,
   pending: 0,
+  pendingKnown: false,
   error: undefined,
 };
 
@@ -46,7 +49,10 @@ export const useSyncStatus = (): SyncState => {
 
     const refresh = async () => {
       const status = db.currentStatus;
-      const pending = await countPending().catch(() => 0);
+      let pending = 0;
+      let pendingKnown = true;
+      try { pending = await countPending(); }
+      catch { pendingKnown = false; }
       if (disposed) return;
       setState({
         connected: status.connected,
@@ -56,7 +62,8 @@ export const useSyncStatus = (): SyncState => {
         uploading: status.dataFlowStatus.uploading,
         downloading: status.dataFlowStatus.downloading,
         pending,
-        error: status.dataFlowStatus.uploadError?.message ?? status.dataFlowStatus.downloadError?.message,
+        pendingKnown,
+        error: status.dataFlowStatus.uploadError?.message ?? status.dataFlowStatus.downloadError?.message ?? (!pendingKnown ? 'The upload queue could not be read.' : undefined),
       });
     };
 
@@ -79,5 +86,6 @@ export const indicatorFor = (state: SyncState): IndicatorStatus => {
   if (state.uploading || state.downloading) return 'syncing';
   if (state.pending > 0) return state.connected ? 'syncing' : 'pending';
   if (!state.connected) return 'offline';
+  if (state.connecting || !state.hasSynced) return 'syncing';
   return 'synced';
 };

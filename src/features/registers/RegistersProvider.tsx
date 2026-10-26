@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
-import type { RegisterDefinition, RegisterEntry } from '@shared';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
 import { addEntry, listDefinitions, listEntries, publishDefinition } from '@/data/repos/registers';
-import type { EntryValues, RegisterDef, RegisterDraft, RegisterRow } from './types';
+import { listStaff } from '@/data/repos/staff';
+import { projectRegisters } from './registerProjection';
+import type { EntryValues, RegisterDef, RegisterDraft } from './types';
 
 /**
  * Registers as the screens see them: each register's current definition version
@@ -25,50 +26,12 @@ type Value = {
 
 const RegistersContext = createContext<Value | null>(null);
 
-const formatWhen = (iso: string): string => {
-  const at = new Date(iso);
-  const day = `${at.getDate()} ${at.toLocaleString('en-GB', { month: 'short' })}`;
-  return `${day} · ${at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
-};
-
-const project = (definitions: RegisterDefinition[], entries: RegisterEntry[]): RegisterDef[] => {
-  const currentByRegister = new Map<string, RegisterDefinition>();
-  for (const definition of definitions) {
-    const current = currentByRegister.get(definition.registerId);
-    if (!current || definition.version > current.version) {
-      currentByRegister.set(definition.registerId, definition);
-    }
-  }
-
-  return [...currentByRegister.values()].map((definition) => ({
-    id: definition.registerId,
-    name: definition.name,
-    category: definition.category,
-    description: definition.description,
-    status: definition.status,
-    version: definition.version,
-    fields: definition.fields,
-    rows: entries
-      .filter((entry) => entry.registerId === definition.registerId)
-      .sort((a, b) => b.createdOn.localeCompare(a.createdOn))
-      .map(
-        (entry): RegisterRow => ({
-          id: entry.id,
-          by: entry.createdBy,
-          when: formatWhen(entry.createdOn),
-          registerVersion: entry.registerVersion,
-          values: entry.values,
-        }),
-      ),
-  }));
-};
-
 export const RegistersProvider = ({ children }: { children: ReactNode }) => {
   const context = useAuthorizationContext();
 
   const load = useCallback(async () => {
-    const [definitions, entries] = await Promise.all([listDefinitions(), listEntries()]);
-    return project(definitions, entries);
+    const [definitions, entries, staff] = await Promise.all([listDefinitions(), listEntries(), listStaff()]);
+    return projectRegisters(definitions, entries, staff);
   }, []);
 
   const { data, loading, error, reload } = useLiveQuery(load);

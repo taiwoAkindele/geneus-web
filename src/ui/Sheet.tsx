@@ -56,9 +56,12 @@ export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false
   return (
     <dialog ref={dialog} tabIndex={-1} aria-labelledby={title ? titleId : undefined}
       aria-label={title ? undefined : eyebrow ?? 'Details'} aria-modal="true"
-      onCancel={(event) => { event.preventDefault(); close(); }}
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); close(); }}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
+        // A nested review owns its focus trap and Escape dismissal; its parent
+        // must not consume either event or discard the whole underlying form.
+        event.stopPropagation();
         const items = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, summary, [tabindex]')]
           .filter((item) => item.tabIndex >= 0 && !item.matches(':disabled') && item.getClientRects().length > 0);
         const first = items[0], last = items[items.length - 1];

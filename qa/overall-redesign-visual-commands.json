@@ -1,0 +1,73 @@
+[
+  {
+    "role": "doctor",
+    "width": 320,
+    "path": "/sync",
+    "name": "14-never-synced",
+    "description": "Small-phone sync status separates the headline from last-sync information",
+    "assert": "document.querySelectorAll(\"h1\").length === 1 && document.documentElement.scrollWidth <= innerWidth"
+  },
+  {
+    "evaluate": "window.overallAuditAddRejection()",
+    "name": "15-sync-review"
+  },
+  {
+    "role": "cashier",
+    "width": 1440,
+    "reload": true,
+    "path": "/billing?tab=reports",
+    "fill": {
+      "label": "Search",
+      "value": "no-matching-patient"
+    },
+    "name": "09-filtered-reports"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/admin/staff",
+    "fill": {
+      "label": "Find staff by name or role",
+      "value": "Ngozi"
+    },
+    "name": "24-staff-directory"
+  },
+  {
+    "path": "/admin/staff?view=roster",
+    "name": "25-roster"
+  },
+  {
+    "role": "doctor",
+    "width": 390,
+    "reload": true,
+    "path": "/units",
+    "click": "Complete handoff",
+    "name": "30-handoff-review"
+  },
+  {
+    "click": "Confirm completed handoff",
+    "name": "31-handoff-complete"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/reports/month",
+    "name": "19-monthly-live"
+  },
+  {
+    "scroll": 650,
+    "name": "32-report-commodities"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/reports/month",
+    "name": "20-monthly-small-phone"
+  },
+  {
+    "finish": true
+  }
+]

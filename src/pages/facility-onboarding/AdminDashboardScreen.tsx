@@ -1,173 +1,34 @@
-import { roleLabel } from '@/features/staff/staffAccess';
-import { useNavigate } from 'react-router-dom';
-import { Avatar, Stat, Tag } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
-import { hasPin, useAuth, useAuthorizationContext, useSession, type RosterEntry } from '@/session';
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Icon, type IconName } from '@/ui';
+import { useAuthorizationContext, useSession } from '@/session';
 import { RecoveryEmailCard } from './RecoveryEmailCard';
 
-/** A setup-checklist row: done = filled amber check, todo = amber ring. */
-const ChecklistItem = ({ done, children }: { done?: boolean; children: string }) => (
-  <div className="flex items-center gap-2.5 text-[13px] text-amber-text">
-    {done ? (
-      <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-amber text-[11px] font-extrabold text-white">
-        ✓
-      </span>
-    ) : (
-      <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-[#c9a24a]" />
-    )}
-    {children}
-  </div>
-);
+type Setting = { label: string; description: string; to: string; icon: IconName };
+const SettingsGroup = ({ title, items }: { title: string; items: Setting[] }) => items.length ? <section aria-label={title} className="overflow-hidden rounded-card border border-outline-soft bg-white"><h2 className="border-b border-outline-soft px-5 py-4 text-lg font-extrabold">{title}</h2><ul className="divide-y divide-outline-soft">{items.map((item) => <li key={item.to}><Link to={item.to} className="flex min-h-[84px] items-center gap-4 px-5 py-4 hover:bg-brand-wash"><Icon name={item.icon} className="h-5 w-5 text-brand" /><span className="min-w-0 flex-1"><span className="block font-bold">{item.label}</span><span className="mt-1 block text-sm text-ink-muted">{item.description}</span></span><Icon name="chevron" className="h-4 w-4 text-ink-muted" /></Link></li>)}</ul></section> : null;
 
-const ActionTile = ({ label, primary, onClick }: { label: string; primary?: boolean; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`rounded-card p-4 text-left text-[15px] font-bold ${
-      primary ? 'bg-brand text-white' : 'border border-outline-soft bg-white text-ink'
-    }`}
-  >
-    {label}
-  </button>
-);
-
-const onShiftNow = (entry: RosterEntry): boolean => {
-  if (!entry.shift) return false;
-  const now = Date.now();
-  return (
-    new Date(entry.shift.startsAt).getTime() <= now &&
-    now < new Date(entry.shift.extendedUntil ?? entry.shift.endsAt).getTime()
-  );
-};
-
-const initialsOf = (fullName: string) =>
-  fullName
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('');
-
-/**
- * 2.3 Admin dashboard — the facility admin's landing page, inside the same shell
- * as everything else. Every tile deep-links to the screen that performs the
- * action; nothing here is decorative.
- */
 export const AdminDashboardScreen = () => {
-  const navigate = useNavigate();
-  const { facility } = useSession();
-  const { roster } = useAuth();
+  const { user, facility } = useSession();
   const context = useAuthorizationContext();
-
-  const onShift = roster.filter(onShiftNow);
-  const awaitingPin = roster.filter((entry) => !hasPin(entry.staff.staffId));
-  const rostered = roster.filter((entry) => entry.shift);
-
-  const FacilityCode = () => (
-    <div className="flex items-center justify-between rounded-[18px] bg-brand px-5 py-4 text-white">
-      <div>
-        <div className="text-xs text-brand-accent-soft">Your facility code</div>
-        <div className="mt-0.5 font-mono text-[22px] font-semibold">{facility.code}</div>
-      </div>
-      <span className="rounded-full bg-white/15 px-2.5 py-1.5 text-[11px]">Every Patient ID starts with this</span>
-    </div>
-  );
-
-  const Checklist = () => (
-    <div className="rounded-card border border-amber-border bg-amber-bg p-4">
-      <div className="text-sm font-bold text-amber-text">Finish setting up your facility</div>
-      <div className="mt-3 space-y-2">
-        <ChecklistItem done>Facility registered</ChecklistItem>
-        <ChecklistItem done={roster.length > 1}>Invite your staff</ChecklistItem>
-        <ChecklistItem done={awaitingPin.length === 0}>Everyone has set a PIN</ChecklistItem>
-        <ChecklistItem done={rostered.length > 0}>Put staff on today&rsquo;s roster</ChecklistItem>
-      </div>
-    </div>
-  );
-
-  const Counts = ({ className = '' }: { className?: string }) => (
-    <div className={className}>
-      <Stat value={String(roster.length)} label="Staff" />
-      <Stat value={String(awaitingPin.length)} label="Awaiting PIN" tone="amber" />
-      <Stat value={String(onShift.length)} label="On shift now" />
-    </div>
-  );
-
-  const StaffOnShift = () => (
-    <div className="rounded-card border border-outline-soft bg-white p-4">
-      <div className="mb-3 text-xs font-bold uppercase tracking-[0.06em] text-brand-strong">On shift now</div>
-      {onShift.length === 0 ? (
-        <p className="py-2 text-[13px] text-ink-muted">
-          Nobody is on shift. Put staff on today&rsquo;s roster from the Staff screen.
-        </p>
-      ) : (
-        <div className="divide-y divide-outline-soft">
-          {onShift.map((entry) => (
-            <button
-              key={entry.staff.staffId}
-              type="button"
-              onClick={() => navigate('/admin/staff/access', { state: { staffId: entry.staff.staffId } })}
-              className="flex w-full items-center gap-3 py-3 text-left"
-            >
-              <Avatar tone="green" size="sm">
-                {initialsOf(entry.staff.fullName)}
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-bold">{entry.staff.fullName}</div>
-                <div className="text-xs text-ink-muted">
-                  {roleLabel(entry.staff)} ·{' '}
-                  {entry.staff.permission === 'read_write' ? 'Read & write' : 'Read only'}
-                </div>
-              </div>
-              {entry.shift ? (
-                <Tag tone="green">
-                  {new Date(entry.shift.startsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                </Tag>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const Tiles = () => (
-    <div className="grid grid-cols-2 gap-3">
-      {context.permissions.includes('staff:manage') && context.permissions.includes('staff:permission') ? <ActionTile label="＋ Invite staff" primary onClick={() => navigate('/admin/staff/invite')} /> : null}
-      <ActionTile label="Manage staff" onClick={() => navigate('/admin/staff')} />
-      <ActionTile label="Roster & shifts" onClick={() => navigate('/admin/staff')} />
-      <ActionTile label="Registers" onClick={() => navigate('/registers')} />
-      {context.permissions.includes('unit:manage') ? <ActionTile label="Units & rooms" onClick={() => navigate('/admin/units')} /> : null}
-      {context.permissions.includes('fee_item:manage') ? <ActionTile label="Billing" onClick={() => navigate('/billing')} /> : null}
-      {context.permissions.includes('device:enroll') ? <ActionTile label="Add a device" onClick={() => navigate('/admin/devices')} /> : null}
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-surface">
-      <div className="mx-auto w-full max-w-md px-5 pb-24 pt-4 sm:max-w-none sm:px-7 sm:pt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[13px] text-ink-muted">Facility admin</div>
-            <h1 className="text-[21px] font-extrabold tracking-[-0.02em] sm:text-2xl">{facility.name}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <SyncPill />
-            <Tag tone="amber">ADMIN</Tag>
-          </div>
-        </div>
-
-        {/* Phone: one column. Tablet/desktop: the same blocks in a two-column grid. */}
-        <div className="mt-4 space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
-          <FacilityCode />
-          <Counts className="flex items-center justify-around rounded-[18px] border border-outline-soft bg-white px-5 py-4" />
-          <Checklist />
-          <StaffOnShift />
-          <RecoveryEmailCard />
-          <div className="sm:col-span-2">
-            <Tiles />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  useEffect(() => { document.title = 'Settings · Geneus Health'; }, []);
+  const admin = user.roles.includes('facility_admin');
+  const staff = admin || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign'].includes(permission));
+  const fees = admin || context.permissions.includes('fee_item:manage');
+  const units = admin || context.permissions.includes('unit:manage');
+  const devices = admin || context.permissions.some((permission) => ['device:enroll', 'device:revoke'].includes(permission));
+  const registers = admin || context.permissions.includes('register_definition:publish');
+  return <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 md:px-7"><header><h1 className="text-[28px] font-extrabold">Settings</h1><p className="mt-1 text-sm text-ink-muted">{facility.name} · {facility.code}. Manage the people and services behind daily work.</p></header>
+    <div className="grid items-start gap-5 lg:grid-cols-2"><div className="space-y-5"><SettingsGroup title="People & access" items={[
+      ...(staff ? [{ label: 'Staff & roster', description: 'Staff profiles, combined duties, permissions and planned shifts.', to: '/admin/staff', icon: 'patients' as const }] : []),
+      ...(devices ? [{ label: 'Facility devices', description: 'Enrollment, recent server contact and revocation.', to: '/admin/devices', icon: 'lock' as const }] : []),
+    ]} /><SettingsGroup title="Care & recording" items={[
+      ...(units ? [{ label: 'Units & rooms', description: 'Places patients can be sent, with instructions.', to: '/admin/units', icon: 'referrals' as const }] : []),
+      ...(registers ? [{ label: 'Register books', description: 'Review published books and configure new versions.', to: '/registers', icon: 'registers' as const }] : []),
+    ]} /></div><div className="space-y-5"><SettingsGroup title="Fees & payments" items={fees ? [
+      { label: 'Fee schedule', description: 'Prices, applicability and exemptions. Existing charges retain their original price.', to: '/billing/fees', icon: 'registers' },
+      { label: 'Departments & receiving accounts', description: 'Configure provider connection and department accounts.', to: '/billing/settings', icon: 'referrals' },
+    ] : []} /><SettingsGroup title="Device status" items={[{ label: 'Sync & review', description: 'Queued changes, last sync and records that need a decision.', to: '/sync', icon: 'sync' }]} /></div></div>
+    {admin ? <details className="rounded-card border border-outline-soft bg-white p-5"><summary className="cursor-pointer font-bold">Administrator account recovery</summary><p className="mt-2 text-sm text-ink-muted">Set or change your recovery email when needed.</p><div className="mt-4"><RecoveryEmailCard /></div></details> : null}
+    <p className="text-xs leading-relaxed text-ink-muted">One identity can hold several duties. Access changes sync to other devices; existing clinical and financial history is preserved.</p>
+  </div>;
 };

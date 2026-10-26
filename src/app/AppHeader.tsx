@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Icon, useToast } from '@/ui';
 import { useAuth, useAuthorizationContext } from '@/session';
@@ -8,15 +8,17 @@ import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/se
 import { NotificationList } from './NotificationList';
 
 /**
- * Persistent header for the signed-in app — TABLET & DESKTOP ONLY (`sm:` and up),
- * where there's room for it. On phones it is hidden: the design gives each phone
- * screen a full-height frame with a pinned footer and no top chrome, so mobile
- * puts notifications in the bottom nav and the shift countdown above it instead
- * (see AppShell). Rendered once by AppShell; screen AppBars stick just beneath it
- * via the `--app-header-h` offset.
+ * One facility identity, sync indicator and alert entry point across screen sizes.
+ * The phone dock remains available for primary work, More and Account. Screen
+ * AppBars stick below this header using the shared `--app-header-h` offset.
  */
 const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
   const { notifications, notificationsLoading, notificationsError } = useSession();
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [onClose]);
   return (
     <>
       {/* Backdrop — tap anywhere to dismiss. */}
@@ -52,18 +54,18 @@ export const AppHeader = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 hidden h-[46px] items-center gap-2 border-b border-outline-soft bg-surface px-3 sm:flex">
+    <header className="sticky top-0 z-30 flex h-[52px] items-center gap-2 border-b border-outline-soft bg-white px-3 sm:h-[46px] sm:bg-surface">
       {/* Facility identity */}
       <button
         type="button"
         onClick={() => navigate('/home')}
-        className="flex min-h-0 items-center gap-2"
+        className="flex min-h-[44px] min-w-0 items-center gap-2"
         aria-label="Go to facility home"
       >
         <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[8px] bg-brand text-white">
           <Icon name="home" className="h-[17px] w-[17px]" />
         </span>
-        <span className="font-mono text-[13px] font-semibold text-ink">{facility.code}</span>
+        <span className="truncate font-mono text-[12px] font-semibold text-ink sm:text-[13px]">{facility.code}</span>
         <span className="hidden text-[13px] text-ink-muted lg:inline">{facility.name}</span>
       </button>
 
@@ -74,7 +76,7 @@ export const AppHeader = () => {
         <button
           type="button"
           onClick={() => navigate('/sync')}
-          className="flex min-h-0 items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1.5 text-xs font-bold text-ink-soft"
+          className="hidden min-h-0 items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1.5 text-xs font-bold text-ink-soft sm:flex"
           aria-label={shift ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}; sign-out is manual` : accessLabel(access)}
         >
           <Icon name={shift ? 'clock' : 'lock'} className="h-4 w-4" />
@@ -88,7 +90,7 @@ export const AppHeader = () => {
             onClick={toggle}
             aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
             aria-expanded={open}
-            className="relative flex h-9 w-9 min-h-0 items-center justify-center rounded-full text-ink-soft active:bg-surface-container"
+            className="relative flex h-11 w-11 min-h-0 items-center justify-center rounded-full text-ink-soft active:bg-surface-container"
           >
             <Icon name="bell" className="h-[22px] w-[22px]" />
             {unreadCount > 0 ? (

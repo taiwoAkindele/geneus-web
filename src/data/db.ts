@@ -121,11 +121,12 @@ export const updateRecord = async <T extends AnyDocument>(
   type: DocType,
   id: string,
   changes: Partial<T>,
+  changedOn = nowIso(),
 ): Promise<T> => {
   assertAllowed(context, permission);
   const current = await findRecord<T>(type, id);
   if (!current) throw new Error(`no ${type} ${id} to change`);
-  const stamped = { ...changes, updatedBy: context.userId, updatedOn: nowIso() };
+  const stamped = { ...changes, updatedBy: context.userId, updatedOn: changedOn };
   const merged = validate<T>({ ...current, ...stamped });
   const row = toRow(type, stamped);
   const columns = Object.keys(row);

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Payment } from '@shared';
 import { Button, Sheet } from '@/ui';
 import { formatMoney } from '@/lib/money';
@@ -8,9 +9,11 @@ export const Receipt = ({ payment, data, onClose }: { payment: Payment; data: Bi
   const { facility } = useSession();
   const patient = data.patients.find((p) => p.patientId === payment.patientId);
   const staff = data.staff.find((s) => s.staffId === payment.createdBy);
+  const [printError, setPrintError] = useState('');
   const print = () => {
     const popup = window.open('', '_blank', 'width=500,height=650');
-    if (!popup) return;
+    if (!popup) { setPrintError('The print window was blocked. Allow pop-ups for this app and try again. The payment is already recorded; do not record it again.'); return; }
+    setPrintError('');
     const root = document.createElement('main');
     const lines = [facility.name, 'Payment receipt', payment.receiptNumber, patient?.fullName ?? payment.patientId, payment.patientId,
       new Date(payment.createdOn).toLocaleString('en-GB'), `Method: ${payment.method}`,
@@ -28,5 +31,6 @@ export const Receipt = ({ payment, data, onClose }: { payment: Payment; data: Bi
     <p className="my-3 text-sm">{payment.method === 'cash' ? 'Cash' : 'Bank transfer'} · {staff?.fullName ?? payment.createdBy}</p>
     {payment.reference ? <p className="mb-4 break-all text-sm">Reference: {payment.reference}</p> : null}
     <Button onClick={print}>Print receipt</Button>
+    {printError ? <p role="alert" className="mt-3 text-sm text-danger">{printError}</p> : null}
   </Sheet>;
 };

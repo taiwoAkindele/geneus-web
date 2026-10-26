@@ -10,13 +10,19 @@ type ProviderAccount = { providerAccountId: string; accountNumber: string; accou
 export const BillingSettings = () => {
   const navigate = useNavigate(); const context = useAuthorizationContext(); const departments = useLiveQuery(listBillingDepartments);
   const [connection, setConnection] = useState<BillingConnection>(); const [secret, setSecret] = useState('');
+  const [readingConnection, setReadingConnection] = useState(true), [connectionError, setConnectionError] = useState('');
   const [name, setName] = useState(''); const [departmentId, setDepartment] = useState('');
   const [accounts, setAccounts] = useState<ProviderAccount[]>([]); const [providerId, setProviderId] = useState('');
   const [terminalCode, setTerminalCode] = useState(''); const [notificationPhone, setNotificationPhone] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const working = useRef(false); const allowed = context.permissions.includes('fee_item:manage');
-  const refresh = async () => setConnection(await billingRequest<BillingConnection>('connection/status', { actorStaffId: context.userId }));
-  useEffect(() => { if (allowed) void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not read Paystack settings')); }, [allowed, context.userId]);
+  const refresh = async () => {
+    setReadingConnection(true); setConnectionError('');
+    try { setConnection(await billingRequest<BillingConnection>('connection/status', { actorStaffId: context.userId })); }
+    catch (cause) { setConnectionError(cause instanceof Error ? cause.message : 'Could not read provider settings'); throw cause; }
+    finally { setReadingConnection(false); }
+  };
+  useEffect(() => { document.title = 'Departments & accounts · Geneus Health'; if (allowed) void refresh().catch(() => {}); }, [allowed, context.userId]);
   const perform = async (action: () => Promise<void>) => {
     if (working.current) return; working.current = true; setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); }
@@ -33,8 +39,9 @@ export const BillingSettings = () => {
         })}>Add department</Button>
       </section>
       <section className="space-y-3 rounded-card border border-outline-soft bg-white p-4"><h2 className="text-lg font-bold">Hospital Paystack connection</h2><p className="text-sm text-ink-muted">Each hospital connects its own Paystack business account. Account numbers are linked to departments; patients transfer from their banking apps.</p>
-        <p className="text-sm">{connection ? connection.configured ? `Connected · ${connection.mode} mode` : 'Not connected' : 'Reading connection…'}</p>
-        {connection && !connection.encryptionReady ? <p className="rounded-field bg-amber-bg p-3 text-sm">Your server administrator needs to set BILLING_ENCRYPTION_KEY before a Paystack key can be saved.</p> : null}
+        <p className="text-sm">{readingConnection ? 'Reading connection…' : connectionError ? 'Connection unavailable' : connection?.configured ? `Connected · ${connection.mode} mode` : 'Not connected'}</p>
+        {connectionError ? <div role="alert" className="rounded-field bg-danger-bg p-3 text-sm text-danger"><p>{connectionError}</p><Button fullWidth={false} variant="ghost" disabled={readingConnection} onClick={() => void refresh().catch(() => {})}>Retry connection</Button></div> : null}
+        {connection && !connection.encryptionReady ? <p className="rounded-field bg-amber-bg p-3 text-sm">Payment setup needs secure server configuration before credentials can be saved. Ask your server administrator to enable encrypted provider credentials.</p> : null}
         <TextField label="Paystack secret key" type="password" autoComplete="new-password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Use a test key first" />
         <p className="text-xs text-ink-muted">Sent securely to the backend and stored encrypted. It is never saved in this device's database or returned to the screen.</p>
         <Button disabled={busy || !secret || !connection?.encryptionReady} onClick={() => void perform(async () => {

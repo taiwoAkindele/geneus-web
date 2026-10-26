@@ -128,6 +128,9 @@ const FeeScheduleScreen = lazy(() =>
 );
 const BillingScreen = lazy(() => import('@/pages/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
 const BillingSettingsScreen = lazy(() => import('@/pages/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
+const DevicesScreen = lazy(() => import('@/pages/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
+const StockScreen = lazy(() => import('@/pages/stock/StockScreen').then((module) => ({ default: module.StockScreen })));
+const MonthlySummaryScreen = lazy(() => import('@/pages/monthly-summary/MonthlySummaryScreen').then((module) => ({ default: module.MonthlySummaryScreen })));
 const AppointmentsScreen = lazy(() =>
   import('@/pages/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
 );
@@ -187,9 +190,9 @@ const App = () => {
             <Route path="/registers/new" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id" element={<RegisterEntriesScreen />} />
-            <Route path="/reports/month" element={<UnavailableScreen title="Monthly reports" description="Monthly reporting is not available yet. The register books contain the entries saved by your facility; the summary will use those records when reporting is connected." />} />
+            <Route path="/reports/month" element={<MonthlySummaryScreen />} />
             <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
-            <Route path="/stock" element={<UnavailableScreen title="Medicine & stock" description="Stock tracking is not connected to facility records yet. Continue using your facility’s stock register." />} />
+            <Route path="/stock" element={<StockScreen />} />
             <Route path="/sync" element={<SyncCenterScreen />} />
 
             {/* Facility admin — the same shell as daily use, reached from the
@@ -203,7 +206,8 @@ const App = () => {
             <Route path="/billing/fees" element={<FeeScheduleScreen />} />
             <Route path="/billing/settings" element={<BillingSettingsScreen />} />
             <Route path="/admin/fees" element={<Navigate to="/billing/fees" replace />} />
-            <Route path="/admin/devices" element={<AddDeviceScreen />} />
+            <Route path="/admin/devices" element={<DevicesScreen />} />
+            <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}
           <Route path="/patients/duplicate" element={<RequireCapability permissions={['patient:create']}><DuplicateCheckScreen /></RequireCapability>} />

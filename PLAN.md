@@ -493,3 +493,44 @@ The local review preview uses synthetic in-memory records and resets on reload.
 Live API acceptance, physical printing, assistive-technology assessment and
 low-memory Android field proof remain separate checks. No server/shared contracts,
 production records, migrations or deployments changed for this redesign.
+
+## Combined dashboard and operational delivery (26 October 2026)
+
+Home now combines permitted duties with actual visit, booking, unit, money,
+facility and stock work. Primary phone shortcuts follow the primary duty and
+survive added administrator access; More contains the combined destinations.
+One shared header exposes facility identity, sync and notifications on phones too.
+
+Collections leads billing, with payment review, protected unfinished inputs,
+receipt completion and allocation-based report filters. Appointments has facility
+booking/search/details. Daily registers have persistent validation, review/sign,
+saved-version rendering, readable authors, period search and CSV export. Staff
+uses one directory and a dated roster; settings and synced device management are
+connected. Sync review separates local/queued/refused states and explains decisions.
+
+Stock and monthly reports now use real local records. Inventory derives opening
+quantities plus immutable movements; reports summarize recorded visits, corrected
+diagnosis labels, registers, commodities and trends. These are operational first
+deliveries: automatic prescription-to-stock linkage, practitioner/resource scheduling and
+capacity, programme indicator mapping and later hospital modules remain work.
+
+The matching backend validates versioned register fields and inventory movements,
+protects opening quantities, and serializes forward-only handoff progression.
+Appointment attendance now adds optional attendance/activity fields, policy version 9
+and migration 0014. Arrival, rescheduling, cancellation, no-show and reopening use
+attributed history and deliberate review. Booking changes preserve fees. Shared
+source changes are copied to consumer working trees for validation; commit/pin
+promotion remains the owner's release step.
+See ../docs/OVERALL-REDESIGN-IMPLEMENTATION-2026-10-26.md for scope and release notes.
+
+Validation: 241 frontend tests, both consumer typechecks, production build and the
+300 KB initial-JS budget pass (approximately 123.7 KB gzipped). The server/shared
+suite passes 336 tests; final operational PostgreSQL checks pass all eight cases.
+35 connected browser assertions and all 22 patient-flow regressions pass without
+uncaught browser exceptions. Captures cover desktop, 390px and selected 320px states.
+Live provider/device operations and physical-device acceptance remain separate.
+
+Appointment acceptance adds 14 connected browser assertions, including the nested
+review discard guard, 390px and 320px layouts. Optional attendance/date filters
+collapse so search and bookings remain accessible on small phones. Existing
+patient-flow regressions remain required for shared Sheet changes.

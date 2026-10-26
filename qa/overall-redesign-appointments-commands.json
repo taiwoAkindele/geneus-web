@@ -1,0 +1,193 @@
+[
+  {
+    "role": "records_officer",
+    "width": 1440,
+    "path": "/appointments?booking=appointment%3Atoday",
+    "name": "33-appointment-details",
+    "description": "Reception can manage attendance independently of care or payment",
+    "assert": "document.body.innerText.includes(\"Not arrived\") && document.body.innerText.includes(\"Record arrival\")"
+  },
+  {
+    "click": "Record arrival"
+  },
+  {
+    "click": "Review change"
+  },
+  {
+    "click": "Confirm arrival",
+    "name": "34-appointment-arrived",
+    "description": "Arrival persists with attributed history",
+    "assert": "window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").attendance===\"arrived\" && JSON.parse(window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").activity).length===1 && !document.body.innerText.includes(\"Mark no-show\")"
+  },
+  {
+    "click": "Reschedule"
+  },
+  {
+    "fill": {
+      "label": "New date",
+      "value": "2026-10-28"
+    }
+  },
+  {
+    "fill": {
+      "label": "New time",
+      "value": "14:00"
+    }
+  },
+  {
+    "fill": {
+      "label": "Reason for change",
+      "value": "Patient requested an afternoon review"
+    }
+  },
+  {
+    "click": "Review change",
+    "name": "35-appointment-reschedule-review",
+    "description": "Review includes the chosen local date and reason",
+    "assert": "document.body.innerText.includes(\"Review booking change\") && document.body.innerText.includes(\"14:00\")"
+  },
+  {
+    "click": "Confirm reschedule",
+    "name": "36-appointment-rescheduled",
+    "description": "Rescheduling moves the same booking without raising fees again",
+    "assert": "window.designAudit.rows.appointments.length===3 && JSON.parse(window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").activity).length===2 && window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").attendance===\"booked\""
+  },
+  {
+    "click": "Cancel booking"
+  },
+  {
+    "click": "Review change",
+    "name": "37-appointment-validation",
+    "description": "Cancellation needs an explanation and keeps the saved record untouched",
+    "assert": "document.querySelector(\"[role=alert]\").innerText.includes(\"Explain the reason\") && window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").attendance===\"booked\""
+  },
+  {
+    "fill": {
+      "label": "Reason for change",
+      "value": "Patient cannot attend this appointment"
+    }
+  },
+  {
+    "click": "Review change"
+  },
+  {
+    "click": "Confirm cancellation",
+    "name": "38-appointment-cancelled",
+    "description": "Cancelled bookings keep history and cannot start a visit",
+    "assert": "window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").attendance===\"cancelled\" && !document.querySelector(\"dialog[open]\").innerText.includes(\"Start visit\")"
+  },
+  {
+    "click": "Reopen booking"
+  },
+  {
+    "fill": {
+      "label": "Reason for change",
+      "value": "Patient confirmed availability again"
+    }
+  },
+  {
+    "click": "Review change"
+  },
+  {
+    "click": "Confirm reopening",
+    "name": "39-appointment-reopened",
+    "description": "Reopening preserves the cancellation and all earlier actions",
+    "assert": "JSON.parse(window.designAudit.rows.appointments.find(a=>a.id===\"appointment:today\").activity).map(a=>a.action).join(\",\")===\"arrived,rescheduled,cancelled,reopened\""
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "path": "/appointments?group=overdue&booking=appointment%3Aoverdue"
+  },
+  {
+    "click": "Mark no-show"
+  },
+  {
+    "fill": {
+      "label": "Reason for change",
+      "value": "Patient did not attend the planned review"
+    }
+  },
+  {
+    "click": "Review change"
+  },
+  {
+    "click": "Confirm no-show",
+    "name": "40-appointment-no-show",
+    "description": "An explicit no-show leaves the active overdue list and retains its reason",
+    "assert": "window.designAudit.rows.appointments.find(a=>a.id===\"appointment:overdue\").attendance===\"no_show\" && document.body.innerText.includes(\"No-show recorded\")"
+  },
+  {
+    "role": "records_officer",
+    "width": 390,
+    "readonly": true,
+    "reload": true,
+    "path": "/appointments?booking=appointment%3Atoday",
+    "name": "41-appointment-readonly",
+    "description": "Readonly staff can inspect but cannot change attendance",
+    "assert": "![\"Record arrival\",\"Cancel booking\",\"Reschedule\"].some(t=>[...document.querySelectorAll(\"button\")].some(b=>b.textContent.trim()===t)) && document.documentElement.scrollWidth<=innerWidth"
+  },
+  {
+    "role": "doctor",
+    "width": 390,
+    "reload": true,
+    "path": "/appointments?booking=appointment%3Atoday"
+  },
+  {
+    "click": "Record arrival"
+  },
+  {
+    "click": "Review change",
+    "name": "42-appointment-phone-review",
+    "description": "Phone review contains the patient, impact and deliberate confirmation",
+    "assert": "document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll(\"dialog[open]\")].at(-1).innerText.includes(\"Confirm arrival\")"
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "name": "44-nested-review-discard",
+    "description": "Escape in a nested review preserves the underlying booking and asks before discarding",
+    "assert": "document.querySelectorAll(\"dialog[open]\").length===2 && document.body.innerText.includes(\"Discard unsaved changes?\")"
+  },
+  {
+    "click": "Discard changes"
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "role": "records_officer",
+    "width": 320,
+    "reload": true,
+    "path": "/appointments",
+    "name": "43-appointment-small-phone",
+    "description": "Attendance filters and booking groups fit a small phone",
+    "assert": "document.documentElement.scrollWidth<=innerWidth && document.querySelector(\"h1\").innerText===\"Appointments\" && [...document.querySelectorAll(\"button\")].some(b=>b.textContent.includes(\"Review today\") && b.getBoundingClientRect().top<innerHeight-70)"
+  },
+  {
+    "click": "Filter appointments",
+    "selector": "summary"
+  },
+  {
+    "fill": {
+      "label": "Attendance",
+      "value": "arrived"
+    }
+  },
+  {
+    "name": "45-appointment-filter-empty",
+    "description": "Attendance filter changes the actual worklist and explains an empty result",
+    "assert": "document.body.innerText.includes(\"No appointments match this group and its filters.\") && document.querySelector(\"select\").value===\"arrived\""
+  },
+  {
+    "click": "Clear filters",
+    "name": "46-appointment-clear-filters",
+    "description": "Clearing optional filters restores the active bookings",
+    "assert": "document.querySelector(\"select\").value===\"\" && [...document.querySelectorAll(\"button\")].some(b=>b.textContent.includes(\"Review today\"))"
+  }
+]
