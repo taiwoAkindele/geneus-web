@@ -1,0 +1,34 @@
+[
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "path": "/patients/profile?id=QA-PHC-000001-K2&tab=overview",
+    "name": "01-before-patient-tabs"
+  },
+  {
+    "path": "/billing",
+    "name": "02-before-billing"
+  },
+  {
+    "path": "/billing/fees",
+    "name": "03-before-fees"
+  },
+  {
+    "click": "＋ Add a fee",
+    "name": "04-before-add-fee"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/billing",
+    "name": "05-before-phone-billing"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/registers/new",
+    "name": "06-before-register-builder"
+  }
+]

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClinicalKind } from '@shared';
-import { ActionMenu, Button } from '@/ui';
+import { ActionMenu, Button, SectionTabs } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
 import { useAuthorizationContext, useSession } from '@/session';
 import { useLiveQuery } from '@/data';
@@ -93,7 +93,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       </div>
       <div className="mt-4"><AllergyAlert patientId={record.patientId} /></div>
     </header>
-    <nav aria-label="Patient record sections" className="mb-5 flex gap-4 overflow-x-auto border-b border-outline-soft">{Object.entries(PATIENT_TABS).map(([key, label]) => <button type="button" key={key} aria-current={tab === key ? 'page' : undefined} onClick={() => changeTab(key as PatientTab)} className={`min-h-[52px] shrink-0 border-b-2 px-2 text-sm font-bold ${tab === key ? 'border-brand text-brand' : 'border-transparent text-ink-soft'}`}>{label}</button>)}</nav>
+    <SectionTabs label="Patient record sections" className="mb-5" value={tab} onChange={changeTab} options={Object.entries(PATIENT_TABS).map(([value, label]) => ({ value: value as PatientTab, label }))} />
     {needsAttention ? <div role="alert" className="mb-5 rounded-field border border-amber-border bg-amber-bg p-4 text-sm text-amber-text">Some records for this patient need sync review. Signed on this device does not mean accepted by the server. <Button variant="ghost" fullWidth={false} onClick={() => navigate('/sync')}>Open Sync &amp; device</Button></div> : null}
     {rejections.error ? <p role="alert" className="mb-4 text-sm text-amber-text">Sync review status could not be read. <button type="button" className="font-bold text-brand" onClick={rejections.reload}>Retry sync status</button></p> : null}
     {chart.data && new Set(chart.data.current.map((event) => event.recordId)).size < chart.data.current.length ? <p role="alert" className="mb-4 rounded-field bg-amber-bg p-4 text-sm text-amber-text">Competing clinical versions need reconciliation. Review all versions and Sync &amp; device before relying on the record.</p> : null}

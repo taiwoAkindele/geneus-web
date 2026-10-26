@@ -24,8 +24,7 @@ export const AdminDashboardScreen = () => {
     ]} /><SettingsGroup title="Care & recording" items={[
       ...(units ? [{ label: 'Units & rooms', description: 'Places patients can be sent, with instructions.', to: '/admin/units', icon: 'referrals' as const }] : []),
       ...(registers ? [{ label: 'Register books', description: 'Review published books and configure new versions.', to: '/registers', icon: 'registers' as const }] : []),
-    ]} /></div><div className="space-y-5"><SettingsGroup title="Fees & payments" items={fees ? [
-      { label: 'Fee schedule', description: 'Prices, applicability and exemptions. Existing charges retain their original price.', to: '/billing/fees', icon: 'registers' },
+    ]} /></div><div className="space-y-5"><SettingsGroup title="Payment setup" items={fees ? [
       { label: 'Departments & receiving accounts', description: 'Configure provider connection and department accounts.', to: '/billing/settings', icon: 'referrals' },
     ] : []} /><SettingsGroup title="Device status" items={[{ label: 'Sync & review', description: 'Queued changes, last sync and records that need a decision.', to: '/sync', icon: 'sync' }]} /></div></div>
     {admin ? <details className="rounded-card border border-outline-soft bg-white p-5"><summary className="cursor-pointer font-bold">Administrator account recovery</summary><p className="mt-2 text-sm text-ink-muted">Set or change your recovery email when needed.</p><div className="mt-4"><RecoveryEmailCard /></div></details> : null}

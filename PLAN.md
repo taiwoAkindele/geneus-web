@@ -534,3 +534,13 @@ Appointment acceptance adds 14 connected browser assertions, including the neste
 review discard guard, 390px and 320px layouts. Optional attendance/date filters
 collapse so search and bookings remain accessible on small phones. Existing
 patient-flow regressions remain required for shared Sheet changes.
+
+## Shared tabs, Billing fees and register authoring (27 October 2026)
+
+SectionTabs owns underlined section navigation across patient/clinical views, visits, appointments, billing, staff, units, register lists and the builder. Choices inside forms remain input controls. Arrow/Home/End navigation retains focus and reveals the selected section horizontally.
+
+Fees belongs to Billing alongside patient charges. Add fee is a permission-gated side panel, with guarded dirty dismissal; price changes preserve existing charges. The old fee URL redirects to Billing Fees. Settings retains payment setup.
+
+Register authoring saves immutable named draft snapshots, then publishes a separate version after review. The published form is projected independently from the latest authoring draft. Private incomplete typing is retained per staff/register in local-only register_builder_drafts; it does not sync. Shared snapshots use the existing register_definition contract. Stale local bases are refused before writing; server checks serialize versions and validate field identities and published choices. Changing a field type allocates a new ID.
+
+Validation: 244 frontend and 343 server/shared tests pass, including SQLite recovery/pinned-entry checks and concurrent PostgreSQL authoring. See ../docs/BILLING-TABS-REGISTER-REDESIGN-2026-10-27.md for visual evidence, browser results and release limits. No new dependencies or server migration are needed for this phase.

@@ -19,7 +19,9 @@ import {
 } from './repos/billing';
 import { book, changeAppointment, listAppointments } from './repos/appointments';
 import { clinicalEventsForPatient, patientClinicalRecord, saveClinicalRecord } from './repos/clinical';
-import { DRAFTS_TABLE, TABLE_FOR } from './tables';
+import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
+import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from './repos/registers';
+import { discardRegisterRecovery, readRegisterRecovery, writeRegisterRecovery } from './repos/registerDrafts';
 import { fakeDatabase } from './testing/fakeDatabase';
 
 /**
@@ -45,6 +47,7 @@ const sqliteDatabase = (): LocalDatabase & { close: () => Promise<void> } => {
     sqlite.exec(`CREATE TABLE "${table}" ("id" TEXT PRIMARY KEY, ${[...columns, '_metadata'].map((name) => `"${name}"`).join(', ')})`);
   }
   sqlite.exec(`CREATE TABLE "${DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "patientId", "encounterKey", "step", "data", "updatedOn")`);
+  sqlite.exec(`CREATE TABLE "${REGISTER_DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "registerKey", "data", "updatedOn")`);
   type Bindable = string | number | null;
   const bind = (parameters: unknown[]) => parameters.map((value) => (value === undefined ? null : value)) as Bindable[];
   return {
@@ -278,6 +281,35 @@ describe('the write path against a real SQLite', () => {
       expect(cancelled.updatedOn).toBe(cancelled.activity?.[1].recordedOn);
       expect((await listAppointments())[0].activity).toHaveLength(2);
     } finally { clock.mockRestore(); }
+  });
+
+  it('resumes immutable register drafts without changing the published form or historic entries', async () => {
+    const context = contextFor('records_officer');
+    const values = { name: 'Daily record', category: 'General', description: '', fields: [] };
+    const initial = await saveDraftDefinition(values, null, context, 0);
+    const published = await publishDefinition({ ...values, fields: [{ id: 'name', type: 'text', label: 'Patient name', required: true }] }, initial.registerId, context, 1);
+    await saveDraftDefinition({ ...values, name: 'Work in progress' }, initial.registerId, context, 2);
+    expect((await addEntry({ registerId: initial.registerId, values: { name: 'Example patient' } }, context)).saved).toBe(true);
+    expect((await listEntries())[0]).toMatchObject({ registerVersion: published.version, values: { name: 'Example patient' } });
+    expect((await listDefinitions()).map((definition) => definition.status)).toEqual(['draft', 'published', 'draft']);
+    await expect(saveDraftDefinition(values, initial.registerId, context, 2)).rejects.toThrow(/newer register version/);
+    const republished = await publishDefinition({ ...values, fields: published.fields }, initial.registerId, context, 3);
+    expect(republished.version).toBe(4);
+    expect((await listEntries())[0].registerVersion).toBe(2);
+  });
+
+  it('recovers incomplete register typing privately, validates writes and never queues it for sync', async () => {
+    const context = contextFor('records_officer'), other = contextFor('facility_admin');
+    const incomplete = { name: '', category: 'General', description: 'Half-written instructions', fields: [{ id: 'field:one', type: 'text' as const, label: '', required: false }] };
+    await writeRegisterRecovery(context, 'new', incomplete, 0);
+    await writeRegisterRecovery(context, 'new', { ...incomplete, name: 'Work in progress' }, 0);
+    expect((await readRegisterRecovery(context, 'new'))?.name).toBe('Work in progress');
+    expect(await readRegisterRecovery(other, 'new')).toBeUndefined();
+    expect(await listDefinitions()).toEqual([]);
+    expect(TABLE_FOR).not.toHaveProperty('register_builder_drafts');
+    await expect(writeRegisterRecovery({ ...context, permissions: [] }, 'new', incomplete, 0)).rejects.toThrow();
+    await discardRegisterRecovery(context, 'new');
+    expect(await readRegisterRecovery(context, 'new')).toBeUndefined();
   });
 
   describe('offline billing', () => {

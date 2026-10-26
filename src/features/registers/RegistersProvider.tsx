@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { addEntry, listDefinitions, listEntries, publishDefinition } from '@/data/repos/registers';
+import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from '@/data/repos/registers';
 import { listStaff } from '@/data/repos/staff';
 import { projectRegisters } from './registerProjection';
 import type { EntryValues, RegisterDef, RegisterDraft } from './types';
@@ -19,7 +19,8 @@ type Value = {
   error: Error | undefined;
   reload: () => void;
   getById: (registerId: string) => RegisterDef | undefined;
-  publish: (draft: RegisterDraft, editingId: string | null) => Promise<void>;
+  publish: (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => Promise<RegisterDef['configuration']>;
+  saveDraft: (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => Promise<RegisterDef['configuration']>;
   /** Returns validation issues; an empty list means the entry was saved. */
   addEntry: (registerId: string, entry: NewEntry) => Promise<string[]>;
 };
@@ -43,11 +44,13 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const publish = useCallback(
-    async (draft: RegisterDraft, editingId: string | null) => {
-      await publishDefinition(draft, editingId, context);
+    async (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => {
+      return publishDefinition(draft, editingId, context, expectedVersion);
     },
     [context],
   );
+
+  const saveDraft = useCallback((draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => saveDraftDefinition(draft, editingId, context, expectedVersion), [context]);
 
   const record = useCallback(
     async (registerId: string, entry: NewEntry) => {
@@ -58,8 +61,8 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const value = useMemo<Value>(
-    () => ({ registers, loading, error, reload, getById, publish, addEntry: record }),
-    [registers, loading, error, reload, getById, publish, record],
+    () => ({ registers, loading, error, reload, getById, publish, saveDraft, addEntry: record }),
+    [registers, loading, error, reload, getById, publish, saveDraft, record],
   );
 
   return <RegistersContext.Provider value={value}>{children}</RegistersContext.Provider>;

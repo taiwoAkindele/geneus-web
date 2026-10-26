@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Handoff } from '@shared';
-import { Button, ChoiceChip, DataTable, Sheet, Tag, useToast } from '@/ui';
+import { Button, SectionTabs, DataTable, Sheet, Tag, useToast } from '@/ui';
 import { markHandoff } from '@/data/repos/handoffs';
 import { usePatients } from '@/features/search';
 import { readDeviceUnit, rememberDeviceUnit, useIncomingHandoffs, useUnits } from '@/features/units';
@@ -45,7 +45,7 @@ export const UnitQueueScreen = () => {
       <div className="space-y-4 px-5 py-3 md:px-8">
         <h1 className="text-[24px] font-extrabold">Unit queue</h1>
         <p className="text-sm text-ink-muted">Instructions sent to a unit. Completing a handoff does not sign a result, dispense medication or close the visit.</p>
-        {units.loading ? <p role="status">Reading units…</p> : units.error ? <div role="alert">Units could not be read.<Button variant="ghost" onClick={units.reload}>Try again</Button></div> : active.length === 0 ? <p className="rounded-card border border-dashed border-outline p-4 text-sm text-ink-muted">A facility admin can add units under Admin → Units &amp; rooms.</p> : <div className="flex flex-wrap gap-2">{(units.data ?? []).map((candidate) => <ChoiceChip key={candidate.id} selected={candidate.id === unitId} onClick={() => choose(candidate.id)}>{candidate.name}{candidate.active ? '' : ' (retired)'}</ChoiceChip>)}</div>}
+        {units.loading ? <p role="status">Reading units…</p> : units.error ? <div role="alert">Units could not be read.<Button variant="ghost" onClick={units.reload}>Try again</Button></div> : active.length === 0 ? <p className="rounded-card border border-dashed border-outline p-4 text-sm text-ink-muted">A facility admin can add units under Admin → Units &amp; rooms.</p> : <SectionTabs label="Receiving units" value={unitId ?? ''} onChange={choose} options={(units.data ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name + (candidate.active ? '' : ' (retired)') }))} />}
         {unit ? <>
           <h2 className="text-lg font-bold">{unit.name}{unit.active ? '' : ' · retired unit'}</h2>
           <h2 className="text-[15px] font-bold">Sent here · oldest first{!incoming.loading && !incoming.error ? ` · ${list.length} waiting` : ''}</h2>

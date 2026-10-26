@@ -1,125 +1,22 @@
 import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuthorizationContext } from '@/session';
-import { Banner, Button, Icon, Tag } from '@/ui';
-import { CATEGORY_COLORS, monogram, useRegisters } from '@/features/registers';
+import { Button, SectionTabs, Tag } from '@/ui';
+import { useRegisters } from '@/features/registers';
 
-const StatCard = ({ label, value, dot }: { label: string; value: number | string; dot: string }) => (
-  <div className="rounded-[14px] border border-outline-soft bg-white px-4 py-3.5">
-    <div className="flex items-center gap-1.5">
-      <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: dot }} />
-      <span className="text-[12px] font-semibold text-ink-muted">{label}</span>
-    </div>
-    <div className="mt-2 text-[30px] font-extrabold tracking-[-0.02em]">{value}</div>
-  </div>
-);
-
-/** Registers index — the facility's configured registers, with a builder entry point (PRD §9.4). */
 export const RegistersListScreen = () => {
-  const navigate = useNavigate();
-  const { registers, loading, error, reload } = useRegisters();
-  const canPublish = useAuthorizationContext().permissions.includes('register_definition:publish');
-
+  const query = useRegisters(), [params, setParams] = useSearchParams();
+  const canConfigure = useAuthorizationContext().permissions.includes('register_definition:publish');
+  const view = canConfigure && params.get('view') === 'drafts' ? 'drafts' : 'published';
+  const published = query.registers.filter((register) => register.status === 'published');
+  const drafts = query.registers.filter((register) => register.hasDraft);
+  const shown = view === 'drafts' ? drafts : published;
   useEffect(() => { document.title = 'Registers · Geneus Health'; }, []);
-  const visible = registers.filter((register) => canPublish || register.status === 'published');
-  const published = registers.filter((r) => r.status === 'published').length;
-
-  return (
-    <div className="min-h-screen bg-surface">
-      <div className="w-full px-5 py-4 md:px-8">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Back"
-              onClick={() => navigate('/home')}
-              className="-ml-2 flex h-10 w-10 min-h-0 flex-none items-center justify-center text-ink-soft"
-            >
-              <Icon name="back" className="h-6 w-6" />
-            </button>
-            <div>
-              <div className="font-mono text-[12px] uppercase tracking-[0.16em] text-brand-strong">Registers</div>
-              <h1 className="text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">Your registers</h1>
-            </div>
-          </div>
-          {canPublish ? <Button variant="primary" fullWidth={false} className="px-4" onClick={() => navigate('/registers/new')}>
-            ＋ Create register
-          </Button> : null}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-3 gap-3">
-          <StatCard label="Registers" value={loading || error ? '—' : registers.length} dot="#006b3f" />
-          <StatCard label="Published" value={loading || error ? '—' : published} dot="#1b3a8f" />
-          <StatCard label="Draft" value={loading || error ? '—' : registers.length - published} dot="#e8a300" />
-        </div>
-
-        {/* Cards */}
-        <div className="mt-6 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Configured registers</div>
-        {error ? (
-          <Banner tone="amber" title="Could not read this device's registers" className="mt-3">
-            The register list could not be read. <Button variant="ghost" onClick={reload}>Try again</Button>
-          </Banner>
-        ) : null}
-
-        {loading && registers.length === 0 ? (
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1, 2].map((row) => (
-              <div key={row} className="h-[132px] animate-pulse rounded-card border border-outline-soft bg-surface-muted" />
-            ))}
-          </div>
-        ) : null}
-
-        {!loading && !error && registers.length === 0 ? (
-          <div className="mt-3 rounded-card border border-dashed border-outline p-10 text-center">
-            <div className="text-[15px] font-bold text-ink-soft">No registers yet</div>
-            <div className="mt-1.5 text-[13px] text-ink-muted">Create the first register this facility keeps.</div>
-            <div className="mt-4">
-              {canPublish ? <Button variant="primary" fullWidth={false} className="px-5" onClick={() => navigate('/registers/new')}>
-                ＋ Create register
-              </Button> : null}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mt-3 grid grid-cols-1 gap-3 pb-24 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((r) => {
-            const [bg, fg] = CATEGORY_COLORS[r.category] ?? ['#dcefe2', '#00502e'];
-            const fieldCount = r.fields.filter((f) => f.type !== 'section').length;
-            return (
-              <article
-                key={r.id}
-                className="flex flex-col gap-3 rounded-card border border-outline-soft bg-white p-4 text-left"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] text-[15px] font-extrabold" style={{ backgroundColor: bg, color: fg }}>
-                      {monogram(r.name)}
-                    </span>
-                    <div>
-                      <div className="text-base font-bold leading-tight">{r.name}</div>
-                      <div className="text-[12px] text-ink-muted">{r.category}</div>
-                    </div>
-                  </div>
-                  <Tag tone={r.status === 'published' ? 'green' : 'amber'}>{r.status === 'published' ? 'Published' : 'Draft'}</Tag>
-                </div>
-                <p className="text-[13px] leading-relaxed text-ink-soft">{r.description}</p>
-                <div className="flex items-center gap-3.5 border-t border-outline-soft pt-2.5">
-                  <span className="font-mono text-xs text-ink-muted">{fieldCount} fields</span>
-                  <span className="font-mono text-xs text-ink-muted">{r.rows.length} entries</span>
-                  {canPublish ? <Link to={`/registers/${r.id}/configure`} className="ml-auto inline-flex min-h-[44px] items-center text-sm font-bold text-ink-soft">Configure</Link> : null}
-                  <Link to={`/registers/${r.id}`} className="ml-auto inline-flex min-h-[44px] items-center text-sm font-bold text-brand">Open register <Icon name="chevron" className="ml-1 h-4 w-4" /></Link>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-        <p className="max-w-[70ch] pb-6 text-xs leading-relaxed text-ink-muted">
-          Each facility configures the registers it actually keeps. Build one from scratch, define every field, then
-          publish it — staff record entries against the published version.
-        </p>
-      </div>
-    </div>
-  );
+  return <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 pb-24 md:px-7"><header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-[28px] font-extrabold">Registers</h1><p className="mt-1 text-sm text-ink-soft">Open a published register to record entries. Configuration drafts are kept separate.</p></div>{canConfigure ? <Link className="inline-flex min-h-[52px] items-center rounded-field bg-brand px-4 py-3 font-bold text-white" to="/registers/new">Create register</Link> : null}</header>
+    <SectionTabs label="Register sections" value={view} onChange={(value) => setParams(value === 'drafts' ? { view: value } : {})} options={[{ value: 'published', label: 'Published', count: query.loading || query.error ? undefined : published.length }, ...(canConfigure ? [{ value: 'drafts', label: 'Drafts', count: query.loading || query.error ? undefined : drafts.length }] : [])]} />
+    {query.loading ? <p role="status">Reading registers…</p> : query.error ? <div role="alert"><p>Registers could not be read.</p><Button variant="ghost" onClick={query.reload}>Try again</Button></div> : shown.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{shown.map((register) => {
+      const shown = view === 'drafts' ? register.configuration : register;
+      return <article key={register.id} className="space-y-3 rounded-card border border-outline-soft bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 text-lg font-extrabold">{shown.name}</h2><Tag tone={view === 'drafts' ? 'amber' : 'green'}>{view === 'drafts' ? 'Draft' : 'Published'}</Tag></div><p className="text-xs text-ink-muted">{shown.category} · Version {shown.version}</p><p className="text-sm text-ink-soft">{shown.description || 'No instructions recorded.'}</p><p className="text-xs text-ink-muted">{shown.fields.filter((field) => field.type !== 'section').length} questions · {register.rows.length} saved entries</p>{canConfigure && register.hasDraft && register.status === 'published' ? <p className="text-xs text-ink-muted">A configuration draft is in progress. Staff still use published version {register.version}.</p> : null}<div className="flex flex-wrap gap-3 border-t border-outline-soft pt-2">{register.status === 'published' ? <Link className="inline-flex min-h-[44px] items-center font-bold text-brand" to={'/registers/' + encodeURIComponent(register.id)}>Open register</Link> : null}{canConfigure ? <Link className="inline-flex min-h-[44px] items-center font-bold text-ink-soft" to={'/registers/' + encodeURIComponent(register.id) + '/configure'}>{view === 'drafts' ? 'Resume draft' : 'Configure'}</Link> : null}</div></article>;
+    })}</div> : <div className="rounded-card border border-dashed border-outline p-5 text-sm text-ink-soft">{view === 'drafts' ? 'No saved configuration drafts. Use Save draft in the builder to return to unfinished work.' : canConfigure ? 'No published registers yet. Create a register or resume one from Drafts.' : 'No published registers on this device. A permitted staff member can configure one.'}</div>}
+  </div>;
 };

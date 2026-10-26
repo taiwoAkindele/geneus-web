@@ -1,4 +1,5 @@
 export { RegistersProvider, useRegisters } from './RegistersProvider';
+export { RegisterBuilder } from './RegisterBuilder';
 export { RegisterField } from './RegisterField';
 export {
   CATEGORIES,

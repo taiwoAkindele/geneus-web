@@ -14,6 +14,7 @@ export { PinDots } from './PinDots';
 export { PinKeypad } from './PinKeypad';
 export { PulseLoader } from './PulseLoader';
 export { SegmentedControl } from './SegmentedControl';
+export { SectionTabs } from './SectionTabs';
 export { SelectField } from './SelectField';
 export { Sheet, SheetCancelButton } from './Sheet';
 export { ActionMenu } from './ActionMenu';

@@ -43,6 +43,9 @@ export type RegisterDef = {
   status: RegisterStatus;
   version: number;
   fields: RegisterField[];
+  /** Latest authoring snapshot, which can be newer than the published form. */
+  configuration: RegisterDefinition;
+  hasDraft: boolean;
   rows: RegisterRow[];
 };
 

@@ -1,0 +1,9 @@
+[
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=overview",
+    "name": "01-before-patient-tabs",
+    "assert": "Boolean(document.querySelector('nav[aria-label=\"Patient record sections\"]'))"
+  }
+]

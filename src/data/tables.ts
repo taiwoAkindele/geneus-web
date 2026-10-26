@@ -1,5 +1,7 @@
 import type { DocType } from '@shared';
 
+export const REGISTER_DRAFTS_TABLE = 'register_builder_drafts';
+
 /**
  * Record type ↔ table name. Table names match the Sync Streams (and the
  * server's tables) so PowerSync can route downloaded rows and name uploaded

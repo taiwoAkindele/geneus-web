@@ -97,3 +97,9 @@ for the 14 appointment lifecycle assertions. It writes separate
 `appointment-results.json` plus captures 33 through 46, including nested-dialog
 discard protection and readonly/390px/320px views. Complete or deliberately discard
 unsaved forms before a full reload; browser navigation correctly prompts otherwise.
+
+## Billing tabs and register authoring (27 October)
+
+Run `$env:OVERALL_AUDIT_OUTPUT='qa/artifacts/billing-tabs-review/after'; node qa/overall-audit-browser.mjs qa/billing-tabs-registers-commands.json` in PowerShell. This separate capture folder protects the earlier audit baseline. The flow verifies direct fee creation, preserved charge prices, guarded dismissal, readonly access, legacy fee links, draft/recovery/resume/publication, keyboard section navigation and question identity/focus behavior. Private recovery remains in the in-memory fixture when navigating away and back; a full fixture reload still resets it. Real SQLite tests verify persistence and staff ownership independently.
+
+The review preview also accepts `start=/billing?tab=fees` (URL-encode the value when needed) alongside its synthetic role parameter. All records are synthetic and no provider action is submitted. Before-state capture commands and corrected patient-reference commands are kept separately. Full findings: ../docs/BILLING-TABS-REGISTER-REDESIGN-2026-10-27.md.

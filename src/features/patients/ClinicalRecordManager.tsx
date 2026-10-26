@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ClinicalKind, unreviewedLegacyAllergies, type ClinicalEvent } from '@shared';
 import type { PatientClinicalRecord } from '@/data/repos/clinical';
-import { Button, DataTable, Sheet, TextField } from '@/ui';
+import { Button, DataTable, SectionTabs, Sheet, TextField } from '@/ui';
 import { ClinicalRecordSheet } from '@/features/clinical/ClinicalRecordSheet';
 import { ClinicalRecordCard, clinicalTitle } from '@/features/clinical/ClinicalRecordCard';
 import { CLINICAL_LABELS } from '@/features/clinical/clinicalForms';
@@ -22,7 +22,7 @@ export const ClinicalRecordManager = ({ patientId, data, kind, onKindChange, can
   const legacy = unreviewedLegacyAllergies(data.events, data.patients);
   return <section className="space-y-5" aria-label="Manage clinical record">
     <div><h2 className="text-2xl font-extrabold">Clinical record</h2><p className="mt-1 text-sm text-ink-soft">Maintain ongoing care. Earlier signed versions stay in the medical chart.</p></div>
-    <nav aria-label="Clinical record categories" className="flex gap-2 overflow-x-auto border-b border-outline-soft pb-2">{ClinicalKind.options.map((category) => <button type="button" key={category} aria-current={kind === category ? 'page' : undefined} className={`min-h-[48px] shrink-0 border-b-2 px-3 text-sm font-bold ${kind === category ? 'border-brand text-brand' : 'border-transparent text-ink-soft'}`} onClick={() => onKindChange(category)}>{CATEGORY_LABELS[category]} · {data.current.filter((event) => event.kind === category).length + (category === 'allergy' ? legacy.length : 0)}</button>)}</nav>
+    <SectionTabs label="Clinical record categories" value={kind} onChange={onKindChange} options={ClinicalKind.options.map((category) => ({ value: category, label: CATEGORY_LABELS[category], count: data.current.filter((event) => event.kind === category).length + (category === 'allergy' ? legacy.length : 0) }))} />
     <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold">{CLINICAL_LABELS[kind]}</h3>{canRecord ? <Button variant="outlined" fullWidth={false} onClick={() => setEditor({ kind })}>Add {ADD_LABELS[kind]}</Button> : <p className="text-sm text-ink-soft">View access · a clinician records updates.</p>}</div>
     {kind === 'allergy' ? legacy.map((allergy) => <div key={allergy.patientId + allergy.allergen} className="flex flex-wrap items-center justify-between gap-3 rounded-field border border-amber-border bg-amber-bg p-4 text-sm"><div><b>{allergy.allergen}</b><p>Legacy report · reaction and severity need review.</p>{allergy.patientId !== patientId ? <p className="break-all">Recorded under linked ID {allergy.patientId}</p> : null}</div>{canRecord ? <Button variant="outlined" fullWidth={false} onClick={() => setEditor({ kind: 'allergy', patientId: allergy.patientId, initial: { allergen: allergy.allergen } })}>Review legacy allergy</Button> : null}</div>) : null}
     {records.length ? <TextField label="Search clinical records" placeholder="Name, status or recorded details" value={search} onChange={(event) => setSearch(event.target.value)} /> : null}
