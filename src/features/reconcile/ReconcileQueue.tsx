@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { SyncRejection } from '@shared';
 import { AuthorizationError, useLiveQuery } from '@/data';
 import { listStaff } from '@/data/repos/staff';
+import { usePatients } from '@/features/search';
 import {
   applyAgain,
   applyAgainBlocker,
@@ -28,12 +29,16 @@ export const ReconcileQueue = () => {
   const context = useAuthorizationContext();
   const open = useLiveQuery(useCallback(() => listOpenRejections(), []));
   const staff = useLiveQuery(listStaff);
+  const patients = usePatients();
+  const working = useRef(false);
   const [busyId, setBusyId] = useState<string>();
   const canResolve = context.permissions.includes('sync_rejection:resolve');
   const rejections = open.data ?? [];
   const nameOf = (staffId: string) => staff.data?.find((member) => member.staffId === staffId)?.fullName ?? staffId;
 
   const act = async (rejection: SyncRejection, work: () => Promise<unknown>, done: string) => {
+    if (working.current) return;
+    working.current = true;
     setBusyId(rejection.id);
     try {
       await work();
@@ -42,6 +47,7 @@ export const ReconcileQueue = () => {
       if (!(cause instanceof AuthorizationError)) console.error('reconcile action failed', cause);
       toast(cause instanceof Error ? cause.message : 'Could not resolve this — please try again', { tone: 'error' });
     } finally {
+      working.current = false;
       setBusyId(undefined);
     }
   };
@@ -60,7 +66,7 @@ export const ReconcileQueue = () => {
   if (rejections.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">
-        Nothing needs a decision — every change was accepted.
+        No unresolved review items are currently available on this device. This does not confirm that every queued change has reached the server.
       </div>
     );
   }
@@ -76,6 +82,7 @@ export const ReconcileQueue = () => {
           canResolve={canResolve}
           applyBlocker={applyAgainBlocker(rejection, context)}
           nameOf={nameOf}
+          patientNameOf={(id) => patients.data?.find((patient) => patient.patientId === id)?.fullName}
           busy={busyId === rejection.id}
           onKeepServer={() => void act(rejection, () => resolveRejection(rejection, 'Kept the saved values', context), 'Kept what is saved')}
           onUseDevice={(columns) =>
@@ -91,7 +98,7 @@ export const ReconcileQueue = () => {
               'Held records restored',
             )
           }
-          onApplyAgain={() => void act(rejection, () => applyAgain(rejection, context), 'Applied again in your name')}
+          onApplyAgain={() => void act(rejection, () => applyAgain(rejection, context), 'Saved locally and queued again in your name')}
           onDiscard={() => void act(rejection, () => discardRejection(rejection, context), 'Discarded — recorded in your name')}
         />
       ))}

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { book, listAppointments } from '@/data/repos/appointments';
+import { book, changeAppointment, listAppointments, type AppointmentChange } from '@/data/repos/appointments';
 import { listPatients } from '@/data/repos/patients';
 import { closingEntries, listEncounters } from '@/data/repos/encounters';
 import { projectAppointments } from './appointmentList';
@@ -17,6 +17,7 @@ type Value = {
   error: Error | undefined;
   reload: () => void;
   book: (appointment: NewAppointment) => Promise<void>;
+  change: (id: string, change: AppointmentChange) => Promise<void>;
   forPatient: (patientId: string) => BookedAppointment[];
 };
 const AppointmentsContext = createContext<Value | null>(null);
@@ -39,8 +40,9 @@ export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
   const { data, loading, error, reload } = useLiveQuery(load);
   const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments, data.clinicalEvents, data.identityEvents) : [], [data, now]);
   const bookAppointment = useCallback(async (appointment: NewAppointment) => { await book(appointment, context); }, [context]);
+  const changeBooking = useCallback(async (id: string, change: AppointmentChange) => { await changeAppointment(id, change, context); reload(); }, [context, reload]);
   const forPatient = useCallback((patientId: string) => { const ids = linkedPatientIds(patientId, data?.identityEvents ?? []); return appointments.filter((appointment) => ids.includes(appointment.patient.id)); }, [appointments, data]);
-  const value = useMemo(() => ({ appointments, loading, error, reload, book: bookAppointment, forPatient }), [appointments, loading, error, reload, bookAppointment, forPatient]);
+  const value = useMemo(() => ({ appointments, loading, error, reload, book: bookAppointment, change: changeBooking, forPatient }), [appointments, loading, error, reload, bookAppointment, changeBooking, forPatient]);
   return <AppointmentsContext.Provider value={value}>{children}</AppointmentsContext.Provider>;
 };
 

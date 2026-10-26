@@ -76,7 +76,7 @@ try {
     const needsOpen = await evaluate(`(() => { const summary = [...document.querySelectorAll('summary')].find(n => n.textContent.trim().startsWith(${JSON.stringify(title)})); return summary && !summary.parentElement.open ? summary.textContent.trim() : ''; })()`);
     if (needsOpen) await click(needsOpen, 'summary');
   };
-  const save = async () => { await click('Save permanently'); await waitFor('!document.querySelector("dialog[open]")'); };
+  const save = async () => { const review = await evaluate('[...document.querySelectorAll("dialog button")].find(n=>n.textContent.trim().startsWith("Review & sign"))?.textContent.trim()'); if (review) await click(review); await click('Save permanently'); await waitFor('!document.querySelector("dialog[open]")'); };
   await cdp('Runtime.enable'); await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await cdp('Page.navigate', { url: 'http://127.0.0.1:5194/qa/clinical.html' });
@@ -110,7 +110,7 @@ try {
     await cdp('Emulation.setTouchEmulationEnabled', { enabled: true });
     await coverage(); await tapHelp('Temp (°C)'); await tooltipFits(); await dismiss();
     results.push('Vitals help opens on touch and stays in the phone viewport');
-    await fill('Preview encounter section', 'complaint'); await pause(150); await coverage();
+    await fill('Preview encounter section', 'complaint'); await pause(150); await expand('Use structured history'); await coverage();
     assert.equal(await evaluate('[...document.querySelectorAll("textarea")].every(n => n.value === "")'), true, 'An example was inserted as a finding');
     await tapHelp('History of presenting illness'); await tooltipFits();
     assert.equal(await evaluate('document.querySelector(\'[role="tooltip"]\').textContent.includes("Sore throat began two days ago")'), true);
@@ -133,7 +133,7 @@ try {
     results.push('All remaining encounter inputs have accessible field explanations');
     await cdp('Emulation.setTouchEmulationEnabled', { enabled: false });
     await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-    await fill('Preview encounter section', 'complaint'); await pause(150);
+    await fill('Preview encounter section', 'complaint'); await pause(150); await expand('Use structured history');
     const point = await helpPoint('Examination');
     await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await waitFor('Boolean(document.querySelector(\'[role="tooltip"]\'))'); await tooltipFits();
@@ -187,7 +187,7 @@ try {
   results.push('Repeat observations');
   await click('Correct original observation'); await fill('Temp (°C)', '37'); await fill('Reason for correction', 'Synthetic transcription correction'); await click('Review entry'); await click('Confirm & save permanently'); await waitFor('!document.querySelector("dialog[open]")');
   results.push('Structured correction');
-  await click('Add progress note'); await fill('Assessment', 'Synthetic progress assessment'); await fill('Clinical plan / advice', 'Synthetic progress plan'); await click('Review entry'); await click('Confirm & save permanently'); await waitFor('!document.querySelector("dialog[open]")');
+  await click('Add progress note'); await expand('Use structured history'); await fill('Assessment', 'Synthetic progress assessment'); await fill('Clinical plan / advice', 'Synthetic progress plan'); await click('Review entry'); await click('Confirm & save permanently'); await waitFor('!document.querySelector("dialog[open]")');
   results.push('Structured progress note');
   const rows = await evaluate('window.clinicalQa.rows');
   assert.equal(rows.clinical_events.length, 9);

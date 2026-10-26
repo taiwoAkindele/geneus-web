@@ -23,6 +23,8 @@ export type RegisterRow = {
   id: string;
   by: string;
   when: string;
+  entryDate: string;
+  fields: RegisterField[];
   /** The definition version this entry was recorded against (pinned, never migrated). */
   registerVersion: number;
   values: EntryValues;

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { validateRegisterEntry } from '@shared';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Icon, Sheet, useToast } from '@/ui';
+import { Button, Icon, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
+import { downloadCsv } from '@/lib/csv';
 import { useAuthorizationContext, useSession } from '@/session';
 import { RegisterField, useRegisters, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
 
@@ -26,44 +28,53 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
   });
 
   const [saving, setSaving] = useState(false);
+  const [issues, setIssues] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const [edited, setEdited] = useState(false);
+  const summary = useRef<HTMLDivElement>(null);
+  const savingRef = useRef(false);
+  useEffect(() => { if (issues.length || reviewing) summary.current?.focus(); }, [issues, reviewing]);
+  const review = () => {
+    const errors = validateRegisterEntry(register.fields, draft);
+    setIssues(errors);
+    if (!errors.length) setReviewing(true);
+  };
 
   const save = async () => {
-    if (saving) return;
+    if (savingRef.current || !reviewing) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const issues = await addEntry(register.id, { values: draft });
       if (issues.length > 0) {
-        toast(issues[0]);
-        setSaving(false);
+        setIssues(issues); setReviewing(false);
         return;
       }
       toast(`Entry saved & locked — recorded by ${user.name}`);
       onClose();
-    } catch {
-      toast('Could not save the entry — please try again');
-      setSaving(false);
-    }
+    } catch (cause) { setIssues([cause instanceof Error ? cause.message : 'Could not save the entry. Try again.']); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   return (
-    <Sheet onClose={onClose} closeDisabled={saving} eyebrow={`${register.category} · New entry`} title={register.name}>
-      <div className="flex flex-col gap-4">
+    <Sheet onClose={onClose} closeDisabled={saving} hasUnsavedChanges={edited} eyebrow={`${register.category} · New entry`} title={reviewing ? `Review · ${register.name}` : register.name}>
+      {issues.length ? <div ref={summary} tabIndex={-1} role="alert" className="mb-4 rounded-field border border-danger bg-danger-bg p-4 text-sm text-danger"><p className="font-bold">Check this entry</p><ul className="mt-2 list-disc pl-5">{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div> : null}
+      {reviewing ? <div ref={summary} tabIndex={-1} className="space-y-4 outline-none"><p className="text-sm text-ink-muted">Check the answers before signing. The saved entry is permanent and attributed to {user.name}.</p><dl className="divide-y divide-outline-soft">{register.fields.filter((field) => field.type !== 'section').map((field) => <div key={field.id} className="py-3"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="mt-1 break-words text-sm">{fmtCell(draft[field.id])}</dd></div>)}</dl></div> : <div className="flex flex-col gap-4">
         {register.fields.map((f) => (
           <RegisterField
             key={f.id}
             field={f}
             value={draft[f.id]}
-            onChange={(v) => setDraft((d) => ({ ...d, [f.id]: v }))}
+            error={issues.length ? validateRegisterEntry([f], draft)[0] : undefined}
+            onChange={(v) => { const next = { ...draft, [f.id]: v }; setEdited(true); setDraft(next); if (issues.length) setIssues(validateRegisterEntry(register.fields, next)); }}
           />
         ))}
-      </div>
+      </div>}
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <Button variant="primary" fullWidth={false} className="flex-1" loading={saving} onClick={save}>
-          Save entry
+        <Button variant="primary" fullWidth={false} className="flex-1" loading={saving} onClick={reviewing ? save : review}>
+          {reviewing ? 'Sign & save entry' : 'Review entry'}
         </Button>
-        <Button variant="outlined" fullWidth={false} className="px-6" onClick={onClose}>
-          Cancel
-        </Button>
+        {reviewing ? <Button variant="outlined" fullWidth={false} className="px-6" disabled={saving} onClick={() => setReviewing(false)}>Keep editing</Button> : <SheetCancelButton disabled={saving} />}
       </div>
     </Sheet>
   );
@@ -76,7 +87,11 @@ export const RegisterEntriesScreen = () => {
   const { getById, loading, error, reload } = useRegisters();
   const context = useAuthorizationContext();
   const register = getById(id);
+  useEffect(() => { document.title = `${register?.name ?? 'Register'} · Geneus Health`; }, [register?.name]);
   const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   if (loading && !register) {
     return (
@@ -98,7 +113,11 @@ export const RegisterEntriesScreen = () => {
     );
   }
 
-  const columns = register.fields.filter((f) => f.type !== 'section');
+  const fieldMap = new Map(register.fields.filter((field) => field.type !== 'section').map((field) => [field.id, field]));
+  for (const row of register.rows) for (const field of row.fields) if (field.type !== 'section' && !fieldMap.has(field.id)) fieldMap.set(field.id, field);
+  const columns = [...fieldMap.values()];
+  const shown = register.rows.filter((row) => (!from || row.entryDate >= from) && (!to || row.entryDate <= to) && (row.by + ' ' + Object.values(row.values).map(fmtCell).join(' ')).toLowerCase().includes(search.toLowerCase()));
+  const exportEntries = () => downloadCsv('register-' + register.id.replace(/[^a-z0-9-]/gi, '-') + '.csv', [['Entry ID', 'Entry date', 'Version', 'Recorded by', 'Field', 'Value'], ...shown.flatMap((row) => row.fields.filter((field) => field.type !== 'section').map((field) => [row.id, row.entryDate, row.registerVersion, row.by, field.label, fmtCell(row.values[field.id])]))]);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -118,31 +137,19 @@ export const RegisterEntriesScreen = () => {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-[14px] border border-outline-soft bg-white px-4 py-3.5">
-            <div className="text-[12px] font-semibold text-ink-muted">Entries</div>
-            <div className="mt-2 text-[26px] font-extrabold tracking-[-0.02em]">{register.rows.length}</div>
-          </div>
-          <div className="rounded-[14px] border border-outline-soft bg-white px-4 py-3.5">
-            <div className="text-[12px] font-semibold text-ink-muted">Fields</div>
-            <div className="mt-2 text-[26px] font-extrabold tracking-[-0.02em]">{columns.length}</div>
-          </div>
-          <div className="rounded-[14px] border border-outline-soft bg-white px-4 py-3.5">
-            <div className="text-[12px] font-semibold text-ink-muted">Status</div>
-            <div className="mt-2 text-[20px] font-extrabold tracking-[-0.02em]">{register.status === 'published' ? 'Published' : 'Draft'}</div>
-          </div>
-        </div>
-
+        <div className="mt-5 grid gap-3 sm:grid-cols-3"><TextField label="Search entries" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /><TextField label="Entries from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /><TextField label="Entries to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></div>
+        {from && to && from > to ? <p role="alert" className="mt-2 text-sm text-danger">The end date must be on or after the start date.</p> : null}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-ink-muted">{shown.length} of {register.rows.length} entries · current version {register.version}</p><Button variant="outlined" fullWidth={false} disabled={!shown.length} onClick={exportEntries}>Export shown entries</Button></div>
         {register.rows.length > 0 ? (
           <>
+            {!shown.length ? <p className="mt-4 text-sm text-ink-muted">No entries match these filters.</p> : null}
             <div className="mt-5 space-y-2 lg:hidden">
-              {register.rows.map((row, index) => <details key={row.id} className="rounded-card border border-outline-soft bg-white p-4">
+              {shown.map((row, index) => <details key={row.id} className="rounded-card border border-outline-soft bg-white p-4">
                 <summary className="cursor-pointer text-[14px] font-semibold text-ink">
                   Entry {register.rows.length - index} · {row.when}
-                  <span className="mt-1 block text-[13px] font-normal text-ink-muted">{columns.slice(0, 2).map((field) => `${field.label}: ${fmtCell(row.values[field.id])}`).join(' · ')}</span>
+                  <span className="mt-1 block text-[13px] font-normal text-ink-muted">{row.fields.filter((field) => field.type !== 'section').slice(0, 2).map((field) => `${field.label}: ${fmtCell(row.values[field.id])}`).join(' · ')}</span>
                 </summary>
-                <dl className="mt-4 space-y-3">{columns.map((field) => <div key={field.id}><dt className="text-[12px] font-semibold text-ink-muted">{field.label || 'Field'}</dt><dd className="mt-1 break-words text-sm">{fmtCell(row.values[field.id])}</dd></div>)}</dl>
+                <dl className="mt-4 space-y-3">{row.fields.filter((field) => field.type !== 'section').map((field) => <div key={field.id}><dt className="text-[12px] font-semibold text-ink-muted">{field.label || 'Field'}</dt><dd className="mt-1 break-words text-sm">{fmtCell(row.values[field.id])}</dd></div>)}</dl>
                 <p className="mt-4 border-t border-outline-soft pt-3 text-xs text-ink-muted">Recorded by {row.by} · {row.when}</p>
               </details>)}
             </div>
@@ -160,16 +167,16 @@ export const RegisterEntriesScreen = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {register.rows.map((row, i) => (
+                    {shown.map((row, i) => (
                       <tr key={row.id} className="border-t border-outline-soft align-top">
                         <td className="whitespace-nowrap px-3.5 py-3 font-mono text-xs text-ink-muted">
                           {String(register.rows.length - i).padStart(3, '0')}
                         </td>
                         {columns.map((c) => (
-                          <td key={c.id} className="whitespace-nowrap px-3.5 py-3 text-ink">{fmtCell(row.values[c.id])}</td>
+                          <td key={c.id} className="whitespace-nowrap px-3.5 py-3 text-ink">{row.registerVersion !== register.version ? <span className="mb-1 block text-xs text-ink-muted">{row.fields.find((field) => field.id === c.id)?.label ?? 'Not in this version'}</span> : null}{fmtCell(row.values[c.id])}</td>
                         ))}
                         <td className="whitespace-nowrap px-3.5 py-3">
-                          <div className="text-[13px] font-semibold text-ink-soft">{row.by}</div>
+                          <div className="text-[13px] font-semibold text-ink-soft">{row.by}</div><p className="text-xs text-ink-muted">Version {row.registerVersion}</p>
                           <div className="mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] text-ink-muted">
                             <Icon name="lock" className="h-3 w-3" /> {row.when}
                           </div>

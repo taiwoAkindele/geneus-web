@@ -1,8 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Unit } from '@shared';
 import { AppBar, Button, Tag, TextField, useToast } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { createUnit, setUnitActive } from '@/data/repos/units';
 import { useUnits } from '@/features/units';
 import { useAuthorizationContext } from '@/session';
@@ -16,6 +15,7 @@ const SUGGESTED = ['Registration', 'Consultation', 'Injection Room', 'Laboratory
  * deleted — past handoffs still name it.
  */
 export const UnitsScreen = () => {
+  useEffect(() => { document.title = 'Units & rooms · Geneus Health'; }, []);
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();
@@ -54,8 +54,9 @@ export const UnitsScreen = () => {
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Units & rooms" onBack={() => navigate('/admin')} right={<SyncPill />} />
+      <AppBar title="Units & rooms" onBack={() => navigate('/admin')} />
       <div className="mx-auto w-full max-w-md px-5 pb-24 pt-2 md:max-w-lg">
+        <h1 className="mb-3 text-2xl font-extrabold">Units &amp; rooms</h1>
         <p className="text-[13px] leading-relaxed text-ink-muted">
           Add the rooms this facility uses. Patients are sent between them with an instruction that travels along.
         </p>

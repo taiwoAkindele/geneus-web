@@ -303,7 +303,7 @@ their section-card design; structured desktop worklists use tables.
   referral and monthly-report routes show a clear unavailable message, never sample
   operational data. The cashier workspace explains that booking/payment integration is
   still pending.
-- Desktop patients use a sortable table and adjacent record preview. Appointments,
+- Patients use a sortable table that opens a full patient chart on desktop and phone. Appointments,
   encounters, unit queues, staff and fees use tables; register entries retain a desktop
   table and gain expandable phone summaries. Table pages render at most 25 rows.
 - Actions follow the shared permission names. Clinical steps are view-only for staff
@@ -463,3 +463,74 @@ every 30 seconds. Database refreshes then mistook fresh activity for clock rollb
 and cleared login. SessionProvider now uses Date.now() for session validity while
 retaining the coarse display tick. Link confirmation and review requests retain
 login; genuine 30-minute inactivity still expires and reload cannot revive it.
+
+## Patient chart redesign implementation (26 October 2026)
+
+Patient selection now opens a full chart on desktop and phone. Overview is a
+longitudinal medical chart; Visits is one searchable/filterable/paginated table;
+Clinical record maintains ongoing care with explicit review/sign and version
+history; Appointments connects bookings with their actual visits; Personal details
+separates readable demographics from authorized edits. Tabs and selected visits
+use URL parameters, retaining patient context and visit-list filters on return.
+Facility visits and station filters share the same visit table.
+
+View visit is a distinct signed-record reader with section navigation, print
+preview, activity history and entry-targeted amendments/corrections. Originals
+remain immutable. Continue visit focuses one current task, advances after signing,
+and keeps skipped tasks/unfinished input in the author's private device draft.
+No-test skipping advances past both lab tasks. Draft navigation follows a new
+visit's first signature to its saved ID and is cleared at closure; it never syncs
+as a clinical finding. Existing repositories remain the only mutation paths.
+Demographic edits preserve concurrent untouched fields and refuse same-field
+conflicts. Linked-record source IDs and existing permissions remain enforced.
+
+Validation: 223 tests across 26 files, typecheck, production build and bundle-size
+check pass. Initial JS is 121.1 KiB gzipped against the 300 KiB budget. All 22
+connected patient-flow browser checks, 13 clinical workflows and six field-help
+checks pass without browser exceptions. Desktop (1487 × 1058) and 390px/320px
+phone captures are compared with the selected design references in design-qa.md.
+The local review preview uses synthetic in-memory records and resets on reload.
+Live API acceptance, physical printing, assistive-technology assessment and
+low-memory Android field proof remain separate checks. No server/shared contracts,
+production records, migrations or deployments changed for this redesign.
+
+## Combined dashboard and operational delivery (26 October 2026)
+
+Home now combines permitted duties with actual visit, booking, unit, money,
+facility and stock work. Primary phone shortcuts follow the primary duty and
+survive added administrator access; More contains the combined destinations.
+One shared header exposes facility identity, sync and notifications on phones too.
+
+Collections leads billing, with payment review, protected unfinished inputs,
+receipt completion and allocation-based report filters. Appointments has facility
+booking/search/details. Daily registers have persistent validation, review/sign,
+saved-version rendering, readable authors, period search and CSV export. Staff
+uses one directory and a dated roster; settings and synced device management are
+connected. Sync review separates local/queued/refused states and explains decisions.
+
+Stock and monthly reports now use real local records. Inventory derives opening
+quantities plus immutable movements; reports summarize recorded visits, corrected
+diagnosis labels, registers, commodities and trends. These are operational first
+deliveries: automatic prescription-to-stock linkage, practitioner/resource scheduling and
+capacity, programme indicator mapping and later hospital modules remain work.
+
+The matching backend validates versioned register fields and inventory movements,
+protects opening quantities, and serializes forward-only handoff progression.
+Appointment attendance now adds optional attendance/activity fields, policy version 9
+and migration 0014. Arrival, rescheduling, cancellation, no-show and reopening use
+attributed history and deliberate review. Booking changes preserve fees. Shared
+source changes are copied to consumer working trees for validation; commit/pin
+promotion remains the owner's release step.
+See ../docs/OVERALL-REDESIGN-IMPLEMENTATION-2026-10-26.md for scope and release notes.
+
+Validation: 241 frontend tests, both consumer typechecks, production build and the
+300 KB initial-JS budget pass (approximately 123.7 KB gzipped). The server/shared
+suite passes 336 tests; final operational PostgreSQL checks pass all eight cases.
+35 connected browser assertions and all 22 patient-flow regressions pass without
+uncaught browser exceptions. Captures cover desktop, 390px and selected 320px states.
+Live provider/device operations and physical-device acceptance remain separate.
+
+Appointment acceptance adds 14 connected browser assertions, including the nested
+review discard guard, 390px and 320px layouts. Optional attendance/date filters
+collapse so search and bookings remain accessible on small phones. Existing
+patient-flow regressions remain required for shared Sheet changes.

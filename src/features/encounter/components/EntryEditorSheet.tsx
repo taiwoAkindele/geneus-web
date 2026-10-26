@@ -10,6 +10,7 @@ import { STEP_DEFS } from '../steps';
 import type { EncounterData, StepKey } from '../types';
 import { StepForm, type StepFormController } from './StepForm';
 import { summarize } from '../useEncounter';
+import { entryRows } from '../visitContent';
 
 type Props = { patientId: string; encounterId: string; step: StepKey; entries: EncounterEntry[]; target?: EncounterEntry; onClose: () => void };
 export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target, onClose }: Props) => {
@@ -26,6 +27,7 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     return corrections.find((entry) => !replaced.has(entry.id))?.id ?? null;
   });
   const [note, setNote] = useState('');
+  const initialValues = useRef(JSON.stringify(data));
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -57,7 +59,7 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the entry'); }
     finally { busy.current = false; setSaving(false); }
   };
-  return <Sheet title={`${target ? 'Correct' : 'Record another'} ${STEP_DEFS[step].short.toLowerCase()}`} onClose={onClose} closeDisabled={saving}>
+  return <Sheet title={`${target ? 'Correct' : 'Record another'} ${STEP_DEFS[step].short.toLowerCase()}`} onClose={onClose} closeDisabled={saving} placement="side" hasUnsavedChanges={Boolean(note) || JSON.stringify(data) !== initialValues.current}>
     <p className="mb-4 text-sm text-ink-muted">{target ? 'This adds a signed correction. The original entry remains available below.' : 'Record a new observation or progress note at this time.'}</p>
     <fieldset disabled={saving}>
       {reviewing ? <dl className="space-y-2 text-sm">{summarize(data, step).map((row) => <div key={row.label}><dt className="font-bold">{row.label}</dt><dd className="whitespace-pre-wrap">{row.value}</dd></div>)}{target ? <p className="mt-2">Reason: {note}</p> : null}</dl> : <>
@@ -66,7 +68,7 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
           help={ENCOUNTER_FIELD_HELP.correction} value={note} onChange={(event) => setNote(event.target.value)} /></div> : null}
       </>}
     </fieldset>
-    {target ? <details className="mt-4 text-sm"><summary>Original recorded values</summary><dl>{Object.entries(target.values).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl></details> : null}
+    {target ? <details className="mt-4 text-sm"><summary>Original recorded values</summary><dl>{entryRows(target).map((row) => <div key={row.label} className="mt-2"><dt className="font-semibold">{row.label}</dt><dd className="whitespace-pre-wrap break-words">{row.value}</dd></div>)}</dl></details> : null}
     {error ? <p role="alert" className="my-3 text-sm text-danger">{error}</p> : null}
     <div className="mt-4 space-y-2"><Button disabled={saving} loading={saving} onClick={reviewing ? save : review}>{reviewing ? 'Confirm & save permanently' : 'Review entry'}</Button>{reviewing ? <Button variant="outlined" disabled={saving} onClick={() => setReviewing(false)}>Keep editing</Button> : null}</div>
   </Sheet>;

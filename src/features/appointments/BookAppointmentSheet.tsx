@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, SegmentedControl, SelectField, Sheet, TextField, useToast } from '@/ui';
+import { Button, SegmentedControl, SelectField, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
 import { VisitType } from '@shared';
 import { VISIT_TYPE_LABELS } from '@/features/billing/feeForm';
 import { useAppointments } from './AppointmentsProvider';
@@ -22,29 +22,31 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const [reason, setReason] = useState('Consultation');
   const [visitType, setVisitType] = useState<VisitType>('general');
   const [booking, setBooking] = useState(false);
+  const [error, setError] = useState('');
 
   const canBook = mode === 'now' || Boolean(date && time);
 
   const submit = async () => {
     if (!canBook || booking) return;
-    setBooking(true);
-    const scheduledFor = mode === 'scheduled' ? new Date(`${date}T${time}`).toISOString() : undefined;
+    setBooking(true); setError('');
     try {
+      const scheduledFor = mode === 'scheduled' ? new Date(`${date}T${time}`).toISOString() : undefined;
       await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType });
       toast(
         scheduledFor
-          ? `Appointment booked for ${fmtDay(date)} — added to the encounters list`
-          : 'Appointment booked for now — added to today’s encounters list',
+          ? `Appointment saved on this device for ${fmtDay(date)}`
+          : 'Appointment saved on this device for now',
       );
       onClose();
-    } catch {
-      toast('Could not save the appointment — please try again');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save the appointment — your entries are still here.');
       setBooking(false);
     }
   };
 
   return (
-    <Sheet onClose={onClose} eyebrow="Book an appointment" title={patient.name}>
+    <Sheet onClose={onClose} eyebrow="Book an appointment" title={patient.name} placement="side" closeDisabled={booking} hasUnsavedChanges={mode !== 'now' || Boolean(date || time) || reason !== 'Consultation' || visitType !== 'general'}>
+      <p className="mb-4 break-all font-mono text-sm text-ink-soft">{patient.id}</p>
       <SegmentedControl
         ariaLabel="When"
         value={mode}
@@ -56,17 +58,17 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
       />
 
       {mode === 'scheduled' ? (
-        <div className="mt-4 flex gap-3">
-          <div className="flex-1">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
             <TextField label="Date" name="appt_date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
-          <div className="w-32">
+          <div className="min-w-0">
             <TextField label="Time" name="appt_time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
         </div>
       ) : (
         <p className="mt-4 rounded-card bg-brand-tint p-3.5 text-[13px] leading-relaxed text-brand">
-          The patient joins today’s encounters list as <b>pending</b>, ready to be seen now.
+          The booking is due today, ready for care. The visit begins when its first clinical entry is signed.
         </p>
       )}
 
@@ -76,9 +78,12 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
       </div>
 
       <div className="mt-5">
+        {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         <Button variant="primary" disabled={!canBook || booking} loading={booking} onClick={submit}>
-          Book appointment
+          Save appointment
         </Button>
+        <div className="mt-3"><SheetCancelButton disabled={booking} /></div>
+        <p className="mt-3 text-sm text-ink-soft">A booking schedules care. It does not create a signed visit. Saved bookings sync when connected.</p>
       </div>
     </Sheet>
   );

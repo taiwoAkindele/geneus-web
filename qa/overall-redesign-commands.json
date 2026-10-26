@@ -1,0 +1,307 @@
+[
+  {
+    "role": "doctor",
+    "width": 1440,
+    "combined": true,
+    "path": "/home",
+    "name": "01-combined-desktop",
+    "description": "Combined duties show care, money and management",
+    "assert": "document.title === \"Home · Geneus Health\" && [\"Visits in progress\", \"Billing & collections\", \"Facility management\"].every(t=>document.body.innerText.includes(t)) && document.querySelectorAll(\"main\").length === 1"
+  },
+  {
+    "role": "doctor",
+    "width": 390,
+    "combined": true,
+    "path": "/home",
+    "name": "02-combined-phone",
+    "description": "Phone preserves visits and presents work before metrics",
+    "assert": "document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('nav')].find(n=>n.getClientRects().length && n.getAttribute('aria-label') === 'Main navigation').innerText.includes('Visits') && document.querySelector('section[aria-label=\"Work summary\"]').getBoundingClientRect().top > document.querySelector('section[aria-labelledby]').getBoundingClientRect().top"
+  },
+  {
+    "label": "More navigation",
+    "name": "03-more-phone",
+    "description": "More contains the union of permitted duties",
+    "assert": "Boolean(document.querySelector(\"dialog[open]\")) && [\"Unit queue\", \"Billing\", \"Staff & roster\", \"Settings\", \"Monthly reports\", \"Medicine & stock\"].every(t=>document.querySelector(\"dialog[open]\").innerText.includes(t))"
+  },
+  {
+    "key": "Escape",
+    "code": 27,
+    "description": "More dismisses with Escape and restores focus",
+    "assert": "!document.querySelector(\"dialog[open]\") && document.activeElement.getAttribute(\"aria-label\") === \"More navigation\""
+  },
+  {
+    "role": "doctor",
+    "width": 320,
+    "combined": true,
+    "readonly": true,
+    "reload": true,
+    "path": "/home",
+    "name": "04-readonly-small-phone",
+    "description": "Read-only duties preserve reading without record actions",
+    "assert": "document.documentElement.scrollWidth <= innerWidth && ![...document.querySelectorAll(\"a,button\")].some(n=>n.getClientRects().length && /^(Continue visit|Register patient)$/.test(n.textContent.trim()))"
+  },
+  {
+    "role": "cashier",
+    "width": 1440,
+    "reload": true,
+    "path": "/home",
+    "name": "05-cashier-home",
+    "description": "Cashier sees collection work without clinical worklists",
+    "assert": "document.body.innerText.includes(\"Billing & collections\") && !document.body.innerText.includes(\"Visits in progress\")"
+  },
+  {
+    "path": "/billing?tab=collections&patient=QA-PHC-000001-K2",
+    "description": "Billing account opens from dashboard route",
+    "assert": "Boolean(document.querySelector(\"dialog[open]\"))"
+  },
+  {
+    "click": "Review payment",
+    "description": "Empty payment is blocked without posting",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Enter an amount\") && window.designAudit.rows.payments.length === 1"
+  },
+  {
+    "fill": {
+      "label": "Cash received",
+      "value": "1000"
+    },
+    "key": "Escape",
+    "code": 27,
+    "name": "06-payment-discard-guard",
+    "description": "Escape protects unfinished payment amounts",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Discard unsaved changes?') && document.querySelector('input[name=\"amount-charge:0\"]').value === '1000'"
+  },
+  {
+    "click": "Keep editing"
+  },
+  {
+    "click": "Review payment",
+    "name": "07-payment-review",
+    "description": "Payment review shows amount before writing",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Review payment\") && document.querySelector(\"dialog[open]\").innerText.includes(\"1,000.00\") && window.designAudit.rows.payments.length === 1"
+  },
+  {
+    "click": "Confirm & record cash",
+    "name": "08-payment-receipt",
+    "description": "Payment posts once and opens a receipt",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Payment receipt\") && window.designAudit.rows.payments.length === 2"
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "path": "/billing?tab=reports",
+    "fill": {
+      "label": "Search",
+      "value": "no-matching-patient"
+    },
+    "name": "09-filtered-reports",
+    "description": "Reports apply the visible patient search",
+    "assert": "document.body.innerText.includes(\"No collections match these filters.\") && !document.querySelector(\"select\").parentElement.parentElement.innerText.includes(\"Fee entries\")"
+  },
+  {
+    "role": "records_officer",
+    "width": 390,
+    "reload": true,
+    "path": "/home",
+    "name": "10-reception-home",
+    "description": "Reception receives booking work and registration action",
+    "assert": "document.body.innerText.includes(\"Today's appointments\") && document.body.innerText.includes(\"Register patient\")"
+  },
+  {
+    "path": "/appointments?group=overdue",
+    "name": "11-booking-drilldown",
+    "description": "Dashboard booking group opens the correct list",
+    "assert": "new URLSearchParams(window.designAudit.search).get(\"group\") === \"overdue\" && document.body.innerText.includes(\"Overdue\")"
+  },
+  {
+    "path": "/registers/register:malaria",
+    "click": "＋ Add entry",
+    "description": "Register entry opens"
+  },
+  {
+    "click": "Review entry",
+    "name": "12-register-validation",
+    "description": "Register validation stays inside the dialog with no success toast",
+    "assert": "document.querySelector(\"dialog[open] [role=alert]\").innerText.includes(\"Check this entry\") && !document.querySelector(\"[role=status]\")?.innerText.includes(\"is required\")"
+  },
+  {
+    "fill": {
+      "label": "Patient name",
+      "value": "Synthetic Patient"
+    }
+  },
+  {
+    "click": "Negative"
+  },
+  {
+    "click": "Review entry",
+    "name": "13-register-review",
+    "description": "Register has explicit review before permanent entry",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Sign & save entry\")"
+  },
+  {
+    "click": "Sign & save entry",
+    "description": "Register entry is saved with attribution",
+    "assert": "!document.querySelector(\"dialog[open]\") && window.designAudit.rows.register_entries.length === 2"
+  },
+  {
+    "role": "doctor",
+    "width": 320,
+    "reload": true,
+    "path": "/sync",
+    "name": "14-never-synced",
+    "description": "Sync makes no loss or acceptance claims",
+    "assert": "!document.body.innerText.includes('Nothing needs a decision') && !document.body.innerText.includes('Lost') && document.body.innerText.includes('Never synced') && document.body.innerText.includes('does not confirm')"
+  },
+  {
+    "evaluate": "window.overallAuditAddRejection()",
+    "name": "15-sync-review",
+    "description": "Refused records remain visible independently of queue count",
+    "assert": "document.body.innerText.includes(\"Records need review\") && document.body.innerText.includes(\"Needs a decision\")"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/stock",
+    "name": "16-stock-live",
+    "description": "Stock uses stored opening balances and movements",
+    "assert": "document.body.innerText.includes(\"Gloves\") && document.body.innerText.includes(\"2 boxes\")"
+  },
+  {
+    "path": "/stock?item=stock%3Agloves",
+    "click": "Record movement"
+  },
+  {
+    "fill": {
+      "label": "Quantity moved",
+      "value": "5"
+    }
+  },
+  {
+    "click": "Review stock entry",
+    "name": "17-stock-review",
+    "description": "Stock review precedes append-only movement",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Recorded balance after this movement: 7\")"
+  },
+  {
+    "click": "Confirm & save stock entry",
+    "name": "18-stock-saved",
+    "description": "Stock movement is persisted and reflected in balance",
+    "assert": "window.designAudit.rows.stock_movements.length === 2 && document.body.innerText.includes(\"7 boxes\")"
+  },
+  {
+    "path": "/reports/month",
+    "name": "19-monthly-live",
+    "description": "Monthly report uses real stored data and states completeness limits",
+    "assert": "document.body.innerText.includes(\"Gloves\") && document.body.innerText.includes(\"Recorded diagnoses\") && !document.body.innerText.includes(\"Monthly reporting is not available\")"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/reports/month",
+    "name": "20-monthly-small-phone",
+    "description": "Monthly reporting fits the phone",
+    "assert": "document.documentElement.scrollWidth <= innerWidth"
+  },
+  {
+    "role": "records_officer",
+    "width": 1440,
+    "reload": true,
+    "path": "/appointments",
+    "click": "Book appointment",
+    "name": "21-facility-booking",
+    "description": "Reception can book directly from the facility schedule",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Choose patient for booking\")"
+  },
+  {
+    "fill": {
+      "label": "Patient name or ID",
+      "value": "Amaka"
+    }
+  },
+  {
+    "click": "Amaka OkoroQA-PHC-000001-K2",
+    "description": "Booking retains the selected patient"
+  },
+  {
+    "click": "Save appointment",
+    "name": "22-booking-saved",
+    "description": "Facility booking saves through the existing repository",
+    "assert": "window.designAudit.rows.appointments.length === 4 && !document.querySelector(\"dialog[open]\")"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/admin",
+    "name": "23-settings",
+    "description": "Settings replaces the permanent onboarding checklist",
+    "assert": "document.querySelector(\"h1\").innerText === \"Settings\" && !document.body.innerText.includes(\"Setup checklist\")"
+  },
+  {
+    "path": "/admin/staff",
+    "fill": {
+      "label": "Find staff by name or role",
+      "value": "Ngozi"
+    },
+    "name": "24-staff-directory",
+    "description": "One staff directory applies name search",
+    "assert": "document.body.innerText.includes(\"Ngozi Bello\") && !document.querySelector(\"table tbody\").innerText.includes(\"Nurse Grace Musa\")"
+  },
+  {
+    "path": "/admin/staff?view=roster",
+    "name": "25-roster",
+    "description": "Roster is a separate dated view",
+    "assert": "document.body.innerText.includes(\"Shifts starting on\") && document.body.innerText.includes(\"not attendance\")"
+  },
+  {
+    "path": "/admin/staff/access?staff=qa-doctor",
+    "name": "26-staff-url",
+    "description": "Staff details can be opened from a stable URL",
+    "assert": "window.designAudit.path === '/admin/staff/access' && document.querySelector('input[name=\"staff_name\"]').value === 'Dr Ada Obi'"
+  },
+  {
+    "path": "/admin/devices",
+    "name": "27-devices",
+    "description": "Device management uses synced device records",
+    "assert": "document.body.innerText.includes(\"Synthetic facility tablet\") && document.body.innerText.includes(\"Last server contact\")"
+  },
+  {
+    "click": "Revoke access",
+    "name": "28-revoke-review",
+    "description": "Device revocation requires a deliberate connected confirmation",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Connect before revoking access.\") && [...document.querySelectorAll(\"dialog[open] button\")].find(n=>n.textContent.trim()===\"Confirm revocation\").disabled"
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "path": "/billing/settings",
+    "name": "29-provider-failure",
+    "description": "Provider failure ends the loading state next to its setup step",
+    "assert": "document.body.innerText.includes(\"Connection unavailable\") && !document.body.innerText.includes(\"Reading connection\") && document.querySelectorAll(\"main\").length === 1"
+  },
+  {
+    "role": "doctor",
+    "width": 390,
+    "reload": true,
+    "path": "/units",
+    "click": "Complete handoff",
+    "name": "30-handoff-review",
+    "description": "Handoff completion explains its limited consequence",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Record any clinical result or medication separately\")"
+  },
+  {
+    "click": "Confirm completed handoff",
+    "name": "31-handoff-complete",
+    "description": "Completed handoff leaves the unit queue",
+    "assert": "window.designAudit.rows.handoffs[0].status === \"done\" && !document.querySelector(\"dialog[open]\")"
+  },
+  {
+    "finish": true
+  }
+]

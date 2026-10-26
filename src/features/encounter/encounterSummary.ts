@@ -1,6 +1,6 @@
 import { effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type Encounter, type EncounterEntry } from '@shared';
-import { encounterLabel, stamp } from './encounterRecord';
-import { STEP_DEFS } from './steps';
+import { encounterLabel, stamp, projectEncounter, EMPTY_ENCOUNTER_DATA } from './encounterRecord';
+import { STEP_DEFS, stepsFor } from './steps';
 
 export type EncounterStatus = 'Open' | 'Closed' | 'Admitted';
 
@@ -15,6 +15,8 @@ export type EncounterSummary = {
   openedOn: string;
   when: string;
   chips: string[];
+  nextAction: string;
+  hasSignedEntries: boolean;
 };
 
 const firstOf = (entries: readonly EncounterEntry[], step: EncounterEntry['step']) =>
@@ -41,14 +43,18 @@ export const summariseEncounter = (encounter: Encounter, entries: readonly Encou
   if (followUp && ENCOUNTER_STEP_VALUES.follow_up.parse(followUp.values).followUpOn) chips.push('Follow-up');
 
   const diagnosis = firstOf(steps, 'diagnosis');
+  const complaint = firstOf(steps, 'complaint');
   const last = steps[steps.length - 1];
   const title = diagnosis
     ? ENCOUNTER_STEP_VALUES.diagnosis.parse(diagnosis.values).diagnosis
+    : complaint ? ENCOUNTER_STEP_VALUES.complaint.parse(complaint.values).complaints.join(', ') || 'Consultation note'
     : last && last.step !== 'amendment'
       ? `${STEP_DEFS[last.step].short} saved`
       : 'Opened';
 
   const opened = stamp(encounter.openedOn);
+  const projected = projectEncounter({ patientId: encounter.patientId, encounter, entries, draft: EMPTY_ENCOUNTER_DATA, skippedNow: [], staffNames: new Map() });
+  const next = stepsFor(projected.data)[projected.activeIndex];
   return {
     id: encounter.id,
     label: encounterLabel(encounter.id),
@@ -58,5 +64,7 @@ export const summariseEncounter = (encounter: Encounter, entries: readonly Encou
     openedOn: encounter.openedOn,
     when: status === 'Open' ? `Started ${opened.time}` : opened.date,
     chips,
+    hasSignedEntries: steps.length > 0,
+    nextAction: status !== 'Open' ? 'View signed record' : order && !firstOf(steps, 'lab_results') && !diagnosis ? 'Awaiting results' : next?.key === 'complaint' ? 'Consultation' : next?.short ?? 'Review visit',
   };
 };

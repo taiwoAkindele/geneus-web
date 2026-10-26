@@ -11,6 +11,7 @@ import { patientIdentityIds } from './patientIdentity';
  */
 
 export const listEncounters = () => allOfType<Encounter>('encounter');
+export const listEncounterEntries = () => allOfType<EncounterEntry>('encounter_entry');
 
 export const encountersForPatient = (patientId: string) => allWhere<Encounter>('encounter', 'patientId', patientId);
 
@@ -59,6 +60,11 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     const [chargeGroups, paymentGroups, adjustmentGroups, appointments] = await Promise.all([Promise.all(ids.map(chargesForPatient)), Promise.all(ids.map(paymentsForPatient)), Promise.all(ids.map(adjustmentsForPatient)), listAppointments()]);
     const charges = chargeGroups.flat(), payments = paymentGroups.flat(), adjustments = adjustmentGroups.flat();
     const appointment = appointments.find((a) => a.id === save.appointmentId);
+    if (save.appointmentId) {
+      if (!appointment || appointment.patientId !== save.patientId) throw new Error('This booking is not available for this patient');
+      if (appointment.attendance === 'cancelled' || appointment.attendance === 'no_show') throw new Error('Reopen this inactive booking before starting care');
+      if ((await listEncounters()).some((encounter) => encounter.appointmentId === appointment.id)) throw new Error('This booking already has a visit. Continue or review that visit');
+    }
     const unpaid = save.appointmentId ? !isAppointmentConfirmed(save.appointmentId, charges, payments, adjustments, appointment?.chargeIds) : false;
     if (unpaid && !save.collectLaterReason?.trim()) throw new Error('Give a See now — collect later reason to continue care');
     records.push({

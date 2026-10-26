@@ -33,14 +33,16 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
       <TextAreaField label="Clinical note" name="complaint_note" help={H.clinicalNote}
         value={d.complaint.note} placeholder={`Example: ${H.clinicalNote.example}`}
         onChange={(event) => setField('complaint', 'note', event.target.value)} />
-      {([
+      <details open={Boolean(d.complaint.historyOfPresentIllness || d.complaint.examination || d.complaint.assessment || d.complaint.plan)} className="rounded-field border border-outline-soft p-3">
+      <summary className="cursor-pointer text-sm font-bold text-brand">Use structured history, examination, assessment and plan</summary>
+      <div className="mt-4 space-y-4">{([
         { key: 'historyOfPresentIllness', label: 'History of presenting illness', help: H.presentingIllness },
         { key: 'examination', label: 'Examination', help: H.examination },
         { key: 'assessment', label: 'Assessment', help: H.assessment },
         { key: 'plan', label: 'Clinical plan / advice', help: H.plan },
       ] as const).map(({ key, label, help }) => <TextAreaField key={key} label={label} name={`complaint_${key}`}
         help={help} value={d.complaint[key] ?? ''} placeholder={`Example: ${help.example}`}
-        onChange={(event) => setField('complaint', key, event.target.value)} />)}
+        onChange={(event) => setField('complaint', key, event.target.value)} />)}</div></details>
     </div>;
   }
 

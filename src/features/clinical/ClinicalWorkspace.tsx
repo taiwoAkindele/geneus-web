@@ -39,7 +39,7 @@ export const ClinicalWorkspace = ({ patientId, encounterId }: { patientId: strin
       <p><b>Active problems:</b> {problems.filter((event) => event.values.status === 'active').map(clinicalTitle).join(', ') || 'None recorded'}</p>
       <p className="mt-2"><b>Current medications:</b> {medications.map((event) => [event.values.drug, event.values.dose, event.values.frequency].join(' · ')).join('; ') || 'None reconciled'}</p>
       <p className={allergies.length ? 'mt-2 font-bold text-danger' : 'mt-2'}>
-        <b>Structured allergies:</b> {allergies.map((allergy) => allergy.allergen + ' (' + [allergy.reaction, allergy.severity, allergy.verification].join('; ') + ')').join('; ') || 'None recorded — allergy status still needs clinical review'}
+        <b>Recorded allergies:</b> {allergies.map((allergy) => allergy.allergen + ' (' + [allergy.reaction, allergy.severity, allergy.verification].join('; ') + ')').join('; ') || 'None recorded — allergy status still needs clinical review'}
       </p>
       {plans.map((plan) => <div key={plan.id} className="mt-2">
         <b>{clinicalTitle(plan)}:</b> {String(plan.values.goal ?? plan.values.plan)}
@@ -51,7 +51,7 @@ export const ClinicalWorkspace = ({ patientId, encounterId }: { patientId: strin
       const records = current.filter((event) => event.kind === kind);
       const addLabel = { problem: 'problem', history: 'history / examination', medication: 'medication', allergy: 'allergy', care_plan: 'care plan', specialty: 'specialty assessment' }[kind];
       return <details key={kind} open={kind === 'problem'} className="rounded-card border border-outline-soft bg-white p-4">
-        <summary className="cursor-pointer font-bold">{CLINICAL_LABELS[kind]} · {records.length}</summary>
+        <summary className="cursor-pointer font-bold">{CLINICAL_LABELS[kind]} · {records.length + (kind === 'allergy' ? legacyAllergies.length : 0)}</summary>
         <div className="mt-3 space-y-3">
           {kind === 'allergy' ? legacyAllergies.map((allergy) => <div key={`${allergy.patientId}-${allergy.allergen}`} className="rounded-field border border-amber-border p-3 text-sm">
             <b>{allergy.allergen}</b> · Legacy allergy entry; reaction and severity need review.

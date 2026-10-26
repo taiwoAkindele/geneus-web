@@ -4,8 +4,11 @@ import { calendarDate } from '@/lib/calendarDate';
 import type { AppointmentGroup, BookedAppointment } from './types';
 
 export const APPOINTMENT_GROUP_LABELS: Record<AppointmentGroup, string> = {
-  today: 'Today', overdue: 'Overdue', upcoming: 'Upcoming', completed: 'Completed',
+  today: 'Today', overdue: 'Overdue', upcoming: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No-show',
 };
+
+export const bookingIsInactive = (booking: Pick<BookedAppointment, 'attendance'>) => booking.attendance === 'cancelled' || booking.attendance === 'no_show';
+export const bookingAttendanceLabel = (booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>) => booking.group === 'completed' ? 'Visit completed' : booking.encounterId ? 'Visit in progress' : ({ booked: 'Not arrived', arrived: 'Arrived', cancelled: 'Cancelled', no_show: 'No-show' }[booking.attendance ?? 'booked']);
 
 export const projectAppointments = (
   appointments: readonly Appointment[], patients: readonly Patient[],
@@ -28,7 +31,7 @@ export const projectAppointments = (
     const at = appointment.scheduledFor ?? appointment.createdOn;
     const day = calendarDate(at);
     const encounter = byAppointment.get(appointment.id);
-    const group: AppointmentGroup = encounter && closedIds.has(encounter.id) ? 'completed' : day < today ? 'overdue' : day > today ? 'upcoming' : 'today';
+    const group: AppointmentGroup = encounter && closedIds.has(encounter.id) ? 'completed' : appointment.attendance === 'cancelled' ? 'cancelled' : appointment.attendance === 'no_show' ? 'no_show' : day < today ? 'overdue' : day > today ? 'upcoming' : 'today';
     return {
       id: appointment.id,
       patient: {
@@ -40,6 +43,7 @@ export const projectAppointments = (
       day: day === today ? 'Today' : new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       when: new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       at, group, encounterId: encounter?.id, status: appointment.status,
+      attendance: appointment.attendance, activity: appointment.activity, scheduledFor: appointment.scheduledFor,
       paymentStatus: isAppointmentConfirmed(appointment.id, charges, payments, adjustments, appointment.chargeIds) ? 'Confirmed' : 'Awaiting payment',
     };
   }).sort((a, b) => a.at.localeCompare(b.at));

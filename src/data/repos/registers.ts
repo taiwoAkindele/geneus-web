@@ -6,7 +6,8 @@ import {
   type RegisterEntryValue,
   type RegisterFieldDef,
 } from '@shared';
-import { allOfType, envelope, insertRecord, newId, todayIso } from '../db';
+import { allOfType, envelope, insertRecord, newId } from '../db';
+import { calendarDate } from '@/lib/calendarDate';
 
 export type RegisterDraft = {
   name: string;
@@ -79,6 +80,8 @@ export const addEntry = async (draft: EntryDraft, context: AuthorizationContext)
   if (!definition) return { saved: false, issues: ['Publish this register before recording entries'] };
 
   const issues = validateRegisterEntry(definition.fields, draft.values);
+  const known = new Set(definition.fields.filter((field) => field.type !== 'section').map((field) => field.id));
+  if (Object.keys(draft.values).some((field) => !known.has(field))) issues.push('The entry includes a field outside this register version');
   if (issues.length > 0) return { saved: false, issues };
 
   await insertRecord<RegisterEntry>(context, 'register_entry:create', 'register_entry', {
@@ -87,7 +90,7 @@ export const addEntry = async (draft: EntryDraft, context: AuthorizationContext)
     type: 'register_entry',
     registerId: draft.registerId,
     registerVersion: definition.version,
-    entryDate: todayIso(),
+    entryDate: calendarDate(),
     setting: 'facility',
     values: draft.values,
   });

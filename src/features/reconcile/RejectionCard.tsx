@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { SyncRejection } from '@shared';
-import { Button, Tag } from '@/ui';
-import { CATEGORY_LABEL, keptRows, RECORD_LABEL, shownValue, type RejectionKind } from './describeRejection';
+import { Button, Sheet, Tag } from '@/ui';
+import { patientChartPath } from '@/features/patients/patientRoutes';
+import { CATEGORY_LABEL, keptRows, RECORD_LABEL, rejectionAdvice, shownValue, type RejectionKind } from './describeRejection';
 
 type Props = {
   rejection: SyncRejection;
@@ -14,6 +16,7 @@ type Props = {
   applyBlocker: string | undefined;
   /** Display names for staff ids, for who first recorded it. */
   nameOf: (staffId: string) => string;
+  patientNameOf: (patientId: string) => string | undefined;
   busy: boolean;
   onKeepServer: () => void;
   onUseDevice: (columns: string[]) => void;
@@ -30,7 +33,7 @@ const Rows = ({ rows }: { rows: { label: string; value: string }[] }) => (
     {rows.map((row) => (
       <div key={row.label} className="flex flex-wrap gap-x-3">
         <dt className="min-w-[110px] font-semibold text-ink-soft">{row.label}</dt>
-        <dd className="flex-1 break-words text-ink">{row.value}</dd>
+        <dd className="min-w-0 flex-1 break-all text-ink">{row.value}</dd>
       </div>
     ))}
   </dl>
@@ -49,6 +52,7 @@ export const RejectionCard = ({
   canResolve,
   applyBlocker,
   nameOf,
+  patientNameOf,
   busy,
   onKeepServer,
   onUseDevice,
@@ -57,7 +61,12 @@ export const RejectionCard = ({
   onDiscard,
 }: Props) => {
   const [chosen, setChosen] = useState<string[]>([]);
+  const [intent, setIntent] = useState<'discard' | 'retry'>();
   const refused = rejection.refusedRecord;
+  const patientId = rejection.entityType === 'patient' ? rejection.entityId : typeof refused?.patientId === 'string' ? refused.patientId : undefined;
+  const patientName = patientId && kind !== 'held' && kind !== 'patient_id_clash' ? patientNameOf(patientId) : undefined;
+  const confirmDiscard = () => setIntent('discard');
+  const confirmRetry = () => setIntent('retry');
   const toggle = (column: string) =>
     setChosen((now) => (now.includes(column) ? now.filter((c) => c !== column) : [...now, column]));
   const what = rejection.operation === 'patch' ? 'change' : rejection.operation === 'delete' ? 'removal' : 'new record';
@@ -78,8 +87,11 @@ export const RejectionCard = ({
         <Tag tone="amber">{kind === 'held' ? 'Held with its patient' : 'Needs a decision'}</Tag>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
-        <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b> {rejection.reason.replace(/^held: /, '')}
+        <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b> {rejectionAdvice(rejection)}
       </p>
+      {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId)} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
+      {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
+      <details className="mt-3 rounded-field border border-outline-soft p-3 text-sm"><summary className="cursor-pointer font-semibold text-ink-soft">Technical details for review or support</summary><p className="mt-3 break-words text-xs text-ink-muted">{rejection.reason.replace(/^held: /, '')}</p><p className="mt-2 break-all font-mono text-xs">{rejection.entityType} · {rejection.entityId}</p>{kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}</details>
 
       {kind === 'column_conflict' ? (
         <table className="mt-3 w-full text-left text-[13px]">
@@ -122,8 +134,6 @@ export const RejectionCard = ({
         </div>
       ) : null}
 
-      {kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}
-
       {kind === 'held' ? (
         <p className="mt-2 text-[12px] text-ink-muted">Decided together with its patient’s registration.</p>
       ) : canResolve ? (
@@ -143,18 +153,18 @@ export const RejectionCard = ({
                 <Button variant="primary" fullWidth={false} className="px-4" disabled={busy} loading={busy} onClick={onReRegister}>
                   Register under a new Patient ID
                 </Button>
-                <Button variant="ghost" fullWidth={false} className="px-4" disabled={busy} onClick={onDiscard}>
+                <Button variant="ghost" fullWidth={false} className="px-4" disabled={busy} onClick={confirmDiscard}>
                   Discard
                 </Button>
               </>
             ) : (
               <>
                 {kind === 'refused_write' ? (
-                  <Button variant="primary" fullWidth={false} className="px-4" disabled={busy || Boolean(applyBlocker)} loading={busy} onClick={onApplyAgain}>
+                  <Button variant="primary" fullWidth={false} className="px-4" disabled={busy || Boolean(applyBlocker)} loading={busy} onClick={confirmRetry}>
                     Apply again
                   </Button>
                 ) : null}
-                <Button variant="outlined" fullWidth={false} className="px-4" disabled={busy} onClick={onDiscard}>
+                <Button variant="outlined" fullWidth={false} className="px-4" disabled={busy} onClick={confirmDiscard}>
                   Discard
                 </Button>
               </>
@@ -168,6 +178,7 @@ export const RejectionCard = ({
       ) : (
         <p className="mt-2 text-[12px] text-ink-muted">A records officer or facility admin decides this.</p>
       )}
+      {intent ? <Sheet title={intent === 'discard' ? 'Discard this refused change?' : 'Apply this change again?'} onClose={() => setIntent(undefined)} closeDisabled={busy}><p className="text-sm leading-relaxed">{intent === 'discard' ? 'This ends review without applying the refused change. Existing server records stay unchanged. The refusal and your discard decision remain in the audit history.' : 'This saves the change in your name and queues it for upload. It may be refused again if the underlying problem has not been corrected.'}</p><div className="mt-5 flex flex-wrap gap-3"><Button fullWidth={false} variant="outlined" disabled={busy} onClick={() => setIntent(undefined)}>Keep reviewing</Button><Button fullWidth={false} variant={intent === 'discard' ? 'danger-outline' : 'primary'} loading={busy} onClick={() => { const action = intent; setIntent(undefined); if (action === 'discard') onDiscard(); else onApplyAgain(); }}>{intent === 'discard' ? 'Confirm discard' : 'Confirm retry'}</Button></div></Sheet> : null}
     </div>
   );
 };

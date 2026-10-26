@@ -44,4 +44,12 @@ describe('the working appointment day', () => {
     expect(projectAppointments([booking], [patient], [], [], now)[0].paymentStatus).toBe('Awaiting payment');
     expect(projectAppointments([{ ...booking, chargeIds: [] }], [patient], [], [], now)[0].paymentStatus).toBe('Confirmed');
   });
+  it('removes cancelled and missed bookings from outstanding date groups while retaining their history', () => {
+    const missed = Appointment.parse({ ...appointment('missed', 21), attendance: 'no_show', activity: [{ id: 'missed:action', action: 'no_show', fromAttendance: 'booked', toAttendance: 'no_show', reason: 'Patient did not attend', recordedBy: 'staff:one', recordedOn: at(22) }] });
+    const cancelled = Appointment.parse({ ...appointment('cancelled', 23, true), createdOn: at(21), attendance: 'cancelled', activity: [{ id: 'cancelled:action', action: 'cancelled', fromAttendance: 'booked', toAttendance: 'cancelled', fromScheduledFor: at(23), toScheduledFor: at(23), reason: 'Patient request', recordedBy: 'staff:one', recordedOn: at(22) }] });
+    const rows = projectAppointments([missed, cancelled], [patient], [], [], now);
+    expect(rows.map((row) => row.group)).toEqual(['no_show', 'cancelled']);
+    expect(rows[0].activity?.[0].reason).toBe('Patient did not attend');
+    expect(rows.filter((row) => row.group === 'overdue' || row.group === 'today')).toHaveLength(0);
+  });
 });

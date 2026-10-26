@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BillingAdjustment, Charge, IncomingTransfer, Payment } from '@shared';
-import { billingRows, totalsFor, transferAllocated } from './ledger';
+import { billingRows, collectionAllocations, totalsFor, transferAllocated } from './ledger';
 
 const env = { facilityId: 'TEST', createdBy: 'staff:1', createdOn: '2026-10-25T10:00:00Z', deviceId: 'device:1' };
 const patientId = 'TEST-000001-K2';
@@ -35,4 +35,16 @@ describe('department and category ledger projections', () => {
     expect(rows[0]).toMatchObject({ waivedMinor: 50000, dueMinor: 0, settledMinor: 0, balanceMinor: 0 });
     expect(totalsFor(rows)).toMatchObject({ waived: 50000, collected: 0 });
   });
+});
+
+it('filters collection allocations by patient search, date and department before summing', () => {
+  const bill = charge('charge:search');
+  const payment = Payment.parse({ ...env, id: 'payment:search', type: 'payment', patientId, method: 'cash', currency: 'NGN', receiptNumber: 'TEST-R-000001-K2', amountMinor: 10000, allocations: [{ chargeId: bill.id, amountMinor: 10000 }] });
+  const data = { charges: [bill], payments: [payment], adjustments: [], transfers: [], fees: [], patients: [], staff: [], departments: [] };
+  const filters = { currency: 'NGN', from: '', to: '', departmentId: '', search: '' };
+  expect(collectionAllocations(data, filters).reduce((sum, row) => sum + row.amountMinor, 0)).toBe(10000);
+  expect(collectionAllocations(data, { ...filters, search: 'no-matching-patient' })).toEqual([]);
+  expect(collectionAllocations(data, { ...filters, search: patientId })).toHaveLength(1);
+  expect(collectionAllocations(data, { ...filters, departmentId: 'other' })).toEqual([]);
+  expect(collectionAllocations(data, { ...filters, from: '2026-10-26' })).toEqual([]);
 });

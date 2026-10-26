@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthorizationContext } from '@/session';
 import { Banner, Button, Icon, Tag } from '@/ui';
 import { CATEGORY_COLORS, monogram, useRegisters } from '@/features/registers';
@@ -19,6 +20,8 @@ export const RegistersListScreen = () => {
   const { registers, loading, error, reload } = useRegisters();
   const canPublish = useAuthorizationContext().permissions.includes('register_definition:publish');
 
+  useEffect(() => { document.title = 'Registers · Geneus Health'; }, []);
+  const visible = registers.filter((register) => canPublish || register.status === 'published');
   const published = registers.filter((r) => r.status === 'published').length;
 
   return (
@@ -81,14 +84,12 @@ export const RegistersListScreen = () => {
         ) : null}
 
         <div className="mt-3 grid grid-cols-1 gap-3 pb-24 sm:grid-cols-2 lg:grid-cols-3">
-          {registers.map((r) => {
+          {visible.map((r) => {
             const [bg, fg] = CATEGORY_COLORS[r.category] ?? ['#dcefe2', '#00502e'];
             const fieldCount = r.fields.filter((f) => f.type !== 'section').length;
             return (
-              <button
+              <article
                 key={r.id}
-                type="button"
-                onClick={() => navigate(`/registers/${r.id}`)}
                 className="flex flex-col gap-3 rounded-card border border-outline-soft bg-white p-4 text-left"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -107,17 +108,10 @@ export const RegistersListScreen = () => {
                 <div className="flex items-center gap-3.5 border-t border-outline-soft pt-2.5">
                   <span className="font-mono text-xs text-ink-muted">{fieldCount} fields</span>
                   <span className="font-mono text-xs text-ink-muted">{r.rows.length} entries</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); navigate(`/registers/${r.id}/configure`); }}
-                    className="ml-auto text-[13px] font-bold text-ink-muted"
-                  >
-                    Configure
-                  </span>
-                  <span className="text-[13px] font-bold text-brand">Open ›</span>
+                  {canPublish ? <Link to={`/registers/${r.id}/configure`} className="ml-auto inline-flex min-h-[44px] items-center text-sm font-bold text-ink-soft">Configure</Link> : null}
+                  <Link to={`/registers/${r.id}`} className="ml-auto inline-flex min-h-[44px] items-center text-sm font-bold text-brand">Open register <Icon name="chevron" className="ml-1 h-4 w-4" /></Link>
                 </div>
-              </button>
+              </article>
             );
           })}
         </div>

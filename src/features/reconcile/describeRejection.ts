@@ -3,8 +3,8 @@ import type { DocType, RejectionCategory, SyncRejection } from '@shared';
 /** What was refused, in the words staff use. */
 export const RECORD_LABEL: Partial<Record<DocType, string>> = {
   patient: 'Patient',
-  encounter: 'Encounter',
-  encounter_entry: 'Encounter step',
+  encounter: 'Visit',
+  encounter_entry: 'Visit entry',
   handoff: 'Unit handoff',
   appointment: 'Appointment',
   register_entry: 'Register entry',
@@ -24,6 +24,15 @@ export const CATEGORY_LABEL: Record<RejectionCategory, string> = {
   authorization: 'Not allowed for the person who saved it',
   identity: 'Device or staff member not recognised',
   validation: 'The record was not valid',
+};
+
+export const rejectionAdvice = (rejection: SyncRejection): string => {
+  if (rejection.reason.startsWith('held:')) return 'Review the patient registration first. Related records remain held with it.';
+  if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';
+  if (rejection.category === 'validation') return 'Some details do not meet the server’s requirements. A records officer should review the record and check that the app and server versions agree before retrying.';
+  if (rejection.category === 'authorization') return 'The server did not allow this action for its author. Ask an authorized staff member to review the change before applying it in their name.';
+  if (rejection.category === 'identity') return 'The server could not confirm the device or staff identity. Ask a facility administrator to check access.';
+  return 'Another saved record conflicts with this change. Compare the values before deciding which should stand.';
 };
 
 export type RejectionKind =

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { decide, type EnrollmentCode } from '@shared';
 import { AppBar, Banner, Button } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { issueEnrollmentCode } from '@/lib/api/devices';
 import { useAuthorizationContext } from '@/session';
 
@@ -49,8 +48,9 @@ export const AddDeviceScreen = () => {
 
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Add a device" onBack={() => navigate('/admin')} right={<SyncPill />} />
+      <AppBar title="Add a device" onBack={() => navigate('/admin/devices')} />
       <div className="mx-auto w-full max-w-md px-5 pb-24 pt-2 md:max-w-lg">
+        <h1 className="mb-4 text-2xl font-extrabold">Add a device</h1>
         <ol className="list-decimal space-y-1.5 pl-5 text-[14px] leading-relaxed text-ink-soft">
           <li>On the new phone, open Geneus and choose <b>Join an existing facility</b>.</li>
           <li>Get a code here and type it in there within 15 minutes. Both phones need a connection.</li>

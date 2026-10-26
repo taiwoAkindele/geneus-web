@@ -1,6 +1,6 @@
-import { Appointment, type AuthorizationContext, type Patient, type VisitType } from '@shared';
+import { Appointment, type AppointmentAction, type AppointmentActivity, type AuthorizationContext, type Encounter, type Patient, type VisitType } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
-import { allOfType, ContractError, envelope, findRecord, insertRecords, newId, type NewRecord } from '../db';
+import { allOfType, allWhere, ContractError, envelope, findRecord, insertRecords, newId, updateRecord, type NewRecord } from '../db';
 import { chargesForPatient, listFeeItems, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
 
@@ -45,3 +45,30 @@ export const bookingRecords = async (draft: AppointmentDraft, context: Authoriza
 };
 export const book = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<Appointment> =>
   (await insertRecords(context, await bookingRecords(draft, context, createdOn)))[0] as Appointment;
+
+export type AppointmentChange = { action: AppointmentAction; reason?: string; scheduledFor?: string; expectedActivityId?: string };
+
+/** Change the existing booking, never make another appointment or raise its fees again. */
+export const changeAppointment = async (id: string, change: AppointmentChange, context: AuthorizationContext): Promise<Appointment> => {
+  assertAllowed(context, 'appointment:update');
+  const booking = await findRecord<Appointment>('appointment', id);
+  if (!booking || booking.facilityId !== context.facilityId) throw new Error('This booking is not available at this facility');
+  const history = booking.activity ?? [];
+  if (history[history.length - 1]?.id !== change.expectedActivityId) throw new Error('This booking has changed. Close this form and review its current details');
+  if ((await allWhere<Encounter>('encounter', 'appointmentId', id)).length) throw new Error('Care has already started. Continue or review the linked visit');
+  // PowerSync omits unchanged columns. A distinct timestamp ensures even two
+  // immediate actions carry updatedOn and their attribution through the queue.
+  const recordedOn = new Date(Math.max(Date.now(), Date.parse(booking.updatedOn ?? booking.createdOn) + 1)).toISOString();
+  const attendance: Appointment['attendance'] = change.action === 'rescheduled' || change.action === 'reopened' ? 'booked' : change.action;
+  const scheduledFor = change.action === 'rescheduled' ? change.scheduledFor : booking.scheduledFor;
+  const action: AppointmentActivity = {
+    id: crypto.randomUUID(), action: change.action, recordedBy: context.userId, recordedOn,
+    fromAttendance: booking.attendance ?? 'booked', toAttendance: attendance,
+    fromScheduledFor: booking.scheduledFor, toScheduledFor: scheduledFor, reason: change.reason?.trim() || undefined,
+  };
+  const changes = { attendance, scheduledFor, status: change.action === 'rescheduled' ? 'scheduled' as const : booking.status, activity: [...history, action], updatedBy: context.userId, updatedOn: recordedOn };
+  const parsed = Appointment.safeParse({ ...booking, ...changes });
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Review the booking change');
+  // Keep the history entry and PATCH metadata on the same timestamp.
+  return updateRecord<Appointment>(context, 'appointment:update', 'appointment', id, changes, recordedOn);
+};

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthorizationContext, DocType, Staff } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { fieldKindsFor } from './contractShape';
@@ -17,7 +17,7 @@ import {
   setFeeItemActive, updateFeeItem, type FeeDraft,
   adjustCharge, adjustmentsForPatient,
 } from './repos/billing';
-import { book } from './repos/appointments';
+import { book, changeAppointment, listAppointments } from './repos/appointments';
 import { clinicalEventsForPatient, patientClinicalRecord, saveClinicalRecord } from './repos/clinical';
 import { DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { fakeDatabase } from './testing/fakeDatabase';
@@ -227,9 +227,57 @@ describe('the write path against a real SQLite', () => {
 
   it('keeps the appointment linked when saving vitals opens its encounter', async () => {
     const patient = await registerPatient({ fullName: 'Amaka', address: 'Ring Road', sex: 'female', ageYears: 32 }, contextFor('records_officer'));
-    const entry = await saveStep({ patientId: patient.patientId, appointmentId: 'appointment:1', step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'));
+    const booking = await book({ patientId: patient.patientId, reason: 'Consultation' }, contextFor('records_officer'));
+    const entry = await saveStep({ patientId: patient.patientId, appointmentId: booking.id, step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'));
     const row = await db.getOptional<{ appointmentId: string }>('SELECT appointmentId FROM encounters WHERE id = ?', [entry.encounterId]);
-    expect(row?.appointmentId).toBe('appointment:1');
+    expect(row?.appointmentId).toBe(booking.id);
+  });
+
+  it('keeps the same booking, fees and attributed history through rescheduling, cancellation and reopening', async () => {
+    const context = contextFor('records_officer');
+    const patient = await registerPatient({ fullName: 'Booked Patient', address: 'Test road', sex: 'female', ageYears: 35 }, context);
+    const fee = await createFeeItem({ name: 'Consultation', category: 'consultation', amountMinor: 100000, currency: 'NGN', chargeWhen: 'every_visit', exemptions: [] }, contextFor('facility_admin'));
+    const booking = await book({ patientId: patient.id, reason: 'Review' }, context);
+    const chargesBefore = await chargesForPatient(patient.id);
+    expect(chargesBefore.some((charge) => charge.feeItemId === fee.id)).toBe(true);
+    const moved = await changeAppointment(booking.id, { action: 'rescheduled', scheduledFor: new Date(Date.now() + 86_400_000).toISOString(), reason: 'Patient requested tomorrow' }, context);
+    const cancelled = await changeAppointment(booking.id, { action: 'cancelled', reason: 'Unable to attend', expectedActivityId: moved.activity?.[0].id }, context);
+    await expect(saveStep({ patientId: patient.id, appointmentId: booking.id, step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'))).rejects.toThrow(/Reopen/);
+    await expect(changeAppointment(booking.id, { action: 'reopened', reason: 'Can attend' }, context)).rejects.toThrow(/changed/);
+    const reopened = await changeAppointment(booking.id, { action: 'reopened', reason: 'Patient can attend', expectedActivityId: cancelled.activity?.[1].id }, context);
+    expect((await listAppointments()).map((appointment) => appointment.id)).toEqual([booking.id]);
+    expect(reopened.activity?.map((event) => event.action)).toEqual(['rescheduled', 'cancelled', 'reopened']);
+    expect(reopened.activity?.every((event) => event.recordedBy === context.userId)).toBe(true);
+    expect(reopened.updatedOn).toBe(reopened.activity?.[2].recordedOn);
+    expect(await chargesForPatient(patient.id)).toEqual(chargesBefore);
+  });
+
+  it('guards no-shows, readonly changes and duplicate or inactive linked visits before writing', async () => {
+    const context = contextFor('records_officer');
+    const patient = await registerPatient({ fullName: 'Arrival Patient', address: 'Test road', sex: 'female', ageYears: 25 }, context);
+    const booking = await book({ patientId: patient.id, reason: 'Consultation' }, context);
+    const readonly = { ...context, permissions: [] };
+    await expect(changeAppointment(booking.id, { action: 'arrived' }, readonly)).rejects.toThrow();
+    const arrival = await changeAppointment(booking.id, { action: 'arrived' }, context);
+    await expect(changeAppointment(booking.id, { action: 'no_show', reason: 'Missed visit', expectedActivityId: arrival.activity?.[0].id }, context)).rejects.toThrow(/due booking/);
+    const saved = await saveStep({ patientId: patient.id, appointmentId: booking.id, step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'));
+    expect(saved.encounterId).toBeTruthy();
+    await expect(changeAppointment(booking.id, { action: 'cancelled', reason: 'Changed mind', expectedActivityId: arrival.activity?.[0].id }, context)).rejects.toThrow(/Care has already started/);
+    await expect(saveStep({ patientId: patient.id, appointmentId: booking.id, step: 'vitals', values: { temperatureC: 37 } }, contextFor('nurse'))).rejects.toThrow(/already has a visit/);
+  });
+
+  it('keeps immediate booking actions attributable when the device clock has not advanced', async () => {
+    const context = contextFor('records_officer');
+    const patient = await registerPatient({ fullName: 'Immediate Actions', address: 'Test road', sex: 'female', ageYears: 25 }, context);
+    const booking = await book({ patientId: patient.id, reason: 'Consultation' }, context);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(booking.createdOn));
+    try {
+      const arrival = await changeAppointment(booking.id, { action: 'arrived' }, context);
+      const cancelled = await changeAppointment(booking.id, { action: 'cancelled', reason: 'Left before care', expectedActivityId: arrival.activity?.[0].id }, context);
+      expect(Date.parse(cancelled.updatedOn!)).toBeGreaterThan(Date.parse(arrival.updatedOn!));
+      expect(cancelled.updatedOn).toBe(cancelled.activity?.[1].recordedOn);
+      expect((await listAppointments())[0].activity).toHaveLength(2);
+    } finally { clock.mockRestore(); }
   });
 
   describe('offline billing', () => {

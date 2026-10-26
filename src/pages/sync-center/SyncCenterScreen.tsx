@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom';
-import { AppBar, Button, Stat, StatusPill } from '@/ui';
+import { useEffect } from 'react';
+import { Button, Stat } from '@/ui';
 import { indicatorFor, useSyncStatus } from '@/data';
 import { accessLabel } from '@/session/accessPolicy';
 import { useAuth, useSession } from '@/session';
@@ -21,58 +21,55 @@ const lastSyncedLabel = (at: Date | undefined): string => {
  * numbers are PowerSync's own: the upload queue and the last completed sync.
  */
 export const SyncCenterScreen = () => {
-  const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { shift, access } = useSession();
+  const { shift, access, notifications } = useSession();
+  useEffect(() => { document.title = 'Sync & review · Geneus Health'; }, []);
   const sync = useSyncStatus();
   const indicator = indicatorFor(sync);
   const headline =
-    indicator === 'error'
+    notifications.some((notification) => notification.kind === 'conflict')
+      ? 'Records need review'
+      : indicator === 'error'
       ? 'Sync problem'
       : indicator === 'offline'
-        ? 'Offline — changes are safe on this device'
+        ? 'Offline · working from this device'
         : sync.pending > 0
-          ? 'Syncing to cloud'
-          : 'Up to date';
+          ? 'Changes waiting to sync'
+          : !sync.hasSynced ? 'First sync not completed' : indicator === 'syncing' ? 'Sync in progress' : 'No queued changes';
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="Sync & device" onBack={() => navigate(-1)} right={<StatusPill status={indicator} />} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:max-w-3xl">
+        <h1 className="px-5 pb-4 pt-5 text-2xl font-extrabold">Sync &amp; review</h1>
         <div className="flex-1 space-y-5 px-5 py-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
           {/* Sync status */}
           <div>
             <div className="rounded-[18px] border border-outline-soft bg-white p-4">
-              <div className="mb-3.5 flex items-center justify-between">
+              <div className="mb-3.5 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                 <span className="text-base font-bold">{headline}</span>
                 <span className="font-mono text-[13px] text-slate-text">{lastSyncedLabel(sync.lastSyncedAt)}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface-high">
-                <div className={`h-full bg-slate ${sync.pending > 0 ? 'w-1/2' : 'w-full'}`} />
-              </div>
               <div className="mt-4 flex justify-between text-center">
                 <Stat value={sync.connected ? 'Yes' : 'No'} label="Connected" />
-                <Stat value={String(sync.pending)} label="Waiting" tone={sync.pending > 0 ? 'amber' : undefined} />
-                <Stat value="0" label="Lost" />
+                <Stat value={sync.pendingKnown === false ? '—' : String(sync.pending)} label="Queued changes" tone={sync.pending > 0 ? 'amber' : undefined} />
               </div>
             </div>
             <p className="mx-1 mt-3.5 text-[13px] leading-relaxed text-ink-muted">
               {sync.error
                 ? `The last sync attempt failed: ${sync.error}. Changes stay on this device and are retried automatically.`
-                : 'Everything is safe on this device. Nothing is ever lost because the internet dropped.'}
+                : 'Changes are saved locally before upload. The queue and review list are separate: an empty queue does not confirm that every change was accepted.'}
             </p>
           </div>
 
+          <div className="lg:col-span-2">
+            <h2 className="mb-2.5 text-base font-bold">Records needing review</h2>
+            <ReconcileQueue />
+          </div>
           {/* Roster information does not close the signed-in session. */}
           <section className="rounded-[18px] border border-outline-soft bg-white p-4" aria-label="Sign-in and shift status">
             <h2 className="text-[17px] font-extrabold">{shift ? shift.ended ? 'Shift ended' : `Shift ends ${shift.endsAtLabel}` : accessLabel(access)}</h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">{access === 'admin' ? 'You can sign in at any time. Administrator sessions still close after 30 minutes without activity.' : access === 'always' ? 'You can sign in at any time, every day, without a roster window. Sign out when finished.' : 'Your shift controls new sign-ins. An existing session stays open after the shift ends. Sign out when finished.'}</p>
           </section>
 
-          {/* Reconcile queue — refused uploads wait here for a person, never silently dropped */}
-          <div className="lg:col-span-2">
-            <div className="mb-2.5 text-xs font-bold uppercase tracking-[0.06em] text-ink-muted">Needs attention</div>
-            <ReconcileQueue />
-          </div>
 
           <div className="flex items-center gap-2.5 px-1 lg:col-span-2">
             <span className="h-2 w-2 rounded-full bg-brand-strong" />

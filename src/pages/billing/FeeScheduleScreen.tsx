@@ -1,20 +1,21 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { FeeItem } from '@shared';
-import { SyncPill } from '@/app/SyncPill';
 import { useLiveQuery } from '@/data';
 import { createFeeItem, listFeeItems, setFeeItemActive, updateFeeItem, type FeeDraft } from '@/data/repos/billing';
 import { CATEGORY_LABELS, CHARGE_WHEN_LABELS, FeeEditorSheet } from '@/features/billing';
 import { formatMoney } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
-import { AppBar, Button, DataTable, Tag, useToast } from '@/ui';
+import { AppBar, Button, DataTable, Tag, TextField, useToast } from '@/ui';
 
 export const FeeScheduleScreen = () => {
+  useEffect(() => { document.title = 'Fee schedule · Geneus Health'; }, []);
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();
   const fees = useLiveQuery(listFeeItems);
   const [editing, setEditing] = useState<FeeItem | 'new'>();
+  const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string>();
   const toggling = useRef(false);
 
@@ -49,11 +50,13 @@ export const FeeScheduleScreen = () => {
     );
   }
 
-  const all = [...(fees.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
+  const all = [...(fees.data ?? [])].filter((fee) => `${fee.name} ${CATEGORY_LABELS[fee.category]}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
   return (
     <div className="min-h-screen bg-surface">
-      <AppBar title="Manage fees" onBack={() => navigate('/billing')} right={<SyncPill />} />
+      <AppBar title="Manage fees" onBack={() => navigate('/billing')} />
       <div className="mx-auto w-full max-w-md space-y-4 px-5 pb-24 pt-2 md:max-w-2xl lg:max-w-none lg:px-8">
+        <h1 className="text-2xl font-extrabold">Fee schedule</h1>
+        <TextField label="Find fee by name or category" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <p className="text-[13px] leading-relaxed text-ink-muted">
           Set the fees this facility charges and who receives care free of charge. Changes save on this device and sync when connected.
         </p>
