@@ -11,3 +11,11 @@ it('renders historic entries against their own saved schema and readable author'
   expect(register.version).toBe(2);
   expect(register.rows[0]).toMatchObject({ registerVersion: 1, by: 'Records Officer', fields: [{ id: 'old', label: 'Original question' }], values: { old: 'Original answer' } });
 });
+it('keeps a published register available while its newer draft is being prepared', () => {
+  const published = RegisterDefinition.parse({ ...base, type: 'register_definition', id: 'daily:v1', registerId: 'daily', version: 1, name: 'Daily', category: 'General', status: 'published', fields: [{ id: 'original', type: 'text', label: 'Original question' }] });
+  const draft = RegisterDefinition.parse({ ...published, id: 'daily:v2', version: 2, name: 'Work in progress', status: 'draft', fields: [] });
+  const [register] = projectRegisters([published, draft], [], []);
+  expect(register).toMatchObject({ status: 'published', version: 1, name: 'Daily', hasDraft: true });
+  expect(register.fields[0].label).toBe('Original question');
+  expect(register.configuration).toMatchObject({ version: 2, name: 'Work in progress', fields: [] });
+});

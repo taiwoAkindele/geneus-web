@@ -77,6 +77,7 @@ const permissionToApply = (rejection: SyncRejection): Permission | undefined => 
  * as well as the right to resolve, because the write is applied in their name.
  */
 export const applyAgainBlocker = (rejection: SyncRejection, context: AuthorizationContext): string | undefined => {
+  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Review the current register configuration and save a new draft version. The refused snapshot is kept here; an existing version cannot be overwritten.';
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Review this booking in Appointments and record the intended action against its current history. Saved booking history cannot be overwritten.';
   if (!rejection.refusedRecord && !rejection.refusedChanges) return 'Nothing was kept to apply again — this can only be discarded.';
   const permission = permissionToApply(rejection);

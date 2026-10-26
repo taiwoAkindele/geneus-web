@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { mayApprovePin, type PinSetupCodeIssued } from '@shared';
-import { ActionMenu, Button, DataTable, Sheet, SheetCancelButton, Tag, TextField, SegmentedControl, useToast } from '@/ui';
+import { ActionMenu, Button, DataTable, Sheet, SheetCancelButton, Tag, TextField, SectionTabs, SegmentedControl, useToast } from '@/ui';
 import { useLiveQuery } from '@/data';
 import { accessFor, accessLabel } from '@/session/accessPolicy';
 import { shiftRangeLabel } from '@/session/shiftLabels';
@@ -181,7 +181,7 @@ export const ManageStaffScreen = () => {
     <div className="min-h-screen bg-surface">
       <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
         <div className="flex items-center justify-between gap-3"><h1 className="text-[24px] font-extrabold">Staff &amp; roster</h1>{canManage && context.permissions.includes('staff:permission') ? <Button fullWidth={false} onClick={() => navigate('/admin/staff/invite')}>＋ Add staff</Button> : null}</div>
-        <div className="flex flex-wrap gap-2"><Button fullWidth={false} variant={rosterView ? 'outlined' : 'primary'} onClick={() => setParams({ view: 'directory' })}>Staff directory</Button><Button fullWidth={false} variant={rosterView ? 'primary' : 'outlined'} onClick={() => setParams({ view: 'roster' })}>Duty roster</Button></div>
+        <SectionTabs label="Staff sections" value={rosterView ? 'roster' : 'directory'} onChange={(view) => setParams({ view })} options={[{ value: 'directory', label: 'Staff directory' }, { value: 'roster', label: 'Duty roster' }]} />
         {!rosterView ? <TextField label="Find staff by name or role" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /> : null}
         {loading ? <div role="status" className="h-24 animate-pulse rounded-card bg-surface-muted" aria-label="Loading staff" /> : error ? <div role="alert">Staff could not be read from this device.<Button variant="ghost" onClick={reload}>Try again</Button></div> : <>
           {rosterView ? <section className="space-y-4"><div className="max-w-xs"><TextField label="Shifts starting on" type="date" value={rosterDay} onChange={(event) => setRosterDay(event.target.value)} /></div><p className="text-sm text-ink-muted">Planned sign-in windows, not attendance. Staff with 24-hour access do not require a roster.</p>{shifts.loading ? <p role="status">Reading roster...</p> : shifts.error ? <div role="alert">The roster could not be read.<Button variant="ghost" onClick={shifts.reload}>Try again</Button></div> : !planned.length ? <div className="rounded-card border border-dashed border-outline bg-white p-5 text-sm"><p className="font-bold">No shifts start on this date.</p><p className="mt-2 text-ink-muted">To assign a window for shift-based staff, open their actions in the staff directory. Staff with 24-hour access can sign in without a shift.</p><Button fullWidth={false} variant="outlined" className="mt-3" onClick={() => setParams({ view: 'directory' })}>Open staff directory</Button></div> : <DataTable caption="Planned shifts" rows={planned} rowKey={(shift) => shift.id} columns={[

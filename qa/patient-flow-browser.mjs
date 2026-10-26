@@ -120,7 +120,7 @@ try {
   await click('Overview');await waitFor('document.body.innerText.includes("Hypertension follow-up")');
   checks.push('Clinical review/sign creates a version, retains originals and refreshes the chart');
   checks.push('Dirty clinical editor cannot be silently dismissed');
-  await click('Clinical record');await click('Allergies · 1');await click('Review legacy allergy');
+  await click('Clinical record');await click('Allergies (1)');await click('Review legacy allergy');
   await fill('Reaction','Reported rash');await fill('Severity','mild');await clinicalSave();
   assert.deepEqual(await evaluate('JSON.parse(window.designAudit.rows.patients[0].allergies)'),['Penicillin']);
   await waitFor('document.body.innerText.includes("Reported rash")');
@@ -175,7 +175,7 @@ try {
   await key('Escape',27);assert.equal(await evaluate('document.activeElement.getAttribute("aria-label")'),menuLabel);
   checks.push('Visit overflow menu has agreed actions and restores focus on Escape');
   await go('/encounters');await click('All visits');assert.equal(await visibleTables(),1);
-  await click('Lab · 1');assert.equal(await visibleTables(),1);assert.equal(await evaluate('document.body.innerText.includes("Demo Second Patient")'),true);
+  await click('Lab (1)');assert.equal(await visibleTables(),1);assert.equal(await evaluate('document.body.innerText.includes("Demo Second Patient")'),true);
   checks.push('Facility visit and station queue views each use one table');
 
   await go(chart+'&tab=overview');await click('Continue visit');

@@ -87,6 +87,7 @@ db.execute = async (sql, parameters = []) => {
     db.rows.encounter_drafts = (db.rows.encounter_drafts ?? []).filter((row) => sql.includes('"id" = ?') ? row.id !== parameters[0] : !(row.staffId === parameters[0] && row.patientId === parameters[1] && row.encounterKey === parameters[2]));
     return;
   }
+  if (sql.startsWith('DELETE FROM register_builder_drafts')) { db.rows.register_builder_drafts = (db.rows.register_builder_drafts ?? []).filter((row) => row.id !== parameters[0]); return; }
   if (sql.startsWith('UPDATE encounter_drafts')) { const draft = db.rows.encounter_drafts?.find((r) => r.id === parameters[2]); if (draft) { draft.data = parameters[0]; draft.updatedOn = parameters[1]; } return; }
   const update = /^UPDATE (\w+) SET (.+) WHERE id = \?/.exec(sql);
   if (update) {
@@ -100,8 +101,10 @@ db.execute = async (sql, parameters = []) => {
   const match = /^INSERT INTO (\w+) \(([^)]+)\)/.exec(sql);
   if (!match) throw new Error('Unexpected audit write: ' + sql);
   const fields = match[2].split(',').map((field) => field.trim().replaceAll('"', ''));
-  (db.rows[match[1]] ??= []).push(Object.fromEntries(fields.map((field, index) => [field, parameters[index]])));
-  if (match[1] !== 'encounter_drafts') window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
+  const record = Object.fromEntries(fields.map((field, index) => [field, parameters[index]]));
+  const existingRecovery = match[1] === 'register_builder_drafts' ? db.rows[match[1]]?.find((row) => row.id === record.id) : undefined;
+  if (existingRecovery) Object.assign(existingRecovery, record); else (db.rows[match[1]] ??= []).push(record);
+  if (!['encounter_drafts', 'register_builder_drafts'].includes(match[1])) window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
 db.writeTransaction = async (callback) => callback({ execute: db.execute });
 setDatabaseForTests(db);
@@ -117,7 +120,7 @@ const Ready = ({ children }: { children: React.ReactNode }) => {
   const auth = useAuth();
   return auth.signedIn ? children : <p>Preparing synthetic staff session…</p>;
 };
-createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={['/home']}><RouteObserver /><Routes><Route element={<AppShell />}>
+createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={[auditParams.get('start')?.startsWith('/') && !auditParams.get('start')?.startsWith('//') ? auditParams.get('start')! : '/home']}><RouteObserver /><Routes><Route element={<AppShell />}>
   <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />

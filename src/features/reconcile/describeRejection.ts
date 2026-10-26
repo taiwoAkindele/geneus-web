@@ -28,6 +28,7 @@ export const CATEGORY_LABEL: Record<RejectionCategory, string> = {
 
 export const rejectionAdvice = (rejection: SyncRejection): string => {
   if (rejection.reason.startsWith('held:')) return 'Review the patient registration first. Related records remain held with it.';
+  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Another configuration version arrived first. Sync and open the current register configuration before preparing a new draft. This refused snapshot remains available in the details.';
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';
   if (rejection.category === 'validation') return 'Some details do not meet the server’s requirements. A records officer should review the record and check that the app and server versions agree before retrying.';
   if (rejection.category === 'authorization') return 'The server did not allow this action for its author. Ask an authorized staff member to review the change before applying it in their name.';

@@ -4,7 +4,7 @@ import { ChargeWhen, FeeCategory, VisitType, type FeeItem } from '@shared';
 import type { FeeDraft } from '@/data/repos/billing';
 import { listBillingDepartments } from '@/data/repos/billing';
 import { useLiveQuery } from '@/data';
-import { Button, SelectField, Sheet, TextField } from '@/ui';
+import { Button, SelectField, Sheet, SheetCancelButton, TextField } from '@/ui';
 import { CATEGORY_LABELS, CHARGE_WHEN_LABELS, emptyRule, EXEMPTION_PRESETS, FEE_CURRENCIES, feeDraftFromForm, feeFormValues, VISIT_TYPE_LABELS, type FeeForm } from './feeForm';
 
 type Props = {
@@ -16,7 +16,7 @@ type Props = {
 
 export const FeeEditorSheet = ({ fee, defaultCurrency, onSave, onClose }: Props) => {
   const departments = useLiveQuery(listBillingDepartments);
-  const { register, control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FeeForm>({
+  const { register, control, handleSubmit, setError, formState: { errors, isSubmitting, isDirty } } = useForm<FeeForm>({
     defaultValues: feeFormValues(fee, defaultCurrency),
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'exemptions' });
@@ -38,7 +38,7 @@ export const FeeEditorSheet = ({ fee, defaultCurrency, onSave, onClose }: Props)
   });
 
   return (
-    <Sheet title={fee ? 'Edit fee' : 'Add a fee'} eyebrow="Manage fees" onClose={close} closeDisabled={isSubmitting}>
+    <Sheet title={fee ? 'Edit fee' : 'Add fee'} eyebrow="Billing" onClose={close} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty} placement="side">
       <form onSubmit={save} className="space-y-4">
         <fieldset disabled={isSubmitting} className="space-y-4">
           <TextField label="Fee name" placeholder="e.g. Consultation" required {...register('name', { required: true })} />
@@ -86,7 +86,7 @@ export const FeeEditorSheet = ({ fee, defaultCurrency, onSave, onClose }: Props)
         </fieldset>
         {errors.root ? <p role="alert" className="rounded-card bg-danger-bg p-3 text-[13px] font-semibold text-danger">{errors.root.message}</p> : null}
         <div className="sticky bottom-0 flex gap-3 border-t border-outline-soft bg-white py-4">
-          <Button variant="outlined" fullWidth={false} disabled={isSubmitting} onClick={close}>Cancel</Button>
+          <div className="flex-1"><SheetCancelButton disabled={isSubmitting}>Cancel</SheetCancelButton></div>
           <Button type="submit" loading={isSubmitting} className="flex-1">Save fee</Button>
         </div>
       </form>

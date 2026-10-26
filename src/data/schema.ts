@@ -1,7 +1,7 @@
 import { column, Schema, Table, type ColumnsType, type IndexShorthand } from '@powersync/web';
 import type { DocType } from '@shared';
 import { fieldKindsFor, type FieldKind } from './contractShape';
-import { DRAFTS_TABLE, TABLE_FOR } from './tables';
+import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
 
 /**
  * The local SQLite schema, derived from the shared contract: one table per
@@ -65,4 +65,8 @@ const draftsTable = new Table(
 export const AppSchema = new Schema({
   ...Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
   [DRAFTS_TABLE]: draftsTable,
+  [REGISTER_DRAFTS_TABLE]: new Table(
+    { staffId: column.text, registerKey: column.text, data: column.text, updatedOn: column.text },
+    { localOnly: true, indexes: { owner: ['staffId', 'registerKey'] } },
+  ),
 });

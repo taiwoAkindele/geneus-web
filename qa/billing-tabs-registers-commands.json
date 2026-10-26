@@ -1,0 +1,260 @@
+[
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "path": "/billing",
+    "name": "07-after-billing-tabs",
+    "description": "Billing uses the shared underlined section tabs and direct fee creation",
+    "assert": "Boolean(document.querySelector(\"nav[aria-label=\\\"Billing sections\\\"] button[aria-current=page]\")) && [...document.querySelectorAll(\"button\")].some(b=>b.textContent.trim()===\"Add fee\")"
+  },
+  {
+    "click": "Add fee",
+    "name": "08-after-add-fee-panel",
+    "description": "Add fee opens a side panel inside Billing",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Fee name\")"
+  },
+  {
+    "fill": {
+      "label": "Fee name",
+      "value": "Procedure dressing"
+    }
+  },
+  {
+    "fill": {
+      "label": "Amount",
+      "value": "2500"
+    }
+  },
+  {
+    "fill": {
+      "label": "Charge this fee",
+      "value": "when_ordered"
+    }
+  },
+  {
+    "click": "Save fee",
+    "name": "09-after-fee-saved",
+    "description": "A new fee persists without changing existing patient charges",
+    "assert": "window.designAudit.rows.fee_items.length===3 && window.designAudit.rows.charges.length===2 && !document.querySelector(\"dialog[open]\")"
+  },
+  {
+    "click": "Fees",
+    "name": "10-after-fee-catalog",
+    "description": "Fees is a billing section with clear prices and management actions",
+    "assert": "document.querySelector(\"section[aria-label=\\\"Facility fees\\\"]\").innerText.includes(\"Procedure dressing\")"
+  },
+  {
+    "fill": {
+      "label": "Find fee by name or category",
+      "value": "General"
+    }
+  },
+  {
+    "click": "Edit"
+  },
+  {
+    "fill": {
+      "label": "Amount",
+      "value": "3000"
+    }
+  },
+  {
+    "click": "Save fee",
+    "description": "Updating a fee preserves the old price on posted patient charges",
+    "assert": "window.designAudit.rows.fee_items.find(f=>f.name===\"General consultation\").amountMinor===300000 && window.designAudit.rows.charges[0].amountMinor===200000"
+  },
+  {
+    "click": "Add fee"
+  },
+  {
+    "fill": {
+      "label": "Fee name",
+      "value": "Unfinished fee"
+    }
+  },
+  {
+    "key": "Escape",
+    "code": 27
+  },
+  {
+    "name": "11-after-fee-discard-guard",
+    "description": "Unfinished fee edits cannot be dismissed silently",
+    "assert": "document.body.innerText.includes(\"Discard unsaved changes?\")"
+  },
+  {
+    "click": "Discard changes"
+  },
+  {
+    "role": "facility_admin",
+    "width": 390,
+    "reload": true,
+    "readonly": true,
+    "path": "/billing?tab=fees",
+    "name": "12-after-readonly-fees",
+    "description": "Readonly access can inspect fees without management actions",
+    "assert": "document.documentElement.scrollWidth<=innerWidth && ![...document.querySelectorAll(\"button\")].some(b=>[\"Add fee\",\"Edit\",\"Retire\"].includes(b.textContent.trim()))"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/billing",
+    "name": "13-after-phone-billing",
+    "description": "Billing tabs use one horizontal row on small phones",
+    "assert": "document.documentElement.scrollWidth<=innerWidth && document.querySelector(\"nav[aria-label=\\\"Billing sections\\\"]\").clientHeight<80"
+  },
+  {
+    "path": "/billing/fees",
+    "description": "Existing fee-page links open the same Billing Fees section",
+    "assert": "window.designAudit.path===\"/billing\" && window.designAudit.search.includes(\"tab=fees\")"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/registers/new"
+  },
+  {
+    "click": "Use service log starter"
+  },
+  {
+    "fill": {
+      "label": "Register name",
+      "value": "Daily services"
+    }
+  },
+  {
+    "click": "Save draft",
+    "name": "14-after-saved-register-draft",
+    "description": "A named draft is saved as a real definition snapshot",
+    "assert": "window.designAudit.rows.register_definitions.some(r=>r.name===\"Daily services\" && r.status===\"draft\")"
+  },
+  {
+    "fill": {
+      "label": "Label for field 1",
+      "value": "Patient reference"
+    }
+  },
+  {
+    "path": "/registers?view=drafts",
+    "name": "15-after-register-drafts",
+    "description": "Drafts are a separate list from published daily forms",
+    "assert": "document.body.innerText.includes(\"Daily services\") && document.querySelector(\"nav[aria-label=\\\"Register sections\\\"] [aria-current=page]\").textContent.includes(\"Drafts\")"
+  },
+  {
+    "click": "Resume draft",
+    "selector": "article:last-child a",
+    "name": "16-after-recovered-register",
+    "description": "Leaving and reopening recovers private unfinished typing",
+    "assert": "[...document.querySelectorAll(\"input\")].some(input=>input.value===\"Patient reference\") && document.body.innerText.includes(\"Recovered your unfinished work\")"
+  },
+  {
+    "click": "Preview",
+    "name": "17-after-register-preview",
+    "description": "Preview uses the same question rendering as daily entries",
+    "assert": "document.body.innerText.includes(\"Preview only\") && document.body.innerText.includes(\"Patient reference\")"
+  },
+  {
+    "click": "Review & publish",
+    "name": "18-after-register-publish-review",
+    "description": "Publication is a deliberate review of the new form",
+    "assert": "document.querySelector(\"dialog[open]\").innerText.includes(\"Patient reference\")"
+  },
+  {
+    "click": "Confirm publication",
+    "name": "19-after-register-published",
+    "description": "Publication creates a new version and returns to the published list",
+    "assert": "window.designAudit.rows.register_definitions.some(r=>r.name===\"Daily services\" && r.status===\"published\" && r.version===2) && !document.querySelector(\"dialog[open]\")"
+  },
+  {
+    "path": "/registers/register%3Amalaria/configure"
+  },
+  {
+    "fill": {
+      "label": "Register name",
+      "value": "Malaria revised"
+    }
+  },
+  {
+    "click": "Save draft"
+  },
+  {
+    "path": "/registers/register%3Amalaria",
+    "name": "20-after-published-register-preserved",
+    "description": "A newer configuration draft leaves the published entry form and historic answers intact",
+    "assert": "document.body.innerText.includes(\"Malaria register\") && !document.querySelector(\"h1\").innerText.includes(\"Malaria revised\") && window.designAudit.rows.register_entries.length===1"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/registers/new",
+    "name": "21-after-phone-register-builder",
+    "description": "The builder fits a small phone",
+    "assert": "document.documentElement.scrollWidth<=innerWidth && document.querySelector(\"h1\").innerText===\"Create register\""
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=overview",
+    "name": "22-after-patient-tabs",
+    "description": "Patient sections retain the original tab appearance through the same shared component",
+    "assert": "Boolean(document.querySelector(\"nav[aria-label=\\\"Patient record sections\\\"] [aria-current=page]\"))"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "reload": true,
+    "path": "/billing",
+    "evaluate": "document.querySelector('nav[aria-label=\"Billing sections\"] button').focus()"
+  },
+  {
+    "key": "End",
+    "code": 35,
+    "name": "23-keyboard-last-section",
+    "description": "Keyboard section navigation selects and reveals the last tab on a phone",
+    "assert": "document.querySelector('nav[aria-label=\"Billing sections\"] [aria-current=\"page\"]').textContent.trim()==='Departments' && document.activeElement.textContent.trim()==='Departments' && document.documentElement.scrollWidth<=innerWidth"
+  },
+  {
+    "key": "Home",
+    "code": 36,
+    "description": "Home restores the first section and keyboard focus",
+    "assert": "document.querySelector('nav[aria-label=\"Billing sections\"] [aria-current=\"page\"]').textContent.trim()==='Collections' && document.activeElement.textContent.trim()==='Collections'"
+  },
+  {
+    "role": "facility_admin",
+    "width": 1440,
+    "reload": true,
+    "path": "/registers/new"
+  },
+  {
+    "click": "Use service log starter"
+  },
+  {
+    "fill": {
+      "label": "Register name",
+      "value": "Field identity check"
+    }
+  },
+  {
+    "click": "Save draft"
+  },
+  {
+    "evaluate": "window.originalQuestionId=JSON.parse(window.designAudit.rows.register_definitions.find(r=>r.name==='Field identity check').fields)[0].id; [...document.querySelectorAll('label')].find(l=>l.textContent.startsWith('Type for field 1')).control.focus()"
+  },
+  {
+    "fill": {
+      "label": "Type for field 1",
+      "value": "number"
+    },
+    "name": "24-field-type-focus",
+    "description": "Changing a question type preserves keyboard focus while allocating a new identity",
+    "assert": "document.activeElement===[...document.querySelectorAll('label')].find(l=>l.textContent.startsWith('Type for field 1')).control && window.designAudit.rows.register_builder_drafts.some(r=>JSON.parse(r.data).fields[0].id!==window.originalQuestionId)"
+  },
+  {
+    "click": "Save draft",
+    "description": "New question identities are persisted while the earlier definition stays intact",
+    "assert": "JSON.parse(window.designAudit.rows.register_definitions.find(r=>r.name==='Field identity check' && r.version===1).fields)[0].id===window.originalQuestionId && JSON.parse(window.designAudit.rows.register_definitions.find(r=>r.name==='Field identity check' && r.version===2).fields)[0].id!==window.originalQuestionId"
+  }
+]

@@ -91,6 +91,7 @@ export const RejectionCard = ({
       </p>
       {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId)} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
       {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
+      {rejection.entityType === 'register_definition' && typeof rejection.refusedRecord?.registerId === 'string' ? <Link to={`/registers/${encodeURIComponent(rejection.refusedRecord.registerId)}/configure`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review register configuration</Link> : null}
       <details className="mt-3 rounded-field border border-outline-soft p-3 text-sm"><summary className="cursor-pointer font-semibold text-ink-soft">Technical details for review or support</summary><p className="mt-3 break-words text-xs text-ink-muted">{rejection.reason.replace(/^held: /, '')}</p><p className="mt-2 break-all font-mono text-xs">{rejection.entityType} · {rejection.entityId}</p>{kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}</details>
 
       {kind === 'column_conflict' ? (

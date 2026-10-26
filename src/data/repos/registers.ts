@@ -1,11 +1,13 @@
 import {
   validateRegisterEntry,
+  registerDefinitionIssues,
   type AuthorizationContext,
   type RegisterDefinition,
   type RegisterEntry,
   type RegisterEntryValue,
   type RegisterFieldDef,
 } from '@shared';
+import { assertAllowed } from '@/auth/authorization';
 import { allOfType, envelope, insertRecord, newId } from '../db';
 import { calendarDate } from '@/lib/calendarDate';
 
@@ -42,27 +44,34 @@ export const currentPublished = (
  * version offline collide at the server, which keeps the first and queues the
  * second for reconciliation.
  */
-export const publishDefinition = async (
+const saveDefinition = async (
   draft: RegisterDraft,
   registerId: string | null,
   context: AuthorizationContext,
+  status: 'draft' | 'published',
+  expectedVersion?: number,
 ): Promise<RegisterDefinition> => {
+  assertAllowed(context, 'register_definition:publish');
   const definitions = await listDefinitions();
   const id = registerId ?? newId('register_definition');
   const version = highestVersion(definitions, id) + 1;
+  if (expectedVersion !== undefined && version !== expectedVersion + 1) throw new Error('A newer register version is available. Reopen its configuration before saving your changes. Your private recovery is kept.');
+  const values = { ...draft, name: draft.name.trim(), category: draft.category.trim(), status, fields: draft.fields.map((field) => ({ ...field, label: field.label.trim(), options: field.options?.map((option) => option.trim()) })) };
+  const issues = registerDefinitionIssues(values, definitions.filter((definition) => definition.registerId === id));
+  if (issues.length) throw new Error(issues.join(' '));
   return insertRecord<RegisterDefinition>(context, 'register_definition:publish', 'register_definition', {
     ...envelope(context),
     id: `${id}:v${version}`,
     type: 'register_definition',
     registerId: id,
     version,
-    name: draft.name.trim() || 'Untitled register',
-    category: draft.category,
-    description: draft.description,
-    status: 'published',
-    fields: draft.fields,
+    ...values,
   });
 };
+
+/** Each explicit draft save is an immutable snapshot, just like publication. */
+export const saveDraftDefinition = (draft: RegisterDraft, registerId: string | null, context: AuthorizationContext, expectedVersion?: number) => saveDefinition(draft, registerId, context, 'draft', expectedVersion);
+export const publishDefinition = (draft: RegisterDraft, registerId: string | null, context: AuthorizationContext, expectedVersion?: number) => saveDefinition(draft, registerId, context, 'published', expectedVersion);
 
 export type EntryDraft = {
   registerId: string;

@@ -42,9 +42,8 @@ export const CATEGORY_COLORS: Record<string, [string, string]> = {
 export const typeDef = (type: FieldType): FieldTypeDef => FIELD_TYPES.find((t) => t.type === type) ?? FIELD_TYPES[0];
 export const isChoice = (type: FieldType): boolean => type === 'select' || type === 'multiselect';
 
-/** Deterministic id generator (avoids Math.random for stable keys). */
-let seq = 0;
-export const uid = (prefix: string): string => `${prefix}-${seq++}`;
+/** Field identities survive reloads and cannot collide across offline devices. */
+export const uid = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`;
 
 /** Two-letter monogram from a register name, for the icon tile. */
 export const monogram = (name: string): string => name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'RG';
