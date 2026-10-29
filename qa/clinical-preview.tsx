@@ -44,7 +44,7 @@ db.execute = async (sql, parameters = []) => {
   (db.rows[match[1]] ??= []).push(row);
   if (match[1] !== 'encounter_drafts') window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
-db.writeTransaction = async (callback) => callback({ execute: db.execute });
+db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
 setDatabaseForTests(db);
 localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));

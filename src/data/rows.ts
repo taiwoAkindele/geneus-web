@@ -12,6 +12,10 @@ export type Row = Record<string, unknown>;
 const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
   patient: ['dateOfBirth', 'ageYears', 'ageObservedOn', 'phone', 'nin', 'occupation', 'religion', 'legacyPaperRef', 'identityEvidenceNote'],
   fee_item: ['departmentId'],
+  unit: ['parentId'],
+  location: ['parentId', 'unitId', 'capacity', 'description'],
+  billing_department: ['organizationUnitId'],
+  appointment: ['allocation'],
 };
 
 /** Record → row values, ready to bind. `undefined` becomes NULL. */
@@ -77,7 +81,7 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
  * screen is better off with an odd record than with no list at all.
  */
 export const fromRow = <T extends AnyDocument>(type: DocType, row: Row): T => {
-  const decoded = { ...decodeValues(type, row), type };
+  const decoded = { ...Object.fromEntries(Object.entries(decodeValues(type, row)).filter(([, value]) => value !== null)), type };
   const parsed = parseDocument(decoded);
   if (!parsed.success) {
     console.warn(`record ${String(row.id)} in ${type} does not match the contract`, parsed.error.issues);

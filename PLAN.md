@@ -544,3 +544,12 @@ Fees belongs to Billing alongside patient charges. Add fee is a permission-gated
 Register authoring saves immutable named draft snapshots, then publishes a separate version after review. The published form is projected independently from the latest authoring draft. Private incomplete typing is retained per staff/register in local-only register_builder_drafts; it does not sync. Shared snapshots use the existing register_definition contract. Stale local bases are refused before writing; server checks serialize versions and validate field identities and published choices. Changing a field type allocates a new ID.
 
 Validation: 244 frontend and 343 server/shared tests pass, including SQLite recovery/pinned-entry checks and concurrent PostgreSQL authoring. See ../docs/BILLING-TABS-REGISTER-REDESIGN-2026-10-27.md for visual evidence, browser results and release limits. No new dependencies or server migration are needed for this phase.
+
+
+## Facility services and staff assignments (29 October 2026)
+
+The approved PHC/hospital feature now connects facility setup, service details, professional profiles, private evidence/review, assignments, dated coverage, intake, resource booking and explicit handover. Home stays combined by permitted duties. SectionTabs and existing side panels provide consistent navigation; encrypted drafts retain incomplete setup, and finite weekly series resume without duplicates.
+
+Operational/clinical writes retain the SQLite/PowerSync path with contract 1, schema 4, policy 10, revision/predecessor metadata, authoritative receipts and zero-pending handshakes. Clinical signing uses verified personal scope. Co-signatures and independent delayed review preserve source author/time/content. Private access uses established contacts, memory-only sessions and automatic expiry. Preparation preserves existing care; activation remains an authorized rollout. Supporting server migration 0017 is included. See WORKFORCE.md for scope, deployment, tests and boundaries. No dependencies were added.
+
+Final feature validation: 264 web tests, 404 server/shared tests and eight connected Chrome workflows pass. Both typechecks and the production build pass. Initial JavaScript is 144.6 KB gzip against 300 KB. Configuration revisions are checked inside the write transaction, including PowerSync SQLite views; a regression covers zero row counts and a concurrent revision change.

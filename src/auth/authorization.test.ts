@@ -76,6 +76,10 @@ describe('assertAllowed', () => {
     expect(anonymous.permissions).toEqual([]);
     expect(isAllowed(anonymous, 'patient:create')).toBe(false);
   });
+  it('uses a newer trusted server contact when the signed-in context has an older snapshot',()=>{
+    const admin=contextFor(staff('facility_admin'),ago(2*DAY));recordServerContact(ago(HOUR));
+    expect(isAllowed(admin,'staff:manage')).toBe(true);
+  });
 });
 
 describe('authorizationFor', () => {

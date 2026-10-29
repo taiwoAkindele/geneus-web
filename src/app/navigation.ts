@@ -12,9 +12,9 @@ export const hasAdminWorkspace = (context: NavContext): boolean =>
 export const navigationFor = (context: NavContext): NavItem[] => {
   const roles = context.roles ?? [context.role];
   const admin = roles.includes('facility_admin');
-  const clinical = roles.some((role) => ['chew', 'nurse', 'doctor', 'supervisor'].includes(role)) || context.permissions.includes('encounter:record');
+  const clinical = roles.some((role) => ['chew', 'nurse', 'doctor', 'supervisor', 'laboratory_staff', 'pharmacy_staff'].includes(role)) || context.permissions.includes('encounter:record');
   // Extra duties expand destinations; they do not replace the primary duty's shortcut.
-  const clinicalShortcut = ['chew', 'nurse', 'doctor', 'supervisor'].includes(context.role) || (context.role === 'facility_admin' && clinical);
+  const clinicalShortcut = ['chew', 'nurse', 'doctor', 'supervisor', 'laboratory_staff', 'pharmacy_staff'].includes(context.role) || (context.role === 'facility_admin' && clinical);
   const frontDesk = !clinicalShortcut && context.role !== 'cashier';
   const dailyWork = roles.some((role) => role !== 'cashier') ||
     context.permissions.some((permission) => ['patient:create', 'patient:update', 'appointment:create', 'encounter:record', 'register_entry:create'].includes(permission));
@@ -35,7 +35,8 @@ export const navigationFor = (context: NavContext): NavItem[] => {
     { key: 'stock', label: 'Medicine & stock', to: '/stock', match: '/stock', icon: 'stock', group: 'Facility' },
     { key: 'month', label: 'Monthly reports', to: '/reports/month', match: '/reports', icon: 'month', group: 'Facility' },
   );
-  if (roles.includes('facility_admin') || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign'].includes(permission))) items.push({ key: 'staff', label: 'Staff & roster', to: '/admin/staff', match: '/admin/staff', icon: 'patients', group: 'Facility' });
+  if (roles.includes('facility_admin') || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign', 'credential:read', 'practitioner:manage', 'staff_assignment:manage', 'service_session:manage'].includes(permission))) items.push({ key: 'staff', label: 'Staff & roster', to: '/admin/staff', match: '/admin/staff', icon: 'patients', group: 'Facility' });
+  if (context.permissions.some((p)=>['unit:manage','location:manage','service:manage','staff_assignment:manage','staff:manage'].includes(p))) items.push({key:'facility',label:'Facility setup',to:'/facility',match:'/facility',icon:'referrals',group:'Facility'});
   if (hasAdminWorkspace(context)) items.push({ key: 'admin', label: 'Settings', to: '/admin', match: '/admin', icon: 'lock', group: 'Facility' });
   return items;
 };

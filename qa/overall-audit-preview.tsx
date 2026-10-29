@@ -106,7 +106,7 @@ db.execute = async (sql, parameters = []) => {
   if (existingRecovery) Object.assign(existingRecovery, record); else (db.rows[match[1]] ??= []).push(record);
   if (!['encounter_drafts', 'register_builder_drafts'].includes(match[1])) window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
-db.writeTransaction = async (callback) => callback({ execute: db.execute });
+db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
 setDatabaseForTests(db);
 localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));

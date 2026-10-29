@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+const CareContext=lazy(()=>import('@/features/workforce/CareContext').then((m)=>({default:m.CareContext})));
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useAuthorizationContext, useSession } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
@@ -203,6 +205,7 @@ export const AppShell = () => {
         <AppHeader />
         <ShiftBanner />
         <Content id="main-content" tabIndex={-1} className={`flex-1 outline-none ${ending ? 'pb-44' : 'pb-28'} sm:pb-0`}>
+          <Suspense fallback={null}><CareContext/></Suspense>
           <Outlet />
         </Content>
         <div className="fixed inset-x-0 bottom-0 z-30 sm:hidden">

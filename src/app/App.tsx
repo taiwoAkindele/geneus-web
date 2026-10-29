@@ -56,8 +56,8 @@ const RolesPermissionsScreen = lazy(() =>
   })),
 );
 const ManageStaffScreen = lazy(() =>
-  import('@/pages/facility-onboarding/ManageStaffScreen').then((m) => ({
-    default: m.ManageStaffScreen,
+  import('@/pages/workforce/StaffDirectoryScreen').then((m) => ({
+    default: m.StaffDirectoryScreen,
   })),
 );
 
@@ -101,7 +101,10 @@ const SendToUnitScreen = lazy(() =>
   import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
 const UnitQueueScreen = lazy(() => import('@/pages/units/UnitQueueScreen').then((m) => ({ default: m.UnitQueueScreen })));
-const UnitsScreen = lazy(() => import('@/pages/units/UnitsScreen').then((m) => ({ default: m.UnitsScreen })));
+const FacilityScreen = lazy(() => import('@/pages/workforce/FacilityScreen').then((m) => ({ default: m.FacilityScreen })));
+const ServiceScreen = lazy(() => import('@/pages/workforce/ServiceScreen').then((m) => ({ default: m.ServiceScreen })));
+const StaffScreen = lazy(() => import('@/pages/workforce/StaffScreen').then((m) => ({ default: m.StaffScreen })));
+const ClinicalReviewsScreen = lazy(() => import('@/pages/workforce/ClinicalReviewsScreen').then((m) => ({ default: m.ClinicalReviewsScreen })));
 const RegistersListScreen = lazy(() =>
   import('@/pages/registers/RegistersListScreen').then((m) => ({ default: m.RegistersListScreen })),
 );
@@ -199,9 +202,13 @@ const App = () => {
                 Admin nav entry; each screen deep-links to the next. */}
             <Route path="/admin" element={<AdminDashboardScreen />} />
             <Route path="/admin/staff" element={<ManageStaffScreen />} />
+            <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
+            <Route path="/facility" element={<FacilityScreen />} />
+            <Route path="/clinical-reviews" element={<ClinicalReviewsScreen />} />
+            <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
-            <Route path="/admin/units" element={<UnitsScreen />} />
+            <Route path="/admin/units" element={<Navigate to="/facility?view=structure" replace />} />
             <Route path="/billing" element={<BillingScreen />} />
             <Route path="/billing/fees" element={<FeeScheduleScreen />} />
             <Route path="/billing/settings" element={<BillingSettingsScreen />} />

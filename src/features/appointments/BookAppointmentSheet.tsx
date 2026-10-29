@@ -4,6 +4,7 @@ import { VisitType } from '@shared';
 import { VISIT_TYPE_LABELS } from '@/features/billing/feeForm';
 import { useAppointments } from './AppointmentsProvider';
 import type { AppointmentPatient } from './types';
+import { AllocationFields, type AllocationProposal } from '@/features/workforce/AllocationFields';
 
 const fmtDay = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
@@ -23,6 +24,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const [visitType, setVisitType] = useState<VisitType>('general');
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState('');
+  const [resource,setResource]=useState<AllocationProposal>({});
 
   const canBook = mode === 'now' || Boolean(date && time);
 
@@ -30,8 +32,9 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
     if (!canBook || booking) return;
     setBooking(true); setError('');
     try {
-      const scheduledFor = mode === 'scheduled' ? new Date(`${date}T${time}`).toISOString() : undefined;
-      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType });
+      if(mode==='scheduled'&&resource.error)throw new Error(resource.error);
+      const scheduledFor = mode === 'scheduled' ? resource.scheduledFor||new Date(`${date}T${time}`).toISOString() : undefined;
+      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType, allocation:mode==='scheduled'?resource.allocation:undefined });
       toast(
         scheduledFor
           ? `Appointment saved on this device for ${fmtDay(date)}`
@@ -77,6 +80,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
         <TextField label="Reason" name="appt_reason" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
 
+      {mode==='scheduled'?<div className="mt-4"><AllocationFields start={date&&time?`${date}T${time}`:''} onChange={setResource}/></div>:null}
       <div className="mt-5">
         {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         <Button variant="primary" disabled={!canBook || booking} loading={booking} onClick={submit}>

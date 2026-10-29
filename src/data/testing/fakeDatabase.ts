@@ -20,11 +20,12 @@ export const fakeDatabase = (seed: Record<string, Record<string, unknown>[]> = {
   const statements: Statement[] = [];
   const rows = structuredClone(seed);
   const transactions: CrudTransaction[] = [];
+  const getOptional=async<T>(sql:string,parameters:unknown[]=[])=>((rows[tableOf(sql)??'']??[]).find((row)=>row.id===parameters[0])??null) as T|null;
   return {
     statements,
     rows,
     transactions,
-    writeTransaction: async (callback) => callback({ execute: async (sql, parameters = []) => { statements.push({ sql, parameters }); } }),
+    writeTransaction: async (callback) => callback({ execute: async (sql, parameters = []) => { statements.push({ sql, parameters }); },getOptional }),
     execute: async (sql, parameters = []) => {
       statements.push({ sql, parameters });
     },

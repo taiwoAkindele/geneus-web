@@ -24,9 +24,11 @@ export const CATEGORY_LABEL: Record<RejectionCategory, string> = {
   authorization: 'Not allowed for the person who saved it',
   identity: 'Device or staff member not recognised',
   validation: 'The record was not valid',
+  dependency: 'A linked record needs attention first',
 };
 
 export const rejectionAdvice = (rejection: SyncRejection): string => {
+  if (rejection.category === 'dependency') return 'Resolve the linked records first, then resubmit this original proposal. Its contents have been retained.';
   if (rejection.reason.startsWith('held:')) return 'Review the patient registration first. Related records remain held with it.';
   if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Another configuration version arrived first. Sync and open the current register configuration before preparing a new draft. This refused snapshot remains available in the details.';
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';

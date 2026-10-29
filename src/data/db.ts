@@ -74,15 +74,20 @@ export const insertRecord = async <T extends AnyDocument>(
   permission: Permission,
   type: DocType,
   record: unknown,
+  options?:{replaceSame?:boolean},
 ): Promise<T> => {
   assertAllowed(context, permission);
-  const validated = validate<T>(record);
+  const {prepareClinicalBundle,clearClinicalReview}=await import('./repos/clinicalReviews');
+  const bundle=await prepareClinicalBundle([{type,permission,record:validate(record)}],context);
+  const validated = validate<T>(bundle.records[0].record);
   const row = toRow(type, validated);
+  if(options?.replaceSame){const existing=await findRecord(type,validated.id);if(existing){const {clinicalPayloadHash}=await import('./workforceClinical');if(await clinicalPayloadHash(existing)!==await clinicalPayloadHash(validated))throw new Error('A different clinical record already uses this identity. Review its existing history');}}
   const columns = Object.keys(row);
   await getDatabase().execute(
-    `INSERT INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
+    `INSERT ${options?.replaceSame?'OR REPLACE ':''}INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
     columns.map((column) => row[column]),
   );
+  if(bundle.reviewId)await clearClinicalReview(bundle.reviewId);
   return validated;
 };
 
@@ -95,7 +100,9 @@ export type NewRecord = { permission: Permission; type: DocType; record: unknown
  */
 export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[]): Promise<AnyDocument[]> => {
   for (const { permission } of records) assertAllowed(context, permission);
-  const validated = records.map(({ type, record }) => ({ type, record: validate(record) }));
+  const {prepareClinicalBundle,clearClinicalReview}=await import('./repos/clinicalReviews');
+  const bundle=await prepareClinicalBundle(records.map((r)=>({...r,record:validate(r.record)})),context);
+  const validated=bundle.records.map(({type,record})=>({type,record:validate(record)}));
   await getDatabase().writeTransaction(async (transaction) => {
     for (const { type, record } of validated) {
       const row = toRow(type, record);
@@ -106,6 +113,7 @@ export const insertRecords = async (context: AuthorizationContext, records: read
       );
     }
   });
+  if(bundle.reviewId)await clearClinicalReview(bundle.reviewId);
   return validated.map(({ record }) => record);
 };
 
@@ -128,14 +136,24 @@ export const updateRecord = async <T extends AnyDocument>(
   if (!current) throw new Error(`no ${type} ${id} to change`);
   const stamped = { ...changes, updatedBy: context.userId, updatedOn: changedOn };
   const merged = validate<T>({ ...current, ...stamped });
+  const revision = (changes as Record<string, unknown>).revision;
+  const cas = typeof revision === 'number' && ['unit','billing_department','location','service_definition','service_offering','practitioner_profile'].includes(type);
+  if (cas && revision !== Number((current as Record<string,unknown>).revision ?? 1) + 1) throw new Error('This configuration changed. Reopen the current record before saving');
   const row = toRow(type, stamped);
   const columns = Object.keys(row);
   // `_metadata` is PowerSync's per-write note, not a contract field: it carries the
   // actor even when `updatedBy` is unchanged and therefore absent from the PATCH.
-  await getDatabase().execute(
-    `UPDATE ${TABLE_FOR[type]} SET ${columns.map((name) => `${column(name)} = ?`).join(', ')}, _metadata = ? WHERE id = ?`,
-    [...columns.map((column) => row[column]), context.userId, id],
-  );
+  const statement=`UPDATE ${TABLE_FOR[type]} SET ${columns.map((name)=>`${column(name)} = ?`).join(', ')}, _metadata = ? WHERE id = ?${cas?' AND COALESCE("revision", 1) = ?':''}`;
+  const parameters=[...columns.map((name)=>row[name]),context.userId,id,...(cas?[revision-1]:[])];
+  if(cas){
+    // PowerSync tables are SQLite views: INSTEAD OF triggers legitimately return
+    // rowsAffected=0. Check the revision under the same write lock as the update.
+    await getDatabase().writeTransaction(async(transaction)=>{
+      const locked=await transaction.getOptional<{revision?:number}>(`SELECT revision FROM ${TABLE_FOR[type]} WHERE id = ?`,[id]);
+      if(!locked||Number(locked.revision??1)!==revision-1)throw new Error('This configuration changed in another window. Reopen its current details before saving');
+      await transaction.execute(statement,parameters);
+    });
+  }else await getDatabase().execute(statement,parameters);
   return merged;
 };
 

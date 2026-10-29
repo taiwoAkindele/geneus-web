@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { unitIsRoutable } from '@shared';
+import { SelectField } from '@/ui';
+import { useWorkforce } from '@/features/workforce/useWorkforce';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Avatar, Button, ChoiceChip, useToast } from '@/ui';
 import { SyncPill } from '@/app/SyncPill';
@@ -52,12 +55,14 @@ export const SendToUnitScreen = () => {
   const { patientId, encounterId } = (useLocation().state as SendToUnitNavState) ?? {};
   const patient = usePatient(patientId);
   const units = useUnits();
+  const workforce=useWorkforce();
+  const [serviceId,setServiceId]=useState('');
   const [fromUnitId, setFromUnitId] = useState(readDeviceUnit());
   const [toUnitId, setToUnitId] = useState<string>();
   const [instruction, setInstruction] = useState('');
   const [sending, setSending] = useState(false);
 
-  const active = (units.data ?? []).filter((unit) => unit.active);
+  const active = (units.data ?? []).filter(unitIsRoutable);
   const from = active.find((unit) => unit.id === fromUnitId);
   const to = active.find((unit) => unit.id === toUnitId && unit.id !== from?.id);
 
@@ -98,6 +103,7 @@ export const SendToUnitScreen = () => {
       <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<SyncPill />} />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 px-5 py-3">
+          {workforce.data?.offerings.some((o)=>o.configuration==='active')?<div className="mb-4"><SelectField label="Requested service" value={serviceId} help={{purpose:'Routes the instruction to the responsible unit. Staff confirm the service when accepting work.'}} onChange={(e)=>{const id=e.target.value;setServiceId(id);const offering=workforce.data?.offerings.find((o)=>o.id===id);const destination=active.find((u)=>[u.id,u.unitId].includes(offering?.unitId||''));setToUnitId(destination?.id);}} options={[{value:'',label:'Choose a service or select a unit below'},...workforce.data.offerings.filter((o)=>o.configuration==='active').map((o)=>({value:o.id,label:o.name}))]}/></div>:null}
           {/* Patient */}
           <div className="mb-4 flex items-center gap-3 rounded-[13px] bg-brand-tint px-3.5 py-3">
             <Avatar tone="green" size="sm">{patient.data ? initialsOf(patient.data.fullName) : '··'}</Avatar>

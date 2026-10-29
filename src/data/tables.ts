@@ -1,6 +1,9 @@
 import type { DocType } from '@shared';
 
 export const REGISTER_DRAFTS_TABLE = 'register_builder_drafts';
+export const WORKFORCE_DRAFTS_TABLE = 'workforce_editor_drafts';
+export const WORKFORCE_RECEIPTS_TABLE = 'workforce_upload_receipts';
+export const CLINICAL_REVIEWS_TABLE = 'clinical_review_drafts';
 
 /**
  * Record type ↔ table name. Table names match the Sync Streams (and the
@@ -36,6 +39,21 @@ export const TABLE_FOR: Record<DocType, string> = {
   billing_adjustment: 'billing_adjustments',
   incoming_transfer: 'incoming_transfers',
   billing_department: 'billing_departments',
+  location: 'locations',
+  service_definition: 'service_definitions',
+  service_offering: 'service_offerings',
+  practitioner_profile: 'practitioner_profiles',
+  credential: 'credentials',
+  capability_decision: 'capability_decisions',
+  reviewer_delegation: 'reviewer_delegations',
+  clinical_authority_bootstrap: 'clinical_authority_bootstraps',
+  external_clinical_reviewer: 'external_clinical_reviewers',
+  authority_snapshot: 'authority_snapshots',
+  staff_assignment: 'staff_assignments',
+  service_session: 'service_sessions',
+  session_event: 'session_events',
+  work_ownership_event: 'work_ownership_events',
+  appointment_reservation: 'appointment_reservations',
 };
 
 /**

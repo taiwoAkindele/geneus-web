@@ -1,4 +1,4 @@
-import type { AppointmentStatus, AppointmentAttendance, AppointmentActivity, VisitType } from '@shared';
+import type { AppointmentStatus, AppointmentAttendance, AppointmentActivity, AppointmentAllocation, VisitType } from '@shared';
 
 /**
  * Appointments (PRD §9.8). A booking made from a patient's profile drops the
@@ -22,6 +22,7 @@ export type BookedAppointment = {
   status: AppointmentStatus;
   attendance?: AppointmentAttendance;
   activity?: AppointmentActivity[];
+  allocation?: AppointmentAllocation;
   scheduledFor?: string;
   at: string;
   group: AppointmentGroup;
@@ -30,6 +31,7 @@ export type BookedAppointment = {
 };
 
 export type NewAppointment = {
+  allocation?: AppointmentAllocation;
   patientId: string;
   reason: string;
   /** Absent books the patient for now; present schedules them ahead. */

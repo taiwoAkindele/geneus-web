@@ -22,7 +22,7 @@ export const AdminDashboardScreen = () => {
       ...(staff ? [{ label: 'Staff & roster', description: 'Staff profiles, combined duties, permissions and planned shifts.', to: '/admin/staff', icon: 'patients' as const }] : []),
       ...(devices ? [{ label: 'Facility devices', description: 'Enrollment, recent server contact and revocation.', to: '/admin/devices', icon: 'lock' as const }] : []),
     ]} /><SettingsGroup title="Care & recording" items={[
-      ...(units ? [{ label: 'Units & rooms', description: 'Places patients can be sent, with instructions.', to: '/admin/units', icon: 'referrals' as const }] : []),
+      ...(units ? [{ label: 'Facility setup', description: 'Care services, accountable teams, locations and financial links.', to: '/facility', icon: 'referrals' as const }] : []),
       ...(registers ? [{ label: 'Register books', description: 'Review published books and configure new versions.', to: '/registers', icon: 'registers' as const }] : []),
     ]} /></div><div className="space-y-5"><SettingsGroup title="Payment setup" items={fees ? [
       { label: 'Departments & receiving accounts', description: 'Configure provider connection and department accounts.', to: '/billing/settings', icon: 'referrals' },

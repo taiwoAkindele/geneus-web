@@ -43,7 +43,7 @@ export const projectAppointments = (
       day: day === today ? 'Today' : new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       when: new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       at, group, encounterId: encounter?.id, status: appointment.status,
-      attendance: appointment.attendance, activity: appointment.activity, scheduledFor: appointment.scheduledFor,
+      attendance: appointment.attendance, activity: appointment.activity, scheduledFor: appointment.scheduledFor, allocation: appointment.allocation,
       paymentStatus: isAppointmentConfirmed(appointment.id, charges, payments, adjustments, appointment.chargeIds) ? 'Confirmed' : 'Awaiting payment',
     };
   }).sort((a, b) => a.at.localeCompare(b.at));

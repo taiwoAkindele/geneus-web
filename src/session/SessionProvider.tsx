@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { rolesFor, type AuthorizationContext, type RosterShift, type Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
 import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
-import { authorizationFor, nobody } from '@/auth/authorization';
+import { authorizationFor, nobody, freshAuthorization } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
 import { listOpenRejections } from '@/data/repos/syncRejections';
 import { checkPin, needsLongerPin } from './credentials';
@@ -320,9 +320,10 @@ export const useAuth = (): AuthValue => {
 export const useAuthorizationContext = (): AuthorizationContext => {
   const session = useContext(SessionContext);
   const { facility, deviceId } = useDeviceContext();
+  const contact=lastServerContactOn();
   return useMemo(
-    () => session?.authorization ?? nobody(facility?.code ?? '', deviceId),
-    [session?.authorization, facility?.code, deviceId],
+    () => freshAuthorization(session?.authorization ?? nobody(facility?.code ?? '', deviceId)),
+    [session?.authorization, facility?.code, deviceId, contact],
   );
 };
 
