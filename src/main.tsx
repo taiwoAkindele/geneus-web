@@ -1,3 +1,4 @@
+import { recoverWorkspaceActivation } from '@/data/facilityWorkspaces';
 import '@/lib/platform';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -9,7 +10,7 @@ const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 // The device's secrets (credential, PINs, database key) are read while
 // rendering, so they are decrypted into memory first.
-unlockSecureStorage().then(
+unlockSecureStorage().then(recoverWorkspaceActivation).then(
   () =>
     root.render(
       <React.StrictMode>

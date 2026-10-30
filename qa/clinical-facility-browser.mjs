@@ -1,0 +1,65 @@
+// Real components and repositories, synthetic records, no production API or patient data.
+import { createServer } from 'vite';
+import { spawn } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { resolve, join, sep } from 'node:path';
+import { tmpdir } from 'node:os';
+import assert from 'node:assert/strict';
+const output = resolve('qa/artifacts'); await mkdir(output, { recursive: true });
+const profile = await mkdtemp(join(tmpdir(), 'geneus-care-'));
+const server = await createServer({ configFile: false, envFile: false, root: process.cwd(), logLevel: 'error', resolve: { alias: [{ find: /^@\/data$/, replacement: resolve('qa/clinical-device.ts') }, { find: '@shared', replacement: resolve('shared/src') }, { find: '@', replacement: resolve('src') }] }, esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 5196, strictPort: true } });
+await server.listen();
+const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9336', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+let socket; const errors = [], checks = [];
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+try {
+  let target;
+  for (let attempt = 0; attempt < 50; attempt++) { try { target = (await (await fetch('http://127.0.0.1:9336/json')).json()).find((p) => p.type === 'page'); if (target) break; } catch {} await pause(100); }
+  assert.ok(target, 'Chrome did not start');
+  socket = new WebSocket(target.webSocketDebuggerUrl); await new Promise((done, reject) => { socket.onopen = done; socket.onerror = reject; });
+  let sequence = 0; const pending = new Map();
+  socket.onmessage = ({ data }) => { const message = JSON.parse(data); if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text); if (message.id) { const request = pending.get(message.id); pending.delete(message.id); message.error ? request?.reject(new Error(message.error.message)) : request?.resolve(message.result); } };
+  const cdp = (method, params = {}) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
+  const evaluate = async (expression) => { const result = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text); return result.result.value; };
+  const wait = async (expression) => { for (let attempt = 0; attempt < 100; attempt++) { if (await evaluate(expression)) return; await pause(100); } throw new Error('Timed out: ' + expression + '\n' + await evaluate('document.body.innerText')); };
+  const click = async (text) => { await evaluate(`(() => { const node = [...document.querySelectorAll('button')].find((n) => n.textContent.trim() === ${JSON.stringify(text)} && n.getClientRects().length); if (!node || node.disabled) throw new Error('Missing enabled button: ' + ${JSON.stringify(text)}); node.click(); })()`); await pause(150); };
+  const field = async (label, value) => { await evaluate(`(() => { const label = [...document.querySelectorAll('label')].find((n) => n.textContent.trim().startsWith(${JSON.stringify(label)})); const input = label?.control ?? label?.querySelector('input,textarea,select'); if (!input) throw new Error('Missing field: ' + ${JSON.stringify(label)}); const proto = input.tagName === 'SELECT' ? HTMLSelectElement.prototype : input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); })()`); await pause(100); };
+  const task = async (name) => { await evaluate(`(() => { const node = [...document.querySelectorAll('nav[aria-label="Visit tasks"] button')].find((n) => n.querySelector('span')?.textContent.trim() === ${JSON.stringify(name)}); if (!node || node.disabled) throw new Error('Unavailable task: ' + ${JSON.stringify(name)}); node.click(); })()`); await pause(150); };
+  const sign = async (label) => { await click(label); await wait('Boolean(document.querySelector("dialog[open]"))'); await click('Confirm & lock'); await wait('!document.querySelector("dialog[open]")'); };
+  const load = async () => { await cdp('Page.navigate', { url: 'http://127.0.0.1:5196/qa/clinical-facility.html?patient=QA-PHC-000001-K2' }); await wait('document.body.innerText.includes("Synthetic Care Patient") && Boolean(window.careQa)'); };
+  await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await load(); await task('Diagnosis'); await field('Diagnosis', 'Synthetic assessment'); await sign('Review & sign diagnosis');
+  await task('Testing decision'); await field('Testing decision', 'none_required'); await sign('Review & sign testing decision');
+  await task('Disposition'); await field('Disposition', 'home_care'); await field('Care plan / instructions / reason', 'Synthetic advice and review instructions');
+  await writeFile(join(output, 'care-home-mobile.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  await click('Review & complete visit'); await wait('Boolean(document.querySelector("dialog[open]"))'); await click('Confirm & complete visit');
+  await wait('window.careQa.rows.encounter_entries.some((r) => r.step === "disposition")');
+  assert.equal(await evaluate('window.careQa.rows.encounter_entries.some((r) => ["lab_order","prescription","injection","admission"].includes(r.step))'), false);
+  assert.equal(await evaluate('(window.careQa.rows.charges ?? []).length'), 0); checks.push('Complete diagnosis + no investigations + home care with no medication or charges');
+  await load(); await task('Testing decision'); await field('Testing decision', 'ordered'); await click('Choose investigations'); await task('Lab order');
+  await field('Search facility investigations', 'FBC'); await click('Add'); await sign('Review & sign lab order');
+  assert.equal(await evaluate('window.careQa.rows.charges.length'), 1); assert.equal(await evaluate('window.careQa.rows.charges[0].amountMinor'), 450000);
+  assert.equal(await evaluate('window.careQa.rows.encounter_entries.filter((r) => r.step === "investigation_review").length'), 1); checks.push('Search catalogue by abbreviation and create a linked order, decision and charge');
+  await task('Disposition'); await field('Disposition', 'observation'); await wait('document.body.innerText.includes("Reassessment due")');
+  await field('Disposition', 'referral'); await wait('document.body.innerText.includes("Destination facility code")');
+  await field('Disposition', 'admission'); assert.equal(await evaluate('document.body.innerText.includes("bed allocation are separate")'), true); checks.push('Disposition-specific fields and admission request wording');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await task('Prescription'); await field('Medication decision', 'prescribed'); await click('＋ Add medication'); await field('Drug', 'Synthetic medicine'); await field('Dose', 'Recorded dose');
+  await writeFile(join(output, 'care-prescription-desktop.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true); checks.push('Independent prescription form and responsive layout');
+  await field('Medication decision', 'none_required'); await sign('Review & sign prescription');
+  await task('Diagnosis'); await field('Diagnosis', 'Synthetic assessment'); await sign('Review & sign diagnosis');
+  await task('Disposition'); await field('Disposition', 'home_care'); await field('Care plan / instructions / reason', 'Pending result review assigned to the requesting clinician');
+  await click('Review & complete visit'); await wait('Boolean(document.querySelector("dialog[open]"))'); await click('Confirm & complete visit'); await wait('window.careQa.rows.encounter_entries.some((r) => r.step === "disposition")');
+  await task('Results'); await field('Full blood count', 'Synthetic recorded finding'); await sign('Review & sign results');
+  await task('Result review'); await field('Clinical review / action taken', 'Synthetic clinical review documented'); await sign('Review & sign result review');
+  assert.equal(await evaluate('window.careQa.rows.encounter_entries.filter((r) => r.step === "result_review").length'), 1);
+  checks.push('Record and acknowledge a pending result after consultation completion');
+  assert.deepEqual(errors, []); await writeFile(join(output, 'clinical-facility-browser.json'), JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, errors }, null, 2));
+} catch (cause) { console.error(JSON.stringify({ errors, checks }, null, 2)); throw cause; } finally {
+  socket?.close(); chrome.kill(); await server.close();
+  const safeRoot = resolve(tmpdir()) + sep + 'geneus-care-';
+  if (!resolve(profile).startsWith(safeRoot)) throw new Error('Refusing to remove an unexpected browser profile path');
+  await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}

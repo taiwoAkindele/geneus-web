@@ -82,7 +82,7 @@ describe('connector', () => {
       expect(credentials).toEqual({ endpoint: 'http://sync', token: 'jwt', expiresAt: new Date('2026-09-12T13:00:00Z') });
       const init = fetch.mock.calls[0]?.[1] as RequestInit;
       expect(init).toMatchObject({ headers: expect.objectContaining({ authorization: 'Bearer device-1.secret' }) });
-      expect(JSON.parse(String(init.body))).toEqual({facilityContractVersion:1,schemaVersion:4,policyVersion:10,pendingMutationCount:1});
+      expect(JSON.parse(String(init.body))).toEqual({clinicalWorkflowVersion:1,facilityContractVersion:1,schemaVersion:4,policyVersion:10,pendingMutationCount:1});
       expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
       expect(lastServerContactOn()).toBe('2026-09-12T12:00:00Z');
     });
@@ -112,7 +112,7 @@ describe('connector', () => {
       await createConnector({ onDeenrolled: vi.fn() }).uploadData(db as never);
 
       expect(JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
-        facilityContractVersion:1,schemaVersion:4,policyVersion:10,
+        clinicalWorkflowVersion:1,facilityContractVersion:1,schemaVersion:4,policyVersion:10,
         transactionId: 3,
         mutations: [{ clientId: 7, op: 'put', table: 'patient', id: 'X-Y-000001-K2', data: { fullName: 'Amaka' } }],
       });

@@ -23,6 +23,7 @@ export const TABLE_FOR: Record<DocType, string> = {
   register_definition: 'register_definitions',
   register_entry: 'register_entries',
   referral: 'referrals',
+  inbound_referral: 'inbound_referrals',
   stock_item: 'stock_items',
   stock_movement: 'stock_movements',
   facility: 'facilities',

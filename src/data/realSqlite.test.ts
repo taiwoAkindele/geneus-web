@@ -326,6 +326,17 @@ describe('the write path against a real SQLite', () => {
       return createCharge(fee.id, { patientId: patient, facts: { ageYears: 32, sex: 'female' }, appointmentId: 'appointment:1' }, contextFor('records_officer'));
     };
 
+    it('uses the new offline price without attaching the previous server price version', async () => {
+      const admin = contextFor('facility_admin');
+      const fee = await createFeeItem(draft(), admin);
+      await db.execute('UPDATE fee_items SET "priceVersion" = ? WHERE id = ?', ['price:previous', fee.id]);
+      const changed = await updateFeeItem(fee.id, draft({ amountMinor: 200000 }), admin);
+      expect(changed.priceVersion).toBeUndefined();
+      const reread = (await listFeeItems()).find((item) => item.id === fee.id)!;
+      expect(reread.amountMinor).toBe(200000);
+      expect(reread.priceVersion).toBeUndefined();
+    });
+
     it('round-trips fee rules, amounts and retirement through SQLite', async () => {
       const fee = await createFeeItem(draft(), contextFor('facility_admin'));
       expect((await listFeeItems())[0]).toMatchObject({ amountMinor: 150000, active: true, exemptions: draft().exemptions });

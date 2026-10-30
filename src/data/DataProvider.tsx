@@ -1,3 +1,4 @@
+import { nameActiveWorkspace } from './facilityWorkspaces';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { DeviceCredential, Facility } from '@shared';
 import { PulseLoader } from '@/ui';
@@ -38,6 +39,7 @@ const Screen = ({ children }: { children: ReactNode }) => (
 const EnrolledDevice = ({ credential, enroll, children }: { credential: DeviceCredential; enroll: DeviceContext['enroll']; children: ReactNode }) => {
   const load = useCallback(() => getFacility(), []);
   const { data, loading, error } = useLiveQuery(load);
+  useEffect(() => { if (data?.name) void nameActiveWorkspace(data.name); }, [data?.name]);
   const value = useMemo<DeviceContext>(
     () => ({ deviceId: credential.deviceId, facility: data, enrolled: true, enroll }),
     [credential.deviceId, data, enroll],

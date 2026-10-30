@@ -40,6 +40,7 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
+        <button type="button" className="min-h-[44px] rounded-field border border-outline-soft px-4 py-3 text-left font-bold" onClick={() => go('/facilities')}>Switch facility</button>
         {available.some((workspace) => workspace.id === 'administration') ? (
           <button
             type="button"

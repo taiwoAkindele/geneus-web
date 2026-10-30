@@ -1,10 +1,16 @@
-import { effectiveEncounterEntries, type Encounter, type EncounterEntry, type Role } from '@shared';
-import { AUDIT_LABEL, STEP_DEFS, isClosingStep, stepsFor } from './steps';
+import { effectiveEncounterEntries, closesEncounter, dispositionHeads, type Encounter, type EncounterEntry, type Role } from '@shared';
+import { AUDIT_LABEL, STEP_DEFS, stepsFor } from './steps';
 import { fromStepValues } from './stepValues';
 import type { Amendment, AuditRow, EncounterData, EncounterState, Signature, StepKey } from './types';
 
 /** What a new encounter's forms start with: nothing. A default would be saved as a finding. */
 export const EMPTY_ENCOUNTER_DATA: EncounterData = {
+  workflowVersion: 1,
+  result_review: { resultEntryIds: [], note: '' },
+  investigation_review: { decision: '', reason: '' },
+  prescription: { decision: '', rx: [] },
+  injection_order: { required: false, drug: '', dose: '', route: '', instructions: '' },
+  disposition: { kind: '', note: '', responsibleService: '', reassessOn: '', toFacilityId: '', followUpOn: '' },
   vitals: { temp: '', bp: '', pulse: '', weight: '', spo2: '' },
   complaint: { text: '', note: '' },
   lab_order: { tests: [] },
@@ -66,11 +72,14 @@ export const projectEncounter = ({ patientId, encounter, entries, draft, skipped
     if (entry.step !== 'amendment') saved[entry.step] = entry;
   }
 
-  let data = draft;
-  for (const [key, entry] of Object.entries(saved) as [StepKey, EncounterEntry][]) {
-    data = fromStepValues(key, entry.values, data);
+  let data: EncounterData = { ...draft, workflowVersion: (encounter?.workflowVersion === 1 || entries.some((e) => e.workflowVersion === 1) || entries.some((e) => ['investigation_review', 'result_review', 'prescription', 'injection_order', 'disposition'].includes(e.step)) || !saved.diagnosis ? 1 : undefined) as 1 | undefined };
+  for (const entry of effectiveEncounterEntries(byTime)) {
+    if (entry.step !== 'amendment') data = fromStepValues(entry.step, entry.values, data);
   }
 
+  const dispositions = dispositionHeads(entries);
+  if (dispositions.length === 1) { saved.disposition = dispositions[0]; data = fromStepValues('disposition', dispositions[0].values, data); }
+  if (!saved.result_review) data.result_review = { ...data.result_review, resultEntryIds: byTime.filter((e) => e.step === 'lab_results').map((e) => e.id) };
   const sig: Partial<Record<StepKey, Signature>> = {};
   for (const [key, entry] of Object.entries(saved) as [StepKey, EncounterEntry][]) {
     sig[key] = { actor: nameOf(entry.createdBy), role: ROLE_LABEL[entry.actorRole], ...stamp(entry.createdOn) };
@@ -98,7 +107,7 @@ export const projectEncounter = ({ patientId, encounter, entries, draft, skipped
   }
 
   const steps = stepsFor(data);
-  const closed = steps.some((step) => isClosingStep(step.key) && saved[step.key]);
+  const closed = entries.some(closesEncounter);
   const lastSaved = steps.reduce((last, step, index) => (saved[step.key] ? index : last), -1);
   const activeIndex = closed
     ? -1

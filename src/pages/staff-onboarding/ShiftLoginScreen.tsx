@@ -2,7 +2,7 @@ import { accessFor, covers } from '@/session/accessPolicy';
 import { shiftRangeLabel } from '@/session/shiftLabels';
 import { roleLabel } from '@/features/staff/staffAccess';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, PinDots, PinKeypad, Tag } from '@/ui';
 import { useDeviceContext, useSyncStatus } from '@/data';
 import { lastServerContactOn } from '@/data/deviceCredential';
@@ -122,7 +122,8 @@ export const ShiftLoginScreen = () => {
     <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-6 text-white sm:min-h-0">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="flex items-center justify-end gap-2">
-          <SyncPill />
+          <Link to="/facilities" className="mb-3 block font-bold text-brand">Switch facility</Link>
+    <SyncPill />
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-on-dark">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
             On this device

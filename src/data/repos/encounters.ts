@@ -1,7 +1,7 @@
-import { CLOSING_STEPS, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
-import { allOfType, allWhere, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
+import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
+import { allOfType, allWhere, findRecord, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
-import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient } from './billing';
+import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
 
 /**
@@ -24,7 +24,7 @@ export const entriesAtSteps = async (steps: readonly EncounterStep[]): Promise<E
 
 /** Every closing entry on the device — what tells an open encounter from a finished one. */
 export const closingEntries = async (): Promise<EncounterEntry[]> =>
-  (await Promise.all(CLOSING_STEPS.map((step) => allWhere<EncounterEntry>('encounter_entry', 'step', step)))).flat();
+  (await listEncounterEntries()).filter(closesEncounter);
 
 export type RecordedStep = Exclude<EncounterStep, 'amendment'>;
 
@@ -38,6 +38,8 @@ export type StepSave = {
   /** A follow-up review to book in the same save (PRD §9.8.1, step 7). */
   followUp?: Omit<AppointmentDraft, 'patientId'>;
   collectLaterReason?: string;
+  investigationReason?: string;
+  workflowVersion?: 1;
 };
 
 /**
@@ -48,7 +50,7 @@ export type StepSave = {
 export const saveStep = async (save: StepSave, context: AuthorizationContext): Promise<EncounterEntry> => {
   if (save.encounterId) {
     const prior = await entriesForEncounter(save.encounterId);
-    if (prior.some((entry) => (CLOSING_STEPS as readonly string[]).includes(entry.step))) throw new Error('This encounter is closed. Add an amendment instead');
+    if (prior.some(closesEncounter) && !(POST_CONSULTATION_STEPS as readonly string[]).includes(save.step)) throw new Error('This encounter is closed. Add an amendment instead');
     if (!(REPEATABLE_STEPS as readonly string[]).includes(save.step) && prior.some((entry) => entry.step === save.step)) throw new Error('This section is already saved. Add an amendment instead');
   }
   const savedOn = nowIso();
@@ -70,11 +72,28 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
-      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined },
+      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', workflowVersion: save.workflowVersion, patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined },
     });
   }
 
-  let values = save.values;
+  let values = { ...save.values };
+  const prior = save.encounterId ? effectiveEncounterEntries(await entriesForEncounter(save.encounterId)) : [];
+  if (save.step === 'disposition') {
+    if (values.kind === 'referral') {
+      const patient = await findRecord<Patient>('patient', save.patientId);
+      if (!patient) throw new Error('The referring patient is unavailable');
+      if (!values.toFacilityId || values.toFacilityId === context.facilityId) throw new Error('Choose a different receiving facility');
+      const events = await allWhere<ClinicalEvent>('clinical_event', 'patientId', save.patientId);
+      const allergies = currentAllergies(events, [patient]).map((a) => [a.allergen, a.reaction].filter(Boolean).join(': '));
+      const medications = currentClinicalEvents(events).filter((e) => e.kind === 'medication' && e.values.status === 'active').map((e) => [e.values.drug, e.values.dose, e.values.frequency].filter(Boolean).join(' '));
+      const referralId = newId('referral');
+      const referral: Referral = { ...envelope(context, savedOn), id: referralId, type: 'referral', referralId, patientId: save.patientId, fromFacilityId: context.facilityId, toFacilityId: String(values.toFacilityId), tier1: { fullName: patient.fullName, sex: patient.sex, ageYears: patient.ageYears, dateOfBirth: patient.dateOfBirth, allergies, currentMedications: medications, reason: String(values.note) }, status: 'sent', deliveryStatus: 'alert_pending', sentOn: savedOn, notYetArrivedFlagged: false };
+      records.push({ permission: 'referral:create', type: 'referral', record: referral });
+      values.referralId = referralId;
+    }
+  }
+  const issues = careEntryIssues({ step: save.step, values, workflowVersion: save.workflowVersion }, prior);
+  if (issues.length) throw new Error(issues.join('. '));
   if (save.followUp) {
     const followUp = await bookingRecords({ ...save.followUp, patientId: save.patientId, visitType: 'follow_up' }, context, savedOn);
     records.push(...followUp);
@@ -86,6 +105,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     ...envelope(context, savedOn),
     id: newId('encounter_entry'),
     type: 'encounter_entry',
+    workflowVersion: save.workflowVersion,
     encounterId,
     patientId: save.patientId,
     step: save.step,
@@ -93,16 +113,30 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     values,
   };
   records.push({ permission: 'encounter:record', type: 'encounter_entry', record: entry });
+  if (save.step === 'lab_order' && Array.isArray(values.items)) {
+    const patient = await findRecord<Patient>('patient', save.patientId);
+    if (!patient) throw new Error('The patient is not available');
+    for (const item of values.items as InvestigationItem[]) {
+      if (!item.feeItemId) continue;
+      const fee = await findRecord<FeeItem>('fee_item', item.feeItemId);
+      if (!fee || fee.facilityId !== context.facilityId || !fee.active) throw new Error('An investigation fee is unavailable. Review the catalogue');
+      const snapshot = { ...fee, amountMinor: item.priceMinor!, currency: item.currency! };
+      const charge = { ...newCharge(snapshot, { patientId: patient.id, encounterId, facts: patientBillingFacts(patient) }, context), id: 'charge:order:' + item.id, orderItemId: item.id, orderEntryId: entry.id };
+      records.push({ permission: 'charge:create', type: 'charge', record: charge });
+    }
+    records.push({ permission: 'encounter:record', type: 'encounter_entry', record: { ...envelope(context, savedOn), id: newId('encounter_entry'), type: 'encounter_entry', workflowVersion: 1, encounterId, patientId: save.patientId, step: 'investigation_review', actorRole: context.role, values: { decision: 'ordered', orderEntryId: entry.id, reason: save.investigationReason?.trim() || undefined } } });
+  }
+
 
   const written = await insertRecords(context, records);
-  return written[written.length - 1] as EncounterEntry;
+  return written.find((r) => r.type === 'encounter_entry' && r.step === save.step) as EncounterEntry;
 };
 
 /** Adds a correction beside a saved entry; the original is never touched (PRD §9.8.3). */
 export const amendEntry = async (entry: EncounterEntry, note: string, context: AuthorizationContext, correctedValues?: Record<string, unknown>, expectedCorrectionId?: string | null) => {
   let previousAmendmentId: string | undefined;
   if (correctedValues) {
-    if (!['vitals', 'complaint', 'lab_results', 'diagnosis', 'injection'].includes(entry.step)) throw new Error('This section supports explanatory amendments only');
+    if (!['vitals', 'complaint', 'lab_results', 'diagnosis', 'prescription', 'injection_order', 'injection'].includes(entry.step)) throw new Error('This section supports explanatory amendments only');
     ENCOUNTER_STEP_VALUES[entry.step].parse(correctedValues);
     const entries = await entriesForEncounter(entry.encounterId);
     const corrections = entries.filter((e) => e.step === 'amendment' && e.amends === entry.id && e.values.correctedValues);
@@ -110,6 +144,13 @@ export const amendEntry = async (entry: EncounterEntry, note: string, context: A
     const latest = corrections.find((e) => !replaced.has(e.id));
     previousAmendmentId = latest?.id;
     if (expectedCorrectionId !== undefined && expectedCorrectionId !== (previousAmendmentId ?? null)) throw new Error('This entry was corrected while you were editing. Reopen it to review the correction');
+    if (entry.step === 'prescription' && entries.some((e) => e.step === 'dispense')) throw new Error('Medication has been dispensed. Record changes through medication reconciliation');
+    if (entry.step === 'injection_order' && entries.some((e) => e.step === 'injection')) throw new Error('This injection has been administered. Record a new clinical treatment decision');
+    if (entry.step === 'lab_results' && entry.workflowVersion === 1) {
+      const before = ENCOUNTER_STEP_VALUES.lab_results.parse(entry.values).results.map((r) => r.orderItemId ?? r.test).sort();
+      const after = ENCOUNTER_STEP_VALUES.lab_results.parse(correctedValues).results.map((r) => r.orderItemId ?? r.test).sort();
+      if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('A result correction cannot change its ordered investigation identity');
+    }
     if (entry.step === 'diagnosis') {
       const original = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values);
       const current = ENCOUNTER_STEP_VALUES.diagnosis.parse(latest?.values.correctedValues ?? entry.values);
@@ -124,6 +165,7 @@ export const amendEntry = async (entry: EncounterEntry, note: string, context: A
     ...envelope(context),
     id: newId('encounter_entry'),
     type: 'encounter_entry',
+    workflowVersion: entry.workflowVersion,
     encounterId: entry.encounterId,
     patientId: entry.patientId,
     step: 'amendment',

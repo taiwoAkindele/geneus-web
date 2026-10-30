@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { Facility, Staff } from '@shared';
-import { Button, SegmentedControl, TextField, useToast } from '@/ui';
+import type { FacilityDetails, Staff } from '@shared';
+import { Button, TextField, useToast } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { suggestCode } from '@/data/repos/facility';
 import { assignShift, today } from '@/data/repos/staff';
@@ -9,14 +9,7 @@ import { authorizationFor } from '@/auth/authorization';
 import { registerFacility, sendRegistrationEmailCode } from '@/lib/api/facilities';
 import { SyncingFacility } from '@/app/SyncingFacility';
 import { approvePinSetup } from '@/session';
-
-type Level = 'primary' | 'secondary' | 'tertiary';
-
-const LEVELS: Record<Level, Facility['level']> = {
-  primary: 'phc',
-  secondary: 'general_hospital',
-  tertiary: 'teaching_hospital',
-};
+import { FacilityDetailsFields } from './FacilityDetailsFields';
 
 const endOfToday = (): string => {
   const end = new Date();
@@ -59,17 +52,14 @@ export const RegisterFacilityScreen = () => {
   // this must fire once per registration, not once per render that sees a facility.
   const finishing = useRef(false);
 
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [state, setState] = useState('');
-  const [lga, setLga] = useState('');
+  const [details, setDetails] = useState<FacilityDetails>({ name: '', code: '', state: '', lga: '', level: 'phc' });
+  const { name, code, state, lga, level } = details;
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [emailCode, setEmailCode] = useState('');
   /** Where the code went; the code field appears once it has. */
   const [codeSentTo, setCodeSentTo] = useState<string>();
   const [sendingCode, setSendingCode] = useState(false);
-  const [level, setLevel] = useState<Level>('primary');
   const [saving, setSaving] = useState(false);
 
   const facilityCode = (code || suggestCode(name)).toUpperCase();
@@ -129,7 +119,7 @@ export const RegisterFacilityScreen = () => {
         name: name.trim(),
         state: state.trim(),
         lga: lga.trim(),
-        level: LEVELS[level],
+        level,
         adminFullName: adminName.trim(),
         adminEmail: adminEmail.trim(),
         emailCode: emailCode.trim(),
@@ -158,55 +148,7 @@ export const RegisterFacilityScreen = () => {
         </header>
 
         <div className="flex-1 space-y-4 px-5 py-2">
-          <TextField
-            label="Facility name"
-            placeholder="e.g. Odo-Ona Elewe PHC"
-            name="facility_name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <TextField
-            label="Facility code"
-            hint="Used to build every Patient ID — short and permanent."
-            placeholder="e.g. OOE-PHC"
-            name="facility_code"
-            value={code || suggestCode(name)}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-          />
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <TextField
-                label="State"
-                placeholder="e.g. Oyo"
-                name="facility_state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <TextField
-                label="LGA"
-                placeholder="e.g. Ibadan SW"
-                name="facility_lga"
-                value={lga}
-                onChange={(e) => setLga(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[13px] font-semibold text-ink-soft">Level of care</div>
-            <SegmentedControl
-              ariaLabel="Level of care"
-              value={level}
-              onChange={setLevel}
-              options={[
-                { value: 'primary', label: 'Primary' },
-                { value: 'secondary', label: 'Secondary' },
-                { value: 'tertiary', label: 'Tertiary' },
-              ]}
-            />
-          </div>
+          <FacilityDetailsFields value={{ ...details, code: code || suggestCode(name) }} onChange={(patch) => setDetails((current) => ({ ...current, ...patch }))} />
 
           <TextField
             label="Your full name"

@@ -1,3 +1,4 @@
+import { activeWorkspace } from './facilityWorkspaces';
 import {
   parseDocument,
   SCHEMA_VERSION,
@@ -56,6 +57,11 @@ const validate = <T extends AnyDocument>(record: unknown): T => {
   return result.data as T;
 };
 
+const assertFacilityContext = (context: AuthorizationContext, record?: AnyDocument) => {
+  const workspace = activeWorkspace();
+  if (workspace && (workspace.facilityId !== context.facilityId || workspace.deviceId !== context.deviceId)) throw new Error('The signed-in context belongs to another facility workspace');
+  if (record && record.facilityId !== context.facilityId) throw new Error('A record cannot be written into another facility');
+};
 const placeholders = (count: number): string => Array.from({ length: count }, () => '?').join(', ');
 
 /**
@@ -77,9 +83,11 @@ export const insertRecord = async <T extends AnyDocument>(
   options?:{replaceSame?:boolean},
 ): Promise<T> => {
   assertAllowed(context, permission);
+  assertFacilityContext(context);
   const {prepareClinicalBundle,clearClinicalReview}=await import('./repos/clinicalReviews');
   const bundle=await prepareClinicalBundle([{type,permission,record:validate(record)}],context);
   const validated = validate<T>(bundle.records[0].record);
+  assertFacilityContext(context, validated);
   const row = toRow(type, validated);
   if(options?.replaceSame){const existing=await findRecord(type,validated.id);if(existing){const {clinicalPayloadHash}=await import('./workforceClinical');if(await clinicalPayloadHash(existing)!==await clinicalPayloadHash(validated))throw new Error('A different clinical record already uses this identity. Review its existing history');}}
   const columns = Object.keys(row);
@@ -99,10 +107,12 @@ export type NewRecord = { permission: Permission; type: DocType; record: unknown
  * the first INSERT, so a refusal or a contract failure writes none of them.
  */
 export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[]): Promise<AnyDocument[]> => {
+  assertFacilityContext(context);
   for (const { permission } of records) assertAllowed(context, permission);
   const {prepareClinicalBundle,clearClinicalReview}=await import('./repos/clinicalReviews');
   const bundle=await prepareClinicalBundle(records.map((r)=>({...r,record:validate(r.record)})),context);
   const validated=bundle.records.map(({type,record})=>({type,record:validate(record)}));
+  for (const { record } of validated) assertFacilityContext(context, record);
   await getDatabase().writeTransaction(async (transaction) => {
     for (const { type, record } of validated) {
       const row = toRow(type, record);
@@ -136,6 +146,7 @@ export const updateRecord = async <T extends AnyDocument>(
   if (!current) throw new Error(`no ${type} ${id} to change`);
   const stamped = { ...changes, updatedBy: context.userId, updatedOn: changedOn };
   const merged = validate<T>({ ...current, ...stamped });
+  assertFacilityContext(context, merged);
   const revision = (changes as Record<string, unknown>).revision;
   const cas = typeof revision === 'number' && ['unit','billing_department','location','service_definition','service_offering','practitioner_profile'].includes(type);
   if (cas && revision !== Number((current as Record<string,unknown>).revision ?? 1) + 1) throw new Error('This configuration changed. Reopen the current record before saving');

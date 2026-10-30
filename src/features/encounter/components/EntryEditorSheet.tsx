@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { effectiveEncounterEntries, type EncounterEntry } from '@shared';
+import { effectiveEncounterEntries, dispositionHeads, type EncounterEntry } from '@shared';
 import { amendEntry, saveStep } from '@/data/repos/encounters';
 import { useAuthorizationContext } from '@/session';
 import { Button, Sheet, TextAreaField, useToast } from '@/ui';
@@ -18,8 +18,18 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
   const toast = useToast();
   const [data, setData] = useState<EncounterData>(() => {
     const effective = target ? effectiveEncounterEntries(entries).find((entry) => entry.id === target.id) : undefined;
-    const draft = effective ? fromStepValues(step, effective.values, EMPTY_ENCOUNTER_DATA) : structuredClone(EMPTY_ENCOUNTER_DATA);
-    return step === 'lab_results' ? { ...draft, lab_order: { tests: Object.keys(draft.lab_results) } } : draft;
+    let draft = structuredClone(EMPTY_ENCOUNTER_DATA);
+    for (const entry of effectiveEncounterEntries(entries)) if (entry.step !== 'amendment') draft = fromStepValues(entry.step, entry.values, draft);
+    if (target) draft.workflowVersion = target.workflowVersion;
+    if (effective) draft = fromStepValues(step, effective.values, draft);
+    if (step === 'result_review' && !target) { const reviewed = new Set(entries.filter((e) => e.step === 'result_review').flatMap((e) => e.values.resultEntryIds as string[])); draft.result_review = { resultEntryIds: entries.filter((e) => e.step === 'lab_results' && !reviewed.has(e.id)).map((e) => e.id), note: '' }; }
+    if (step === 'disposition' && !target) draft.disposition = { ...draft.disposition, kind: '', note: '', previousEntryId: dispositionHeads(entries)[0]?.id };
+    if (step === 'lab_results' && !target) { const completed = new Set(Object.keys(draft.lab_results)); draft = { ...draft, lab_order: { ...draft.lab_order, tests: draft.lab_order.tests.filter((t, index) => !completed.has(draft.lab_order.items?.[index]?.id ?? t)), items: draft.lab_order.items?.filter((i) => !completed.has(i.id)) }, lab_results: {} }; }
+    if (step === 'lab_results' && target) {
+      const rows = effective?.values.results as { test: string; result: string; orderItemId?: string }[];
+      draft = { ...draft, lab_order: { ...draft.lab_order, tests: rows.map((r) => r.test), items: draft.lab_order.items?.filter((i) => rows.some((r) => r.orderItemId === i.id)) }, lab_results: Object.fromEntries(rows.map((r) => [r.orderItemId ?? r.test, r.result])) };
+    }
+    return draft;
   });
   const [previousCorrectionId] = useState(() => {
     const corrections = entries.filter((entry) => entry.step === 'amendment' && entry.amends === target?.id && entry.values.correctedValues);
@@ -37,9 +47,9 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     setField: (key, field, value) => setData((current) => ({ ...current, [key]: { ...current[key], [field]: value } })),
     toggleIn: (_key, _field, value) => setData((current) => ({ ...current, lab_order: { tests: current.lab_order.tests.includes(value) ? current.lab_order.tests.filter((test) => test !== value) : [...current.lab_order.tests, value] } })),
     setResult: (test, value) => setData((current) => ({ ...current, lab_results: { ...current.lab_results, [test]: value } })),
-    addRx: () => setData((current) => ({ ...current, diagnosis: { ...current.diagnosis, rx: [...current.diagnosis.rx, { name: '', dose: '' }] } })),
-    setRx: (index, field, value) => setData((current) => ({ ...current, diagnosis: { ...current.diagnosis, rx: current.diagnosis.rx.map((line, i) => i === index ? { ...line, [field]: value } : line) } })),
-    removeRx: (index) => setData((current) => ({ ...current, diagnosis: { ...current.diagnosis, rx: current.diagnosis.rx.filter((_, i) => i !== index) } })),
+    addRx: () => setData((current) => ({ ...current, prescription: { ...current.prescription, rx: [...current.prescription.rx, { name: '', dose: '' }] } })),
+    setRx: (index, field, value) => setData((current) => ({ ...current, prescription: { ...current.prescription, rx: current.prescription.rx.map((line, i) => i === index ? { ...line, [field]: value } : line) } })),
+    removeRx: (index) => setData((current) => ({ ...current, prescription: { ...current.prescription, rx: current.prescription.rx.filter((_, i) => i !== index) } })),
     setDispenseReason: (index, reason) => setData((current) => ({ ...current, dispense: { ...current.dispense, reasons: { ...current.dispense.reasons, [index]: reason } } })),
     toggleDispense: (index) => setData((current) => ({ ...current, dispense: { ...current.dispense, done: { ...current.dispense.done, [index]: !current.dispense.done[index] } } })),
   };
@@ -54,7 +64,7 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     busy.current = true; setSaving(true); setError('');
     try {
       if (target) await amendEntry(target, note, context, toStepValues(step, data), previousCorrectionId);
-      else await saveStep({ patientId, encounterId, step, values: toStepValues(step, data) }, context);
+      else await saveStep({ patientId, encounterId, step, workflowVersion: entries.some((e) => e.workflowVersion === 1) ? 1 : undefined, values: toStepValues(step, data) }, context);
       toast(target ? 'Correction saved; the original remains in the history' : 'Additional entry saved'); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the entry'); }
     finally { busy.current = false; setSaving(false); }

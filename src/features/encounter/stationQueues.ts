@@ -12,7 +12,7 @@ export type StationQueue = 'lab' | 'results' | 'pharmacy';
 export const STATION_QUEUES: readonly StationQueue[] = ['lab', 'results', 'pharmacy'];
 
 /** The steps the queues are decided from — read by step, through the index. */
-export const QUEUE_STEPS: readonly EncounterStep[] = ['lab_order', 'lab_results', 'diagnosis', 'dispense', 'amendment', ...CLOSING_STEPS];
+export const QUEUE_STEPS: readonly EncounterStep[] = ['lab_order', 'lab_results', 'result_review', 'diagnosis', 'prescription', 'dispense', 'amendment', ...CLOSING_STEPS];
 
 export type QueuedPatient = {
   encounterId: string;
@@ -35,26 +35,30 @@ export const stationQueues = (entries: readonly EncounterEntry[]): Record<Statio
 
   const queues: Record<StationQueue, QueuedPatient[]> = { lab: [], results: [], pharmacy: [] };
   for (const [encounterId, saved] of byEncounter) {
-    if (saved.some((entry) => (CLOSING_STEPS as readonly string[]).includes(entry.step))) continue;
+
     const order = firstAt(saved, 'lab_order');
     const results = firstAt(saved, 'lab_results');
     const diagnosis = firstAt(saved, 'diagnosis');
     const patientId = saved[0].patientId;
 
-    if (order && !results && !diagnosis) {
-      const { tests } = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values);
-      queues.lab.push({ encounterId, patientId, waitingSince: order.createdOn, detail: tests.join(', ') });
+    if (order) {
+      const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values);
+      const completed = saved.filter((e) => e.step === 'lab_results').flatMap((e) => ENCOUNTER_STEP_VALUES.lab_results.parse(e.values).results.map((r) => r.orderItemId ?? r.test));
+      const pending = tests.filter((t, index) => !completed.includes(items?.[index]?.id ?? t));
+      if (pending.length) queues.lab.push({ encounterId, patientId, waitingSince: order.createdOn, detail: pending.join(', ') });
     }
-    if (results && !diagnosis) {
+    const reviewedIds = new Set(saved.filter((e) => e.step === 'result_review').flatMap((e) => e.values.resultEntryIds as string[]));
+    if (results && (saved.some((e) => e.workflowVersion === 1) ? saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id)) : !diagnosis)) {
       queues.results.push({ encounterId, patientId, waitingSince: results.createdOn, detail: 'Lab results are back' });
     }
-    if (diagnosis && !firstAt(saved, 'dispense')) {
-      const { prescription } = ENCOUNTER_STEP_VALUES.diagnosis.parse(diagnosis.values);
+    const medication = firstAt(saved, 'prescription');
+    if ((medication || diagnosis) && !firstAt(saved, 'dispense')) {
+      const { prescription } = medication ? ENCOUNTER_STEP_VALUES.prescription.parse(medication.values) : ENCOUNTER_STEP_VALUES.diagnosis.parse(diagnosis!.values);
       if (prescription.length > 0) {
         queues.pharmacy.push({
           encounterId,
           patientId,
-          waitingSince: diagnosis.createdOn,
+          waitingSince: (medication ?? diagnosis)!.createdOn,
           detail: prescription.map((line) => line.drug).join(', '),
         });
       }

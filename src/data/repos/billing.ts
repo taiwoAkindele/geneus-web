@@ -62,7 +62,7 @@ export const createFeeItem = async (draft: FeeDraft, context: AuthorizationConte
   });
 
 export const updateFeeItem = async (id: string, draft: FeeDraft, context: AuthorizationContext): Promise<FeeItem> =>
-  updateRecord<FeeItem>(context, 'fee_item:manage', 'fee_item', id, feeValues(draft));
+  updateRecord<FeeItem>(context, 'fee_item:manage', 'fee_item', id, { ...feeValues(draft), priceVersion: undefined });
 
 /** Retire instead of delete: every old bill must still name its fee. */
 export const setFeeItemActive = (id: string, active: boolean, context: AuthorizationContext) =>

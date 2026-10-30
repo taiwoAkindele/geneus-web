@@ -9,7 +9,7 @@ export const visitStatusLabel = (status: EncounterSummary['status']) => status =
 export const visitDate = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 /** Both the facility list and patient history use one table and the same actions. */
-export const VisitTable = ({ visits, patients, canRecord, onAction, detailFor, orderLabel = 'newest first unless sorted' }: { visits: EncounterSummary[]; patients?: Patient[]; canRecord: boolean; onAction: (visit: EncounterSummary, action: VisitAction) => void; detailFor?: (visit: EncounterSummary) => string; orderLabel?: string }) => {
+export const VisitTable = ({ visits, patients, canRecord, onAction, detailFor, orderLabel = 'newest first unless sorted', serviceQueue = false }: { visits: EncounterSummary[]; patients?: Patient[]; canRecord: boolean; onAction: (visit: EncounterSummary, action: VisitAction) => void; detailFor?: (visit: EncounterSummary) => string; orderLabel?: string; serviceQueue?: boolean }) => {
   const [params, setParams] = useSearchParams();
   const query = params.get('visitQuery') ?? '', status = params.get('visitStatus') ?? '', from = params.get('visitFrom') ?? '', to = params.get('visitTo') ?? '';
   const pageValue = Number(params.get('visitPage') ?? 0);
@@ -38,7 +38,7 @@ export const VisitTable = ({ visits, patients, canRecord, onAction, detailFor, o
       { key: 'status', label: 'Status', sortValue: (visit) => visit.status, render: (visit) => <Tag tone={visit.status === 'Open' ? 'amber' : 'slate'}>{visitStatusLabel(visit.status)}</Tag> },
       { key: 'next', label: 'Next action', className: 'hidden md:table-cell', render: (visit) => detailFor?.(visit) ?? visit.nextAction },
       { key: 'actions', label: 'Actions', render: (visit) => <div className="flex flex-col items-start gap-1 xl:flex-row xl:items-center">
-        <Button variant={visit.status === 'Open' && canRecord ? 'primary' : 'outlined'} fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={() => onAction(visit, visit.status === 'Open' && canRecord ? 'continue' : 'view')}>{visit.status === 'Open' && canRecord ? 'Continue visit' : 'View visit'}</Button>
+        <Button variant={(visit.status === 'Open' || serviceQueue) && canRecord ? 'primary' : 'outlined'} fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={() => onAction(visit, (visit.status === 'Open' || serviceQueue) && canRecord ? 'continue' : 'view')}>{(visit.status === 'Open' || serviceQueue) && canRecord ? (serviceQueue ? 'Open service task' : 'Continue visit') : 'View visit'}</Button>
         <ActionMenu compact label={`Visit actions for ${visitDate(visit.openedOn)}${patients ? ` · ${name(visit.patientId)}` : ''}`} title={`Visit actions · ${visitDate(visit.openedOn)}`} actions={[{ label: 'Print visit summary', icon: 'print', onSelect: () => onAction(visit, 'print') }, { label: 'View activity log', icon: 'clock', onSelect: () => onAction(visit, 'activity') }, ...(canRecord && visit.hasSignedEntries ? [{ label: 'Add amendment…', icon: 'plus' as const, onSelect: () => onAction(visit, 'amend') }] : [])]} />
       </div> },
     ]} /> : <p className="rounded-field border border-dashed border-outline p-6 text-sm text-ink-soft">{visits.length ? 'No visits match these filters.' : 'No visits recorded yet. Start a visit when care begins.'}</p>}

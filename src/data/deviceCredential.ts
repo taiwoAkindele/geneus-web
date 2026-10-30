@@ -35,6 +35,9 @@ export const clearDeviceCredential = (): void => {
  * The server's clock at the last successful exchange — never the device's own
  * clock, which a cheap phone cannot be trusted to keep (root §4.3).
  */
-export const recordServerContact = (serverTime: string): void => void secureSet(LAST_CONTACT_KEY, serverTime);
+export const recordServerContact = (serverTime: string, expectedDeviceId?: string): void => {
+  if (expectedDeviceId && getDeviceCredential()?.deviceId !== expectedDeviceId) return;
+  void secureSet(LAST_CONTACT_KEY, serverTime);
+};
 
 export const lastServerContactOn = (): string | undefined => secureGet(LAST_CONTACT_KEY) ?? undefined;

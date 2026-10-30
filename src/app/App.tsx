@@ -6,7 +6,6 @@ import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/features/appointments';
 import { RegistersProvider } from '@/features/registers';
 import { RegistrationDraftProvider } from '@/features/registration';
-import { UnavailableScreen } from './UnavailableScreen';
 import { RequireCapability } from './RequireCapability';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
@@ -24,6 +23,11 @@ const MagicLinkScreen = lazy(() =>
     default: m.MagicLinkScreen,
   })),
 );
+const FacilityWorkspacesScreen = lazy(() => import('@/pages/facilities/FacilityWorkspacesScreen').then((m) => ({ default: m.FacilityWorkspacesScreen })));
+const OrganizationScreen = lazy(() => import('@/pages/facilities/OrganizationScreen').then((m) => ({ default: m.OrganizationScreen })));
+const AddFacilityScreen = lazy(() => import('@/pages/facilities/AddFacilityScreen').then((m) => ({ default: m.AddFacilityScreen })));
+const InvestigationCatalogueScreen = lazy(() => import('@/pages/investigations/InvestigationCatalogueScreen').then((m) => ({ default: m.InvestigationCatalogueScreen })));
+const FacilityReferralsScreen = lazy(() => import('@/pages/referral/FacilityReferralsScreen').then((m) => ({ default: m.FacilityReferralsScreen })));
 const WorkspaceScreen = lazy(() => import('@/pages/workspace/WorkspaceScreen').then((m) => ({ default: m.WorkspaceScreen })));
 const MagicLinkSentScreen = lazy(() =>
   import('@/pages/facility-onboarding/MagicLinkSentScreen').then((m) => ({
@@ -158,6 +162,7 @@ const App = () => {
         <BrowserRouter>
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
+          <Route path="/facilities" element={<FacilityWorkspacesScreen />} />
           {/* Default screen is the staff shift-login. */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -196,7 +201,7 @@ const App = () => {
             <Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} />
             <Route path="/registers/:id" element={<RegisterEntriesScreen />} />
             <Route path="/reports/month" element={<MonthlySummaryScreen />} />
-            <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
+            <Route path="/referrals/track" element={<FacilityReferralsScreen />} />
             <Route path="/stock" element={<StockScreen />} />
             <Route path="/sync" element={<SyncCenterScreen />} />
 
@@ -206,6 +211,9 @@ const App = () => {
             <Route path="/admin/staff" element={<ManageStaffScreen />} />
             <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
             <Route path="/facility" element={<FacilityScreen />} />
+            <Route path="/organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
+            <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
+            <Route path="/investigations/catalogue" element={<InvestigationCatalogueScreen />} />
             <Route path="/clinical-reviews" element={<ClinicalReviewsScreen />} />
             <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />

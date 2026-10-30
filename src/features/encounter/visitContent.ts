@@ -6,4 +6,4 @@ import type { EncounterData } from './types';
 
 /** Use the form's human labels and units in readers and print summaries too. */
 export const entryRows = (entry: EncounterEntry, context: EncounterData = EMPTY_ENCOUNTER_DATA) =>
-  entry.step === 'amendment' ? [{ label: 'Amendment', value: String(entry.values.note ?? '') }] : summarize(fromStepValues(entry.step, entry.values, context), entry.step);
+  entry.step === 'amendment' ? [{ label: 'Amendment', value: String(entry.values.note ?? '') }] : summarize(fromStepValues(entry.step, entry.values, { ...context, workflowVersion: entry.workflowVersion }), entry.step);

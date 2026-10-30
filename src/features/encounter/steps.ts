@@ -9,7 +9,12 @@ export const STEP_DEFS: Record<StepKey, StepDef> = {
   complaint: { key: 'complaint', title: 'Chief complaint & clinical note', hint: "What the patient reports, plus the clinician's note", short: 'Complaint' },
   lab_order: { key: 'lab_order', title: 'Lab investigations ordered', hint: 'Tests requested for the patient', short: 'Lab order' },
   lab_results: { key: 'lab_results', title: 'Lab results', hint: 'Findings entered against each ordered test', short: 'Results' },
-  diagnosis: { key: 'diagnosis', title: 'Diagnosis, prescription & plan', hint: 'Diagnosis, medications, and what happens next', short: 'Diagnosis' },
+  diagnosis: { key: 'diagnosis', title: 'Assessment / diagnosis', hint: 'Record the clinical assessment independently of treatment', short: 'Diagnosis' },
+  result_review: { key: 'result_review', title: 'Review laboratory results', hint: 'Record clinical acknowledgment and any action taken', short: 'Result review' },
+  investigation_review: { key: 'investigation_review', title: 'Investigation decision', hint: 'Record whether testing is required', short: 'Testing decision' },
+  prescription: { key: 'prescription', title: 'Medication orders', hint: 'Prescribe or record no medication required', short: 'Prescription' },
+  injection_order: { key: 'injection_order', title: 'Injection order', hint: 'Request treatment; administration is recorded separately', short: 'Injection order' },
+  disposition: { key: 'disposition', title: 'Disposition & care plan', hint: 'Record what happens next and who is responsible', short: 'Disposition' },
   injection: { key: 'injection', title: 'Injection administered', hint: 'Drug, dose and route — signed by the nurse who gave it', short: 'Injection' },
   dispense: { key: 'dispense', title: 'Medication dispensed', hint: 'What the pharmacy handed over', short: 'Dispense' },
   admission: { key: 'admission', title: 'Admission to facility', hint: 'Ward, bed and admitting note', short: 'Admission' },
@@ -19,7 +24,7 @@ export const STEP_DEFS: Record<StepKey, StepDef> = {
 const HEAD_KEYS: StepKey[] = ['vitals', 'complaint', 'lab_order', 'lab_results', 'diagnosis'];
 
 /** Saving one of these closes the encounter, so it can never be skipped. */
-export const isClosingStep = (key: StepKey): boolean => key === 'admission' || key === 'follow_up';
+export const isClosingStep = (key: StepKey): boolean => key === 'admission' || key === 'follow_up' || key === 'disposition';
 
 /**
  * The ordered sections for one encounter. The head is fixed; the tail grows from
@@ -28,6 +33,15 @@ export const isClosingStep = (key: StepKey): boolean => key === 'admission' || k
  * the encounter as inpatient) or a follow-up step (closes with a review booked).
  */
 export const stepsFor = (data: EncounterData): StepDef[] => {
+  if (data.workflowVersion === 1) {
+    const keys: StepKey[] = ['vitals', 'complaint', 'diagnosis', 'investigation_review'];
+    if (data.investigation_review.decision === 'ordered') keys.push('lab_order');
+    keys.push('prescription', 'injection_order', 'disposition');
+    if (data.lab_order.tests.length) keys.push('lab_results', 'result_review');
+    if (data.prescription.rx.length) keys.push('dispense');
+    if (data.injection_order.required) keys.push('injection');
+    return keys.map((key) => STEP_DEFS[key]);
+  }
   const tail: StepKey[] = [];
   if (data.diagnosis.injection) tail.push('injection');
   if (data.diagnosis.rx.length > 0) tail.push('dispense');
@@ -57,6 +71,11 @@ export const followUpOptions = (today = new Date()): { value: string; label: str
 ];
 
 export const AUDIT_LABEL: Record<StepKey, string> = {
+  result_review: 'Laboratory results reviewed',
+  investigation_review: 'Investigation decision recorded',
+  prescription: 'Medication decision recorded',
+  injection_order: 'Injection treatment decision recorded',
+  disposition: 'Disposition and care plan recorded',
   vitals: 'Vitals recorded and locked',
   complaint: 'Chief complaint and clinical note recorded',
   lab_order: 'Lab investigations ordered',

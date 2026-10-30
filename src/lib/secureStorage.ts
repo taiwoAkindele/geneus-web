@@ -25,7 +25,7 @@ const KEY_STORE = 'keys';
 const KEY_ID = 'device';
 
 /** Every name kept here. Anything else in localStorage is not a secret. */
-export const SECURE_NAMES = ['geneus.credentials', 'geneus.device', 'geneus.lastServerContactOn', 'geneus.dbKey', 'geneus.workforce.verificationKeys', 'geneus.workforce.selections'] as const;
+export const SECURE_NAMES = ['geneus.organizationFacilities', 'geneus.facilityCreation', 'geneus.facilityOpening', 'geneus.facilitySwitchIdentity', 'geneus.facilityWorkspaces', 'geneus.registrationDrafts', 'geneus.credentials', 'geneus.device', 'geneus.lastServerContactOn', 'geneus.dbKey', 'geneus.workforce.verificationKeys', 'geneus.workforce.selections'] as const;
 export type SecureName = (typeof SECURE_NAMES)[number];
 
 const memory = new Map<SecureName, string>();

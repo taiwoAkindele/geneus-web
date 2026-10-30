@@ -21,11 +21,11 @@ const semantics = (records: readonly NewRecord[]) => {
   const ids = new Map(records.map((r, i) => [(r.record as AnyDocument).id, `new-record-${i}`]));
   const normalize = (value: unknown, depth: number, key = ''): unknown => {
     if (typeof value === 'string')
-      return ['id', 'encounterId', 'appointmentId', 'recordId'].includes(key) ? ids.get(value) || value : value;
+      return ['id', 'encounterId', 'appointmentId', 'recordId', 'orderEntryId', 'referralId', 'orderItemId'].includes(key) ? ids.get(value) || value : value;
     if (Array.isArray(value))
       return value.map((v) => normalize(v, depth + 1, key === 'chargeIds' ? 'id' : key));
     if (value && typeof value === 'object')
-      return Object.fromEntries(Object.entries(value).filter(([k]) => !(depth === 1 && (['createdOn', 'updatedOn'].includes(k) || (k === 'openedOn' && (value as {
+      return Object.fromEntries(Object.entries(value).filter(([k]) => !(depth === 1 && (['createdOn', 'updatedOn'].includes(k) || (k === 'sentOn' && (value as { type?: string }).type === 'referral') || (k === 'openedOn' && (value as {
         type?: string;
       }).type === 'encounter')))).map(([k, v]) => [k, normalize(v, depth + 1, k)]));
     return value;

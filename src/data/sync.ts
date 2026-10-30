@@ -1,4 +1,5 @@
-import { destroySecureStorage } from '@/lib/secureStorage';
+import { ensureFacilityWorkspace, forgetActiveWorkspace, listFacilityWorkspaces, holdWorkspaceTab, isWorkspaceSwitching, markWorkspacePrepared } from './facilityWorkspaces';
+import { getDeviceCredential } from './deviceCredential';
 import { createConnector } from './connector';
 import { databaseCatchingUp, destroyDatabases, openDatabase, type LocalDatabase } from './database';
 
@@ -9,19 +10,20 @@ import { databaseCatchingUp, destroyDatabases, openDatabase, type LocalDatabase 
  * server says the device is no longer enrolled.
  */
 const FIRST_SYNC_TIMEOUT_MS = 30_000;
+const preparedListeners = new WeakSet<LocalDatabase>();
 
 /**
  * De-enrollment as the device experiences it: its credential stops working.
  * The local replica is cleared — it is the facility's data, not the phone's
  * (root §4.3c) — and the device key is destroyed with every secret under it:
- * the credential, the PINs and the database key. The app restarts into
+ * This removes its credential, PINs and database key. The app restarts into
  * onboarding. Unsynced local writes are lost with it; the server would have
  * refused them anyway.
  */
 const onDeenrolled = async (): Promise<void> => {
   await destroyDatabases();
-  await destroySecureStorage();
-  if (typeof window !== 'undefined') window.location.replace('/onboarding/start');
+  await forgetActiveWorkspace();
+  if (typeof window !== 'undefined') window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/onboarding/start');
 };
 
 /**
@@ -29,11 +31,17 @@ const onDeenrolled = async (): Promise<void> => {
  * connect with the same connector, and the database opens once.
  */
 export const startSync = async (): Promise<LocalDatabase> => {
+  const credential = getDeviceCredential();
+  if (credential) await ensureFacilityWorkspace(credential);
+  holdWorkspaceTab();
   const db = await openDatabase();
-  await db.connect(createConnector({ onDeenrolled }));
+  if (credential && db.currentStatus.hasSynced) await markWorkspacePrepared(credential.deviceId);
+  if (credential && !preparedListeners.has(db)) { preparedListeners.add(db); db.registerListener({ statusChanged: (status) => { if (status.hasSynced) void markWorkspacePrepared(credential.deviceId); } }); }
+  const scopedDeenrollment = async () => { if (!isWorkspaceSwitching() && getDeviceCredential()?.deviceId === credential?.deviceId) await onDeenrolled(); };
+  await db.connect(createConnector({ onDeenrolled: scopedDeenrollment }));
   // The encrypted database replacing a legacy one downloads in the background;
   // it has no local writes, so it never uploads (database.ts).
-  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled }));
+  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled: scopedDeenrollment }));
   return db;
 };
 

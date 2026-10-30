@@ -32,6 +32,9 @@ export default defineConfig(({ command, mode }) => {
   if (command === 'build' && DEPLOYED_MODES.includes(mode)) assertProductionEnv(mode);
 
   return {
+    // QA previews use their own Vite config and the default cache. Sharing it
+    // mixes React chunks between servers and breaks hooks on lazy-loaded screens.
+    cacheDir: 'node_modules/.vite/app',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
