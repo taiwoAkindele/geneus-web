@@ -5,7 +5,7 @@ import type { OrganizationFacilityDirectory } from '@shared';
 import { useSession } from '@/session';
 import { listFacilityWorkspaces, switchFacilityWorkspace } from '@/data/facilityWorkspaces';
 import { cacheFacilityDirectory, cachedFacilityDirectory, facilityOpeningProof } from '@/data/facilitySetup';
-import { listOrganizationFacilities, openOrganizationFacility } from '@/lib/api/organizations';
+import { listOrganizationFacilities, resolveOrganizationFacility } from '@/lib/api/organizations';
 import { Icon } from '@/ui';
 
 /** Organization metadata is separate from the independently enrolled operational workspaces. */
@@ -66,7 +66,8 @@ export const FacilitySwitcher = () => {
         await switchFacilityWorkspace(existing.deviceId);
       } else {
         const proof = existing ? { deviceId: existing.deviceId } : await facilityOpeningProof(facility.code, user.staffId, choice.id);
-        const access = await openOrganizationFacility(user.staffId, choice.id, proof);
+        const access = await resolveOrganizationFacility(user.staffId, choice.id, proof, Boolean(existing?.prepared));
+        if (!access) { await switchFacilityWorkspace(existing!.deviceId); return; }
         await switchFacilityWorkspace(access.device?.deviceId ?? existing!.deviceId, access.device, { sourceStaffId: user.staffId, facilityId: access.facilityId, deviceId: proof.deviceId, staffId: access.staffId, personId: access.personId, createdOn: Date.now() });
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not open this facility'); }
