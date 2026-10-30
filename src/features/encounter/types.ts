@@ -1,4 +1,4 @@
-import type { EncounterEntry, EncounterStep } from '@shared';
+import type { EncounterEntry, EncounterStep, InvestigationItem } from '@shared';
 
 /**
  * The Patient Encounter (PRD §9.8). One encounter is one record split into
@@ -13,10 +13,17 @@ export type DiagnosisLine = { label: string; code?: string; codingSystem?: 'ICD-
 
 /** What each section's form holds while it is being recorded — strings as typed. */
 export type EncounterData = {
+  workflowVersion?: 1;
+  result_review: { resultEntryIds: string[]; note: string };
+  investigation_review: { decision: '' | 'none_required' | 'ordered'; reason: string; orderEntryId?: string };
+  prescription: { decision: '' | 'none_required' | 'prescribed'; rx: RxLine[] };
+  injection_order: { required: boolean; drug: string; dose: string; route: string; instructions: string };
+  disposition: { kind: '' | 'home_care' | 'observation' | 'referral' | 'admission'; note: string; responsibleService: string; reassessOn: string; toFacilityId: string; previousEntryId?: string; followUpOn: string };
+
   vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string; height?: string; respiratoryRate?: string };
   /** The complaints as typed, in the patient's words — free text, not a fixed list. */
   complaint: { text: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
-  lab_order: { tests: string[] };
+  lab_order: { tests: string[]; items?: InvestigationItem[]; reason?: string };
   lab_results: Record<string, string>;
   // `injection` / `admit` are the doctor's disposition — they decide which tail
   // sections the encounter grows (see stepsFor). `rx` presence adds the pharmacy step.

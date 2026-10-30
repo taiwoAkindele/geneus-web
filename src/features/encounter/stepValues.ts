@@ -36,12 +36,21 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         const value = data.complaint[key as keyof EncounterData['complaint']];
         return value?.trim() ? [[key, value.trim()]] : [];
       })) };
+    case 'result_review': return { resultEntryIds: data.result_review.resultEntryIds, note: text(data.result_review.note) };
+    case 'investigation_review':
+      return { decision: data.investigation_review.decision, reason: text(data.investigation_review.reason), ...(data.investigation_review.decision === 'ordered' ? { orderEntryId: data.investigation_review.orderEntryId ?? '_pending' } : {}) };
+    case 'prescription':
+      return { decision: data.prescription.decision, prescription: (toStepValues('diagnosis', { ...data, diagnosis: { ...data.diagnosis, rx: data.prescription.rx } }).prescription as unknown[]) };
+    case 'injection_order':
+      return { required: data.injection_order.required, ...(data.injection_order.required ? { drug: text(data.injection_order.drug), dose: text(data.injection_order.dose), route: text(data.injection_order.route), instructions: text(data.injection_order.instructions) } : {}) };
+    case 'disposition':
+      return { kind: data.disposition.kind, note: data.disposition.note.trim(), responsibleService: text(data.disposition.responsibleService), reassessOn: data.disposition.reassessOn ? new Date(data.disposition.reassessOn).toISOString() : undefined, toFacilityId: text(data.disposition.toFacilityId), ...(data.disposition.kind === 'referral' ? { referralId: '_pending' } : {}), previousEntryId: data.disposition.previousEntryId, followUpOn: text(data.disposition.followUpOn) };
     case 'lab_order':
-      return { tests: data.lab_order.tests };
+      return { tests: data.lab_order.tests, ...(data.lab_order.items?.length ? { items: data.lab_order.items } : {}), reason: text(data.lab_order.reason ?? '') };
     case 'lab_results':
       return {
         results: data.lab_order.tests
-          .map((test) => ({ test, result: data.lab_results[test]?.trim() ?? '' }))
+          .map((test, index) => { const item = data.lab_order.items?.[index]; return { test, result: data.lab_results[item?.id ?? test]?.trim() ?? '', ...(item ? { orderItemId: item.id } : {}) }; })
           .filter((row) => row.result),
       };
     case 'diagnosis':
@@ -58,8 +67,8 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
             ...(text(line.route ?? '') ? { route: line.route!.trim() } : {}),
             ...(text(line.quantity ?? '') ? { quantity: measured(line.quantity!) } : {}),
           })),
-        giveInjection: data.diagnosis.injection,
-        admit: data.diagnosis.admit,
+        giveInjection: data.workflowVersion === 1 ? false : data.diagnosis.injection,
+        admit: data.workflowVersion === 1 ? false : data.diagnosis.admit,
       };
     case 'injection':
       return {
@@ -71,7 +80,7 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
       };
     case 'dispense':
       return {
-        lines: data.diagnosis.rx.map((line, index) => ({
+        lines: (data.workflowVersion === 1 && data.prescription.rx.length ? data.prescription.rx : data.diagnosis.rx).map((line, index) => ({
           drug: line.name,
           dispensed: Boolean(data.dispense.done[index]),
           reason: data.dispense.done[index] ? undefined : text(data.dispense.reasons[index] ?? ''),
@@ -95,6 +104,7 @@ const FIELD_LABEL: Record<string, string> = {
   respiratoryRate: 'respiratory rate',
   quantity: 'quantity',
   tests: 'the investigations — choose at least one, or skip this step',
+  resultEntryIds: 'the results to review',
   results: 'the results — enter at least one',
   diagnosis: 'the diagnosis',
   drug: 'the drug name',
@@ -135,11 +145,16 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
       const v = ENCOUNTER_STEP_VALUES.complaint.parse(values) as EncounterStepValues['complaint'];
       return { ...data, complaint: { text: v.complaints.join(', '), note: v.note ?? '', ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => v[key as keyof typeof v] ? [[key, v[key as keyof typeof v]]] : [])) } };
     }
+    case 'result_review': { const v = ENCOUNTER_STEP_VALUES.result_review.parse(values); return { ...data, result_review: { ...v, note: v.note ?? '' } }; }
+    case 'investigation_review': { const v = ENCOUNTER_STEP_VALUES.investigation_review.parse(values); return { ...data, investigation_review: { ...v, reason: v.reason ?? '' } }; }
+    case 'prescription': { const v = ENCOUNTER_STEP_VALUES.prescription.parse(values); return { ...data, prescription: { decision: v.decision, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) }, diagnosis: { ...data.diagnosis, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) } }; }
+    case 'injection_order': { const v = ENCOUNTER_STEP_VALUES.injection_order.parse(values); return { ...data, injection_order: { required: v.required, drug: v.drug ?? '', dose: v.dose ?? '', route: v.route ?? '', instructions: v.instructions ?? '' } }; }
+    case 'disposition': { const v = ENCOUNTER_STEP_VALUES.disposition.parse(values); return { ...data, disposition: { kind: v.kind, note: v.note, responsibleService: v.responsibleService ?? '', reassessOn: v.reassessOn ?? '', toFacilityId: v.toFacilityId ?? '', previousEntryId: v.previousEntryId, followUpOn: v.followUpOn ?? '' } }; }
     case 'lab_order':
-      return { ...data, lab_order: { tests: ENCOUNTER_STEP_VALUES.lab_order.parse(values).tests } };
+      return { ...data, lab_order: ENCOUNTER_STEP_VALUES.lab_order.parse(values) };
     case 'lab_results': {
       const v = ENCOUNTER_STEP_VALUES.lab_results.parse(values);
-      return { ...data, lab_results: Object.fromEntries(v.results.map((row) => [row.test, row.result])) };
+      return { ...data, lab_results: { ...data.lab_results, ...Object.fromEntries(v.results.map((row) => [row.orderItemId ?? row.test, row.result])) } };
     }
     case 'diagnosis': {
       const v = ENCOUNTER_STEP_VALUES.diagnosis.parse(values) as EncounterStepValues['diagnosis'];

@@ -1,3 +1,4 @@
+import { activeWorkspace, activeEnrollmentMarker, isWorkspaceSwitching } from './facilityWorkspaces';
 import type { CrudTransaction, PowerSyncBackendConnector, SyncStatus } from '@powersync/web';
 import { bytesToBase64 } from '@/lib/pbkdf2';
 import { secureGet, secureSet } from '@/lib/secureStorage';
@@ -35,7 +36,7 @@ export type LocalDatabase = {
   getNextCrudTransaction: () => Promise<CrudTransaction | null>;
 };
 
-const DB_FILENAME = 'geneus-encrypted.sqlite';
+const ORIGINAL_DB_FILENAME = 'geneus-encrypted.sqlite';
 /** The plaintext database from before encryption, kept only until the encrypted one has caught up. */
 const LEGACY_FILENAME = 'geneus.sqlite';
 const DB_KEY = 'geneus.dbKey';
@@ -95,8 +96,8 @@ export const openDatabase = (): Promise<LocalDatabase> => {
       return db;
     };
 
-    const encrypted = await open(DB_FILENAME, await databaseKey());
-    if (!(await indexedDbExists(LEGACY_FILENAME))) {
+    const encrypted = await open(activeWorkspace()?.databaseName ?? ORIGINAL_DB_FILENAME, await databaseKey());
+    if (!activeWorkspace()?.legacy || !(await indexedDbExists(LEGACY_FILENAME))) {
       instance = encrypted;
       return encrypted;
     }
@@ -104,7 +105,7 @@ export const openDatabase = (): Promise<LocalDatabase> => {
     const legacy = await open(LEGACY_FILENAME);
     if (await canRetireLegacy(legacy, encrypted)) {
       await legacy.close();
-      await deleteIndexedDb(LEGACY_FILENAME);
+      if (activeWorkspace()?.legacy) await deleteIndexedDb(LEGACY_FILENAME);
       instance = encrypted;
       return encrypted;
     }
@@ -136,13 +137,15 @@ export const destroyDatabases = async (): Promise<void> => {
   catchingUp = undefined;
   opening = undefined;
   if (typeof indexedDB !== 'undefined') {
-    await deleteIndexedDb(DB_FILENAME);
+    await deleteIndexedDb(activeWorkspace()?.databaseName ?? ORIGINAL_DB_FILENAME);
     await deleteIndexedDb(LEGACY_FILENAME);
   }
 };
 
 /** The open database. Screens that read or write sit behind DataProvider, which opened it. */
 export const getDatabase = (): LocalDatabase => {
+  const active = activeWorkspace();
+  if (isWorkspaceSwitching() || (active && activeEnrollmentMarker() && activeEnrollmentMarker() !== active.deviceId)) throw new Error('The facility workspace changed. Reload before continuing');
   if (!instance) throw new Error('the local database is not open yet — is this inside DataProvider?');
   return instance;
 };

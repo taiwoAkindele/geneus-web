@@ -6,6 +6,7 @@ import { accessLabel } from '@/session/accessPolicy';
 import { SyncPill } from './SyncPill';
 import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/session';
 import { NotificationList } from './NotificationList';
+import { FacilitySwitcher } from './FacilitySwitcher';
 
 /**
  * One facility identity, sync indicator and alert entry point across screen sizes.
@@ -43,7 +44,7 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
 
 export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
   const navigate = useNavigate();
-  const { facility, user, shift, access, unreadCount, markAllRead } = useSession();
+  const { user, shift, access, unreadCount, markAllRead } = useSession();
   const [open, setOpen] = useState(false);
 
   const toggle = () => {
@@ -68,7 +69,7 @@ export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
         <span className="hidden text-base font-extrabold text-brand sm:inline">Geneus Health</span>
       </button>
       <span className="hidden h-6 w-px bg-outline-soft sm:block" />
-      <span title={facility.name} className="min-w-0 truncate text-xs font-semibold text-ink sm:max-w-[240px] sm:text-sm">{facility.name}</span>
+      <FacilitySwitcher />
 
       <div className="ml-auto flex items-center gap-1.5">
         <Link to="/sync" title="Sync & review" className="inline-flex min-h-11 shrink-0 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><SyncPill /></Link>

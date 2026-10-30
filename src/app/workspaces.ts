@@ -35,6 +35,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open the laboratory queue and record results.', '/encounters?queue=lab', 'laboratory')] : []),
       ...(keys.has('encounters') && consultation ? [link('results', 'Results ready', 'Review visits with laboratory results ready.', '/encounters?queue=results', 'registers')] : []),
       ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open prescriptions waiting for dispensing.', '/encounters?queue=pharmacy', 'pharmacy')] : []),
+      ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
       ...(keys.has('units') ? [link('handoffs', 'Handoffs & unit queue', 'Review incoming work and the next step of care.', '/units', 'referrals')] : []),
       ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Find patient', 'Open a patient record to review or begin care.', '/patients/search', 'search')] : []),
     ] },
@@ -45,6 +46,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(has(context, 'fee_item:manage') || roleIn(context, 'facility_admin') ? [link('fees', 'Fees', 'Manage the prices attached to facility services.', '/billing/fees', 'registers'), link('receiving', 'Payment setup', 'Manage departments and receiving accounts.', '/billing/settings', 'settings')] : []),
     ] : [] },
     { id: 'operations', label: 'Operations', description: 'Services, teams and schedules', icon: 'calendar', links: [
+      ...(has(context, 'service:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
       ...(keys.has('facility') ? [link('facility', 'Facility setup', 'Manage services, accountable teams and locations.', '/facility', 'referrals')] : []),
       ...(keys.has('staff') ? [link('staff', 'Staff & roster', 'Manage people, assignments and planned shifts.', '/admin/staff', 'patients')] : []),
     ] },
@@ -54,6 +56,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(keys.has('month') ? [link('monthly', 'Monthly reports', 'Review recorded facility activity by month.', '/reports/month', 'month')] : []),
     ] : [] },
     { id: 'administration', label: 'Administration', description: 'Access, devices and settings', icon: 'settings', links: [
+      ...(roleIn(context, 'facility_admin') ? [link('organization', 'Organization', 'Link independent facilities and request staff provisioning.', '/organization', 'referrals')] : []),
       ...(staffAccess ? [link('access', 'User access', 'Open staff profiles to manage sign-in duties and permissions.', '/admin/staff?workspace=administration', 'lock')] : []),
       ...(devices ? [link('devices', 'Facility devices', 'Enroll devices and review or revoke their access.', '/admin/devices', 'lock')] : []),
       ...(staffAccess || devices ? [link('settings', 'Administration settings', 'Manage account recovery and administrative settings.', '/admin', 'settings')] : []),
@@ -70,6 +73,9 @@ export const workspaceForLocation = (pathname: string, search: string, available
   const params = new URLSearchParams(search);
   if (pathname.startsWith('/patients')) return find(preferred === 'finance' || preferred === 'clinical' ? preferred : 'front-desk');
   if (pathname.startsWith('/admin/staff')) return find(params.get('workspace') === 'administration' || pathname === '/admin/staff/access' || preferred === 'administration' ? 'administration' : 'operations') ?? find('administration');
+  if (pathname.startsWith('/referrals')) return find('clinical');
+  if (pathname.startsWith('/investigations')) return find('operations');
+  if (pathname.startsWith('/organization')) return find('administration');
   if (pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');

@@ -1,11 +1,22 @@
-import { createContext, useCallback, useContext, useRef, type ReactNode } from 'react';
+import { secureGet, secureSet } from '@/lib/secureStorage';
+import { registerWorkspaceFlusher } from '@/data/facilityWorkspaces';
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { useAuthorizationContext } from '@/session';
-import { createRegistrationDraft } from './registrationDraft';
+import { createRegistrationDraft, type RegistrationDraftSnapshot } from './registrationDraft';
 import { EMPTY_REGISTRATION, type RegistrationNavState, type RegistrationValues } from './registrationValues';
 
 const DraftContext = createContext<ReturnType<typeof createRegistrationDraft> | null>(null);
 const DraftProvider = ({ children }: { children: ReactNode }) => {
-  const store = useRef(createRegistrationDraft());
+  const { userId } = useAuthorizationContext();
+  const pending = useRef<Promise<void>>(Promise.resolve());
+  const cached: Record<string, RegistrationDraftSnapshot> = JSON.parse(secureGet('geneus.registrationDrafts') ?? '{}');
+  const store = useRef(createRegistrationDraft((draft) => {
+    const next = JSON.parse(secureGet('geneus.registrationDrafts') ?? '{}');
+    if (draft) next[userId] = draft; else delete next[userId];
+    pending.current = secureSet('geneus.registrationDrafts', JSON.stringify(next));
+    void pending.current.catch(() => {});
+  }, cached[userId]));
+  useEffect(() => registerWorkspaceFlusher(() => pending.current), []);
   return <DraftContext.Provider value={store.current}>{children}</DraftContext.Provider>;
 };
 

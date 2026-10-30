@@ -1,4 +1,4 @@
-import { effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type Encounter, type EncounterEntry } from '@shared';
+import { closesEncounter, dispositionHeads, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type Encounter, type EncounterEntry } from '@shared';
 import { encounterLabel, stamp, projectEncounter, EMPTY_ENCOUNTER_DATA } from './encounterRecord';
 import { STEP_DEFS, stepsFor } from './steps';
 
@@ -25,9 +25,11 @@ const firstOf = (entries: readonly EncounterEntry[], step: EncounterEntry['step'
 /** Status, headline and key findings, read from the saved entries alone. */
 export const summariseEncounter = (encounter: Encounter, entries: readonly EncounterEntry[]): EncounterSummary => {
   const steps = effectiveEncounterEntries(entries);
-  const status: EncounterStatus = firstOf(steps, 'admission') ? 'Admitted' : firstOf(steps, 'follow_up') ? 'Closed' : 'Open';
+  const status: EncounterStatus = firstOf(steps, 'admission') ? 'Admitted' : steps.some(closesEncounter) ? 'Closed' : 'Open';
 
   const chips: string[] = [];
+  const disposition = dispositionHeads(steps)[0];
+  if (disposition) chips.push(({ home_care: 'Home care / discharged', observation: 'Observation', referral: 'Referred', admission: 'Admission requested' } as Record<string, string>)[String(disposition.values.kind)]);
   const vitals = firstOf(steps, 'vitals');
   if (vitals) {
     const v = ENCOUNTER_STEP_VALUES.vitals.parse(vitals.values);

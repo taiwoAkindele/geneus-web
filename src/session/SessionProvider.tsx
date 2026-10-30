@@ -10,6 +10,10 @@ import { approvePinSetup } from './pinApproval';
 import { accessFor, maySignIn, mayStaySignedIn, SESSION_IDLE_MS, shiftEnd, type Access } from './accessPolicy';
 import { shiftEndLabel, shiftRangeLabel } from './shiftLabels';
 import { checkShiftSignature, isFrozen } from './signInChecks';
+import { canContinueFacilitySession, clearFacilityIdentity, pendingFacilityIdentity } from './facilityIdentity';
+import { activeWorkspace, isWorkspaceSwitching } from '@/data/facilityWorkspaces';
+import { getDatabase } from '@/data/database';
+import { waitForFirstSync } from '@/data/sync';
 
 /**
  * Shift login (PRD §14.1). Access is evaluated entirely on this device against
@@ -124,6 +128,7 @@ const ROLE_LABELS: Record<string, string> = {
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const { facility, deviceId } = useDeviceContext();
   const [staffId, setStaffId] = useState<string | null>(() => localStorage.getItem(SIGNED_IN_KEY));
+  const [facilityIdentity, setFacilityIdentity] = useState(pendingFacilityIdentity);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const rejections = useLiveQuery(listOpenRejections);
   const notifications = useMemo<AppNotification[]>(() => (rejections.data ?? []).map((rejection) => ({
@@ -194,20 +199,46 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   // `now` is a coarse display tick. Input can update lastActivity between
   // ticks, so comparing it with `now` mistakes fresh activity for a clock
   // rollback when a database/sync refresh renders this provider again.
-  const active = Boolean(entry && mayStaySignedIn(entry, Date.now(), lastActivity.current));
+  const active = Boolean(!facilityIdentity && entry && mayStaySignedIn(entry, Date.now(), lastActivity.current));
 
   const signOut = useCallback(() => {
+    if (isWorkspaceSwitching()) return;
+    void clearFacilityIdentity();
+    setFacilityIdentity(undefined);
     localStorage.removeItem(SIGNED_IN_KEY);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
     lastActivity.current = undefined;
     setStaffId(null);
   }, []);
 
+  // A fresh online organization check links the same person to a different local
+  // membership. Wait for its replica, then apply that facility's login rules.
+  useEffect(() => {
+    if (!facilityIdentity || loading || !data || !facility?.code) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!activeWorkspace()?.prepared && !await waitForFirstSync(getDatabase())) throw new Error('First sync is required');
+        const snapshot = await load();
+        const member = snapshot.staff.find((candidate) => candidate.staffId === facilityIdentity.staffId);
+        const shift = findShift(snapshot.shifts, facilityIdentity.staffId, Date.now());
+        const accepted = member && canContinueFacilitySession(facilityIdentity, { facilityId: facility.code, deviceId, staff: member, shift, lastServerContact: lastServerContactOn() }) &&
+          !(accessFor(member) === 'shift' && shift && await checkShiftSignature(shift) === 'invalid');
+        if (cancelled) return;
+        if (!accepted) { signOut(); return; }
+        if (!entry) { reloadRoster(); return; }
+        await clearFacilityIdentity();
+        if (!cancelled) setFacilityIdentity(undefined);
+      } catch { if (!cancelled) signOut(); }
+    })();
+    return () => { cancelled = true; };
+  }, [facilityIdentity, loading, data, facility?.code, deviceId, entry, load, reloadRoster, signOut]);
+
   // Shift end never expires an authenticated session. Deactivation and staff
   // inactivity still clear the saved identity so reactivation cannot revive it.
   useEffect(() => {
-    if (staffId && !loading && !rosterError && data && (!entry || !active)) signOut();
-  }, [staffId, loading, rosterError, data, entry, active, signOut]);
+    if (!facilityIdentity && staffId && !loading && !rosterError && data && (!entry || !active)) signOut();
+  }, [facilityIdentity, staffId, loading, rosterError, data, entry, active, signOut]);
 
   const signIn = useCallback(
     async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
@@ -239,8 +270,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const auth = useMemo<AuthValue>(
-    () => ({ signedIn: active, loading, error: rosterError, reload: reloadRoster, roster, signIn, signOut }),
-    [active, loading, roster, signIn, signOut, rosterError, reloadRoster],
+    () => ({ signedIn: active, loading: loading || Boolean(facilityIdentity), error: rosterError, reload: reloadRoster, roster, signIn, signOut }),
+    [active, loading, facilityIdentity, roster, signIn, signOut, rosterError, reloadRoster],
   );
 
   const authorization = useMemo<AuthorizationContext>(

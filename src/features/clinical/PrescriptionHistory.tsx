@@ -5,14 +5,14 @@ export type ClinicalEditor = { kind: ClinicalKind; previous?: ClinicalEvent; ini
 type Props = { entries: EncounterEntry[]; current: ClinicalEvent[]; canRecord: boolean; onEdit: (editor: ClinicalEditor) => void };
 export const PrescriptionHistory = ({ entries, current, canRecord, onEdit }: Props) => {
   const prescriptions = effectiveEncounterEntries(entries)
-    .filter((entry) => entry.step === 'diagnosis')
+    .filter((entry) => entry.step === 'diagnosis' || entry.step === 'prescription')
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
   if (!prescriptions.length) return null;
   return <details className="rounded-card border border-outline-soft bg-white p-4">
     <summary className="cursor-pointer font-bold">Encounter diagnoses & prescriptions</summary>
     {prescriptions.map((entry) => {
-      const diagnosis = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values);
-      const diagnoses = diagnosis.diagnoses?.length ? diagnosis.diagnoses : [{ label: diagnosis.diagnosis, certainty: 'unknown' as const }];
+      const diagnosis = entry.step === 'diagnosis' ? ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values) : { diagnosis: 'Medication decision', prescription: ENCOUNTER_STEP_VALUES.prescription.parse(entry.values).prescription, diagnoses: [] };
+      const diagnoses = entry.step === 'prescription' ? [] : diagnosis.diagnoses?.length ? diagnosis.diagnoses : [{ label: diagnosis.diagnosis, certainty: 'unknown' as const }];
       return <div key={entry.id} className="mt-3 border-t border-outline-soft pt-3 text-sm">
         <b>{diagnosis.diagnosis}</b> · {new Date(entry.createdOn).toLocaleDateString('en-GB')}
         {diagnoses.map((problem, index) => <div key={index} className="mt-2">

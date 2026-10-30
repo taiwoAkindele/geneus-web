@@ -1,14 +1,20 @@
+import { useDeviceContext } from '@/data';
+import { zonedInput, zonedInstant } from '@/lib/workforceTime';
+import { InvestigationPicker } from './InvestigationPicker';
 import { Button, ChoiceChip, FieldLabel, Icon, SelectField, SelectOrTextField, TextAreaField, TextField } from '@/ui';
 import { ENCOUNTER_FIELD_HELP as H, PRESCRIPTION_DURATIONS, PRESCRIPTION_FREQUENCIES, PRESCRIPTION_ROUTES } from '../fieldHelp';
-import { followUpOptions, INJECTION_ROUTES, TEST_OPTIONS, WARD_OPTIONS } from '../steps';
+import { followUpOptions, INJECTION_ROUTES, WARD_OPTIONS } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 export type StepFormController = Pick<EncounterController, 'setField' | 'toggleIn' | 'setResult' | 'addRx' | 'setRx' | 'removeRx' | 'setDispenseReason' | 'toggleDispense'> & { enc: Pick<EncounterController['enc'], 'data'> };
 
 /** The active-state input form for a given section. Reads/writes through the hook. */
 export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKey; ctl: StepFormController; correcting?: boolean }) => {
-  const { enc, setField, toggleIn, setResult, addRx, setRx, removeRx, setDispenseReason } = ctl;
+  const { enc, setField, setResult, addRx, setRx, removeRx, setDispenseReason } = ctl;
+  const { facility } = useDeviceContext();
+  const zone = facility?.timeZone ?? 'Africa/Lagos';
   const d = enc.data;
+  const rx = d.workflowVersion === 1 ? d.prescription.rx : d.diagnosis.rx;
 
   if (stepKey === 'vitals') {
     return (
@@ -46,26 +52,11 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
     </div>;
   }
 
-  if (stepKey === 'lab_order') {
-    return (
-      <>
-        <FieldLabel label="Investigations to order" help={H.investigations} />
-        <div className="flex flex-wrap gap-2">
-          {TEST_OPTIONS.map((t) => {
-            const on = d.lab_order.tests.includes(t);
-            return (
-              <ChoiceChip key={t} selected={on} onClick={() => toggleIn('lab_order', 'tests', t)}>
-                {t}{on ? ' ✓' : ''}
-              </ChoiceChip>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-          The lab attendant sees exactly these orders on the patient's record and enters results against them.
-        </p>
-      </>
-    );
-  }
+  if (stepKey === 'result_review') return <div className="space-y-3"><p>{d.result_review.resultEntryIds.length} result entries awaiting clinical acknowledgment.</p>{d.lab_order.tests.map((test, index) => { const value = d.lab_results[d.lab_order.items?.[index]?.id ?? test]; return value ? <p key={index}><strong>{test}:</strong> {value}</p> : null; })}<TextAreaField label="Clinical review / action taken (optional)" value={d.result_review.note} onChange={(e) => setField('result_review', 'note', e.target.value)} /></div>;
+  if (stepKey === 'investigation_review') return <div className="space-y-3"><FieldLabel label="Investigation decision" /><SelectField label="Testing decision" value={d.investigation_review.decision} options={[{ value: '', label: 'Not yet reviewed' }, { value: 'none_required', label: 'No investigations required' }, { value: 'ordered', label: 'Order investigations' }]} onChange={(e) => { setField('investigation_review', 'decision', e.target.value as typeof d.investigation_review.decision); if (e.target.value === 'none_required') { setField('lab_order', 'items', []); setField('lab_order', 'tests', []); } }} /><TextAreaField label="Reason / clinical question (optional)" value={d.investigation_review.reason} onChange={(e) => setField('investigation_review', 'reason', e.target.value)} />{d.investigation_review.decision === 'ordered' ? <p>Choose and sign investigations in the next section. This decision is signed with the order.</p> : null}</div>;
+  if (stepKey === 'lab_order') return <InvestigationPicker items={d.lab_order.items ?? []} onChange={(items) => { setField('lab_order', 'items', items); setField('lab_order', 'tests', items.map((i) => i.name)); }} />;
+  if (stepKey === 'injection_order') return <div className="space-y-3"><SelectField label="Injection treatment" value={d.injection_order.required ? 'yes' : 'no'} options={[{ value: 'no', label: 'No injection ordered' }, { value: 'yes', label: 'Order injection' }]} onChange={(e) => { setField('injection_order', 'required', e.target.value === 'yes'); if (e.target.value === 'no') for (const field of ['drug', 'dose', 'route', 'instructions'] as const) setField('injection_order', field, ''); }} />{d.injection_order.required ? <><TextField label="Medicine" value={d.injection_order.drug} onChange={(e) => setField('injection_order', 'drug', e.target.value)} /><TextField label="Dose" value={d.injection_order.dose} onChange={(e) => setField('injection_order', 'dose', e.target.value)} /><SelectField label="Route" value={d.injection_order.route} options={['', ...INJECTION_ROUTES].map((value) => ({ value, label: value || 'Choose route' }))} onChange={(e) => setField('injection_order', 'route', e.target.value)} /><TextAreaField label="Instructions (optional)" value={d.injection_order.instructions} onChange={(e) => setField('injection_order', 'instructions', e.target.value)} /></> : null}<p>Signing an order does not record administration.</p></div>;
+  if (stepKey === 'disposition') return <div className="space-y-3"><SelectField label="Disposition" value={d.disposition.kind} options={[{ value: '', label: 'Choose disposition' }, { value: 'home_care', label: 'Discharge / Home care' }, { value: 'observation', label: 'Observation' }, { value: 'referral', label: 'Referral' }, { value: 'admission', label: 'Admission requested' }]} onChange={(e) => setField('disposition', 'kind', e.target.value as typeof d.disposition.kind)} /><TextAreaField label="Care plan / instructions / reason" value={d.disposition.note} onChange={(e) => setField('disposition', 'note', e.target.value)} />{['observation', 'admission'].includes(d.disposition.kind) ? <TextField label="Responsible receiving service" value={d.disposition.responsibleService} onChange={(e) => setField('disposition', 'responsibleService', e.target.value)} /> : null}{d.disposition.kind === 'observation' ? <TextField label="Reassessment due" type="datetime-local" value={d.disposition.reassessOn ? zonedInput(d.disposition.reassessOn, zone) : ''} onChange={(e) => setField('disposition', 'reassessOn', e.target.value ? zonedInstant(e.target.value, zone) : '')} /> : null}{d.disposition.kind === 'referral' ? <TextField label="Destination facility code" value={d.disposition.toFacilityId} onChange={(e) => setField('disposition', 'toFacilityId', e.target.value.toUpperCase())} /> : null}<TextField label="Follow-up date (optional)" type="date" value={d.disposition.followUpOn} onChange={(e) => setField('disposition', 'followUpOn', e.target.value)} />{d.disposition.kind === 'observation' ? <p>Observation remains active until a later disposition is recorded.</p> : d.disposition.kind === 'admission' ? <p>This requests admission; receiving-team acceptance and bed allocation are separate.</p> : null}</div>;
 
   if (stepKey === 'lab_results') {
     if (d.lab_order.tests.length === 0) {
@@ -73,17 +64,14 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
     }
     return (
       <div className="space-y-3">
-        {d.lab_order.tests.map((t) => (
-          <TextField key={t} label={t} help={H.result} name={`lr_${t}`} value={d.lab_results[t] || ''} placeholder="Enter result…" onChange={(e) => setResult(t, e.target.value)} />
+        {d.lab_order.tests.map((t, index) => (
+          <TextField key={d.lab_order.items?.[index]?.id ?? t} label={t} help={H.result} name={`lr_${index}`} value={d.lab_results[d.lab_order.items?.[index]?.id ?? t] || ''} placeholder="Enter result…" onChange={(e) => setResult(d.lab_order.items?.[index]?.id ?? t, e.target.value)} />
         ))}
       </div>
     );
   }
 
-  if (stepKey === 'diagnosis') {
-    return (
-      <>
-        <TextField label="Diagnosis" help={H.diagnosis} name="dx" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => setField('diagnosis', 'dx', e.target.value)} />
+  if (stepKey === 'diagnosis') return <>        <TextField label="Diagnosis" help={H.diagnosis} name="dx" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => setField('diagnosis', 'dx', e.target.value)} />
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <TextField label="Diagnosis code (optional)" help={H.diagnosisCode} value={d.diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'code', e.target.value)} />
           <SelectField label="Coding system" help={H.codingSystem} value={d.diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'codingSystem', e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined)} />
@@ -97,9 +85,10 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
           <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.filter((_, i) => i !== index))}>Remove diagnosis</Button>
         </div>)}
         <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', [...(d.diagnosis.diagnoses ?? []), { label: '', certainty: 'unknown' }])}>Add another diagnosis</Button>
-        <div className="mt-4"><FieldLabel label="Prescription" help={H.prescription} /></div>
+{correcting ? <p className="mt-3 text-sm">This correction changes the diagnosis only. Treatment and disposition are recorded separately.</p> : null}</>;
+  if (stepKey === 'prescription') return <><SelectField label="Medication decision" value={d.prescription.decision} options={[{ value: '', label: 'Not yet reviewed' }, { value: 'none_required', label: 'No medication required' }, { value: 'prescribed', label: 'Prescribe medication' }]} onChange={(e) => { setField('prescription', 'decision', e.target.value as typeof d.prescription.decision); if (e.target.value === 'none_required') setField('prescription', 'rx', []); }} />{d.prescription.decision === 'prescribed' ? <>        <div className="mt-4"><FieldLabel label="Prescription" help={H.prescription} /></div>
         <div className="space-y-2">
-          {d.diagnosis.rx.map((m, idx) => (
+          {rx.map((m, idx) => (
             <div key={idx} className="flex items-end gap-2.5 rounded-field border border-outline-soft bg-white p-3">
               <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
                 <TextField label="Drug" help={H.drug} name={`rx_${idx}_drug`} value={m.name} placeholder="e.g. Artemether-Lumefantrine" onChange={(e) => setRx(idx, 'name', e.target.value)} />
@@ -127,23 +116,7 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
           <Button variant="outlined" onClick={addRx}>＋ Add medication</Button>
         </div>
 
-        {correcting ? <p className="mt-4 text-sm text-ink-muted">The saved disposition stays unchanged. Medication changes after dispensing belong in medication reconciliation.</p> : <><div className="mt-5"><FieldLabel label="Plan / disposition" help={H.disposition} /></div>
-        <div className="flex flex-wrap gap-2">
-          <ChoiceChip selected={d.diagnosis.injection} onClick={() => setField('diagnosis', 'injection', !d.diagnosis.injection)}>
-            Give injection{d.diagnosis.injection ? ' ✓' : ''}
-          </ChoiceChip>
-          <ChoiceChip selected={d.diagnosis.admit} onClick={() => setField('diagnosis', 'admit', !d.diagnosis.admit)}>
-            Admit patient{d.diagnosis.admit ? ' ✓' : ''}
-          </ChoiceChip>
-        </div>
-        <p className="mt-2.5 text-xs leading-relaxed text-ink-muted">
-          Prescribing adds a pharmacy step. Injection adds a nurse-administered step. Admitting keeps the patient as an
-          inpatient instead of closing with a follow-up — the matching sections appear below once you lock this step.
-        </p>
-        </>}
-      </>
-    );
-  }
+</> : null}</>;
 
   if (stepKey === 'injection') {
     return (
@@ -199,7 +172,7 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
       <>
         <FieldLabel label="Tick each medication as it is handed over" help={H.dispensing} />
         <div className="space-y-2">
-          {d.diagnosis.rx.map((m, idx) => {
+          {rx.map((m, idx) => {
             const done = Boolean(d.dispense.done[idx]);
             return (
               <div key={idx} className="space-y-2">

@@ -10,6 +10,9 @@
  *
  * Held in memory only, so an approval lasts as long as the page and is spent by
  * the PIN it allows; a reload means asking again.
+ * Reusing the first administrator's existing PIN during additional-facility
+ * registration is handled separately in facilityIdentity.ts. It does not grant
+ * approval to choose or reset another facility membership's PIN.
  */
 const approved = new Set<string>();
 

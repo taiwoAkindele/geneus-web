@@ -48,13 +48,15 @@ export const toMutation = (entry: CrudEntry): UploadMutation => {
   };
 };
 
-export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBackendConnector => ({
+export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBackendConnector => {
+  const enrolledDevice = getDeviceCredential();
+  return ({
   fetchCredentials: async (): Promise<PowerSyncCredentials | null> => {
-    const device = getDeviceCredential();
+    const device = enrolledDevice;
     if (!device) return null;
     try {
       const minted = await fetchSyncToken(device.credential);
-      recordServerContact(minted.serverTime);
+      recordServerContact(minted.serverTime, device.deviceId);
       await refreshWorkforceKeys();
       return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
     } catch (cause) {
@@ -67,14 +69,14 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
   },
 
   uploadData: async (database): Promise<void> => {
-    const device = getDeviceCredential();
+    const device = enrolledDevice;
     if (!device) return;
     const db = database as unknown as Pick<LocalDatabase, 'getNextCrudTransaction'>;
 
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime);}
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }
@@ -87,7 +89,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       try {
         const response = await uploadMutations(device.credential, request);
         await confirmWorkforceReceipts(device.credential, request.mutations.filter(requiresFacilityContract));
-        recordServerContact(response.serverTime);
+        recordServerContact(response.serverTime, device.deviceId);
         if (response.rejected.length > 0) {
           console.warn('server rejected queued writes — see the reconcile queue', response.rejected);
         }
@@ -99,3 +101,4 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     }
   },
 });
+};
