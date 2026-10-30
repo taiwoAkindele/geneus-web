@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Icon, useToast } from '@/ui';
+import { Link, useNavigate } from 'react-router-dom';
+import { Avatar, Button, Icon, useToast } from '@/ui';
 import { useAuth, useAuthorizationContext } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
 import { SyncPill } from './SyncPill';
@@ -41,9 +41,9 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-export const AppHeader = () => {
+export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
   const navigate = useNavigate();
-  const { facility, shift, access, unreadCount, markAllRead } = useSession();
+  const { facility, user, shift, access, unreadCount, markAllRead } = useSession();
   const [open, setOpen] = useState(false);
 
   const toggle = () => {
@@ -54,34 +54,24 @@ export const AppHeader = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-[52px] items-center gap-2 border-b border-outline-soft bg-white px-3 sm:h-[46px] sm:bg-surface">
+    <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-outline-soft bg-white px-3 sm:gap-3 md:gap-5 md:px-7">
       {/* Facility identity */}
       <button
         type="button"
         onClick={() => navigate('/home')}
-        className="flex min-h-[44px] min-w-0 items-center gap-2"
-        aria-label="Go to facility home"
+        className="flex min-h-[44px] min-w-11 shrink-0 items-center gap-2"
+        aria-label="Geneus Health home"
       >
-        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[8px] bg-brand text-white">
-          <Icon name="home" className="h-[17px] w-[17px]" />
+        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-brand-accent-soft text-brand">
+          <Icon name="plus" className="h-6 w-6" />
         </span>
-        <span className="truncate font-mono text-[12px] font-semibold text-ink sm:text-[13px]">{facility.code}</span>
-        <span className="hidden text-[13px] text-ink-muted lg:inline">{facility.name}</span>
+        <span className="hidden text-base font-extrabold text-brand sm:inline">Geneus Health</span>
       </button>
+      <span className="hidden h-6 w-px bg-outline-soft sm:block" />
+      <span title={facility.name} className="min-w-0 truncate text-xs font-semibold text-ink sm:max-w-[240px] sm:text-sm">{facility.name}</span>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <SyncPill />
-
-        {/* Shift chip — tap for the sync/shift center. An admin has no shift to end (accessPolicy.ts). */}
-        <button
-          type="button"
-          onClick={() => navigate('/sync')}
-          className="hidden min-h-0 items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-1.5 text-xs font-bold text-ink-soft sm:flex"
-          aria-label={shift ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}; sign-out is manual` : accessLabel(access)}
-        >
-          <Icon name={shift ? 'clock' : 'lock'} className="h-4 w-4" />
-          {shift ? <span className="font-mono">{shift.ended ? 'Shift ended' : shift.endsAtLabel}</span> : <span>{accessLabel(access)}</span>}
-        </button>
+        <Link to="/sync" title="Sync & review" className="inline-flex min-h-11 shrink-0 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><SyncPill /></Link>
 
         {/* Notification bell */}
         <div className="relative">
@@ -101,6 +91,7 @@ export const AppHeader = () => {
           </button>
           {open ? <NotificationCenter onClose={() => setOpen(false)} /> : null}
         </div>
+        {onProfile ? <button type="button" onClick={onProfile} title={shift ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}` : accessLabel(access)} aria-label="Your profile and sign out" aria-haspopup="dialog" className="flex min-h-11 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-ink hover:bg-brand-wash"><Avatar tone="mint" size="sm">{user.initials}</Avatar><span className="hidden max-w-[150px] truncate xl:block">{user.name}</span><Icon name="chevron-down" className="hidden h-4 w-4 md:block" /></button> : null}
       </div>
     </header>
   );

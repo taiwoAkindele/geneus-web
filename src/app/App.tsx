@@ -24,6 +24,7 @@ const MagicLinkScreen = lazy(() =>
     default: m.MagicLinkScreen,
   })),
 );
+const WorkspaceScreen = lazy(() => import('@/pages/workspace/WorkspaceScreen').then((m) => ({ default: m.WorkspaceScreen })));
 const MagicLinkSentScreen = lazy(() =>
   import('@/pages/facility-onboarding/MagicLinkSentScreen').then((m) => ({
     default: m.MagicLinkSentScreen,
@@ -179,6 +180,7 @@ const App = () => {
           <Route element={<RequireShift />}>
           <Route element={<AppShell />}>
             <Route path="/home" element={<FacilityHomeScreen />} />
+            <Route path="/workspace/:moduleId" element={<WorkspaceScreen />} />
             <Route path="/patients/search" element={<PatientSearchScreen />} />
             <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />

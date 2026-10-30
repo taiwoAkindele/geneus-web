@@ -7,6 +7,10 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Modular workspaces — 30 October 2026
+
+Home now follows selected sketch 1 from the [modular workspace proposal](../docs/MODULAR-WORKSPACE-UX-PLAN-2026-10-29.md): seven permission-filtered module destinations, a resume shortcut and real attention items. Each module has an overview and focused desktop/mobile navigation. Existing screen URLs and repositories are reused; Laboratory and Pharmacy open existing station queues. Finance owns financial setup, Operations owns services/rosters, and Administration owns access/devices/recovery. Shared patient/staff pages preserve workspace context, including browser Back. Module preferences are scoped to the staff member and facility and store no patient content. No server/shared-contract changes or new module-activation capability are introduced. See [current design QA](qa/artifacts/modular-workspace-2026-10-30/design-qa.md).
+
 ### Encounter field guidance
 
 Encounter inputs and embedded clinical forms provide purpose/example help through
