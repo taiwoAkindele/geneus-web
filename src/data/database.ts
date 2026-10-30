@@ -21,7 +21,7 @@ import { secureGet, secureSet } from '@/lib/secureStorage';
  * `setDatabaseForTests`. Only `src/data` may import this module.
  */
 export type LocalDatabase = {
-  writeTransaction: <T>(callback: (transaction: Pick<LocalDatabase, 'execute'>) => Promise<T>) => Promise<T>;
+  writeTransaction: <T>(callback: (transaction: Pick<LocalDatabase, 'execute'|'getOptional'>) => Promise<T>) => Promise<T>;
   execute: (sql: string, parameters?: unknown[]) => Promise<unknown>;
   getAll: <T>(sql: string, parameters?: unknown[]) => Promise<T[]>;
   getOptional: <T>(sql: string, parameters?: unknown[]) => Promise<T | null>;

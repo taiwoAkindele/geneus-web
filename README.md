@@ -4,6 +4,8 @@ The Geneus Health PWA: an offline-first replica of one facility's records on a c
 Android phone, synced by PowerSync from PostgreSQL. Read [PLAN.md](PLAN.md) before
 changing anything; the layering, the budget and the build order are decided there.
 
+Facility services and staff assignments: [WORKFORCE.md](WORKFORCE.md).
+
 ## Local development
 
 ```

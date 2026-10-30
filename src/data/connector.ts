@@ -1,6 +1,9 @@
 import type { CrudEntry, PowerSyncBackendConnector, PowerSyncCredentials } from '@powersync/web';
 import type { UploadMutation, UploadRequest } from '@shared';
-import { fetchSyncToken, uploadMutations } from '@/lib/api/sync';
+import { fetchSyncToken, uploadMutations, WORKFORCE_VERSIONS } from '@/lib/api/sync';
+import { FACILITY_DOCUMENT_POLICY, requiresFacilityContract } from '@shared';
+import { refreshWorkforceKeys } from './workforceAuthority';
+import { confirmWorkforceReceipts } from './repos/workforceReceipts';
 import { isUnauthorized } from '@/lib/api/client';
 import type { LocalDatabase } from './database';
 import { getDeviceCredential, recordServerContact } from './deviceCredential';
@@ -40,6 +43,8 @@ export const toMutation = (entry: CrudEntry): UploadMutation => {
     id: entry.id,
     data,
     ...(entry.previousValues ? { previous: decodeValues(table, entry.previousValues) } : {}),
+    ...((['unit','billing_department','location','service_definition','service_offering','practitioner_profile'].includes(table) && entry.op === 'PATCH' && typeof data.revision === 'number') ? { expectedRevision: data.revision - 1 } : {}),
+    ...((Object.prototype.hasOwnProperty.call(FACILITY_DOCUMENT_POLICY, table) && ['versioned','append_only'].includes(FACILITY_DOCUMENT_POLICY[table as keyof typeof FACILITY_DOCUMENT_POLICY].change)) ? { expectedPreviousId: typeof data.previousId === 'string' ? data.previousId : null } : {}),
   };
 };
 
@@ -50,6 +55,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     try {
       const minted = await fetchSyncToken(device.credential);
       recordServerContact(minted.serverTime);
+      await refreshWorkforceKeys();
       return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
     } catch (cause) {
       if (isUnauthorized(cause)) {
@@ -67,14 +73,20 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
 
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
-      if (!transaction) return;
+      if (!transaction) {
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime);}
+        catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
+        return;
+      }
 
       const request: UploadRequest = {
+        ...WORKFORCE_VERSIONS,
         transactionId: transaction.transactionId ?? null,
         mutations: transaction.crud.map(toMutation),
       };
       try {
         const response = await uploadMutations(device.credential, request);
+        await confirmWorkforceReceipts(device.credential, request.mutations.filter(requiresFacilityContract));
         recordServerContact(response.serverTime);
         if (response.rejected.length > 0) {
           console.warn('server rejected queued writes — see the reconcile queue', response.rejected);

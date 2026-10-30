@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Handoff } from '@shared';
+import { unitIsRoutable, type Handoff } from '@shared';
 import { Button, SectionTabs, DataTable, Sheet, Tag, useToast } from '@/ui';
 import { markHandoff } from '@/data/repos/handoffs';
 import { usePatients } from '@/features/search';
 import { readDeviceUnit, rememberDeviceUnit, useIncomingHandoffs, useUnits } from '@/features/units';
 import { useAuthorizationContext } from '@/session';
+import { useWorkforce } from '@/features/workforce/useWorkforce';
+import { OwnershipPanel } from '@/features/workforce/OwnershipPanel';
 
 const timeOf = (at: string) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 export const UnitQueueScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();
+  const workforce=useWorkforce();
   const units = useUnits();
   const patients = usePatients();
   const [unitId, setUnitId] = useState(readDeviceUnit());
@@ -20,7 +23,7 @@ export const UnitQueueScreen = () => {
   const [completing, setCompleting] = useState<Handoff>();
   useEffect(() => { document.title = 'Unit queue · Geneus Health'; }, []);
   const busy = useRef(false);
-  const active = (units.data ?? []).filter((unit) => unit.active);
+  const active = (units.data ?? []).filter(unitIsRoutable);
   const unit = units.data?.find((candidate) => candidate.id === unitId);
   const unitName = (id: string) => units.data?.find((candidate) => candidate.id === id)?.name ?? 'another unit';
   const patientName = (id: string) => patients.data?.find((patient) => patient.patientId === id)?.fullName ?? id;
@@ -33,6 +36,7 @@ export const UnitQueueScreen = () => {
     finally { busy.current = false; setBusyId(undefined); }
   };
   const actions = (handoff: Handoff) => <div className="flex flex-wrap gap-2">
+    {workforce.data?<div className="w-full"><OwnershipPanel source={handoff} data={workforce.data}/></div>:null}
     {context.permissions.includes('handoff:update') ? <>
       {handoff.status === 'pending' ? <Button variant="outlined" fullWidth={false} className="px-3 py-2" disabled={Boolean(busyId)} onClick={() => void mark(handoff, 'received')}>Arrived</Button> : null}
       <Button fullWidth={false} className="px-3 py-2" loading={busyId === handoff.id} disabled={Boolean(busyId)} onClick={() => setCompleting(handoff)}>Complete handoff</Button>
@@ -45,7 +49,7 @@ export const UnitQueueScreen = () => {
       <div className="space-y-4 px-5 py-3 md:px-8">
         <h1 className="text-[24px] font-extrabold">Unit queue</h1>
         <p className="text-sm text-ink-muted">Instructions sent to a unit. Completing a handoff does not sign a result, dispense medication or close the visit.</p>
-        {units.loading ? <p role="status">Reading units…</p> : units.error ? <div role="alert">Units could not be read.<Button variant="ghost" onClick={units.reload}>Try again</Button></div> : active.length === 0 ? <p className="rounded-card border border-dashed border-outline p-4 text-sm text-ink-muted">A facility admin can add units under Admin → Units &amp; rooms.</p> : <SectionTabs label="Receiving units" value={unitId ?? ''} onChange={choose} options={(units.data ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name + (candidate.active ? '' : ' (retired)') }))} />}
+        {units.loading ? <p role="status">Reading units…</p> : units.error ? <div role="alert">Units could not be read.<Button variant="ghost" onClick={units.reload}>Try again</Button></div> : active.length === 0 ? <p className="rounded-card border border-dashed border-outline p-4 text-sm text-ink-muted">A facility admin can add units under Admin → Units &amp; rooms.</p> : <SectionTabs label="Receiving units" value={unitId ?? ''} onChange={choose} options={(units.data ?? []).filter((candidate)=>unitIsRoutable(candidate)||candidate.id===unitId).map((candidate) => ({ value: candidate.id, label: candidate.name + (candidate.active ? '' : ' (retired)') }))} />}
         {unit ? <>
           <h2 className="text-lg font-bold">{unit.name}{unit.active ? '' : ' · retired unit'}</h2>
           <h2 className="text-[15px] font-bold">Sent here · oldest first{!incoming.loading && !incoming.error ? ` · ${list.length} waiting` : ''}</h2>

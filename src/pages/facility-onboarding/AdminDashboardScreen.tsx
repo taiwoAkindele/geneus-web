@@ -10,23 +10,15 @@ const SettingsGroup = ({ title, items }: { title: string; items: Setting[] }) =>
 export const AdminDashboardScreen = () => {
   const { user, facility } = useSession();
   const context = useAuthorizationContext();
-  useEffect(() => { document.title = 'Settings · Geneus Health'; }, []);
+  useEffect(() => { document.title = 'Administration · Geneus Health'; }, []);
   const admin = user.roles.includes('facility_admin');
   const staff = admin || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign'].includes(permission));
-  const fees = admin || context.permissions.includes('fee_item:manage');
-  const units = admin || context.permissions.includes('unit:manage');
   const devices = admin || context.permissions.some((permission) => ['device:enroll', 'device:revoke'].includes(permission));
-  const registers = admin || context.permissions.includes('register_definition:publish');
-  return <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 md:px-7"><header><h1 className="text-[28px] font-extrabold">Settings</h1><p className="mt-1 text-sm text-ink-muted">{facility.name} · {facility.code}. Manage the people and services behind daily work.</p></header>
+  return <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 md:px-7"><header><h1 className="text-[28px] font-extrabold">Administration</h1><p className="mt-1 text-sm text-ink-muted">{facility.name} · {facility.code}. Manage user access, devices and account settings.</p></header>
     <div className="grid items-start gap-5 lg:grid-cols-2"><div className="space-y-5"><SettingsGroup title="People & access" items={[
-      ...(staff ? [{ label: 'Staff & roster', description: 'Staff profiles, combined duties, permissions and planned shifts.', to: '/admin/staff', icon: 'patients' as const }] : []),
+      ...(staff ? [{ label: 'User access', description: 'Open staff profiles to manage sign-in duties and permissions.', to: '/admin/staff?workspace=administration', icon: 'patients' as const }] : []),
       ...(devices ? [{ label: 'Facility devices', description: 'Enrollment, recent server contact and revocation.', to: '/admin/devices', icon: 'lock' as const }] : []),
-    ]} /><SettingsGroup title="Care & recording" items={[
-      ...(units ? [{ label: 'Units & rooms', description: 'Places patients can be sent, with instructions.', to: '/admin/units', icon: 'referrals' as const }] : []),
-      ...(registers ? [{ label: 'Register books', description: 'Review published books and configure new versions.', to: '/registers', icon: 'registers' as const }] : []),
-    ]} /></div><div className="space-y-5"><SettingsGroup title="Payment setup" items={fees ? [
-      { label: 'Departments & receiving accounts', description: 'Configure provider connection and department accounts.', to: '/billing/settings', icon: 'referrals' },
-    ] : []} /><SettingsGroup title="Device status" items={[{ label: 'Sync & review', description: 'Queued changes, last sync and records that need a decision.', to: '/sync', icon: 'sync' }]} /></div></div>
+    ]} /></div><div className="space-y-5"><SettingsGroup title="Device status" items={[{ label: 'Sync & review', description: 'Queued changes, last sync and records that need a decision.', to: '/sync', icon: 'sync' }]} /></div></div>
     {admin ? <details className="rounded-card border border-outline-soft bg-white p-5"><summary className="cursor-pointer font-bold">Administrator account recovery</summary><p className="mt-2 text-sm text-ink-muted">Set or change your recovery email when needed.</p><div className="mt-4"><RecoveryEmailCard /></div></details> : null}
     <p className="text-xs leading-relaxed text-ink-muted">One identity can hold several duties. Access changes sync to other devices; existing clinical and financial history is preserved.</p>
   </div>;

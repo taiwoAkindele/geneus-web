@@ -1,5 +1,10 @@
 import {
   ArrowLeftRight,
+  ArrowRight,
+  CalendarDays,
+  FileText,
+  FlaskConical,
+  LayoutGrid,
   BarChart3,
   Bell,
   BookText,
@@ -15,6 +20,8 @@ import {
   MoreVertical,
   Package,
   Plus,
+  Pill,
+  Settings,
   Printer,
   RefreshCw,
   ScanLine,
@@ -38,6 +45,13 @@ import {
  * lower-literacy (PRD §13), so an icon is often read before its label.
  */
 export type IconName =
+  | 'arrow-right'
+  | 'calendar'
+  | 'finance'
+  | 'laboratory'
+  | 'pharmacy'
+  | 'settings'
+  | 'modules'
   | 'home'
   | 'patients'
   | 'encounter'
@@ -65,6 +79,13 @@ export type IconName =
   | 'chevron-down';
 
 const ICONS: Record<IconName, LucideIcon> = {
+  'arrow-right': ArrowRight,
+  calendar: CalendarDays,
+  finance: FileText,
+  laboratory: FlaskConical,
+  pharmacy: Pill,
+  settings: Settings,
+  modules: LayoutGrid,
   home: Home,
   patients: Users,
   encounter: Stethoscope,

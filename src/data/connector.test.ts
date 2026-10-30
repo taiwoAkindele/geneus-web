@@ -32,6 +32,11 @@ describe('connector', () => {
   });
 
   describe('toMutation', () => {
+    it('carries configuration revisions and exact event predecessors',()=>{
+      expect(toMutation(entry({op:'PATCH' as CrudEntry['op'],table:'units',id:'unit:test',opData:{revision:3}})).expectedRevision).toBe(2);
+      expect(toMutation(entry({op:'PUT' as CrudEntry['op'],table:'service_sessions',id:'session:v2',opData:{previousId:'session:v1'}})).expectedPreviousId).toBe('session:v1');
+      expect(toMutation(entry({op:'PUT' as CrudEntry['op'],table:'session_events',id:'intake:first'})).expectedPreviousId).toBeNull();
+    });
     it('carries explicit patient clears and null base values through the upload boundary', () => {
       const clear = toMutation(entry({ op: 'PATCH' as CrudEntry['op'], table: 'patients', id: 'OOE-000001-K2', opData: { phone: null, dateOfBirth: null, ageYears: 30 }, previousValues: { phone: '0801', dateOfBirth: null } }));
       expect(clear.data.phone).toBeNull(); expect(clear.data.dateOfBirth).toBeNull();
@@ -69,7 +74,7 @@ describe('connector', () => {
 
   describe('fetchCredentials', () => {
     it('mints a token as the device and records the server clock', async () => {
-      const fetch = respond(200, { token: 'jwt', expiresOn: '2026-09-12T13:00:00Z', syncEndpoint: 'http://sync', serverTime: '2026-09-12T12:00:00Z' });
+      const fetch = respond(200, { token: 'jwt', expiresOn: '2026-09-12T13:00:00Z', syncEndpoint: 'http://sync', serverTime: '2026-09-12T12:00:00Z', keys: [] });
       vi.stubGlobal('fetch', fetch);
 
       const credentials = await createConnector({ onDeenrolled: vi.fn() }).fetchCredentials();
@@ -77,9 +82,8 @@ describe('connector', () => {
       expect(credentials).toEqual({ endpoint: 'http://sync', token: 'jwt', expiresAt: new Date('2026-09-12T13:00:00Z') });
       const init = fetch.mock.calls[0]?.[1] as RequestInit;
       expect(init).toMatchObject({ headers: expect.objectContaining({ authorization: 'Bearer device-1.secret' }) });
-      // No body, so no JSON content-type: Fastify rejects an empty JSON body with a 400.
-      expect(init.body).toBeUndefined();
-      expect((init.headers as Record<string, string>)['content-type']).toBeUndefined();
+      expect(JSON.parse(String(init.body))).toEqual({facilityContractVersion:1,schemaVersion:4,policyVersion:10,pendingMutationCount:1});
+      expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
       expect(lastServerContactOn()).toBe('2026-09-12T12:00:00Z');
     });
 
@@ -108,6 +112,7 @@ describe('connector', () => {
       await createConnector({ onDeenrolled: vi.fn() }).uploadData(db as never);
 
       expect(JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+        facilityContractVersion:1,schemaVersion:4,policyVersion:10,
         transactionId: 3,
         mutations: [{ clientId: 7, op: 'put', table: 'patient', id: 'X-Y-000001-K2', data: { fullName: 'Amaka' } }],
       });
@@ -149,6 +154,11 @@ describe('connector', () => {
       await expect(createConnector({ onDeenrolled }).uploadData(db as never)).rejects.toThrow();
       expect(onDeenrolled).toHaveBeenCalledOnce();
       expect(complete).not.toHaveBeenCalled();
+    });
+    it('retains the SDK transaction on incompatible versions without de-enrolling the device',async()=>{
+      vi.stubGlobal('fetch',respond(409,{error:'upgrade_required',message:'Upgrade required'}));
+      const db=fakeDatabase(),{transaction,complete}=transactionOf([entry({op:'PUT' as CrudEntry['op'],table:'patients',id:'x'})]),onDeenrolled=vi.fn();db.transactions.push(transaction);
+      await expect(createConnector({onDeenrolled}).uploadData(db as never)).rejects.toThrow();expect(complete).not.toHaveBeenCalled();expect(onDeenrolled).not.toHaveBeenCalled();
     });
   });
 });

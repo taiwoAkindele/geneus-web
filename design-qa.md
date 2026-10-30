@@ -1,3 +1,14 @@
+# Latest: modular workspace QA — 30 October 2026
+
+final result: passed
+
+Selected target: sketch 1 from the modular workspace proposal. The current review,
+comparison evidence, fixes and validation are recorded in
+[modular workspace design QA](qa/artifacts/modular-workspace-2026-10-30/design-qa.md).
+The earlier patient-flow QA below is preserved as historical evidence.
+
+---
+
 # Patient flow implementation QA — 26 October 2026
 
 final result: passed

@@ -1,3 +1,3 @@
-import { Dashboard } from '@/features/dashboard';
+import { ModuleHome } from '@/features/dashboard/ModuleHome';
 
-export const FacilityHomeScreen = () => <Dashboard />;
+export const FacilityHomeScreen = () => <ModuleHome />;

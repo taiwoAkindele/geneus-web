@@ -24,6 +24,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   facility_admin: 'Facility Admin',
   supervisor: 'Supervisor',
   cashier: 'Cashier',
+  laboratory_staff: 'Laboratory staff',
+  pharmacy_staff: 'Pharmacy staff',
 };
 
 /** A short, readable handle for an encounter; its id is a uuid no one reads aloud. */

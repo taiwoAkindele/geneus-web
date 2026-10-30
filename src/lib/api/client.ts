@@ -38,6 +38,10 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   return payload as T;
 };
 
+/** Online-only private reads; tokens stay in the signed-in person's memory. */
+export const workforceRequest = <T>(path: string, credential: string, token?: string, body?: unknown, method = body === undefined ? 'GET' : 'POST'): Promise<T> =>
+  request<T>(path, { method, cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...(token ? { 'x-workforce-access': token } : {}), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+
 export const get = <T>(path: string): Promise<T> => request<T>(path, { method: 'GET' });
 
 export const post = <T>(path: string, body: unknown): Promise<T> =>

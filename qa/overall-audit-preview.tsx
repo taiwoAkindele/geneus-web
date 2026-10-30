@@ -17,6 +17,7 @@ import { DevicesScreen } from '@/pages/facility-onboarding/DevicesScreen';
 import { StockScreen } from '@/pages/stock/StockScreen';
 import { MonthlySummaryScreen } from '@/pages/monthly-summary/MonthlySummaryScreen';
 import { FacilityHomeScreen } from '@/pages/facility-home/FacilityHomeScreen';
+import { WorkspaceScreen } from '@/pages/workspace/WorkspaceScreen';
 import { PatientSearchScreen } from '@/pages/patient-search/PatientSearchScreen';
 import { PatientProfileScreen } from '@/pages/patient/PatientProfileScreen';
 import { EncountersScreen } from '@/pages/encounters/EncountersScreen';
@@ -106,7 +107,7 @@ db.execute = async (sql, parameters = []) => {
   if (existingRecovery) Object.assign(existingRecovery, record); else (db.rows[match[1]] ??= []).push(record);
   if (!['encounter_drafts', 'register_builder_drafts'].includes(match[1])) window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
-db.writeTransaction = async (callback) => callback({ execute: db.execute });
+db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
 setDatabaseForTests(db);
 localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
@@ -121,7 +122,7 @@ const Ready = ({ children }: { children: React.ReactNode }) => {
   return auth.signedIn ? children : <p>Preparing synthetic staff session…</p>;
 };
 createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={[auditParams.get('start')?.startsWith('/') && !auditParams.get('start')?.startsWith('//') ? auditParams.get('start')! : '/home']}><RouteObserver /><Routes><Route element={<AppShell />}>
-  <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
+  <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/workspace/:moduleId" element={<WorkspaceScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />

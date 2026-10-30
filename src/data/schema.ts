@@ -1,7 +1,7 @@
 import { column, Schema, Table, type ColumnsType, type IndexShorthand } from '@powersync/web';
 import type { DocType } from '@shared';
 import { fieldKindsFor, type FieldKind } from './contractShape';
-import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
+import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, WORKFORCE_DRAFTS_TABLE, WORKFORCE_RECEIPTS_TABLE, CLINICAL_REVIEWS_TABLE, TABLE_FOR } from './tables';
 
 /**
  * The local SQLite schema, derived from the shared contract: one table per
@@ -28,7 +28,16 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   register_entry: { register: ['registerId'], patient: ['patientId'] },
   roster_shift: { staff: ['staffId'] },
   sync_rejection: { open: ['resolvedOn'] },
+  audit_event: { source: ['entityId'] },
   pin_setup_code: { staff: ['staffId'] },
+  service_offering: { unit: ['unitId'] },
+  practitioner_profile: { staff: ['staffId'] },
+  authority_snapshot: { staff: ['staffId'] },
+  staff_assignment: { staff: ['staffId'], offering: ['offeringId'] },
+  service_session: { offering: ['offeringId'], starts: ['startsAt'] },
+  session_event: { offering: ['offeringId'] },
+  work_ownership_event: { source: ['sourceId'] },
+  appointment_reservation: { booking: ['appointmentId'] },
 };
 
 const COLUMN_FOR: Record<FieldKind, typeof column.text> = {
@@ -65,6 +74,9 @@ const draftsTable = new Table(
 export const AppSchema = new Schema({
   ...Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
   [DRAFTS_TABLE]: draftsTable,
+  [WORKFORCE_DRAFTS_TABLE]: new Table({ staffId:column.text, deviceId:column.text, slot:column.text, data:column.text, updatedOn:column.text }, { localOnly:true, indexes:{owner:['staffId','deviceId','slot']} }),
+  [WORKFORCE_RECEIPTS_TABLE]: new Table({ clientId:column.integer, outcome:column.text }, {localOnly:true}),
+  [CLINICAL_REVIEWS_TABLE]: new Table({ facilityId:column.text, staffId:column.text, semanticKey:column.text, data:column.text }, {localOnly:true,indexes:{owner:['staffId']}}),
   [REGISTER_DRAFTS_TABLE]: new Table(
     { staffId: column.text, registerKey: column.text, data: column.text, updatedOn: column.text },
     { localOnly: true, indexes: { owner: ['staffId', 'registerKey'] } },

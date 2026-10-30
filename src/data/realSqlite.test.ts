@@ -19,7 +19,7 @@ import {
 } from './repos/billing';
 import { book, changeAppointment, listAppointments } from './repos/appointments';
 import { clinicalEventsForPatient, patientClinicalRecord, saveClinicalRecord } from './repos/clinical';
-import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
+import { CLINICAL_REVIEWS_TABLE, DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from './repos/registers';
 import { discardRegisterRecovery, readRegisterRecovery, writeRegisterRecovery } from './repos/registerDrafts';
 import { fakeDatabase } from './testing/fakeDatabase';
@@ -48,13 +48,14 @@ const sqliteDatabase = (): LocalDatabase & { close: () => Promise<void> } => {
   }
   sqlite.exec(`CREATE TABLE "${DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "patientId", "encounterKey", "step", "data", "updatedOn")`);
   sqlite.exec(`CREATE TABLE "${REGISTER_DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "registerKey", "data", "updatedOn")`);
+  sqlite.exec(`CREATE TABLE "${CLINICAL_REVIEWS_TABLE}" ("id" TEXT PRIMARY KEY, "facilityId", "staffId", "semanticKey", "data")`);
   type Bindable = string | number | null;
   const bind = (parameters: unknown[]) => parameters.map((value) => (value === undefined ? null : value)) as Bindable[];
   return {
     ...fakeDatabase(),
     writeTransaction: async (callback) => {
       sqlite.exec('BEGIN');
-      try { const result = await callback({ execute: async (sql, parameters = []) => sqlite.prepare(sql).run(...bind(parameters)) }); sqlite.exec('COMMIT'); return result; }
+      try { const result = await callback({ execute: async (sql, parameters = []) => sqlite.prepare(sql).run(...bind(parameters)),getOptional:async<T>(sql:string,parameters:unknown[]=[])=>sqlite.prepare(sql).get(...bind(parameters)) as T||null }); sqlite.exec('COMMIT'); return result; }
       catch (error) { sqlite.exec('ROLLBACK'); throw error; }
     },
     execute: async (sql, parameters = []) => {
