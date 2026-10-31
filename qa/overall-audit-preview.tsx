@@ -27,6 +27,9 @@ import { UnitQueueScreen } from '@/pages/units/UnitQueueScreen';
 import { RegistersListScreen } from '@/pages/registers/RegistersListScreen';
 import { SyncCenterScreen } from '@/pages/sync-center/SyncCenterScreen';
 import { NewPatientStep1Screen } from '@/pages/patient-registration/NewPatientStep1Screen';
+import { NewPatientStep2Screen } from '@/pages/patient-registration/NewPatientStep2Screen';
+import { DuplicateCheckScreen } from '@/pages/patient-registration/DuplicateCheckScreen';
+import { unlockSecureStorage } from '@/lib/secureStorage';
 import { AdminDashboardScreen } from '@/pages/facility-onboarding/AdminDashboardScreen';
 import { ManageStaffScreen } from '@/pages/facility-onboarding/ManageStaffScreen';
 import { InviteStaffScreen } from '@/pages/facility-onboarding/InviteStaffScreen';
@@ -41,6 +44,7 @@ import { FeeScheduleScreen } from '@/pages/billing/FeeScheduleScreen';
 import { UnavailableScreen } from '@/app/UnavailableScreen';
 import '../src/index.css';
 
+await unlockSecureStorage();
 const now = new Date().toISOString();
 const earlier = new Date(Date.now() - 7 * 86400000).toISOString();
 const envelope = { facilityId: 'QA-PHC', deviceId: 'qa-device', createdBy: 'qa-doctor', createdOn: now, schemaVersion: 3 };
@@ -49,7 +53,8 @@ const secondId = 'QA-PHC-000002-K3';
 const patients = [Patient.parse({ ...envelope, id: patientId, patientId, type: 'patient', fullName: 'Amaka Okoro', address: 'Synthetic address', phone: '08000000000', occupation: 'Test occupation', sex: 'female', ageYears: 30, allergies: ['Penicillin'] }), Patient.parse({ ...envelope, id: secondId, patientId: secondId, type: 'patient', fullName: 'Demo Second Patient', address: 'Synthetic address', sex: 'male', ageYears: 41, allergies: [] })];
 const auditParams = new URLSearchParams(location.search);
 const selectedRole = auditParams.get('role') ?? 'doctor';
-const staff = Staff.parse({ ...envelope, id: 'qa-doctor', staffId: 'qa-doctor', type: 'staff', fullName: selectedRole === 'cashier' ? 'Chika Eze' : selectedRole === 'records_officer' ? 'Ngozi Bello' : 'Dr Ada Obi', role: selectedRole, ...(auditParams.has('combined') ? { additionalRoles: ['facility_admin'] } : {}), permission: auditParams.has('readonly') ? 'read_only' : 'read_write', active: true, loginAccess: 'always' });
+const actorId = auditParams.get('actor') === 'second' ? 'qa-doctor-second' : 'qa-doctor';
+const staff = Staff.parse({ ...envelope, id: actorId, staffId: actorId, type: 'staff', fullName: selectedRole === 'cashier' ? 'Chika Eze' : selectedRole === 'records_officer' ? 'Ngozi Bello' : 'Dr Ada Obi', role: selectedRole, ...(auditParams.has('combined') ? { additionalRoles: ['facility_admin'] } : {}), permission: auditParams.has('readonly') ? 'read_only' : 'read_write', active: true, loginAccess: 'always' });
 const visits = [Encounter.parse({ ...envelope, id: 'encounter:open', type: 'encounter', patientId, openedOn: now, setting: 'facility' }), Encounter.parse({ ...envelope, id: 'encounter:closed', type: 'encounter', patientId, openedOn: earlier, setting: 'facility' }), Encounter.parse({ ...envelope, id: 'encounter:lab', type: 'encounter', patientId: secondId, openedOn: now, setting: 'facility' })];
 const entry = (id: string, encounterId: string, step: string, values: Record<string, unknown>) => EncounterEntry.parse({ ...envelope, id, type: 'encounter_entry', patientId: encounterId === 'encounter:lab' ? secondId : patientId, encounterId, actorRole: 'doctor', step, values, createdOn: encounterId === 'encounter:closed' ? earlier : now });
 const entries = [entry('entry:vitals', 'encounter:open', 'vitals', { temperatureC: 37, systolicMmHg: 120, diastolicMmHg: 80, weightKg: 65, pulseBpm: 80 }), entry('entry:diagnosis', 'encounter:closed', 'diagnosis', { diagnosis: 'Routine review', prescription: [] }), entry('entry:closed', 'encounter:closed', 'follow_up', {}), entry('entry:lab', 'encounter:lab', 'lab_order', { tests: ['Synthetic test'] })];
@@ -125,6 +130,8 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/workspace/:moduleId" element={<WorkspaceScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
+  <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
+  <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
   <Route path="/stock" element={<StockScreen />} />
 </Route></Routes></MemoryRouter></RegistrationDraftProvider></RegistersProvider></AppointmentsProvider></Ready></SessionProvider></ToastProvider>);

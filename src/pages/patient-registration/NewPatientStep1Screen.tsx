@@ -6,6 +6,7 @@ import { SyncPill } from '@/app/SyncPill';
 import { calendarDate } from '@/lib/calendarDate';
 import { validCalendarDate, yearsBetween } from '@shared';
 import { EMPTY_REGISTRATION, useRegistrationDraft, type RegistrationNavState, type RegistrationValues } from '@/features/registration';
+import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/features/registration/RegistrationRecoveryPrompt';
 
 const todayIso = (): string => calendarDate();
 
@@ -64,7 +65,8 @@ const Step1Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
         className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card"
       >
         <div className="flex-1 space-y-4 px-5 py-3">
-          {!editing ? <div className="flex items-center justify-between gap-3 text-xs text-ink-muted"><span>Your details are kept between these steps.</span><button type="button" onClick={() => { clear(); reset(EMPTY_REGISTRATION); }} className="font-bold text-brand">Clear form</button></div> : null}
+          <RegistrationRecoveryStatus />
+          {!editing ? <div className="flex justify-end text-xs"><button type="button" onClick={() => { void clear().catch(() => {}); reset(EMPTY_REGISTRATION); }} className="min-h-11 font-bold text-brand">Clear form</button></div> : null}
           <TextField
             label="Full name"
             placeholder="e.g. Amaka Okoro"
@@ -152,5 +154,5 @@ const Step1Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
 
 export const NewPatientStep1Screen = () => {
   const state = (useLocation().state as RegistrationNavState) ?? {};
-  return <Step1Form key={state.patientId ?? 'new'} state={state} />;
+  return <RegistrationRecoveryGate key={state.patientId ?? 'new'} draftKey={state.patientId ?? 'new'}><Step1Form key={state.patientId ?? 'new'} state={state} /></RegistrationRecoveryGate>;
 };

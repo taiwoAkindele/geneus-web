@@ -11,7 +11,14 @@
 
 Home now follows selected sketch 1 from the [modular workspace proposal](../docs/MODULAR-WORKSPACE-UX-PLAN-2026-10-29.md): seven permission-filtered module destinations, a resume shortcut and real attention items. Each module has an overview and focused desktop/mobile navigation. Existing screen URLs and repositories are reused; Laboratory and Pharmacy open existing station queues. Finance owns financial setup, Operations owns services/rosters, and Administration owns access/devices/recovery. Shared patient/staff pages preserve workspace context, including browser Back. Module preferences are scoped to the staff member and facility and store no patient content. No server/shared-contract changes or new module-activation capability are introduced. See [current design QA](qa/artifacts/modular-workspace-2026-10-30/design-qa.md).
 
+### Core patient journey: private registration recovery (31 October 2026)
+
+The first registration slice is implemented on `feat/core-patient-journey`. Encrypted drafts are scoped to staff, facility and device enrollment, with separate drafts for new registrations and patient edits. Returning after reload offers Resume or Discard before mounting the form. Both steps show persistence status and retry failed writes. Successful local patient creation clears only its draft; unreadable recovery data is preserved rather than replaced. The existing facility workspace flusher waits for persistence before switching.
+
+Synthetic browser acceptance covers both steps, encrypted storage, reload, staff isolation, discard, successful local registration and a 320px phone. See [registration recovery checks](qa/registration-recovery-qa.md). Real device/server/receiving-device acceptance remains outstanding. Next is provisional emergency registration and later identity resolution; neither is implemented by this slice.
+
 ### Encounter field guidance
+
 
 Encounter inputs and embedded clinical forms provide purpose/example help through
 shared field controls. Help opens on hover, keyboard focus or tap, fits the viewport
