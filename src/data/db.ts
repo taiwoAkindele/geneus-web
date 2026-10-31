@@ -11,7 +11,7 @@ import {
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { fieldKindsFor } from './contractShape';
-import { getDatabase } from './database';
+import { getDatabase, type LocalDatabase } from './database';
 import { fromRow, toRow, type Row } from './rows';
 import { ALL_TABLES, TABLE_FOR } from './tables';
 
@@ -82,7 +82,7 @@ export const insertRecord = async <T extends AnyDocument>(
   permission: Permission,
   type: DocType,
   record: unknown,
-  options?:{replaceSame?:boolean},
+  options?:{replaceSame?:boolean; checkUnderLock?: (transaction: Pick<LocalDatabase, 'execute' | 'getOptional'>) => Promise<void>},
 ): Promise<T> => {
   assertAllowed(context, permission);
   assertFacilityContext(context);
@@ -93,10 +93,13 @@ export const insertRecord = async <T extends AnyDocument>(
   const row = toRow(type, validated);
   if(options?.replaceSame){const existing=await findRecord(type,validated.id);if(existing){const {clinicalPayloadHash}=await import('./workforceClinical');if(await clinicalPayloadHash(existing)!==await clinicalPayloadHash(validated))throw new Error('A different clinical record already uses this identity. Review its existing history');}}
   const columns = Object.keys(row);
-  await getDatabase().execute(
-    `INSERT ${options?.replaceSame?'OR REPLACE ':''}INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`,
-    columns.map((column) => row[column]),
-  );
+  const statement = `INSERT ${options?.replaceSame?'OR REPLACE ':''}INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`;
+  const parameters = columns.map((column) => row[column]);
+  if (options?.checkUnderLock) await getDatabase().writeTransaction(async (transaction) => {
+    await options.checkUnderLock!(transaction);
+    await transaction.execute(statement, parameters);
+  });
+  else await getDatabase().execute(statement, parameters);
   if(bundle.reviewId)await clearClinicalReview(bundle.reviewId);
   return validated;
 };

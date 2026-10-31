@@ -1,0 +1,284 @@
+[
+  {
+    "path": "/workspace/clinical",
+    "assert": "document.body.innerText.includes('Wards & admissions')",
+    "description": "Clinical workspace exposes the ward workflow"
+  },
+  {
+    "evaluate": "window.seedAdmissionScenario(); true"
+  },
+  {
+    "path": "/admissions",
+    "name": "01-admission-requests",
+    "assert": "document.body.innerText.includes('Review admission') && document.body.innerText.includes('Amaka Okoro')",
+    "description": "Signed request appears with patient and chart link"
+  },
+  {
+    "click": "Review admission"
+  },
+  {
+    "fill": {
+      "label": "Receiving team",
+      "value": "unit:1"
+    }
+  },
+  {
+    "click": "Confirm admission",
+    "assert": "window.designAudit.rows.inpatient_events.length === 1 && !document.querySelector('dialog[open]')",
+    "description": "Confirmation creates a visit-linked admission"
+  },
+  {
+    "path": "/admissions?tab=inpatients",
+    "name": "02-awaiting-bed",
+    "assert": "document.body.innerText.includes('Awaiting bed')",
+    "description": "Confirmed admission appears before bed allocation"
+  },
+  {
+    "click": "Reserve bed"
+  },
+  {
+    "fill": {
+      "label": "Ward",
+      "value": "ward:surgical"
+    }
+  },
+  {
+    "fill": {
+      "label": "Bed",
+      "value": "bed:01"
+    }
+  },
+  {
+    "name": "03-bed-reservation"
+  },
+  {
+    "click": "Reserve bed",
+    "assert": "window.designAudit.rows.inpatient_events.at(-1).action === 'reserve' && document.body.innerText.includes('Awaiting arrival')",
+    "description": "Reservation is distinct from arrival"
+  },
+  {
+    "evaluate": "window.designAudit.rows.ps_crud=[{id:window.designAudit.rows.inpatient_events.at(-1).id}]; window.dispatchEvent(new Event('geneus:inpatientSupport')); true"
+  },
+  {
+    "path": "/admissions?tab=beds",
+    "name": "04-bed-reserved-pending",
+    "assert": "document.body.innerText.includes('Reserved') && document.body.innerText.includes('Pending server confirmation')",
+    "description": "Local reservation is visibly pending"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "click": "Confirm arrival"
+  },
+  {
+    "click": "Confirm ward arrival",
+    "assert": "window.designAudit.rows.inpatient_events.at(-1).action === 'arrive'",
+    "description": "Physical arrival records a separate event"
+  },
+  {
+    "click": "Open patient chart",
+    "selector": "a",
+    "name": "05-inpatient-chart",
+    "assert": "document.body.innerText.includes('Inpatient · In ward') && document.body.innerText.includes('Surgical ward · Bed 01') && ![...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='Start visit')",
+    "description": "Chart displays current stay instead of offering a new visit"
+  },
+  {
+    "path": "/encounters?care=inpatient&queue=all",
+    "name": "06-inpatient-list",
+    "assert": "document.body.innerText.includes('Amaka Okoro') && document.body.innerText.includes('Surgical ward · Bed 01')",
+    "description": "Clinical inpatient tab shows ward and bed"
+  },
+  {
+    "fill": {
+      "label": "Visits from",
+      "value": "2099-01-01"
+    },
+    "assert": "document.body.innerText.includes('Amaka Okoro')",
+    "description": "Date filters do not hide active inpatients"
+  },
+  {
+    "path": "/encounters?care=outpatient&queue=all",
+    "assert": "!document.body.innerText.includes('Amaka Okoro') && document.body.innerText.includes('Demo Second Patient')",
+    "description": "Active inpatient is excluded from outpatient caseload"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "click": "Transfer bed"
+  },
+  {
+    "fill": {
+      "label": "Ward",
+      "value": "ward:surgical"
+    }
+  },
+  {
+    "fill": {
+      "label": "Bed",
+      "value": "bed:02"
+    }
+  },
+  {
+    "fill": {
+      "label": "Reason / handover note",
+      "value": "Synthetic completed move for ward care"
+    }
+  },
+  {
+    "click": "Confirm transfer",
+    "assert": "window.designAudit.rows.inpatient_events.at(-1).bedId === 'bed:02'",
+    "description": "Transfer records destination and preserves prior events"
+  },
+  {
+    "path": "/admissions?tab=beds",
+    "name": "07-after-transfer",
+    "assert": "document.body.innerText.includes('Cleaning') && document.body.innerText.includes('Occupied')",
+    "description": "Transfer releases old bed for cleaning and occupies destination"
+  },
+  {
+    "click": "Confirm cleaned & ready"
+  },
+  {
+    "click": "Confirm cleaned & ready",
+    "assert": "window.designAudit.rows.bed_ready_events.length === 1",
+    "description": "Cleaning confirmation releases the vacated bed"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "click": "Ready for discharge"
+  },
+  {
+    "click": "Mark ready for discharge",
+    "assert": "document.body.innerText.includes('Ready for discharge') && document.body.innerText.includes('Amaka Okoro')",
+    "description": "Discharge-ready patient remains an inpatient"
+  },
+  {
+    "click": "Stay activity",
+    "name": "08-stay-activity",
+    "assert": "document.body.innerText.includes('Synthetic completed move for ward care')",
+    "description": "Activity preserves transfer explanation and authorship"
+  },
+  {
+    "evaluate": "document.querySelector('dialog[open] button[aria-label=\"Close\"]')?.click(); true"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "click": "Confirm departure"
+  },
+  {
+    "click": "Confirm departure",
+    "assert": "window.designAudit.rows.inpatient_events.at(-1).action === 'discharge' && !document.body.innerText.includes('Amaka Okoro')",
+    "description": "Actual departure closes active stay"
+  },
+  {
+    "path": "/admissions?tab=beds",
+    "name": "09-after-departure",
+    "assert": "document.body.innerText.includes('Cleaning')",
+    "description": "Departure requires bed cleaning before reuse"
+  },
+  {
+    "click": "Confirm cleaned & ready"
+  },
+  {
+    "click": "Confirm cleaned & ready",
+    "assert": "window.designAudit.rows.bed_ready_events.length === 2",
+    "description": "Final bed is returned to available state"
+  },
+  {
+    "path": "/encounters?care=outpatient&queue=all",
+    "assert": "!document.body.innerText.includes('Amaka Okoro')",
+    "description": "Discharge does not create an outpatient attendance"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "fill": {
+      "label": "Stay history",
+      "value": "all"
+    },
+    "name": "10-discharged-history",
+    "assert": "document.body.innerText.includes('Discharged') && document.body.innerText.includes('Amaka Okoro')",
+    "description": "Discharged stay and chart link remain available"
+  },
+  {
+    "click": "Open patient chart",
+    "selector": "a",
+    "name": "10b-discharged-chart",
+    "assert": "document.querySelector('section[aria-label=\"Saved visit\"]').innerText.includes('Hospital stay · Discharged')",
+    "description": "Saved visit displays the actual discharged stay rather than the original admission decision"
+  },
+  {
+    "click": "Print visit summary",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Hospital stay · Discharged')",
+    "description": "Printed visit preview uses the actual stay status"
+  },
+  {
+    "role": "cashier",
+    "path": "/admissions",
+    "assert": "document.body.innerText.includes('View access') && !document.body.innerText.includes('Review admission')",
+    "description": "Cashier cannot bypass ward permissions using direct route"
+  },
+  {
+    "role": "doctor",
+    "width": 320,
+    "evaluate": "window.seedAdmissionScenario(); true"
+  },
+  {
+    "path": "/admissions",
+    "name": "11-phone-requests",
+    "assert": "document.documentElement.scrollWidth <= innerWidth",
+    "description": "Phone request list does not overflow the page"
+  },
+  {
+    "click": "Review admission"
+  },
+  {
+    "fill": {
+      "label": "Receiving team",
+      "value": "unit:1"
+    }
+  },
+  {
+    "click": "Confirm admission"
+  },
+  {
+    "path": "/admissions?tab=inpatients"
+  },
+  {
+    "click": "Reserve bed"
+  },
+  {
+    "fill": {
+      "label": "Ward",
+      "value": "ward:surgical"
+    }
+  },
+  {
+    "fill": {
+      "label": "Bed",
+      "value": "bed:01"
+    }
+  },
+  {
+    "name": "12-phone-reservation",
+    "assert": "document.querySelector('dialog[open]').getBoundingClientRect().width <= innerWidth && [...document.querySelectorAll('dialog[open] select')].every(n=>n.getBoundingClientRect().right<=innerWidth)",
+    "description": "Phone allocation controls fit the screen"
+  },
+  {
+    "click": "Reserve bed"
+  },
+  {
+    "path": "/admissions?tab=inpatients",
+    "name": "13-phone-inpatients",
+    "scroll": 350,
+    "assert": "window.designAudit.rows.inpatient_events.length===2 && document.documentElement.scrollWidth<=innerWidth",
+    "description": "Phone can confirm admission and reserve a bed"
+  }
+]

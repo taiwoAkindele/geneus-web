@@ -31,6 +31,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
     { id: 'clinical', label: 'Clinical', description: 'Consultation, laboratory and pharmacy', icon: 'encounter', links: [
+      ...(has(context, 'admission:manage') ? [link('admissions', 'Wards & admissions', 'Receive requests, allocate beds and manage inpatient stays.', '/admissions', 'patients')] : []),
       ...(keys.has('encounters') && consultation ? [link('consultation', 'Consultation & nursing', 'Open visits and continue recording care.', '/encounters?queue=all', 'encounter')] : []),
       ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open the laboratory queue and record results.', '/encounters?queue=lab', 'laboratory')] : []),
       ...(keys.has('encounters') && consultation ? [link('results', 'Results ready', 'Review visits with laboratory results ready.', '/encounters?queue=results', 'registers')] : []),
@@ -76,7 +77,7 @@ export const workspaceForLocation = (pathname: string, search: string, available
   if (pathname.startsWith('/referrals')) return find('clinical');
   if (pathname.startsWith('/investigations')) return find('operations');
   if (pathname.startsWith('/organization')) return find('administration');
-  if (pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
+  if (pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');
   if (pathname.startsWith('/stock')) return find('inventory');

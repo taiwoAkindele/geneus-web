@@ -9,6 +9,7 @@ import type { LocalDatabase } from './database';
 import { getDeviceCredential, recordServerContact } from './deviceCredential';
 import { decodeValues } from './rows';
 import { TYPE_FOR } from './tables';
+import { rememberInpatientSupport } from './inpatientSupport';
 
 /**
  * How PowerSync talks to geneus-server on this device's behalf: a short-lived
@@ -56,6 +57,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     if (!device) return null;
     try {
       const minted = await fetchSyncToken(device.credential);
+      rememberInpatientSupport(device, minted.inpatientWorkflowVersion);
       recordServerContact(minted.serverTime, device.deviceId);
       await refreshWorkforceKeys();
       return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
@@ -76,7 +78,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);}
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }
@@ -88,7 +90,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       };
       try {
         const response = await uploadMutations(device.credential, request);
-        await confirmWorkforceReceipts(device.credential, request.mutations.filter(requiresFacilityContract));
+        await confirmWorkforceReceipts(device.credential, request.mutations.filter((mutation) => requiresFacilityContract(mutation) || ['inpatient_event','bed_ready_event'].includes(mutation.table)));
         recordServerContact(response.serverTime, device.deviceId);
         if (response.rejected.length > 0) {
           console.warn('server rejected queued writes — see the reconcile queue', response.rejected);
