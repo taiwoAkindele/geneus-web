@@ -18,6 +18,14 @@ export class ApiError extends Error {
 
 const OFFLINE_MESSAGE = 'Cannot reach the Geneus server — check the connection and try again';
 
+/** Binary documents use the same API origin/error boundary; bytes never enter JSON or logs. */
+export const binaryRequest=async(path:string,init:RequestInit):Promise<Response>=>{
+  let response:Response;
+  try{response=await fetch(`${BASE_URL}${path}`,init);}catch(cause){if(cause instanceof Error&&cause.name==='AbortError')throw cause;throw new ApiError('offline',OFFLINE_MESSAGE);}
+  if(!response.ok){const detail=await response.json().catch(()=>undefined) as {error?:string;message?:string}|undefined;throw new ApiError(detail?.error??'request_failed',detail?.message??`The document request was refused (${response.status})`,response.status);}
+  return response;
+};
+
 const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   let response: Response;
   try {

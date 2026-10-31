@@ -1,4 +1,4 @@
-export const PATIENT_TABS = { overview: 'Overview', visits: 'Visits', clinical: 'Clinical record', appointments: 'Appointments', details: 'Personal details' } as const;
+export const PATIENT_TABS = { overview: 'Overview', visits: 'Visits', clinical: 'Clinical record', documents:'Documents', appointments: 'Appointments', details: 'Personal details' } as const;
 export type PatientTab = keyof typeof PATIENT_TABS;
 
 export const patientChartPath = (patientId: string, tab: PatientTab = 'overview', extra: Record<string, string> = {}) =>

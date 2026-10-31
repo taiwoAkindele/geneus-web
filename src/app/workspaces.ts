@@ -1,4 +1,5 @@
 import type { AuthorizationContext, Permission, Role } from '@shared';
+import { clinicalDocumentAccess } from '@shared';
 import type { IconName } from '@/ui';
 import { navigationFor } from './navigation';
 
@@ -39,6 +40,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
       ...(keys.has('units') ? [link('handoffs', 'Handoffs & unit queue', 'Review incoming work and the next step of care.', '/units', 'referrals')] : []),
       ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Find patient', 'Open a patient record to review or begin care.', '/patients/search', 'search')] : []),
+      ...(clinicalDocumentAccess(context)?[link('documents','Documents','Manage hospital files and review visit documents.','/documents','registers')]:[]),
     ] },
     { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: keys.has('billing') ? [
       link('accounts', 'Patient accounts', 'Find bills, review charges and receive payments.', '/billing?tab=collections', 'finance'),
@@ -77,7 +79,7 @@ export const workspaceForLocation = (pathname: string, search: string, available
   if (pathname.startsWith('/referrals')) return find('clinical');
   if (pathname.startsWith('/investigations')) return find('operations');
   if (pathname.startsWith('/organization')) return find('administration');
-  if (pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
+  if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');
   if (pathname.startsWith('/stock')) return find('inventory');

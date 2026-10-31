@@ -77,6 +77,7 @@ const permissionToApply = (rejection: SyncRejection): Permission | undefined => 
  * as well as the right to resolve, because the write is applied in their name.
  */
 export const applyAgainBlocker = (rejection: SyncRejection, context: AuthorizationContext): string | undefined => {
+  if(['library_document','visit_document'].includes(rejection.entityType))return 'Open the retained file, then review the current library version or inpatient chart before recording a corrected version. Document history cannot be overwritten from here.';
   if(['encounter_entry','clinical_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext)return 'Use independent clinical review to preserve the original author, authority and performance time';
   if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Review the current register configuration and save a new draft version. The refused snapshot is kept here; an existing version cannot be overwritten.';
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Review this booking in Appointments and record the intended action against its current history. Saved booking history cannot be overwritten.';

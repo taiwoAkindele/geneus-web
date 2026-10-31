@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { SyncRejection } from '@shared';
 import { Button, Sheet, Tag } from '@/ui';
 import { patientChartPath } from '@/features/patients/patientRoutes';
+import { RetainedDocument } from '@/features/documents/RetainedDocument';
 import { CATEGORY_LABEL, keptRows, RECORD_LABEL, rejectionAdvice, shownValue, type RejectionKind } from './describeRejection';
 
 type Props = {
@@ -90,6 +91,7 @@ export const RejectionCard = ({
         <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b> {rejectionAdvice(rejection)}
       </p>
       {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId)} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
+      {['library_document','visit_document'].includes(rejection.entityType)?<RetainedDocument rejection={rejection}/>:null}
       {['encounter_entry','clinical_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext?<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Independent clinical review · preserve original authorship</Link>:null}
       {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
       {rejection.entityType === 'register_definition' && typeof rejection.refusedRecord?.registerId === 'string' ? <Link to={`/registers/${encodeURIComponent(rejection.refusedRecord.registerId)}/configure`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review register configuration</Link> : null}

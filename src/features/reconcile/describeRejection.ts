@@ -5,6 +5,8 @@ export const RECORD_LABEL: Partial<Record<DocType, string>> = {
   patient: 'Patient',
   encounter: 'Visit',
   encounter_entry: 'Visit entry',
+  library_document: 'Library document',
+  visit_document: 'Visit document',
   handoff: 'Unit handoff',
   appointment: 'Appointment',
   register_entry: 'Register entry',
