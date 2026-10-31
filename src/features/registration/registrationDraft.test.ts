@@ -15,7 +15,7 @@ describe('registration draft across steps', () => {
     const draft = createRegistrationDraft();
     draft.keep('new', { ...draft.read('new'), fullName: 'Unsaved person', sex: 'M' });
     expect(draft.read('patient:other', { fullName: 'Different patient', sex: 'F' }).fullName).toBe('Different patient');
-    draft.clear();
+    draft.clear('new');
     expect(draft.read('new')).toMatchObject({ fullName: '', sex: '' });
   });
 });

@@ -29,7 +29,8 @@ export const useSavePatient = () => {
           ? await updatePatient(editingPatientId, details, context)
           : await registerPatient(details, context, (patientId) => identityReviewRecords(patientId, decision, context));
         toast(editingPatientId ? 'Patient details saved' : `Registered — ${patient.patientId}`);
-        clearDraft();
+        try { await clearDraft(editingPatientId ?? 'new'); }
+        catch { toast('Patient saved. Draft cleanup could not finish; keep this device and retry cleanup.', { tone: 'error' }); }
         navigate('/patients/profile', { state: { patientId: patient.patientId }, replace: true });
       } catch (cause) {
         toast(cause instanceof Error ? cause.message : 'Could not save the patient — please try again', {

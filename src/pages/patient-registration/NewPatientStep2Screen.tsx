@@ -14,6 +14,7 @@ import {
 } from '@/features/registration';
 import { findLikelyMatches } from '@/features/search';
 import type { DuplicateNavState } from './DuplicateCheckScreen';
+import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/features/registration/RegistrationRecoveryPrompt';
 
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
 
@@ -86,6 +87,7 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
         className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card"
       >
         <div className="flex-1 space-y-4 px-5 py-3">
+          <RegistrationRecoveryStatus />
           <div>
             <TextField label="Occupation" placeholder="e.g. Trader" autoComplete="off" {...register('occupation')} />
             <div className="mt-2.5 flex flex-wrap gap-2">
@@ -163,5 +165,5 @@ const Step2Form = ({ state }: { state: NonNullable<RegistrationNavState> }) => {
 
 export const NewPatientStep2Screen = () => {
   const state = (useLocation().state as RegistrationNavState) ?? {};
-  return <Step2Form key={state.patientId ?? 'new'} state={state} />;
+  return <RegistrationRecoveryGate key={state.patientId ?? 'new'} draftKey={state.patientId ?? 'new'}><Step2Form key={state.patientId ?? 'new'} state={state} /></RegistrationRecoveryGate>;
 };

@@ -1,0 +1,22 @@
+[
+  { "role": "doctor", "width": 1440, "path": "/patients/new", "assert": "Boolean(document.querySelector('input[name=fullName]'))", "description": "New registration opens the existing form" },
+  { "fill": { "label": "Full name", "value": "Synthetic Recovery Patient" } },
+  { "click": "F" },
+  { "fill": { "label": "Age", "value": "32" } },
+  { "fill": { "label": "Address", "value": "Synthetic recovery address" }, "name": "01-private-draft", "assert": "localStorage.getItem('geneus.registrationDrafts').startsWith('enc1:') && !localStorage.getItem('geneus.registrationDrafts').includes('Synthetic Recovery')", "description": "Form typing is persisted encrypted on the device" },
+  { "reload": true, "path": "/patients/new", "name": "02-resume-choice", "assert": "document.body.innerText.includes('Resume your unfinished form?') && !document.querySelector('input[name=fullName]')", "description": "Reload offers explicit Resume or Discard before opening private form contents" },
+  { "click": "Resume registration", "assert": "document.querySelector('input[name=fullName]').value === 'Synthetic Recovery Patient' && document.querySelector('input[name=address]').value === 'Synthetic recovery address'", "description": "Resume restores the values actually typed" },
+  { "click": "Continue — Additional details", "assert": "window.designAudit.path === '/patients/new/details'", "description": "The resumed form continues to the existing second step" },
+  { "fill": { "label": "Occupation", "value": "Synthetic occupation" } },
+  { "reload": true, "path": "/patients/new/details", "assert": "document.body.innerText.includes('Resume your unfinished form?')", "description": "Additional details also offer recovery after reload" },
+  { "click": "Resume registration", "name": "03-step-two-recovered", "assert": "document.querySelector('input[name=occupation]').value === 'Synthetic occupation'", "description": "Recovery keeps both registration steps" },
+  { "click": "Register patient", "name": "04-registration-saved", "assert": "window.designAudit.path === '/patients/profile' && window.designAudit.rows.patients.filter(p => p.fullName === 'Synthetic Recovery Patient').length === 1", "description": "Recovered registration creates one patient and opens the chart" },
+  { "path": "/patients/new", "assert": "document.querySelector('input[name=fullName]').value === ''", "description": "Successful registration clears the active form" },
+  { "fill": { "label": "Full name", "value": "Synthetic Private Draft" } },
+  { "reload": true, "actor": "second", "path": "/patients/new", "assert": "document.querySelector('input[name=fullName]').value === '' && !document.body.innerText.includes('Resume your unfinished form?')", "description": "Another signed-in worker cannot see or resume the first worker's draft" },
+  { "reload": true, "actor": "first", "path": "/patients/new", "assert": "document.body.innerText.includes('Resume your unfinished form?')", "description": "The original worker can still recover their private draft" },
+  { "click": "Discard draft", "assert": "document.querySelector('input[name=fullName]').value === ''", "description": "Explicit discard starts a blank form" },
+  { "reload": true, "path": "/patients/new", "assert": "!document.body.innerText.includes('Resume your unfinished form?') && document.querySelector('input[name=fullName]').value === ''", "description": "Discard remains effective after restart" },
+  { "width": 320, "path": "/patients/new", "fill": { "label": "Full name", "value": "Synthetic Phone Draft" } },
+  { "reload": true, "path": "/patients/new", "name": "05-recovery-small-phone", "assert": "document.documentElement.scrollWidth <= innerWidth && document.body.innerText.includes('Resume your unfinished form?')", "description": "Recovery controls fit a 320px phone" }
+]

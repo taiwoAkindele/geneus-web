@@ -5,6 +5,7 @@ import { toPatientDetails, useSavePatient, useClearRegistrationDraft, useRegistr
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/features/search';
 import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
+import { RegistrationRecoveryGate } from '@/features/registration/RegistrationRecoveryPrompt';
 
 export type DuplicateNavState = { matchIds: string[] } | null;
 
@@ -31,7 +32,7 @@ const formatDay = (iso: string): string => new Date(iso).toLocaleDateString('en-
  * as a bottom sheet over the (blurred) registration form when the form found a
  * likely match. Nothing is written until the person at the desk answers.
  */
-export const DuplicateCheckScreen = () => {
+const DuplicateCheck = () => {
   const navigate = useNavigate();
   const savePatient = useSavePatient();
   const clearDraft = useClearRegistrationDraft();
@@ -62,7 +63,7 @@ export const DuplicateCheckScreen = () => {
   const useExisting = async () => {
     if (!match || saving) return;
     setSaving(true); setError('');
-    try { await recordExistingSelection(match.patient.patientId, context); clearDraft(); navigate('/patients/profile', { state: { patientId: match.patient.patientId }, replace: true }); }
+    try { await recordExistingSelection(match.patient.patientId, context); await clearDraft(); navigate('/patients/profile', { state: { patientId: match.patient.patientId }, replace: true }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not record the identity decision'); }
     finally { setSaving(false); }
   };
@@ -175,3 +176,5 @@ export const DuplicateCheckScreen = () => {
     </Sheet>
   );
 };
+
+export const DuplicateCheckScreen = () => <RegistrationRecoveryGate><DuplicateCheck /></RegistrationRecoveryGate>;
