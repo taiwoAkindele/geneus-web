@@ -17,10 +17,11 @@ const server = process.env.PATIENT_FLOW_PREVIEW ? undefined : await createServer
   configFile: false, root: process.cwd(), logLevel: 'error',
   resolve: { alias: [
     { find: /^@\/data$/, replacement: resolve('qa/clinical-device.ts') },
-    { find: '@shared', replacement: resolve('shared/src') },
+    { find: '@shared', replacement: resolve(process.env.GENEUS_QA_CANONICAL_CONTRACT === '1' ? '../geneus-shared/src' : 'shared/src') },
+    { find: /^zod$/, replacement: resolve('node_modules/zod/index.js') },
     { find: '@', replacement: resolve('src') },
   ] },
-  esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 5196, strictPort: true },
+  esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 5196, strictPort: true, fs: { allow: [process.cwd(), resolve('../geneus-shared')] } },
 });
 await server?.listen();
 const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
@@ -105,6 +106,10 @@ try {
     if (command.finish) break;
     try {
       const role = command.role ?? currentRole ?? 'doctor', width = command.width ?? currentWidth ?? 1440;
+      if (command.offline !== undefined) {
+        await cdp('Network.enable');
+        await cdp('Network.emulateNetworkConditions', { offline: Boolean(command.offline), latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+      }
       if (role !== currentRole || width !== currentWidth || command.reload) {
         await cdp('Emulation.setDeviceMetricsOverride', { width, height: width > 800 ? 1024 : 844, deviceScaleFactor: 1, mobile: width <= 800 });
         await cdp('Page.navigate', { url: previewOrigin + '/qa/overall-audit.html?role=' + encodeURIComponent(role) + (command.combined ? '&combined=1' : '') + (command.readonly ? '&readonly=1' : '') + (command.actor ? '&actor=' + encodeURIComponent(command.actor) : '') });

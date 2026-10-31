@@ -308,7 +308,7 @@ describe('repositories', () => {
     it('inserts a fully stamped record, booleans as integers', async () => {
       const staff = await createStaff({ fullName: 'Amaka', role: 'doctor', permission: 'read_write' }, contextFor('facility_admin'));
 
-      expect(staff).toMatchObject({ facilityId: 'OOE-PHC', deviceId: 'device-1', createdBy: 'staff:facility_admin', schemaVersion: 4, active: true });
+      expect(staff).toMatchObject({ facilityId: 'OOE-PHC', deviceId: 'device-1', createdBy: 'staff:facility_admin', schemaVersion: 5, active: true });
       const [statement] = db.statements;
       expect(statement.sql).toMatch(/^INSERT INTO staff \(/);
       const columns = /\(([^)]+)\)/.exec(statement.sql)?.[1].split(', ').map((name) => name.replace(/"/g, '')) ?? [];

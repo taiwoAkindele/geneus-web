@@ -1,19 +1,23 @@
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { yearsBetween, type Patient } from '@shared';
-import { getPatient, updatePatient } from '@/data/repos/patients';
+import { patientSexLabel, yearsBetween, type Patient } from '@shared';
+import { useNavigate } from 'react-router-dom';
+import { getPatient, listPatients, updatePatient } from '@/data/repos/patients';
 import { fromPatient, toPatientDetails, type RegistrationValues } from '@/features/registration/registrationValues';
 import { useAuthorizationContext } from '@/session';
 import { currentAge } from '@/features/search';
+import { listIdentityEvents } from '@/data/repos/patientIdentity';
+import { unreviewedIdentityMatches } from './identityCandidates';
 import { Button, SelectField, Sheet, SheetCancelButton, TextAreaField, TextField, useToast } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { PatientIdentityPanel } from './PatientIdentityPanel';
 
 export const PersonalDetails = ({ patient, canEdit, onEdit, onPrint }: { patient: Patient; canEdit: boolean; onEdit: () => void; onPrint: () => void }) => <section className="space-y-5">
-  <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-extrabold">Personal details</h2><p className="mt-1 text-sm text-ink-soft">Administrative information about the patient.</p></div><div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} onClick={onPrint}>Print patient card</Button>{canEdit ? <Button fullWidth={false} onClick={onEdit}>Edit personal details</Button> : null}</div></div>
+  <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-extrabold">Personal details</h2><p className="mt-1 text-sm text-ink-soft">Administrative information about the patient.</p></div><div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} onClick={onPrint}>Print patient card</Button>{canEdit ? <Button fullWidth={false} onClick={onEdit}>{patient.identityStatus === 'provisional' ? 'Identify patient' : 'Edit personal details'}</Button> : null}</div></div>
   {[
-    { title: 'Identification', fields: [['Patient ID', patient.patientId], ['Full name', patient.fullName], ['Sex', patient.sex === 'female' ? 'Female' : 'Male'], ['Age', currentAge(patient) === undefined ? 'Not recorded' : `${currentAge(patient)} years${patient.dobEstimated || !patient.dateOfBirth ? ' · estimated' : ''}`], ['Date of birth', patient.dateOfBirth ?? 'Not recorded']] },
-    { title: 'Contact', fields: [['Phone', patient.phone ?? 'Not recorded'], ['Address', patient.address]] },
+    ...(patient.provisionalReason ? [{ title: 'Provisional registration history', fields: [['Original circumstances', patient.provisionalReason], ['Identification status', patient.identityStatus === 'provisional' ? 'Not yet identified' : 'Identified later'], ...(patient.identifiedOn ? [['Identified on', new Date(patient.identifiedOn).toLocaleString('en-GB')], ['Identified by', patient.identifiedBy ?? 'Not recorded'], ['Identification explanation', patient.identificationNote ?? 'Not recorded']] : [])] }] : []),
+    { title: 'Identification', fields: [['Patient ID', patient.patientId], ['Full name', patient.fullName], ['Sex', patientSexLabel(patient.sex)], ['Age', currentAge(patient) === undefined ? 'Not recorded' : `${currentAge(patient)} years${patient.dobEstimated || !patient.dateOfBirth ? ' · estimated' : ''}`], ['Date of birth', patient.dateOfBirth ?? 'Not recorded']] },
+    { title: 'Contact', fields: [['Phone', patient.phone ?? 'Not recorded'], ['Address', patient.address ?? 'Not recorded']] },
     { title: 'Additional details', fields: [['Occupation', patient.occupation ?? 'Not recorded'], ['Religion', patient.religion ?? 'Not recorded'], ['Old folder number', patient.legacyPaperRef ?? 'Not recorded'], ...(canEdit ? [['NIN', patient.nin ? `•••••••${patient.nin.slice(-4)}` : 'Not provided']] : []), ['Identity information', patient.identityEvidence === 'document_seen' ? 'Identity document checked by staff' : 'Reported by patient / representative'], ...(canEdit && patient.identityEvidenceNote ? [['Evidence checked', patient.identityEvidenceNote]] : []), ['Registered', new Date(patient.createdOn).toLocaleDateString('en-GB')]] },
   ].map((section) => <section key={section.title} className="overflow-hidden rounded-field border border-outline-soft"><h3 className="bg-brand-wash px-4 py-3 font-bold text-brand">{section.title}</h3><dl className="divide-y divide-outline-soft">{section.fields.map(([label, value]) => <div key={label} className="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[180px_1fr]"><dt className="font-semibold text-ink-soft">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl></section>)}
   <PatientIdentityPanel patientId={patient.patientId} />
@@ -23,6 +27,9 @@ export const PersonalDetailsEditor = ({ patient, onClose, onSaved }: { patient: 
   const context = useAuthorizationContext();
   const toast = useToast();
   const initial = useRef(fromPatient(patient));
+  const identifying = patient.identityStatus === 'provisional';
+  const navigate = useNavigate();
+  const [matchingIds, setMatchingIds] = useState<string[]>([]);
   const [error, setError] = useState('');
   const { register, handleSubmit, watch, setValue, formState: { isDirty, isSubmitting, errors } } = useForm<RegistrationValues>({ defaultValues: initial.current });
   const evidence = watch('identityEvidence');
@@ -32,23 +39,36 @@ export const PersonalDetailsEditor = ({ patient, onClose, onSaved }: { patient: 
       if (!form.age.trim() && !form.dateOfBirth) throw new Error('Record an age or date of birth');
       const latest = await getPatient(patient.patientId);
       if (!latest) throw new Error('The patient could not be read. Your changes are still here.');
+      if (identifying && latest.identityStatus !== 'provisional') throw new Error('This patient has already been identified. Review the current details before making another change');
       const latestForm = fromPatient(latest);
+      const identityFields = ['fullName', 'sex', 'address', 'age', 'dateOfBirth', 'phone', 'nin', 'folder'] as const;
+      if (identifying && identityFields.some((key) => latestForm[key] !== initial.current[key])) throw new Error('Patient identity details changed while you were editing. Review the current record before identifying this patient');
       const merged = { ...latestForm };
       const changed = (Object.keys(form) as (keyof RegistrationValues)[]).filter((key) => form[key] !== initial.current[key]);
       for (const key of changed) {
         if (latestForm[key] !== initial.current[key]) throw new Error('These details changed while you were editing. Keep your changes and review the current record before saving.');
         Object.assign(merged, { [key]: form[key] });
       }
+      if (identifying) merged.identityStatus = 'identified';
       const details = toPatientDetails(merged);
       if (!changed.includes('religion')) details.religion = latest.religion;
+      if (identifying) {
+        const [patients, events] = await Promise.all([listPatients(), listIdentityEvents()]);
+        const matches = unreviewedIdentityMatches(details, patient.patientId, patients, events);
+        if (matches.length) {
+          setMatchingIds(matches.map((match) => match.patient.patientId));
+          throw new Error('These details match a possible existing patient. Review the records before completing identification; this patient and their care history have been kept.');
+        }
+      }
       await updatePatient(patient.patientId, details, context);
       toast('Patient details updated on this device'); onSaved(); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save. Your changes are still here.'); }
   });
-  return <Sheet title="Edit personal details" eyebrow={patient.patientId} placement="side" onClose={onClose} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty}>
+  return <Sheet title={identifying ? 'Identify patient' : 'Edit personal details'} eyebrow={patient.patientId} placement="side" onClose={onClose} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty}>
     <form noValidate onSubmit={save} className="space-y-4">
+      {identifying ? <><p className="rounded-field bg-amber-bg p-3 text-sm text-amber-text">Add the patient’s reported or checked identity. Their patient ID and all earlier care stay together. If they already have a record, use identity review to compare and link the records.</p><TextField label="How was the patient identified?" maxLength={500} hint="Who supplied the information or what evidence was checked. Do not copy full document numbers." {...register('identificationNote', { validate: (value) => value.trim().length >= 3 || 'Explain how the patient was identified' })} error={errors.identificationNote?.message} /></> : null}
       <TextField label="Full name" required {...register('fullName', { validate: (value) => Boolean(value.trim()) || 'Enter the patient’s name' })} error={errors.fullName?.message} />
-      <div className="grid grid-cols-2 gap-3"><SelectField label="Sex" {...register('sex', { required: 'Choose sex' })} options={[{ value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }]} /><TextField label="Age" type="number" min="0" max="130" {...register('age')} help={{ purpose: 'Use an estimated age when the birth date is unknown. If both are recorded, they must agree.' }} /></div>
+      <div className="grid grid-cols-2 gap-3"><SelectField label="Sex" {...register('sex', { required: 'Choose sex' })} options={[{ value: '', label: 'Not recorded' }, { value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }]} /><TextField label="Age" type="number" min="0" max="130" {...register('age')} help={{ purpose: 'Use an estimated age when the birth date is unknown. If both are recorded, they must agree.' }} /></div>
       <TextField label="Date of birth" type="date" max={calendarDate()} {...register('dateOfBirth', { onChange: (event) => { const date = String(event.target.value); if (date && date <= calendarDate()) setValue('age', String(yearsBetween(date, calendarDate())), { shouldDirty: true }); } })} />
       <label className="flex items-center gap-3 text-sm"><input type="checkbox" {...register('dobEstimated')} className="h-5 w-5 min-h-0" />Age / birth date is estimated</label>
       {!watch('dateOfBirth') ? <p className="text-sm text-ink-soft">Without a birth date, the recorded age is treated as an estimate.</p> : null}
@@ -62,7 +82,8 @@ export const PersonalDetailsEditor = ({ patient, onClose, onSaved }: { patient: 
       </div></details>
       {isDirty ? <p className="rounded-field bg-amber-bg p-3 text-sm text-amber-text">Unsaved changes</p> : null}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-      <Button type="submit" loading={isSubmitting}>Save changes</Button><SheetCancelButton disabled={isSubmitting} />
+      {matchingIds.length ? context.permissions.includes('patient_identity:review') ? <Button variant="outlined" onClick={() => { onClose(); navigate(`/patients/identity?primary=${encodeURIComponent(matchingIds[0])}&other=${encodeURIComponent(patient.patientId)}`); }}>Review possible existing record</Button> : <p className="text-sm text-ink-soft">Ask a records officer to compare the possible existing record before completing identification.</p> : null}
+      <Button type="submit" loading={isSubmitting}>{identifying ? 'Confirm patient identity' : 'Save changes'}</Button><SheetCancelButton disabled={isSubmitting} />
       <p className="text-sm text-ink-soft">Updates are recorded with your name and time.</p>
     </form>
   </Sheet>;

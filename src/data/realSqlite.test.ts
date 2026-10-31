@@ -9,7 +9,7 @@ import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/dra
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { assignShift, createStaff, editStaff, extendShift, findShift, listShifts, listStaff } from './repos/staff';
 import { registerPatient, updatePatient, getPatient } from './repos/patients';
-import { fromPatient, toPatientDetails } from '@/features/registration/registrationValues';
+import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from '@/features/registration/registrationValues';
 import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from './repos/patientIdentity';
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
@@ -86,6 +86,65 @@ describe('the write path against a real SQLite', () => {
   });
 
 
+
+  describe('provisional registration and later identification', () => {
+    const unknown = { ...EMPTY_REGISTRATION, identityStatus: 'provisional' as const, provisionalReason: 'Identity unknown on arrival' };
+    it('opens care for distinct unknown patients and retains their ID and care after identification', async () => {
+      const context = contextFor('doctor');
+      const first = await registerPatient(toPatientDetails(unknown), context);
+      const second = await registerPatient(toPatientDetails(unknown), context);
+      expect(first.patientId).not.toBe(second.patientId);
+      expect(first.fullName).not.toBe(second.fullName);
+      expect(first.sex).toBeUndefined(); expect(first.ageYears).toBeUndefined(); expect(first.address).toBeUndefined();
+      const entry = await saveStep({ patientId: first.patientId, step: 'complaint', values: { complaints: ['Synthetic presenting concern'] } }, context);
+      const resolved = await updatePatient(first.patientId, toPatientDetails({ ...fromPatient(first), identityStatus: 'identified', fullName: 'Synthetic Identified Patient', sex: 'F', age: '30', address: 'Synthetic address', identificationNote: 'Representative supplied identity information' }), context);
+      expect(resolved.patientId).toBe(first.patientId);
+      expect(resolved.provisionalReason).toBe(unknown.provisionalReason);
+      expect(resolved.identifiedBy).toBe(context.userId);
+      expect(resolved.identifiedOn).toBe(resolved.updatedOn);
+      const chart = await patientClinicalRecord(first.patientId);
+      expect(chart?.entries.some((item) => item.id === entry.id && item.patientId === first.patientId)).toBe(true);
+      expect((await getPatient(second.patientId))?.identityStatus).toBe('provisional');
+      const partlyKnown = await updatePatient(second.id, toPatientDetails({ ...fromPatient(second), sex: 'M' }), context);
+      expect(partlyKnown.fullName).toBe(second.fullName); expect(partlyKnown.identityStatus).toBe('provisional'); expect(partlyKnown.sex).toBe('male');
+      const cleared = await updatePatient(second.id, toPatientDetails({ ...fromPatient(partlyKnown), sex: '' }), context);
+      expect(cleared.sex).toBeUndefined(); expect(cleared.identityStatus).toBe('provisional');
+      await expect(updatePatient(first.patientId, { ...toPatientDetails(fromPatient(resolved)), identificationNote: 'Replace historical explanation' }, context)).rejects.toThrow(/history/);
+    });
+    it('refuses an incomplete identification and preserves the provisional record', async () => {
+      const context = contextFor('doctor');
+      const patient = await registerPatient(toPatientDetails(unknown), context);
+      await expect(updatePatient(patient.id, { fullName: 'Known name only', identityStatus: 'identified' }, context)).rejects.toThrow();
+      expect((await getPatient(patient.id))?.identityStatus).toBe('provisional');
+    });
+    it('does not overwrite demographics changed in another local window during identification', async () => {
+      const context = contextFor('doctor');
+      const patient = await registerPatient(toPatientDetails(unknown), context);
+      const originalTransaction = db.writeTransaction;
+      let raced = false;
+      db.writeTransaction = async (callback) => {
+        if (!raced) { raced = true; await db.execute('UPDATE patients SET sex = ? WHERE id = ?', ['female', patient.id]); }
+        return originalTransaction(callback);
+      };
+      await expect(updatePatient(patient.id, toPatientDetails({ ...fromPatient(patient), identityStatus: 'identified', fullName: 'Synthetic Identified Patient', sex: 'M', age: '30', address: 'Synthetic address', identificationNote: 'Representative supplied identity information' }), context)).rejects.toThrow(/another window/);
+      const retained = await getPatient(patient.id);
+      expect(retained?.identityStatus).toBe('provisional'); expect(retained?.sex).toBe('female'); expect(retained?.identifiedBy).toBeUndefined();
+    });
+  });
+
+  it('stops identification when an unchanged demographic was edited in another window', async () => {
+    const context = contextFor('doctor');
+    const patient = await registerPatient(toPatientDetails({ ...EMPTY_REGISTRATION, identityStatus: 'provisional', provisionalReason: 'Synthetic unidentified arrival', sex: 'F', phone: '08000000001' }), context);
+    const originalTransaction = db.writeTransaction;
+    let raced = false;
+    db.writeTransaction = async (callback) => {
+      if (!raced) { raced = true; await db.execute('UPDATE patients SET phone = ? WHERE id = ?', ['08000000002', patient.id]); }
+      return originalTransaction(callback);
+    };
+    await expect(updatePatient(patient.id, toPatientDetails({ ...fromPatient(patient), identityStatus: 'identified', fullName: 'Synthetic Identified Patient', age: '30', address: 'Synthetic address', identificationNote: 'Representative supplied identity information' }), context)).rejects.toThrow(/changed/);
+    const retained = await getPatient(patient.id);
+    expect(retained?.identityStatus).toBe('provisional'); expect(retained?.phone).toBe('08000000002'); expect(retained?.identifiedBy).toBeUndefined();
+  });
 
   describe('staff sign-in access and full-day rosters', () => {
     it('persists 24-hour access without changing roles or write capabilities', async () => {

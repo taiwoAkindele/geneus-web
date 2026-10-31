@@ -72,10 +72,10 @@ const DuplicateCheck = () => {
   const comparison = match
     ? [
         { label: 'Name', typed: values.fullName, registered: match.patient.fullName },
-        { label: 'Sex', typed: values.sex, registered: match.patient.sex === 'female' ? 'F' : 'M' },
+        { label: 'Sex', typed: values.sex, registered: match.patient.sex === 'female' ? 'F' : match.patient.sex === 'male' ? 'M' : 'Not recorded' },
         { label: 'Age', typed: typedAge, registered: String(currentAge(match.patient) ?? '—') },
         { label: 'Phone', typed: values.phone || '—', registered: match.patient.phone ?? '—' },
-        { label: 'Address', typed: values.address, registered: match.patient.address },
+        { label: 'Address', typed: values.address, registered: match.patient.address ?? 'Not recorded' },
       ]
     : [];
 
@@ -94,7 +94,7 @@ const DuplicateCheck = () => {
               <div className="flex-1">
                 <div className="text-[17px] font-bold">{match.patient.fullName}</div>
                 <div className="text-[13px] text-ink-muted">
-                  {[match.patient.sex === 'female' ? 'F' : 'M', currentAge(match.patient), match.patient.phone]
+                  {[match.patient.sex === 'female' ? 'F' : match.patient.sex === 'male' ? 'M' : 'Sex not recorded', currentAge(match.patient), match.patient.phone]
                     .filter((part) => part !== undefined && part !== '')
                     .join(' · ')}
                 </div>

@@ -77,17 +77,20 @@ export type LikelyMatch = { patient: Patient; reasons: MatchReason[] };
  * support. Strongest first: a phone match, then the most reasons.
  */
 export const findLikelyMatches = (details: PatientDetails, patients: readonly Patient[], now = Date.now()): LikelyMatch[] => {
+  // Generated temporary labels are not evidence of a shared identity.
+  if (details.identityStatus === 'provisional') return [];
   const age = candidateAge(details, now);
   const phone = phoneKey(details.phone);
   return patients
+    .filter((patient) => patient.identityStatus !== 'provisional')
     .map((patient): LikelyMatch => {
       const reasons: MatchReason[] = [];
       if (namesMatch(details.fullName, patient.fullName)) reasons.push('name');
       if (phone && phone === phoneKey(patient.phone)) reasons.push('phone');
       const theirs = currentAge(patient, now);
       if (age !== undefined && theirs !== undefined && Math.abs(age - theirs) <= AGE_TOLERANCE_YEARS) reasons.push('age');
-      if (details.sex === patient.sex) reasons.push('sex');
-      if (nameTokens(details.address).some((token) => token.length > 3 && nameTokens(patient.address).includes(token))) {
+      if (details.sex && details.sex === patient.sex) reasons.push('sex');
+      if (nameTokens(details.address ?? '').some((token) => token.length > 3 && nameTokens(patient.address ?? '').includes(token))) {
         reasons.push('address');
       }
       return { patient, reasons };

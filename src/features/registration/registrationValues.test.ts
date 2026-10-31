@@ -39,6 +39,6 @@ describe('registration values', () => {
     const details = toPatientDetails(values);
 
     const patient = { ...details, id: 'x', type: 'patient' as const, patientId: 'OOE-000001-AB', facilityId: 'OOE', schemaVersion: 3, createdBy: 's', createdOn: '2026-01-01T00:00:00Z', deviceId: 'd', dobEstimated: false, allergies: [] };
-    expect(fromPatient(patient)).toEqual(values);
+    expect(fromPatient({ ...patient, identityStatus: 'identified' })).toEqual(values);
   });
 });

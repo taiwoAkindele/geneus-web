@@ -10,6 +10,9 @@ export type Religion = 'christianity' | 'islam' | 'other';
  * the persistence boundary).
  */
 export type RegistrationValues = {
+  identityStatus: 'identified' | 'provisional';
+  provisionalReason: string;
+  identificationNote: string;
   fullName: string;
   sex: '' | 'F' | 'M';
   age: string;
@@ -29,6 +32,9 @@ export type RegistrationValues = {
 export type RegistrationNavState = { patientId?: string } | null;
 
 export const EMPTY_REGISTRATION: RegistrationValues = {
+  identityStatus: 'identified',
+  provisionalReason: '',
+  identificationNote: '',
   fullName: '',
   sex: '',
   age: '',
@@ -50,7 +56,9 @@ const optional = (value: string): string | undefined => value.trim() || undefine
 export const parseAge = (age: string): number | undefined => (age.trim() === '' ? undefined : Number(age));
 
 export const toPatientDetails = (values: RegistrationValues): PatientDetails => {
-  if (!values.sex) throw new Error('Choose the patient’s sex');
+  const provisional = values.identityStatus === 'provisional';
+  if (!provisional && !values.sex) throw new Error('Choose the patient’s sex');
+  if (provisional && values.provisionalReason.trim().length < 3) throw new Error('Explain why identity is not yet known');
   const today = new Date().toISOString().slice(0, 10);
   const age = parseAge(values.age);
   if (values.dateOfBirth && (!validCalendarDate(values.dateOfBirth) || values.dateOfBirth > today)) throw new Error('Enter a valid date of birth that is not in the future');
@@ -62,11 +70,12 @@ export const toPatientDetails = (values: RegistrationValues): PatientDetails => 
   if (values.identityEvidence === 'document_seen' && !values.identityEvidenceNote.trim()) throw new Error('Describe the identity document checked');
   if (values.identityEvidenceNote.length > 300) throw new Error('Keep the evidence description within 300 characters');
   return ({
-  fullName: values.fullName.trim(),
-  address: values.address.trim(),
-  sex: values.sex === 'F' ? 'female' : 'male',
+  fullName: provisional ? '' : values.fullName.trim(),
+  address: optional(values.address),
+  sex: values.sex === 'F' ? 'female' : values.sex === 'M' ? 'male' : undefined,
+  ...(provisional ? { identityStatus: 'provisional' as const, provisionalReason: values.provisionalReason.trim() } : values.identificationNote.trim() ? { identityStatus: 'identified' as const, identificationNote: values.identificationNote.trim() } : {}),
   ageYears: age,
-  ageObservedOn: today,
+  ageObservedOn: provisional && age === undefined && !values.dateOfBirth ? undefined : today,
   dobEstimated: values.dobEstimated || (!values.dateOfBirth && age !== undefined),
   dateOfBirth: optional(values.dateOfBirth),
   phone: optional(values.phone),
@@ -74,7 +83,7 @@ export const toPatientDetails = (values: RegistrationValues): PatientDetails => 
   religion: optional(values.religion),
   legacyPaperRef: optional(values.folder),
   nin: optional(nin),
-  identityEvidence: values.identityEvidence,
+  identityEvidence: provisional ? undefined : values.identityEvidence,
   identityEvidenceNote: values.identityEvidence === 'document_seen' ? optional(values.identityEvidenceNote) : undefined,
   });
 };
@@ -83,12 +92,15 @@ const isReligion = (value: string | undefined): value is Religion =>
   value === 'christianity' || value === 'islam' || value === 'other';
 
 export const fromPatient = (patient: Patient): RegistrationValues => ({
-  fullName: patient.fullName,
-  sex: patient.sex === 'female' ? 'F' : 'M',
+  identityStatus: patient.identityStatus,
+  provisionalReason: patient.provisionalReason ?? '',
+  identificationNote: patient.identificationNote ?? '',
+  fullName: patient.identityStatus === 'provisional' ? '' : patient.fullName,
+  sex: patient.sex === 'female' ? 'F' : patient.sex === 'male' ? 'M' : '',
   age: patient.ageYears === undefined ? '' : String(patientAge(patient)),
   dateOfBirth: patient.dateOfBirth ?? '',
   phone: patient.phone ?? '',
-  address: patient.address,
+  address: patient.address ?? '',
   occupation: patient.occupation ?? '',
   religion: isReligion(patient.religion) ? patient.religion : '',
   folder: patient.legacyPaperRef ?? '',

@@ -5,7 +5,7 @@ import { currentAge, searchPatients, usePatients } from '@/features/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
-import { canonicalPatientId } from '@shared';
+import { canonicalPatientId, patientSexLabel } from '@shared';
 import { ScanPatientCard } from '@/features/patients/ScanPatientCard';
 import { patientChartPath } from '@/features/patients/patientRoutes';
 
@@ -39,7 +39,7 @@ export const PatientSearchScreen = () => {
       <p className="mb-3 text-sm text-ink-soft">{found.length} {query ? 'matching' : 'registered'} patients</p>
       {found.length ? <DataTable caption="Registered patients" rows={found} rowKey={(patient) => patient.patientId} page={page} onPageChange={(nextPage) => setParams((current) => { const next = new URLSearchParams(current); next.set('page', String(nextPage)); return next; }, { replace: true })} columns={[
         { key: 'name', label: 'Patient', sortValue: (patient) => patient.fullName, render: (patient) => <div><button type="button" className="min-h-[44px] text-left font-bold text-brand hover:underline" onClick={() => open(patient.patientId)}>{patient.fullName}</button><p className="break-all font-mono text-xs text-ink-soft">{patient.patientId}</p><p className="mt-2 text-sm text-ink-soft md:hidden">{patient.phone ?? 'Phone not recorded'}</p></div> },
-        { key: 'age', label: 'Age / sex', sortValue: (patient) => currentAge(patient) ?? -1, render: (patient) => <div>{currentAge(patient) === undefined ? 'Age not recorded' : String(currentAge(patient)) + ' years'}<p className="mt-1 text-sm text-ink-soft">{patient.sex === 'female' ? 'Female' : 'Male'}</p></div> },
+        { key: 'age', label: 'Age / sex', sortValue: (patient) => currentAge(patient) ?? -1, render: (patient) => <div>{currentAge(patient) === undefined ? 'Age not recorded' : String(currentAge(patient)) + ' years'}<p className="mt-1 text-sm text-ink-soft">{patientSexLabel(patient.sex)}</p></div> },
         { key: 'phone', label: 'Phone', className: 'hidden md:table-cell', render: (patient) => patient.phone ?? 'Not recorded' },
         { key: 'address', label: 'Address', className: 'hidden xl:table-cell', render: (patient) => patient.address },
         { key: 'open', label: 'Action', className: 'hidden sm:table-cell', render: (patient) => <Button variant="outlined" fullWidth={false} onClick={() => open(patient.patientId)}>Open chart</Button> },

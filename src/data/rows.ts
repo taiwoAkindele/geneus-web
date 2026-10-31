@@ -10,7 +10,7 @@ import { fieldKindsFor } from './contractShape';
 export type Row = Record<string, unknown>;
 
 const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
-  patient: ['dateOfBirth', 'ageYears', 'ageObservedOn', 'phone', 'nin', 'occupation', 'religion', 'legacyPaperRef', 'identityEvidenceNote'],
+  patient: ['sex', 'address', 'dateOfBirth', 'ageYears', 'ageObservedOn', 'phone', 'nin', 'occupation', 'religion', 'legacyPaperRef', 'identityEvidenceNote'],
   fee_item: ['departmentId'],
   unit: ['parentId'],
   location: ['parentId', 'unitId', 'capacity', 'description'],
