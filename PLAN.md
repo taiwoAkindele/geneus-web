@@ -17,6 +17,12 @@ The first registration slice is implemented on `feat/core-patient-journey`. Encr
 
 Synthetic browser acceptance covers both steps, encrypted storage, reload, staff isolation, discard, successful local registration and a 320px phone. See [registration recovery checks](qa/registration-recovery-qa.md). Real device/server/receiving-device acceptance remains outstanding. Next is provisional emergency registration and later identity resolution; neither is implemented by this slice.
 
+### Core patient journey: provisional registration (31 October 2026)
+
+The schema-5 integration adds explicit emergency registration without invented name/sex/address/age answers. Separate arrivals receive distinct temporary labels and patient IDs. Staff can start care, then identify the patient on the same chart with an explanation, attribution and an immutable snapshot of the demographics reviewed. Concurrent demographic edits stop identification. Possible existing-record matches open the existing reviewed identity workflow. Unknown sex is displayed explicitly, and the original circumstances and clinical history are retained.
+
+This is implemented and tested against the canonical contract; normal app integration awaits the shared-contract commit and submodule promotion required by repository rules. See [verification and release order](qa/provisional-registration-qa.md). Physical-device and receiving-device sync checks remain release work.
+
 ### Encounter field guidance
 
 

@@ -1,11 +1,13 @@
 import { activeWorkspace } from './facilityWorkspaces';
 import {
   parseDocument,
+  patientIdentificationIssues,
   SCHEMA_VERSION,
   type AnyDocument,
   type AuthorizationContext,
   type DocType,
   type Permission,
+  type Patient,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { fieldKindsFor } from './contractShape';
@@ -156,7 +158,19 @@ export const updateRecord = async <T extends AnyDocument>(
   // actor even when `updatedBy` is unchanged and therefore absent from the PATCH.
   const statement=`UPDATE ${TABLE_FOR[type]} SET ${columns.map((name)=>`${column(name)} = ?`).join(', ')}, _metadata = ? WHERE id = ?${cas?' AND COALESCE("revision", 1) = ?':''}`;
   const parameters=[...columns.map((name)=>row[name]),context.userId,id,...(cas?[revision-1]:[])];
-  if(cas){
+  if (type === 'patient' && current.type === 'patient') {
+    await getDatabase().writeTransaction(async (transaction) => {
+      const locked = await transaction.getOptional<Row>(`SELECT * FROM ${TABLE_FOR.patient} WHERE id = ?`, [id]);
+      if (!locked) throw new Error('The patient could not be read. Keep your changes and try again');
+      const live = fromRow<Patient>('patient', locked);
+      const checked = new Set([...Object.keys(changes), 'identityStatus', 'provisionalReason', 'identifiedBy', 'identifiedOn', 'identificationNote']);
+      if ([...checked].some((key) => JSON.stringify((live as Record<string, unknown>)[key] ?? null) !== JSON.stringify((current as Record<string, unknown>)[key] ?? null))) throw new Error('Patient details changed in another window. Review the current record before saving');
+      const next = validate<Patient>({ ...live, ...stamped });
+      const issues = patientIdentificationIssues(live, next, context.userId, changedOn);
+      if (issues.length) throw new Error(issues.join('; '));
+      await transaction.execute(statement, parameters);
+    });
+  } else if(cas){
     // PowerSync tables are SQLite views: INSTEAD OF triggers legitimately return
     // rowsAffected=0. Check the revision under the same write lock as the update.
     await getDatabase().writeTransaction(async(transaction)=>{

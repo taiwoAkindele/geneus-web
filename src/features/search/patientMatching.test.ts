@@ -15,6 +15,7 @@ const patient = (overrides: Partial<Patient>): Patient => ({
   deviceId: 'device-1',
   patientId: 'OOE-PHC-000047-K2',
   fullName: 'Amaka Okoro',
+  identityStatus: 'identified',
   address: '14 Odo-Ona Elewe, Ibadan',
   sex: 'female',
   ageYears: 32,
@@ -37,6 +38,10 @@ const registering = (overrides: Partial<PatientDetails>): PatientDetails => ({
 });
 
 describe('the duplicate check', () => {
+  it('does not treat temporary provisional labels as evidence of identity', () => {
+    expect(findLikelyMatches(registering({ identityStatus: 'provisional' }), [amaka], NOW)).toEqual([]);
+    expect(findLikelyMatches(registering({}), [{ ...amaka, identityStatus: 'provisional' }], NOW)).toEqual([]);
+  });
   it('flags the same name, sex and a close age as the same person', () => {
     const [match] = findLikelyMatches(registering({}), [amaka, ibrahim], NOW);
 

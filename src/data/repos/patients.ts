@@ -1,4 +1,4 @@
-import { Patient, patientAge, type AuthorizationContext } from '@shared';
+import { Patient, patientAge, patientIdentificationIssues, patientIdentitySnapshot, provisionalPatientName, type AuthorizationContext } from '@shared';
 import { mintPatientId } from '@/lib/patientId';
 import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
 import { listFeeItems, newCharge, patientBillingFacts } from './billing';
@@ -12,7 +12,7 @@ export const getPatient = (patientId: string) => findRecord<Patient>('patient', 
 export type PatientDetails = Pick<
   Patient,
   'fullName' | 'address' | 'sex' | 'ageYears' | 'dateOfBirth' | 'phone' | 'occupation' | 'religion' | 'legacyPaperRef'
-> & Partial<Pick<Patient, 'dobEstimated' | 'ageObservedOn' | 'nin' | 'identityEvidence' | 'identityEvidenceNote'>>;
+> & Partial<Pick<Patient, 'dobEstimated' | 'ageObservedOn' | 'nin' | 'identityEvidence' | 'identityEvidenceNote' | 'identityStatus' | 'provisionalReason' | 'identificationNote'>>;
 
 /**
  * Registers a new patient under a Patient ID minted here, offline. The
@@ -27,6 +27,7 @@ export const registerPatient = async (details: PatientDetails, context: Authoriz
   const patient = Patient.parse({
     ...envelope(context),
     ...details,
+    ...(details.identityStatus === 'provisional' ? { fullName: provisionalPatientName(patientId) } : {}),
     id: patientId,
     type: 'patient',
     patientId,
@@ -53,7 +54,16 @@ export const updatePatient = async (
 ): Promise<Patient> => {
   const current = await findRecord<Patient>('patient', patientId);
   if (!current) throw new Error(`no patient ${patientId} to change`);
-  const next: Record<string, unknown> = { ...details };
+  const next: Record<string, unknown> = { ...details, ...(details.identityStatus === 'provisional' ? { fullName: provisionalPatientName(patientId) } : {}) };
+  const changedOn = new Date().toISOString();
+  if (current.identityStatus === 'provisional' && details.identityStatus === 'identified') {
+    next.identifiedBy = context.userId;
+    next.identifiedOn = changedOn;
+    next.identificationBase = patientIdentitySnapshot(current);
+  }
+  const proposed = Patient.parse({ ...current, ...next });
+  const issues = patientIdentificationIssues(current, proposed, context.userId, changedOn);
+  if (issues.length) throw new Error(issues.join('; '));
   if (details.ageYears === patientAge(current) && details.dateOfBirth === current.dateOfBirth) {
     next.ageYears = current.ageYears;
     next.ageObservedOn = current.ageObservedOn;
@@ -63,7 +73,7 @@ export const updatePatient = async (
       .map(([field, value]) => [field, value === undefined ? null : value]),
   ) as Partial<Patient>;
   if (Object.keys(changes).length === 0) return current;
-  return updateRecord<Patient>(context, 'patient:update', 'patient', patientId, changes);
+  return updateRecord<Patient>(context, 'patient:update', 'patient', patientId, changes, changedOn);
 };
 
 export const findPatient = (patients: Patient[], patientId: string): Patient | undefined =>

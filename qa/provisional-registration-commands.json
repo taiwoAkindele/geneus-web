@@ -1,0 +1,195 @@
+[
+  {
+    "role": "doctor",
+    "width": 1440,
+    "path": "/patients/new"
+  },
+  {
+    "evaluate": "document.querySelector('input[type=checkbox]').click(); true",
+    "assert": "document.body.innerText.includes('Create provisional record') && !document.querySelector('input[name=fullName]')",
+    "description": "Explicit emergency mode offers registration without an invented name"
+  },
+  {
+    "fill": {
+      "label": "Reason for provisional registration",
+      "value": "Synthetic unidentified arrival; no representative available"
+    },
+    "name": "01-emergency-registration"
+  },
+  {
+    "evaluate": "Promise.all([import('/src/data/repos/clinicalReviews.ts'),import('/src/features/workforce/CareContext.tsx')]).then(()=>true)"
+  },
+  {
+    "offline": true,
+    "assert": "navigator.onLine === false",
+    "description": "The browser has no network connection during registration and care"
+  },
+  {
+    "click": "Create provisional record",
+    "name": "02-provisional-chart",
+    "assert": "window.designAudit.path === '/patients/profile' && document.body.innerText.includes('Identity not yet known') && document.body.innerText.includes('Sex not recorded') && document.body.innerText.includes('Age not recorded')",
+    "description": "Unknown demographics remain unknown and the patient chart opens immediately"
+  },
+  {
+    "evaluate": "(() => { const patient=window.designAudit.rows.patients.find(p=>p.identityStatus==='provisional'); window.provisionalPatientId=patient.patientId; return patient.sex==null && patient.ageYears==null && patient.address==null; })()",
+    "assert": "Boolean(window.provisionalPatientId)",
+    "description": "The provisional record contains no invented sex, age or address"
+  },
+  {
+    "click": "Start visit",
+    "name": "03-start-care",
+    "assert": "window.designAudit.path === '/encounters/record'",
+    "description": "Clinical care opens for the provisional patient"
+  },
+  {
+    "fill": {
+      "label": "Temp",
+      "value": "37"
+    }
+  },
+  {
+    "click": "Review & sign vitals"
+  },
+  {
+    "click": "Confirm & lock",
+    "assert": "window.designAudit.rows.encounter_entries.some(e=>e.patientId===window.provisionalPatientId && e.step==='vitals')",
+    "description": "A signed clinical observation is saved against the provisional patient"
+  },
+  {
+    "evaluate": "window.designAudit.go('/patients/profile?patient='+encodeURIComponent(window.provisionalPatientId)); true"
+  },
+  {
+    "click": "Identify patient",
+    "name": "04-identify-patient",
+    "assert": "Boolean(document.querySelector('dialog[open]')) && document.querySelector('input[name=fullName]').value === ''",
+    "description": "Identification asks for a real name rather than retaining the temporary label"
+  },
+  {
+    "fill": {
+      "label": "How was the patient identified?",
+      "value": "Synthetic representative reported the patient details"
+    }
+  },
+  {
+    "fill": {
+      "label": "Full name",
+      "value": "Synthetic Identified Patient"
+    }
+  },
+  {
+    "fill": {
+      "label": "Sex",
+      "value": "F"
+    }
+  },
+  {
+    "fill": {
+      "label": "Age",
+      "value": "30"
+    }
+  },
+  {
+    "fill": {
+      "label": "Address",
+      "value": "Synthetic identified address"
+    }
+  },
+  {
+    "click": "Confirm patient identity",
+    "name": "05-identified-chart",
+    "assert": "!document.querySelector('dialog[open]') && document.querySelector('h1').textContent==='Synthetic Identified Patient' && !document.body.innerText.includes('Identity not yet known')",
+    "description": "Later identification updates the existing chart"
+  },
+  {
+    "assert": "(() => { const patient=window.designAudit.rows.patients.find(p=>p.patientId===window.provisionalPatientId); return patient.identityStatus==='identified' && patient.identifiedBy==='qa-doctor' && patient.identifiedOn===patient.updatedOn && patient.provisionalReason.includes('Synthetic unidentified arrival') && window.designAudit.rows.encounter_entries.some(e=>e.patientId===window.provisionalPatientId && e.step==='vitals'); })()",
+    "description": "The patient ID, original circumstances, staff attribution and identification time are retained"
+  },
+  {
+    "path": "/patients/new"
+  },
+  {
+    "evaluate": "document.querySelector('input[type=checkbox]').click(); true"
+  },
+  {
+    "fill": {
+      "label": "Reason for provisional registration",
+      "value": "Second synthetic unidentified arrival"
+    }
+  },
+  {
+    "click": "Create provisional record",
+    "assert": "window.designAudit.rows.patients.filter(p=>p.provisionalReason).length===2 && window.designAudit.rows.patients.filter(p=>p.provisionalReason).map(p=>p.patientId).every((id,i,ids)=>ids.indexOf(id)===i)",
+    "description": "Separate unidentified arrivals receive distinct patient IDs"
+  },
+  {
+    "click": "Identify patient"
+  },
+  {
+    "fill": {
+      "label": "How was the patient identified?",
+      "value": "Synthetic representative supplied matching details"
+    }
+  },
+  {
+    "fill": {
+      "label": "Full name",
+      "value": "Synthetic Identified Patient"
+    }
+  },
+  {
+    "fill": {
+      "label": "Sex",
+      "value": "F"
+    }
+  },
+  {
+    "fill": {
+      "label": "Age",
+      "value": "30"
+    }
+  },
+  {
+    "fill": {
+      "label": "Address",
+      "value": "Synthetic identified address"
+    }
+  },
+  {
+    "click": "Confirm patient identity",
+    "assert": "Boolean(document.querySelector('dialog[open]')) && document.body.innerText.includes('possible existing patient')",
+    "description": "Identification stops for review when details match an existing patient"
+  },
+  {
+    "click": "Review possible existing record",
+    "assert": "window.designAudit.path==='/patients/identity' && window.designAudit.search.includes('primary=') && window.designAudit.search.includes('other=')",
+    "description": "A possible duplicate opens the existing attributed identity-review workflow"
+  },
+  {
+    "offline": false
+  },
+  {
+    "width": 320,
+    "path": "/patients/new"
+  },
+  {
+    "evaluate": "document.querySelector('input[type=checkbox]').click(); true",
+    "name": "06-emergency-small-phone",
+    "assert": "document.documentElement.scrollWidth <= innerWidth",
+    "description": "Emergency registration fits a 320px phone"
+  },
+  {
+    "fill": {
+      "label": "Reason for provisional registration",
+      "value": "Synthetic mobile unidentified arrival"
+    }
+  },
+  {
+    "click": "Create provisional record"
+  },
+  {
+    "click": "Identify patient",
+    "name": "07-identify-small-phone",
+    "assert": "document.documentElement.scrollWidth <= innerWidth && Boolean(document.querySelector('dialog[open]'))",
+    "description": "Identification controls fit a 320px phone"
+  }
+]

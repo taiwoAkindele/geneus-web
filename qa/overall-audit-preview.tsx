@@ -29,6 +29,7 @@ import { SyncCenterScreen } from '@/pages/sync-center/SyncCenterScreen';
 import { NewPatientStep1Screen } from '@/pages/patient-registration/NewPatientStep1Screen';
 import { NewPatientStep2Screen } from '@/pages/patient-registration/NewPatientStep2Screen';
 import { DuplicateCheckScreen } from '@/pages/patient-registration/DuplicateCheckScreen';
+import { IdentityReviewScreen } from '@/pages/patient-registration/IdentityReviewScreen';
 import { unlockSecureStorage } from '@/lib/secureStorage';
 import { AdminDashboardScreen } from '@/pages/facility-onboarding/AdminDashboardScreen';
 import { ManageStaffScreen } from '@/pages/facility-onboarding/ManageStaffScreen';
@@ -132,6 +133,7 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
   <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
   <Route path="/patients/duplicate" element={<DuplicateCheckScreen />} />
+  <Route path="/patients/identity" element={<IdentityReviewScreen />} />
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
   <Route path="/stock" element={<StockScreen />} />
 </Route></Routes></MemoryRouter></RegistrationDraftProvider></RegistersProvider></AppointmentsProvider></Ready></SessionProvider></ToastProvider>);

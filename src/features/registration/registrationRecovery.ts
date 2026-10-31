@@ -19,7 +19,7 @@ const parseDraft = (value: unknown): RegistrationDraftSnapshot => {
     if (typeof field !== typeof values[key]) throw new Error('The saved registration draft could not be read. Keep this device and retry recovery.');
     Object.assign(values, { [key]: field });
   }
-  if (!['', 'F', 'M'].includes(values.sex) || !['', 'christianity', 'islam', 'other'].includes(values.religion) || !['reported', 'document_seen'].includes(values.identityEvidence)) throw new Error('The saved registration draft has unsupported values. Keep this device and retry recovery.');
+  if (!['identified', 'provisional'].includes(values.identityStatus) || !['', 'F', 'M'].includes(values.sex) || !['', 'christianity', 'islam', 'other'].includes(values.religion) || !['reported', 'document_seen'].includes(values.identityEvidence)) throw new Error('The saved registration draft has unsupported values. Keep this device and retry recovery.');
   return { key: value.key, values, ...(typeof value.updatedOn === 'string' ? { updatedOn: value.updatedOn } : {}) };
 };
 

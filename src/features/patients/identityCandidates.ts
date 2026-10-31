@@ -1,8 +1,20 @@
 import { canonicalPatientId, type Patient, type PatientIdentityEvent } from '@shared';
 import { findLikelyMatches } from '@/features/search/patientMatching';
+import type { PatientDetails } from '@/data/repos/patients';
 
 export const identityPairKey = (a: string, b: string): string => [a, b].sort().join('|');
 export type IdentityCandidate = { patient: Patient; other: Patient; reason: string };
+
+/** Completed reviews must allow identification; pending proposals cannot waive it. */
+export const unreviewedIdentityMatches = (details: PatientDetails, patientId: string, patients: readonly Patient[], events: readonly PatientIdentityEvent[]) => {
+  const latest = new Map<string, PatientIdentityEvent>();
+  for (const event of events.filter((event) => event.revision !== undefined).sort((a, b) => a.revision! - b.revision!)) {
+    if (event.otherPatientId) latest.set(identityPairKey(event.patientId, event.otherPatientId), event);
+  }
+  return findLikelyMatches(details, patients.filter((candidate) => candidate.patientId !== patientId)).filter(({ patient }) =>
+    canonicalPatientId(patient.patientId, events) !== canonicalPatientId(patientId, events)
+    && latest.get(identityPairKey(patientId, patient.patientId))?.outcome !== 'distinct');
+};
 
 /** Candidate discovery suggests review; it never establishes identity. */
 export const identityCandidates = (patients: readonly Patient[], events: readonly PatientIdentityEvent[], limit = 100): IdentityCandidate[] => {
