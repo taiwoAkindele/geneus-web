@@ -8,14 +8,14 @@ import { Button, SelectField, Sheet, SheetCancelButton, TextAreaField, useToast 
 import { projectEncounter, EMPTY_ENCOUNTER_DATA } from '@/features/encounter/encounterRecord';
 import { STEP_DEFS } from '@/features/encounter/steps';
 import { entryRows } from '@/features/encounter/visitContent';
-import { summariseEncounter } from '@/features/encounter/encounterSummary';
-import { visitDate, visitStatusLabel } from '@/features/encounter/VisitTable';
+import { summariseEncounter, type EncounterSummary } from '@/features/encounter/encounterSummary';
+import { visitDate, visitStatusLabel as consultationStatusLabel } from '@/features/encounter/VisitTable';
 import { EntryEditorSheet } from '@/features/encounter/components/EntryEditorSheet';
 import type { StepKey } from '@/features/encounter';
 
 const GROUPS: Record<string, { label: string; steps?: string[] }> = { summary: { label: 'Summary' }, vitals: { label: 'Vitals', steps: ['vitals'] }, consultation: { label: 'Consultation', steps: ['complaint'] }, investigations: { label: 'Investigations', steps: ['investigation_review', 'lab_order', 'lab_results', 'result_review'] }, treatment: { label: 'Diagnosis & treatment', steps: ['diagnosis', 'prescription', 'injection_order', 'injection', 'dispense', 'admission'] }, disposition: { label: 'Disposition & care plan', steps: ['disposition'] }, follow_up: { label: 'Follow-up', steps: ['follow_up'] } };
 
-export const VisitRecord = ({ patient, encounter, entries, staffNames, canRecord, onBack, onContinue, onRefresh, onAppointments }: { patient: Patient; encounter: Encounter; entries: EncounterEntry[]; staffNames: Map<string, string>; canRecord: boolean; onBack: () => void; onContinue: () => void; onRefresh: () => void; onAppointments: () => void }) => {
+export const VisitRecord = ({ patient, encounter, entries, staffNames, canRecord, onBack, onContinue, onRefresh, onAppointments, summary }: { patient: Patient; encounter: Encounter; entries: EncounterEntry[]; staffNames: Map<string, string>; canRecord: boolean; onBack: () => void; onContinue: () => void; onRefresh: () => void; onAppointments: () => void; summary?: EncounterSummary }) => {
   const [params, setParams] = useSearchParams();
   const context = useAuthorizationContext();
   const { user, facility } = useSession();
@@ -28,7 +28,10 @@ export const VisitRecord = ({ patient, encounter, entries, staffNames, canRecord
   const [error, setError] = useState('');
   const [editor, setEditor] = useState<EncounterEntry>();
   const printContent = useRef<HTMLDivElement>(null);
-  const card = summariseEncounter(encounter, entries);
+  const card = summary ?? summariseEncounter(encounter, entries);
+  const visitStatusLabel = (status: EncounterSummary['status']) => card.admissionStatus
+    ? `${card.careType === 'inpatient' ? 'Inpatient · ' : card.careType === 'past_inpatient' ? 'Hospital stay · ' : ''}${card.admissionStatus}`
+    : consultationStatusLabel(status);
   const state = projectEncounter({ patientId: encounter.patientId, encounter, entries, draft: EMPTY_ENCOUNTER_DATA, skippedNow: [], staffNames });
   const stepOrder = ['vitals', 'complaint', 'lab_order', 'lab_results', 'diagnosis', 'injection', 'dispense', 'admission', 'follow_up'];
   const saved = effectiveEncounterEntries(entries).sort((a, b) => stepOrder.indexOf(a.step) - stepOrder.indexOf(b.step) || a.createdOn.localeCompare(b.createdOn) || a.id.localeCompare(b.id));

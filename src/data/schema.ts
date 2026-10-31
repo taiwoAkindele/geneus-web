@@ -24,6 +24,8 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   handoff: { toUnit: ['toUnitId'], patient: ['patientId'] },
   encounter_entry: { encounter: ['encounterId'], patient: ['patientId'], step: ['step'] },
   clinical_event: { patient: ['patientId'], record: ['recordId'], kind: ['kind'] },
+  inpatient_event: { patient: ['patientId'], admission: ['admissionId'], visit: ['encounterId'], previous: ['previousId'], bed: ['bedId'] },
+  bed_ready_event: { bed: ['bedId'], release: ['releaseEventId'] },
   register_definition: { register: ['registerId'] },
   register_entry: { register: ['registerId'], patient: ['patientId'] },
   roster_shift: { staff: ['staffId'] },

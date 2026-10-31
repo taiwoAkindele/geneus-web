@@ -17,6 +17,9 @@ export type EncounterSummary = {
   chips: string[];
   nextAction: string;
   hasSignedEntries: boolean;
+  careType?: 'inpatient' | 'outpatient' | 'past_inpatient';
+  admissionStatus?: string;
+  wardBed?: string;
 };
 
 const firstOf = (entries: readonly EncounterEntry[], step: EncounterEntry['step']) =>

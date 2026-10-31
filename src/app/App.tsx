@@ -125,6 +125,7 @@ const SyncCenterScreen = lazy(() =>
 const EncountersScreen = lazy(() =>
   import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
 );
+const InpatientScreen = lazy(() => import('@/pages/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const PatientProfileScreen = lazy(() =>
   import('@/pages/patient/PatientProfileScreen').then((m) => ({ default: m.PatientProfileScreen })),
 );
@@ -190,6 +191,7 @@ const App = () => {
             <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
             <Route path="/encounters" element={<EncountersScreen />} />
+            <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
             <Route path="/encounters/record" element={<EncounterScreen />} />
             <Route path="/appointments" element={<AppointmentsScreen />} />
             <Route path="/patients/new" element={<RequireCapability permissions={['patient:create', 'patient:update']}><NewPatientStep1Screen /></RequireCapability>} />
