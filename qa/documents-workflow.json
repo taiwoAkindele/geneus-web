@@ -1,0 +1,359 @@
+[
+  {
+    "evaluate": "window.seedDocumentScenario();window.designAudit.go('/documents')",
+    "name": "library-empty",
+    "assert": "document.body.innerText.includes('Upload document')",
+    "description": "Library is available inside Clinical"
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "evaluate": "window.qaChooseDocument=(fileName,text)=>{let pdf='%PDF-1.4\\n';const content='BT /F1 18 Tf 60 720 Td ('+text+') Tj ET';const parts=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Length '+content.length+' >>\\nstream\\n'+content+'\\nendstream'];const offsets=[0];parts.forEach((part,index)=>{offsets.push(pdf.length);pdf+=(index+1)+' 0 obj\\n'+part+'\\nendobj\\n';});const xref=pdf.length;pdf+='xref\\n0 6\\n0000000000 65535 f \\n'+offsets.slice(1).map(offset=>String(offset).padStart(10,'0')+' 00000 n \\n').join('')+'trailer\\n<< /Size 6 /Root 1 0 R >>\\nstartxref\\n'+xref+'\\n%%EOF';const transfer=new DataTransfer();transfer.items.add(new File([pdf],fileName,{type:'application/pdf'}));const input=document.querySelector('dialog input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));};true"
+  },
+  {
+    "evaluate": "window.qaChooseDocument('Hospital consent.pdf','Hospital consent template version 1')"
+  },
+  {
+    "fill": {
+      "label": "Document name",
+      "value": "Hospital consent"
+    }
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "name": "library-uploaded",
+    "assert": "window.designAudit.rows.library_documents?.length===1&&!document.querySelector('dialog[open]')",
+    "description": "Library upload saves local metadata and encrypted file"
+  },
+  {
+    "click": "Preview"
+  },
+  {
+    "name": "library-pdf-preview",
+    "assert": "Boolean(document.querySelector('iframe[src^=\"blob:\"]'))",
+    "description": "PDF is opened from encrypted local bytes"
+  },
+  {
+    "key": "Escape"
+  },
+  {
+    "click": "Visit documents"
+  },
+  {
+    "name": "visit-review-empty",
+    "assert": "!Array.from(document.querySelectorAll('button')).some(n=>/^(Add document|Upload document|Upload signed copy)$/.test(n.textContent.trim()))",
+    "description": "Global visit review has no attachment actions"
+  },
+  {
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=documents&visit=encounter%3Aopen"
+  },
+  {
+    "name": "inpatient-chart-empty"
+  },
+  {
+    "name": "inpatient-chart-empty",
+    "assert": "document.body.innerText.includes('Add document')",
+    "description": "Active inpatient chart permits attachment"
+  },
+  {
+    "click": "Add document"
+  },
+  {
+    "evaluate": "(()=>{const select=[...document.querySelectorAll('dialog select')].find(n=>[...n.options].some(o=>o.textContent.includes('Hospital consent')));const value=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;value.call(select,window.designAudit.rows.library_documents[0].id);select.dispatchEvent(new Event('change',{bubbles:true}));})()"
+  },
+  {
+    "name": "chart-attach-form"
+  },
+  {
+    "click": "Add visit document"
+  },
+  {
+    "name": "chart-with-issued-copy",
+    "assert": "window.designAudit.rows.visit_documents?.length===1",
+    "description": "Library copy attaches only to selected inpatient visit"
+  },
+  {
+    "path": "/documents?tab=visits"
+  },
+  {
+    "name": "visit-review-populated",
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&document.body.innerText.includes('Surgical ward')&&document.body.innerText.includes('Bed 01')&&document.querySelectorAll('a[href*=\"tab=documents\"]').length>=1",
+    "description": "Review lists patient, visit, ward, bed and chart link"
+  },
+  {
+    "click": "Open patient chart",
+    "selector": "a"
+  },
+  {
+    "label": "Visit document actions for Hospital consent"
+  },
+  {
+    "click": "Upload signed copy"
+  },
+  {
+    "evaluate": "window.qaChooseDocument('Signed consent.pdf','Synthetic signed copy - reviewed guardian evidence')"
+  },
+  {
+    "fill": {
+      "label": "Who signed",
+      "value": "representative"
+    }
+  },
+  {
+    "fill": {
+      "label": "Signer’s name",
+      "value": "Emeka Okoro"
+    }
+  },
+  {
+    "fill": {
+      "label": "Relationship to patient",
+      "value": "Parent"
+    }
+  },
+  {
+    "fill": {
+      "label": "Representative authority checked",
+      "value": "Guardian identification and authority recorded on the signed form."
+    }
+  },
+  {
+    "evaluate": "document.querySelector('dialog input[type=checkbox]').click()"
+  },
+  {
+    "name": "signature-review-form"
+  },
+  {
+    "click": "Upload signed copy"
+  },
+  {
+    "name": "signed-chart-document",
+    "assert": "window.designAudit.rows.visit_documents?.length===2&&document.body.innerText.includes('Signed — staff reviewed')",
+    "description": "Signed scan retains unsigned original and reviewer evidence"
+  },
+  {
+    "label": "Visit document actions for Hospital consent"
+  },
+  {
+    "click": "Version history"
+  },
+  {
+    "name": "visit-original-and-signed-history",
+    "assert": "document.querySelector('dialog').innerText.includes('Version 1')&&document.querySelector('dialog').innerText.includes('Version 2')",
+    "description": "Both visit file versions remain accessible"
+  },
+  {
+    "key": "Escape"
+  },
+  {
+    "path": "/documents?tab=visits"
+  },
+  {
+    "fill": {
+      "label": "Signature status",
+      "value": "signed"
+    }
+  },
+  {
+    "name": "visit-review-signed",
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&!Array.from(document.querySelectorAll('button')).filter(n=>n.getClientRects().length).some(n=>/^(Add document|Upload signed copy|Review signature status)$/.test(n.textContent.trim()))",
+    "description": "Signed filter is review-only"
+  },
+  {
+    "path": "/documents"
+  },
+  {
+    "label": "Actions for Hospital consent"
+  },
+  {
+    "click": "Replace file"
+  },
+  {
+    "evaluate": "window.qaChooseDocument('Hospital consent v2.pdf','Hospital consent template version 2')"
+  },
+  {
+    "click": "Replace library file"
+  },
+  {
+    "name": "library-version-two",
+    "assert": "window.designAudit.rows.library_documents.length===2&&window.designAudit.rows.visit_documents[0].file===window.designAudit.rows.library_documents[0].file",
+    "description": "Library replacement preserves issued original"
+  },
+  {
+    "label": "Actions for Hospital consent"
+  },
+  {
+    "click": "Archive"
+  },
+  {
+    "click": "Archive document"
+  },
+  {
+    "name": "library-archived",
+    "assert": "document.body.innerText.includes('No library documents match this view.')",
+    "description": "Archive removes active template without deleting history"
+  },
+  {
+    "fill": {
+      "label": "Library state",
+      "value": "archived"
+    }
+  },
+  {
+    "name": "archived-library-history"
+  },
+  {
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=documents&visit=encounter%3Aclosed"
+  },
+  {
+    "name": "past-visit-read-only",
+    "assert": "!Array.from(document.querySelectorAll('button')).filter(n=>n.getClientRects().length).some(n=>n.textContent.trim()==='Add document')",
+    "description": "Past outpatient visit has no document mutation actions"
+  },
+  {
+    "path": "/documents?tab=visits"
+  },
+  {
+    "name": "visit-after-library-archive",
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&document.body.innerText.includes('Signed consent.pdf')",
+    "description": "Archiving template preserves existing signed visit copy"
+  },
+  {
+    "width": 320,
+    "evaluate": "window.seedDocumentScenario();window.designAudit.go('/documents')",
+    "name": "phone-library-empty",
+    "assert": "document.documentElement.scrollWidth<=innerWidth",
+    "description": "Documents screen fits a 320px phone"
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "evaluate": "window.qaChooseDocument=(fileName,text)=>{let pdf='%PDF-1.4\\n';const content='BT /F1 18 Tf 60 720 Td ('+text+') Tj ET';const parts=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Length '+content.length+' >>\\nstream\\n'+content+'\\nendstream'];const offsets=[0];parts.forEach((part,index)=>{offsets.push(pdf.length);pdf+=(index+1)+' 0 obj\\n'+part+'\\nendobj\\n';});const xref=pdf.length;pdf+='xref\\n0 6\\n0000000000 65535 f \\n'+offsets.slice(1).map(offset=>String(offset).padStart(10,'0')+' 00000 n \\n').join('')+'trailer\\n<< /Size 6 /Root 1 0 R >>\\nstartxref\\n'+xref+'\\n%%EOF';const transfer=new DataTransfer();transfer.items.add(new File([pdf],fileName,{type:'application/pdf'}));const input=document.querySelector('dialog input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));};true"
+  },
+  {
+    "evaluate": "window.qaChooseDocument('Phone uploaded form.pdf','Phone form preview')"
+  },
+  {
+    "fill": {
+      "label": "Document name",
+      "value": "Phone hospital form"
+    }
+  },
+  {
+    "name": "phone-upload-form",
+    "assert": "document.documentElement.scrollWidth<=innerWidth",
+    "description": "Upload form fits a 320px phone"
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "name": "phone-library-populated"
+  },
+  {
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=documents&visit=encounter%3Aopen"
+  },
+  {
+    "click": "Add document"
+  },
+  {
+    "evaluate": "(()=>{const select=[...document.querySelectorAll('dialog select')].find(n=>[...n.options].some(o=>o.textContent.includes('Phone hospital form')));Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,window.designAudit.rows.library_documents[0].id);select.dispatchEvent(new Event('change',{bubbles:true}));})()"
+  },
+  {
+    "click": "Add visit document"
+  },
+  {
+    "path": "/documents?tab=visits"
+  },
+  {
+    "name": "phone-visit-review",
+    "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('Bed 01')",
+    "description": "Patient and bed review fits phone without page overflow"
+  },
+  {
+    "role": "cashier",
+    "width": 1440,
+    "path": "/documents",
+    "name": "cashier-documents-access",
+    "assert": "document.body.innerText.includes('Clinical Services access')&&!document.body.innerText.includes('Upload document')",
+    "description": "Existing clinical access boundary remains enforced"
+  },
+  {
+    "role": "doctor",
+    "readonly": true,
+    "path": "/documents",
+    "evaluate": "window.seedDocumentScenario()",
+    "name": "read-only-documents",
+    "assert": "!Array.from(document.querySelectorAll('button')).some(n=>n.textContent.trim()==='Upload document')",
+    "description": "Read-only clinical users cannot add library files"
+  },
+  {
+    "role": "doctor",
+    "reload": true,
+    "path": "/documents",
+    "evaluate": "window.seedDocumentScenario()"
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "evaluate": "(async()=>{const canvas=document.createElement('canvas');canvas.width=480;canvas.height=640;const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,480,640);context.fillStyle='#005235';context.font='24px Arial';context.fillText('Synthetic scanned hospital form',30,60);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));const transfer=new DataTransfer();transfer.items.add(new File([blob],'Scanned form.png',{type:'image/png'}));const input=document.querySelector('dialog input[type=file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()"
+  },
+  {
+    "fill": {
+      "label": "Document name",
+      "value": "Scanned hospital form"
+    }
+  },
+  {
+    "click": "Upload document"
+  },
+  {
+    "click": "Preview"
+  },
+  {
+    "name": "image-preview",
+    "assert": "document.querySelector('dialog img')?.naturalWidth===480",
+    "description": "Uploaded image previews from encrypted browser storage"
+  },
+  {
+    "key": "Escape"
+  },
+  {
+    "evaluate": "(async()=>{const {toRow,fromRow}=await import('/src/data/rows.ts');const row=window.designAudit.rows.library_documents[0];const original=fromRow('library_document',row);window.designAudit.rows.sync_rejections=[toRow('sync_rejection',{...original,id:'sync-rejection:document-qa',type:'sync_rejection',entityType:'library_document',entityId:original.id,operation:'put',category:'validation',reason:'Synthetic refused proposal for recovery verification',attributedTo:original.createdBy,refusedRecord:original})];window.designAudit.go('/sync');})()"
+  },
+  {
+    "name": "document-refusal-recovery",
+    "assert": "document.body.innerText.includes('Open retained file')",
+    "description": "Refused documents expose read-only file recovery"
+  },
+  {
+    "click": "Open retained file"
+  },
+  {
+    "name": "retained-image-preview",
+    "assert": "document.querySelector('dialog img')?.naturalWidth===480",
+    "description": "Refused file can still be previewed and downloaded"
+  },
+  {
+    "key": "Escape"
+  },
+  {
+    "evaluate": "(async()=>{const rows=window.designAudit.rows;const file=JSON.parse(rows.library_documents[0].file);sessionStorage.setItem('qa-retained-file',JSON.stringify(file));const {documentScope,cachedDocument}=await import('/src/data/documentFiles.ts');const result=await cachedDocument(documentScope({facilityId:'QA-PHC',deviceId:'qa-device'}),file);return result?.bytes.length===file.byteSize;})()",
+    "assert": "Boolean(sessionStorage.getItem('qa-retained-file'))",
+    "description": "Original byte descriptor retained for browser reload check"
+  },
+  {
+    "reload": true,
+    "evaluate": "(async()=>{const {documentScope,cachedDocument}=await import('/src/data/documentFiles.ts');const file=JSON.parse(sessionStorage.getItem('qa-retained-file'));window.qaCacheSurvived=(await cachedDocument(documentScope({facilityId:'QA-PHC',deviceId:'qa-device'}),file))?.bytes.length===file.byteSize;})()",
+    "assert": "window.qaCacheSurvived===true",
+    "description": "Encrypted file cache survives browser reload"
+  },
+  {
+    "finish": true
+  }
+]

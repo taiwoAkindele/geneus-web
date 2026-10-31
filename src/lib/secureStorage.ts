@@ -69,6 +69,15 @@ const loadDeviceKey = async (): Promise<CryptoKey> => {
 
 const key = (): Promise<CryptoKey> => (deviceKey ??= loadDeviceKey());
 
+/** Binary cache uses the same non-extractable device key; scope is authenticated with the ciphertext. */
+export const encryptDeviceBytes = async (plain:Uint8Array,scope:string):Promise<{iv:Uint8Array;cipher:ArrayBuffer}> => {
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(scope)},await key(),plain.slice().buffer);
+  return {iv,cipher};
+};
+export const decryptDeviceBytes = async (stored:{iv:Uint8Array;cipher:ArrayBuffer},scope:string):Promise<Uint8Array> =>
+  new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(stored.iv).buffer,additionalData:new TextEncoder().encode(scope)},await key(),stored.cipher));
+
 const encrypt = async (plain: string): Promise<string> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await key(), new TextEncoder().encode(plain));

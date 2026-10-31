@@ -46,6 +46,10 @@ import { UnavailableScreen } from '@/app/UnavailableScreen';
 import { InpatientScreen } from '@/pages/inpatient/InpatientScreen';
 import { RequireCapability } from '@/app/RequireCapability';
 import { Location } from '@shared';
+import { InpatientEvent } from '@shared';
+import { DocumentsScreen } from '@/pages/documents/DocumentsScreen';
+import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsAccess';
+import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
 import '../src/index.css';
 
@@ -115,6 +119,7 @@ db.execute = async (sql, parameters = []) => {
   const record = Object.fromEntries(fields.map((field, index) => [field, parameters[index]]));
   const existingRecovery = match[1] === 'register_builder_drafts' ? db.rows[match[1]]?.find((row) => row.id === record.id) : undefined;
   if (existingRecovery) Object.assign(existingRecovery, record); else (db.rows[match[1]] ??= []).push(record);
+  if(['library_documents','visit_documents'].includes(match[1]))(db.rows.ps_crud??=[]).push({id:record.id});
   if (!['encounter_drafts', 'register_builder_drafts'].includes(match[1])) window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
 const originalOptional = db.getOptional;
@@ -138,6 +143,14 @@ Object.assign(window, { seedAdmissionScenario: () => {
   rememberInpatientSupport({facilityId:envelope.facilityId,deviceId:envelope.deviceId},1);
   listeners.forEach((listener) => listener());
 } });
+Object.assign(window, { seedDocumentScenario: () => {
+  (window as unknown as {seedAdmissionScenario:()=>void}).seedAdmissionScenario();
+  const confirmation = InpatientEvent.parse({...envelope,schemaVersion:5,id:'admission:documents',admissionId:'admission:documents',type:'inpatient_event',patientId,encounterId:'encounter:open',requestEntryId:'entry:admission-request',receivingUnitId:'unit:1',action:'confirm',actorRole:'doctor'});
+  const reservation=InpatientEvent.parse({...confirmation,id:'admission:reserved',previousId:confirmation.id,action:'reserve',wardId:'ward:surgical',bedId:'bed:01'});
+  const arrival=InpatientEvent.parse({...reservation,id:'admission:arrived',previousId:reservation.id,action:'arrive'});
+  db.rows.inpatient_events=[confirmation,reservation,arrival].map(event=>toRow('inpatient_event',event));
+  rememberDocumentSupport(envelope,1);listeners.forEach(listener=>listener());
+} });
 const RouteObserver = () => {
   const navigate = useNavigate(); const route = useLocation();
   useEffect(() => { Object.assign(window, { designAudit: { go: (path: string, state?: unknown) => navigate(path, { state }), path: route.pathname, search: route.search, patientId, rows: db.rows, seedHistory: (count: number) => { for (let i = 0; i < count; i++) { const opened = new Date(Date.now() - (i + 20) * 86400000).toISOString(); const historical = Encounter.parse({ ...envelope, id: 'encounter:history-' + i, type: 'encounter', patientId, openedOn: opened, createdOn: opened, setting: 'facility' }); db.rows.encounters.push(toRow('encounter', historical)); db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'entry:history-close-' + i, type: 'encounter_entry', patientId, encounterId: historical.id, createdOn: opened, step: 'follow_up', values: {}, actorRole: 'doctor' }))); } listeners.forEach((listener) => listener()); }, setPatient: (fields: Record<string, unknown>) => { Object.assign(db.rows.patients[0], fields); listeners.forEach((listener) => listener()); } } }); }, [navigate, route]);
@@ -150,6 +163,7 @@ const Ready = ({ children }: { children: React.ReactNode }) => {
 createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={[auditParams.get('start')?.startsWith('/') && !auditParams.get('start')?.startsWith('//') ? auditParams.get('start')! : '/home']}><RouteObserver /><Routes><Route element={<AppShell />}>
   <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/workspace/:moduleId" element={<WorkspaceScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
+  <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen /></ClinicalDocumentsAccess>} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
   <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
   <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />
