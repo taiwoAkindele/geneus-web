@@ -1,15 +1,21 @@
-import { CLINICAL_VALUES, currentClinicalEvents, type AuthorizationContext, type ClinicalEvent, type ClinicalKind, type Encounter } from '@shared';
+import { CLINICAL_VALUES, currentClinicalEvents, canReadPatientChart, type AuthorizationContext, type ClinicalEvent, type ClinicalKind, type Encounter } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { allWhere, envelope, findRecord, insertRecord, newId } from '../db';
 import { patientIdentityIds } from './patientIdentity';
 import { encountersForPatient, entriesForEncounter } from './encounters';
 import { listStaff } from './staff';
 import { getPatient } from './patients';
+import { activeWorkspace } from '../facilityWorkspaces';
 
 export const clinicalEventsForPatient = (patientId: string) => allWhere<ClinicalEvent>('clinical_event', 'patientId', patientId);
 export const listAllergyEvents = () => allWhere<ClinicalEvent>('clinical_event', 'kind', 'allergy');
 
-export const patientClinicalRecord = async (patientId: string) => {
+export const patientClinicalRecord = async (patientId: string, context:AuthorizationContext) => {
+  if(!canReadPatientChart(context))throw new Error('Permission to view medical history is required');
+  const workspace=activeWorkspace();
+  if(workspace&&(workspace.facilityId!==context.facilityId||workspace.deviceId!==context.deviceId))throw new Error('Open medical history in the current hospital workspace');
+  const patient=await getPatient(patientId);
+  if(patient&&patient.facilityId!==context.facilityId)throw new Error('Medical history belongs to another hospital');
   const ids = await patientIdentityIds(patientId);
   const [groups, encounterGroups, staff, patients] = await Promise.all([
     Promise.all(ids.map(clinicalEventsForPatient)), Promise.all(ids.map(encountersForPatient)), listStaff(), Promise.all(ids.map(getPatient)),

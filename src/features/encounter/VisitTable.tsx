@@ -15,7 +15,7 @@ export const VisitTable = ({ visits, patients, canRecord, onAction, detailFor, o
   const pageValue = Number(params.get('visitPage') ?? 0);
   const page = Number.isInteger(pageValue) && pageValue >= 0 ? pageValue : 0;
   const sortKey = params.get('visitSort');
-  const sort = sortKey === 'visit' || sortKey === 'status' ? { key: sortKey, descending: params.get('visitDescending') === '1' } : undefined;
+  const sort = sortKey === 'patient' || sortKey === 'visit' || sortKey === 'status' ? { key: sortKey, descending: params.get('visitDescending') === '1' } : undefined;
   const change = (key: string, value: string) => setParams((current) => { const next = new URLSearchParams(current); if (value) next.set(key, value); else next.delete(key); if (key !== 'visitPage') next.delete('visitPage'); return next; }, { replace: true });
   const name = (id: string) => patients?.find((patient) => patient.patientId === id)?.fullName ?? id;
   const shown = visits.filter((visit) => (!status || visit.status === status) && (visit.careType === 'inpatient' || ((!from || calendarDate(visit.openedOn) >= from) && (!to || calendarDate(visit.openedOn) <= to))) && `${visit.title} ${visit.label} ${visit.patientId} ${name(visit.patientId)}`.toLowerCase().includes(query.toLowerCase()));
@@ -30,8 +30,9 @@ export const VisitTable = ({ visits, patients, canRecord, onAction, detailFor, o
     {(from || to) && visits.some((visit) => visit.careType === 'inpatient') ? <p className="text-sm text-ink-soft">Active inpatients stay visible even when admitted before the selected dates.</p> : null}
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink-soft"><span>{shown.length} of {visits.length} visits · {orderLabel}</span>{query || status || from || to ? <button className="min-h-[44px] font-bold text-brand" type="button" onClick={() => setParams((current) => { const next = new URLSearchParams(current); ['visitQuery', 'visitStatus', 'visitFrom', 'visitTo', 'visitPage'].forEach((key) => next.delete(key)); return next; }, { replace: true })}>Clear visit filters</button> : null}</div>
     {shown.length ? <DataTable key={`${query}|${status}|${from}|${to}`} caption={patients ? 'Facility visits' : 'Patient visits'} rows={shown} rowKey={(visit) => visit.id} page={page} onPageChange={(value) => change('visitPage', String(value))} sort={sort} onSortChange={(value) => setParams((current) => { const next = new URLSearchParams(current); next.set('visitSort', value.key); next.set('visitDescending', value.descending ? '1' : '0'); next.delete('visitPage'); return next; }, { replace: true })} columns={[
-      { key: 'visit', label: patients ? 'Patient / visit' : 'Visit date', sortValue: (visit) => patients ? name(visit.patientId) : visit.openedOn, render: (visit) => <div className="min-w-[100px] max-w-[260px]">
-        {patients ? <p className="font-bold">{name(visit.patientId)}</p> : null}<button type="button" className="min-h-[44px] py-1 text-left font-bold text-brand hover:underline" onClick={() => onAction(visit, 'view')}>{visitDate(visit.openedOn)}</button>
+      ...(patients ? [{ key: 'patient', label: 'Patient', sortValue: (visit:EncounterSummary) => name(visit.patientId), render: (visit:EncounterSummary) => <div><p className="font-bold">{name(visit.patientId)}</p><p className="break-all font-mono text-xs text-ink-soft">{visit.patientId}</p></div> }] : []),
+      { key: 'visit', label: 'Visit date', sortValue: (visit) => visit.openedOn, render: (visit) => <div className="min-w-[100px] max-w-[260px]">
+        <button type="button" className="min-h-[44px] py-1 text-left font-bold text-brand hover:underline" onClick={() => onAction(visit, 'view')}>{visitDate(visit.openedOn)}</button>
         <p className="break-all font-mono text-xs text-ink-soft">{patients ? visit.patientId : visit.label}</p><p className="mt-1 text-sm lg:hidden">{visit.title}</p>
         <p className="mt-2 text-sm text-ink-soft md:hidden">{detailFor?.(visit) ?? visit.nextAction}</p>
       </div> },

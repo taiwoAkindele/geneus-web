@@ -99,8 +99,8 @@ export const StaffForm = ({ initial, canEditName, canEditAccess, submitLabel, on
       </fieldset>
       <section aria-label="Effective access" className="rounded-card bg-brand-wash p-4">
         <h2 className="font-bold">{permission === 'read_only' ? 'View-only access' : `${effective.length} actions allowed`}</h2>
-        <p className="mt-1 text-sm text-ink-muted">{permission === 'read_only' ? 'This person can view records but cannot create or change anything.' : 'Combined access from the selected roles and any additional permissions.'}</p>
-        {permission === 'read_write' && effective.length ? <details className="mt-2"><summary className="cursor-pointer py-2 text-sm font-semibold">Review allowed actions</summary><ul className="list-disc space-y-1 pl-5 text-sm">{effective.map((item) => item !== 'pin_setup_code:claim' ? <li key={item}>{PERMISSION_LABELS[item]}</li> : null)}</ul></details> : null}
+        <p className="mt-1 text-sm text-ink-muted">{permission === 'read_only' ? 'This person can view patient details and any medical history their permissions allow, but cannot create or change records.' : 'Combined access from the selected roles and any additional permissions.'}</p>
+        {effective.length ? <details className="mt-2"><summary className="cursor-pointer py-2 text-sm font-semibold">Review allowed actions</summary><ul className="list-disc space-y-1 pl-5 text-sm">{effective.map((item) => item !== 'pin_setup_code:claim' ? <li key={item}>{PERMISSION_LABELS[item]}</li> : null)}</ul></details> : null}
       </section>
       {error ? <p role="alert" className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
       {(canEditName || canEditAccess) ? <Button type="submit" loading={saving} disabled={saving || !fullName.trim() || !selectedRoles.length}>{submitLabel}</Button> : <p className="text-sm text-ink-muted">You have view access. Ask a facility admin to change this staff member.</p>}

@@ -14,7 +14,7 @@ import { observationHistory } from './clinicalSummary';
 export const ClinicalWorkspace = ({ patientId, encounterId }: { patientId: string; encounterId?: string }) => {
   const context = useAuthorizationContext();
   const canRecord = context.permissions.includes('encounter:record');
-  const live = useLiveQuery(useCallback(() => patientClinicalRecord(patientId), [patientId]));
+  const live = useLiveQuery(useCallback(() => patientClinicalRecord(patientId,context), [patientId,context.userId,context.permissions.join('|')]));
   const [editor, setEditor] = useState<ClinicalEditor>();
   if (live.loading) return <p role="status" className="p-4 text-sm">Reading clinical summary…</p>;
   if (live.error) return <div role="alert" className="p-4 text-sm text-danger">

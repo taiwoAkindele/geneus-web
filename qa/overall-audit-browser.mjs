@@ -112,7 +112,7 @@ try {
       }
       if (role !== currentRole || width !== currentWidth || command.reload) {
         await cdp('Emulation.setDeviceMetricsOverride', { width, height: width > 800 ? 1024 : 844, deviceScaleFactor: 1, mobile: width <= 800 });
-        await cdp('Page.navigate', { url: previewOrigin + '/qa/overall-audit.html?role=' + encodeURIComponent(role) + (command.combined ? '&combined=1' : '') + (command.readonly ? '&readonly=1' : '') + (command.actor ? '&actor=' + encodeURIComponent(command.actor) : '') });
+        await cdp('Page.navigate', { url: previewOrigin + '/qa/overall-audit.html?role=' + encodeURIComponent(role) + (command.combined ? '&combined=1' : '') + (command.readonly ? '&readonly=1' : '') + (command.chartAccess ? '&chartAccess=1' : '') + (command.actor ? '&actor=' + encodeURIComponent(command.actor) : '') });
         await waitFor('Boolean(window.designAudit)&&Boolean(document.querySelector("h1"))');await evaluate('document.fonts.ready.then(()=>true)');
         currentRole = role; currentWidth = width;
       }

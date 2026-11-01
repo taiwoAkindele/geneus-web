@@ -9,6 +9,7 @@ export const roleLabel = (staff: Pick<Staff, 'role' | 'additionalRoles'>): strin
   rolesFor(staff).map((role) => ROLE_LABELS[role]).join(' + ');
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
+  'patient_chart:read': 'View patient medical history',
   'admission:manage': 'Manage admissions and ward beds',
   'location:manage': 'Manage care locations', 'service:manage': 'Manage services',
   'practitioner:manage': 'Manage professional profiles', 'credential:manage': 'Record credential evidence',

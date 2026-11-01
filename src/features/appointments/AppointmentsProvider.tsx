@@ -7,7 +7,7 @@ import { closingEntries, listEncounters } from '@/data/repos/encounters';
 import { projectAppointments } from './appointmentList';
 import { listCharges, listPayments, listAdjustments } from '@/data/repos/billing';
 import type { BookedAppointment, NewAppointment } from './types';
-import { linkedPatientIds } from '@shared';
+import { canReadPatientChart,linkedPatientIds } from '@shared';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
 import { listAllergyEvents } from '@/data/repos/clinical';
 
@@ -34,9 +34,9 @@ export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
 
   const load = useCallback(async () => {
     const [appointments, patients, encounters, closing] = await Promise.all([listAppointments(), listPatients(), listEncounters(), closingEntries()]);
-    const [charges, payments, adjustments, identityEvents, clinicalEvents] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listIdentityEvents(), listAllergyEvents()]);
-    return { appointments, patients, encounters, closing, charges, payments, adjustments, identityEvents, clinicalEvents };
-  }, []);
+    const [charges, payments, adjustments, identityEvents, clinicalEvents] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listIdentityEvents(), canReadPatientChart(context)?listAllergyEvents():Promise.resolve([])]);
+    return { appointments, patients:canReadPatientChart(context)?patients:patients.map(patient=>({...patient,allergies:[]})), encounters, closing, charges, payments, adjustments, identityEvents, clinicalEvents };
+  }, [context.userId,context.permissions.join('|')]);
   const { data, loading, error, reload } = useLiveQuery(load);
   const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments, data.clinicalEvents, data.identityEvents) : [], [data, now]);
   const bookAppointment = useCallback(async (appointment: NewAppointment) => { await book(appointment, context); }, [context]);

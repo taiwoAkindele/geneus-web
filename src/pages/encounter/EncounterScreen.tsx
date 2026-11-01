@@ -1,3 +1,4 @@
+import { PatientChartAccess } from '@/features/patients/PatientChartAccess';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { conflictingCorrections, type EncounterEntry } from '@shared';
@@ -12,7 +13,8 @@ import { AllergyAlert } from '@/features/clinical';
 import { patientChartPath } from '@/features/patients/patientRoutes';
 import { ENCOUNTER_FIELD_HELP } from '@/features/encounter/fieldHelp';
 
-export const EncounterScreen = () => {
+export const EncounterScreen = () => <PatientChartAccess><EncounterContent/></PatientChartAccess>;
+const EncounterContent = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const state = (useLocation().state as EncounterNavState) ?? {};
@@ -22,8 +24,8 @@ export const EncounterScreen = () => {
   const requestedReturn = params.get('returnTo');
   const task = params.get('task');
   const initialTask = task && task in STEP_DEFS ? task as StepKey : undefined;
-  const returnTo = requestedReturn && (requestedReturn.startsWith('/patients/profile?') || requestedReturn.startsWith('/encounters?')) ? requestedReturn : patientId ? patientChartPath(patientId, 'visits') : '/patients/search';
-  if (!patientId) return <div className="p-6 text-sm"><p>Open a visit from the patient record.</p><Button variant="ghost" onClick={() => navigate('/patients/search')}>Find a patient</Button></div>;
+  const returnTo = requestedReturn && (requestedReturn.startsWith('/patients/profile?') || requestedReturn.startsWith('/encounters?') || requestedReturn.startsWith('/patients/search?')) ? requestedReturn : patientId ? patientChartPath(patientId, 'visits') : '/patients/search';
+  if (!patientId) return <div className="p-6 text-sm"><p>Open a visit from the patient record.</p><Button variant="ghost" onClick={() => navigate('/patients/search')}>Patients</Button></div>;
   return <EncounterRecord key={patientId + '|' + (encounterId ?? appointmentId ?? 'new') + '|' + initialTask} initialTask={initialTask} patientId={patientId} encounterId={encounterId} appointmentId={appointmentId} returnTo={returnTo} />;
 };
 
