@@ -8,8 +8,9 @@ import { patientIdentityIds } from '@/data/repos/patientIdentity';
 const newestFirst = (a: EncounterSummary, b: EncounterSummary) => b.openedOn.localeCompare(a.openedOn);
 
 /** Every open encounter anyone on shift can pick up, and the most recently finished. */
-export const useEncounterList = (): LiveQuery<{ open: EncounterSummary[]; closed: EncounterSummary[] }> => {
+export const useEncounterList = (enabled=true): LiveQuery<{ open: EncounterSummary[]; closed: EncounterSummary[] }> => {
   const load = useCallback(async () => {
+    if(!enabled)return {open:[],closed:[]};
     const [encounters, entries] = await Promise.all([listEncounters(), listEncounterEntries()]);
     const byEncounter = new Map<string, typeof entries>();
     for (const entry of entries) { const group = byEncounter.get(entry.encounterId) ?? []; group.push(entry); byEncounter.set(entry.encounterId, group); }
@@ -18,7 +19,7 @@ export const useEncounterList = (): LiveQuery<{ open: EncounterSummary[]; closed
       open: summaries.filter((summary) => summary.status === 'Open').sort(newestFirst),
       closed: summaries.filter((summary) => summary.status !== 'Open').sort(newestFirst),
     };
-  }, []);
+  }, [enabled]);
   return useLiveQuery(load);
 };
 

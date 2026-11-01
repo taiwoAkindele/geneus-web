@@ -40,7 +40,7 @@ describe('assertAllowed', () => {
 
   it('refuses read-only staff every write', () => {
     const readOnly = contextFor(staff('facility_admin', 'read_only'));
-    expect(readOnly.permissions).toEqual([]);
+    expect(readOnly.permissions).toEqual(['patient_chart:read']);
     expect(isAllowed(readOnly, 'patient:create')).toBe(false);
     expect(isAllowed(readOnly, 'staff:manage')).toBe(false);
   });

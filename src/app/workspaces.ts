@@ -26,20 +26,19 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const reports = roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'register_entry:create', 'register_definition:publish');
   const modules: Workspace[] = [
     { id: 'front-desk', label: 'Patients & Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', links: [
-      link('patients', 'Find patient', 'Find a patient and open their shared record.', '/patients/search', 'search'),
+      link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'),
       ...(has(context, 'patient:create') ? [link('registration', 'Register patient', 'Create a patient record after checking for duplicates.', '/patients/new', 'plus')] : []),
       ...(appointments ? [link('appointments', 'Appointments & arrivals', 'Plan bookings and record attendance.', '/appointments', 'clock')] : []),
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
     { id: 'clinical', label: 'Clinical', description: 'Consultation, laboratory and pharmacy', icon: 'encounter', links: [
       ...(has(context, 'admission:manage') ? [link('admissions', 'Wards & admissions', 'Receive requests, allocate beds and manage inpatient stays.', '/admissions', 'patients')] : []),
-      ...(keys.has('encounters') && consultation ? [link('consultation', 'Consultation & nursing', 'Open visits and continue recording care.', '/encounters?queue=all', 'encounter')] : []),
+      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Patients', 'View patient details, admissions and permitted medical history.', '/patients/search', 'patients')] : []),
       ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open the laboratory queue and record results.', '/encounters?queue=lab', 'laboratory')] : []),
       ...(keys.has('encounters') && consultation ? [link('results', 'Results ready', 'Review visits with laboratory results ready.', '/encounters?queue=results', 'registers')] : []),
       ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open prescriptions waiting for dispensing.', '/encounters?queue=pharmacy', 'pharmacy')] : []),
       ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
       ...(keys.has('units') ? [link('handoffs', 'Handoffs & unit queue', 'Review incoming work and the next step of care.', '/units', 'referrals')] : []),
-      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Find patient', 'Open a patient record to review or begin care.', '/patients/search', 'search')] : []),
       ...(clinicalDocumentAccess(context)?[link('documents','Documents','Manage hospital files and review visit documents.','/documents','registers')]:[]),
     ] },
     { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: keys.has('billing') ? [

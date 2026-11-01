@@ -36,7 +36,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
   const canEdit = context.permissions.includes('patient:update');
   const canBook = context.permissions.includes('appointment:create');
   const patient = usePatient(patientId);
-  const chart = useLiveQuery(useCallback(() => patientId ? patientClinicalRecord(patientId) : Promise.resolve(undefined), [patientId]));
+  const chart = useLiveQuery(useCallback(() => patientId ? patientClinicalRecord(patientId,context) : Promise.resolve(undefined), [patientId,context.userId,context.permissions.join('|')]));
   const rejections = useLiveQuery(listOpenRejections);
   const admissions = useInpatient();
   const bookings = useAppointments();
@@ -51,10 +51,10 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
   useEffect(() => { document.title = PATIENT_TABS[tab] + ' · Patient record · Geneus Health'; }, [tab]);
   useEffect(() => { const heading = document.querySelector<HTMLElement>('#patient-section-heading h2'); if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); } }, [tab, chart.loading]);
 
-  if (!patientId) return <Message>No patient selected. <Button variant="ghost" onClick={() => navigate('/patients/search')}>Find a patient</Button></Message>;
+  if (!patientId) return <Message>No patient selected. <Button variant="ghost" onClick={() => navigate('/patients/search')}>Patients</Button></Message>;
   if (patient.loading) return <Message>Opening the patient record…</Message>;
   if (patient.error) return <Message>The record could not be read. <Button variant="ghost" onClick={patient.reload}>Try again</Button></Message>;
-  if (!patient.data) return <Message>This patient is not on this device. <Button variant="ghost" onClick={() => navigate('/patients/search')}>Find a patient</Button></Message>;
+  if (!patient.data) return <Message>This patient is not on this device. <Button variant="ghost" onClick={() => navigate('/patients/search')}>Patients</Button></Message>;
   const record = patient.data;
   const appointments = bookings.forPatient(patientId);
   const activeVisits = history.filter((visit) => visit.status === 'Open' || visit.careType === 'inpatient');

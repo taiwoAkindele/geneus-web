@@ -1,3 +1,4 @@
+import { PatientChartAccess } from '@/features/patients/PatientChartAccess';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { unitIsRoutable, type Handoff } from '@shared';
@@ -10,7 +11,8 @@ import { useWorkforce } from '@/features/workforce/useWorkforce';
 import { OwnershipPanel } from '@/features/workforce/OwnershipPanel';
 
 const timeOf = (at: string) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-export const UnitQueueScreen = () => {
+export const UnitQueueScreen = () => <PatientChartAccess><UnitQueueContent/></PatientChartAccess>;
+const UnitQueueContent = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();

@@ -1,0 +1,138 @@
+[
+  {
+    "role": "records_officer",
+    "path": "/patients/search",
+    "evaluate": "window.seedPatientDirectoryScenario()"
+  },
+  {
+    "name": "front-desk-patients",
+    "assert": "document.body.innerText.includes('Last visit date')&&document.body.innerText.includes('Never Visited Patient')&&!document.body.innerText.includes('Reason / diagnosis')",
+    "description": "Front desk sees a complete operational patient directory without clinical findings"
+  },
+  {
+    "assert": "[...document.querySelectorAll('a')].filter(node=>node.getClientRects().length&&/Find patient/i.test(node.textContent)).length===0",
+    "description": "Patient navigation uses Patients"
+  },
+  {
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&!document.body.innerText.includes('Never Visited Patient')",
+    "description": "Inpatients tab filters to active admissions",
+    "evaluate": "[...document.querySelectorAll('button')].find(node=>node.textContent.trim().startsWith('Inpatients')).click()"
+  },
+  {
+    "click": "View details"
+  },
+  {
+    "name": "front-desk-patient-details",
+    "assert": "document.body.innerText.includes('Surgical ward')&&document.body.innerText.includes('Bed 01')&&document.body.innerText.includes('Attending / responsible staff')&&!document.body.innerText.includes('View medical history')&&!document.body.innerText.includes('Hypertension')&&!document.body.innerText.includes('Penicillin')",
+    "description": "Patient details show location and responsible team without exposing medical history"
+  },
+  {
+    "assert": "document.body.innerText.includes('Book appointment')&&document.body.innerText.includes('Edit personal details')",
+    "description": "Front-desk booking and demographic editing remain available"
+  },
+  {
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=overview",
+    "name": "front-desk-chart-denied",
+    "assert": "document.body.innerText.includes('Medical history access required')&&!document.body.innerText.includes('Hypertension')",
+    "description": "Direct chart link cannot bypass read permission"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000001-K2&visit=encounter%3Aopen",
+    "assert": "document.body.innerText.includes('Medical history access required')",
+    "description": "Direct clinical visit link is protected"
+  },
+  {
+    "path": "/encounters?queue=all",
+    "assert": "window.designAudit.path==='/patients/search'&&document.body.innerText.includes('Patients')",
+    "description": "Previous consultation list redirects to the unified Patients screen"
+  },
+  {
+    "fill": {
+      "label": "Search patients",
+      "value": "OLD-314"
+    },
+    "assert": "document.body.innerText.includes('Never Visited Patient')&&!document.body.innerText.includes('Amaka Okoro')",
+    "description": "Old folder search includes patients without visits"
+  },
+  {
+    "fill": {
+      "label": "Search patients",
+      "value": "08099990000"
+    },
+    "assert": "document.body.innerText.includes('Never Visited Patient')",
+    "description": "Phone search is retained"
+  },
+  {
+    "role": "doctor",
+    "path": "/workspace/clinical",
+    "evaluate": "window.seedPatientDirectoryScenario();window.designAudit.go('/patients/search')"
+  },
+  {
+    "name": "clinical-patients",
+    "assert": "document.body.innerText.includes('Reason / diagnosis')&&[...document.querySelectorAll('nav a')].filter(node=>node.getClientRects().length&&node.textContent.trim()==='Patients').length>=1&&!document.body.innerText.includes('Consultation & nursing')",
+    "description": "Clinical has a single Patients entry and permitted clinical context"
+  },
+  {
+    "click": "Amaka Okoro"
+  },
+  {
+    "name": "clinical-patient-details",
+    "assert": "document.body.innerText.includes('View medical history')",
+    "description": "Authorised staff get a medical-history button inside details"
+  },
+  {
+    "click": "View medical history",
+    "selector": "a"
+  },
+  {
+    "name": "authorised-medical-history",
+    "assert": "document.body.innerText.includes('Medical chart')&&document.body.innerText.includes('Hypertension')",
+    "description": "Explicit action opens the existing medical chart"
+  },
+  {
+    "role": "records_officer",
+    "reload": true,
+    "readonly": true,
+    "chartAccess": true,
+    "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=details"
+  },
+  {
+    "assert": "document.body.innerText.includes('View medical history')&&!document.body.innerText.includes('Edit personal details')",
+    "description": "Read-only front desk may receive a separate chart-read grant"
+  },
+  {
+    "click": "View medical history",
+    "selector": "a"
+  },
+  {
+    "assert": "document.body.innerText.includes('Medical chart')&&!document.body.innerText.includes('Start visit')&&!document.body.innerText.includes('Continue visit')",
+    "description": "Medical-history reading does not grant care writing"
+  },
+  {
+    "evaluate": "window.setPatientHistoryAccess(false)",
+    "assert": "document.body.innerText.includes('Medical history access required')&&!document.body.innerText.includes('Hypertension')",
+    "description": "Revoking chart read access removes an already open medical history"
+  },
+  {
+    "role": "doctor",
+    "width": 320,
+    "path": "/patients/search",
+    "evaluate": "window.seedPatientDirectoryScenario()"
+  },
+  {
+    "name": "phone-patients",
+    "assert": "document.documentElement.scrollWidth<=innerWidth",
+    "description": "Patients directory fits a 320px phone"
+  },
+  {
+    "click": "Amaka Okoro"
+  },
+  {
+    "name": "phone-patient-details",
+    "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('View medical history')",
+    "description": "Patient details and medical-history entry fit a 320px phone"
+  },
+  {
+    "finish": true
+  }
+]

@@ -63,7 +63,7 @@ const patients = [Patient.parse({ ...envelope, id: patientId, patientId, type: '
 const auditParams = new URLSearchParams(location.search);
 const selectedRole = auditParams.get('role') ?? 'doctor';
 const actorId = auditParams.get('actor') === 'second' ? 'qa-doctor-second' : 'qa-doctor';
-const staff = Staff.parse({ ...envelope, id: actorId, staffId: actorId, type: 'staff', fullName: selectedRole === 'cashier' ? 'Chika Eze' : selectedRole === 'records_officer' ? 'Ngozi Bello' : 'Dr Ada Obi', role: selectedRole, ...(auditParams.has('combined') ? { additionalRoles: ['facility_admin'] } : {}), permission: auditParams.has('readonly') ? 'read_only' : 'read_write', active: true, loginAccess: 'always' });
+const staff = Staff.parse({ ...envelope, id: actorId, staffId: actorId, type: 'staff', fullName: selectedRole === 'cashier' ? 'Chika Eze' : selectedRole === 'records_officer' ? 'Ngozi Bello' : 'Dr Ada Obi', role: selectedRole, ...(auditParams.has('chartAccess') ? {additionalPermissions:['patient_chart:read']} : {}), ...(auditParams.has('combined') ? { additionalRoles: ['facility_admin'] } : {}), permission: auditParams.has('readonly') ? 'read_only' : 'read_write', active: true, loginAccess: 'always' });
 const visits = [Encounter.parse({ ...envelope, id: 'encounter:open', type: 'encounter', patientId, openedOn: now, setting: 'facility' }), Encounter.parse({ ...envelope, id: 'encounter:closed', type: 'encounter', patientId, openedOn: earlier, setting: 'facility' }), Encounter.parse({ ...envelope, id: 'encounter:lab', type: 'encounter', patientId: secondId, openedOn: now, setting: 'facility' })];
 const entry = (id: string, encounterId: string, step: string, values: Record<string, unknown>) => EncounterEntry.parse({ ...envelope, id, type: 'encounter_entry', patientId: encounterId === 'encounter:lab' ? secondId : patientId, encounterId, actorRole: 'doctor', step, values, createdOn: encounterId === 'encounter:closed' ? earlier : now });
 const entries = [entry('entry:vitals', 'encounter:open', 'vitals', { temperatureC: 37, systolicMmHg: 120, diastolicMmHg: 80, weightKg: 65, pulseBpm: 80 }), entry('entry:diagnosis', 'encounter:closed', 'diagnosis', { diagnosis: 'Routine review', prescription: [] }), entry('entry:closed', 'encounter:closed', 'follow_up', {}), entry('entry:lab', 'encounter:lab', 'lab_order', { tests: ['Synthetic test'] })];
@@ -151,6 +151,15 @@ Object.assign(window, { seedDocumentScenario: () => {
   db.rows.inpatient_events=[confirmation,reservation,arrival].map(event=>toRow('inpatient_event',event));
   rememberDocumentSupport(envelope,1);listeners.forEach(listener=>listener());
 } });
+Object.assign(window,{setPatientHistoryAccess:(allowed:boolean)=>{
+  const row=db.rows.staff.find(row=>row.id===staff.id)!;row.additionalPermissions=JSON.stringify(allowed?['patient_chart:read']:[]);listeners.forEach(listener=>listener());
+},seedPatientDirectoryScenario:()=>{
+  (window as unknown as {seedDocumentScenario:()=>void}).seedDocumentScenario();
+  const open=db.rows.encounters.find(row=>row.id==='encounter:open')!;open.openedOn=new Date(Date.now()-2*86400000).toISOString();
+  db.rows.encounters.push(toRow('encounter',Encounter.parse({...envelope,id:'encounter:latest',type:'encounter',patientId,openedOn:new Date(Date.now()-300000).toISOString()})));
+  db.rows.patients.push(toRow('patient',Patient.parse({...envelope,id:'QA-PHC-000003-K4',patientId:'QA-PHC-000003-K4',type:'patient',fullName:'Never Visited Patient',address:'Synthetic address',phone:'08099990000',legacyPaperRef:'OLD-314',sex:'male',ageYears:25})));
+  listeners.forEach(listener=>listener());
+}});
 const RouteObserver = () => {
   const navigate = useNavigate(); const route = useLocation();
   useEffect(() => { Object.assign(window, { designAudit: { go: (path: string, state?: unknown) => navigate(path, { state }), path: route.pathname, search: route.search, patientId, rows: db.rows, seedHistory: (count: number) => { for (let i = 0; i < count; i++) { const opened = new Date(Date.now() - (i + 20) * 86400000).toISOString(); const historical = Encounter.parse({ ...envelope, id: 'encounter:history-' + i, type: 'encounter', patientId, openedOn: opened, createdOn: opened, setting: 'facility' }); db.rows.encounters.push(toRow('encounter', historical)); db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'entry:history-close-' + i, type: 'encounter_entry', patientId, encounterId: historical.id, createdOn: opened, step: 'follow_up', values: {}, actorRole: 'doctor' }))); } listeners.forEach((listener) => listener()); }, setPatient: (fields: Record<string, unknown>) => { Object.assign(db.rows.patients[0], fields); listeners.forEach((listener) => listener()); } } }); }, [navigate, route]);

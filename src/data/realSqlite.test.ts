@@ -102,7 +102,7 @@ describe('the write path against a real SQLite', () => {
       expect(resolved.provisionalReason).toBe(unknown.provisionalReason);
       expect(resolved.identifiedBy).toBe(context.userId);
       expect(resolved.identifiedOn).toBe(resolved.updatedOn);
-      const chart = await patientClinicalRecord(first.patientId);
+      const chart = await patientClinicalRecord(first.patientId,context);
       expect(chart?.entries.some((item) => item.id === entry.id && item.patientId === first.patientId)).toBe(true);
       expect((await getPatient(second.patientId))?.identityStatus).toBe('provisional');
       const partlyKnown = await updatePatient(second.id, toPatientDetails({ ...fromPatient(second), sex: 'M' }), context);
@@ -198,7 +198,7 @@ describe('the write path against a real SQLite', () => {
     it('blocks every mutation for read-only staff even with combined grants', async () => {
       const staff = await createStaff({ fullName: 'View Only', role: 'nurse', additionalRoles: ['cashier'], additionalPermissions: ['fee_item:manage'], permission: 'read_only' }, contextFor('facility_admin'));
       const context = authorizationFor({ staff, facilityId: 'OOE-PHC', deviceId: 'device-1' });
-      expect(context.permissions).toEqual([]);
+      expect(context.permissions).toEqual(['patient_chart:read']);
       await expect(editStaff(staff, { ...staff, permission: 'read_write' }, context)).rejects.toThrow(/role doesn't allow/);
       expect((await listStaff())[0].permission).toBe('read_only');
     });
@@ -559,7 +559,7 @@ describe('the write path against a real SQLite', () => {
     it('saves and resolves a problem as an attributed append-only chain', async () => {
       const original = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
       const revision = await saveClinicalRecord(patientId, 'problem', { ...values, status: 'resolved' }, contextFor('doctor'), original);
-      const record = await patientClinicalRecord(patientId);
+      const record = await patientClinicalRecord(patientId,contextFor('doctor'));
       expect(record.events).toHaveLength(2);
       expect(record.current).toEqual([revision]);
       expect((await clinicalEventsForPatient(patientId))[0].values.status).toBe('active');

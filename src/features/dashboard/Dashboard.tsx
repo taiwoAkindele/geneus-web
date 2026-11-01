@@ -84,7 +84,7 @@ export const Dashboard = () => {
   useEffect(() => { document.title = 'Home · Geneus Health'; }, []);
   const quickActions: { label: string; to: string; icon: IconName; primary?: boolean }[] = [
     ...(context.permissions.includes('patient:create') ? [{ label: 'Register patient', to: '/patients/new', icon: 'plus' as const, primary: context.role === 'records_officer' }] : []),
-    { label: 'Find patient', to: '/patients/search', icon: 'search', primary: careFirst },
+    { label: 'Patients', to: '/patients/search', icon: 'search', primary: careFirst },
     ...(access.billing ? [{ label: 'Open billing', to: '/billing', icon: 'registers' as const, primary: billingFirst }] : []),
   ];
   quickActions.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));

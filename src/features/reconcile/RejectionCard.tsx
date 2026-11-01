@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { SyncRejection } from '@shared';
+import { canReadPatientChart,type SyncRejection } from '@shared';
 import { Button, Sheet, Tag } from '@/ui';
 import { patientChartPath } from '@/features/patients/patientRoutes';
+import { useAuthorizationContext } from '@/session';
 import { RetainedDocument } from '@/features/documents/RetainedDocument';
 import { CATEGORY_LABEL, keptRows, RECORD_LABEL, rejectionAdvice, shownValue, type RejectionKind } from './describeRejection';
 
@@ -61,6 +62,7 @@ export const RejectionCard = ({
   onApplyAgain,
   onDiscard,
 }: Props) => {
+  const context=useAuthorizationContext();
   const [chosen, setChosen] = useState<string[]>([]);
   const [intent, setIntent] = useState<'discard' | 'retry'>();
   const refused = rejection.refusedRecord;
@@ -72,6 +74,7 @@ export const RejectionCard = ({
     setChosen((now) => (now.includes(column) ? now.filter((c) => c !== column) : [...now, column]));
   const what = rejection.operation === 'patch' ? 'change' : rejection.operation === 'delete' ? 'removal' : 'new record';
 
+  if(!canReadPatientChart(context)&&['encounter','encounter_entry','clinical_event','visit_document','library_document','referral','handoff','inpatient_event'].includes(rejection.entityType))return <div className="rounded-card border border-outline-soft p-4 text-sm">A clinical change needs review. Permission to view medical history is required to inspect or resolve it.</div>;
   return (
     <div className="rounded-card border border-outline-soft bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -90,7 +93,7 @@ export const RejectionCard = ({
       <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
         <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b> {rejectionAdvice(rejection)}
       </p>
-      {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId)} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
+      {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId,'details')} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
       {['library_document','visit_document'].includes(rejection.entityType)?<RetainedDocument rejection={rejection}/>:null}
       {['encounter_entry','clinical_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext?<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Independent clinical review · preserve original authorship</Link>:null}
       {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
