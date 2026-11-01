@@ -25,9 +25,8 @@ export type EncounterData = {
   complaint: { text: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
   lab_order: { tests: string[]; items?: InvestigationItem[]; reason?: string };
   lab_results: Record<string, string>;
-  // `injection` / `admit` are the doctor's disposition — they decide which tail
-  // sections the encounter grows (see stepsFor). `rx` presence adds the pharmacy step.
-  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean; code?: string; codingSystem?: DiagnosisLine['codingSystem']; certainty?: DiagnosisLine['certainty']; diagnoses?: DiagnosisLine[] };
+  // `rx`, `injection` and `admit` are read only from visits recorded in the retired order.
+  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean; pendingResultsReason?: string; code?: string; codingSystem?: DiagnosisLine['codingSystem']; certainty?: DiagnosisLine['certainty']; diagnoses?: DiagnosisLine[] };
   injection: { drug: string; dose: string; route: string; site: string; note: string };
   /** Per prescription line: handed over, or the reason it was not. */
   dispense: { done: Record<number, boolean>; reasons: Record<number, string> };

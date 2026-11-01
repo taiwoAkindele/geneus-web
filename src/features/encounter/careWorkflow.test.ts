@@ -10,18 +10,60 @@ let sequence = 0;
 const entry = (step: EncounterEntry['step'], values: Record<string, unknown>): EncounterEntry => ({ ...encounter, type: 'encounter_entry', id: `entry:${++sequence}`, encounterId: encounter.id, actorRole: 'doctor', step, values, createdOn: `2026-10-30T09:${String(sequence).padStart(2, '0')}:00Z` });
 const project = (entries: EncounterEntry[]) => projectEncounter({ patientId: encounter.patientId, encounter, entries, draft: structuredClone(EMPTY_ENCOUNTER_DATA), skippedNow: [], staffNames: new Map() });
 
+/** A visit recorded in order up to its treatment decisions, with no tests ordered. */
+const treatedVisit = () => [
+  entry('vitals', { temperatureC: 37 }), entry('complaint', { complaints: ['Headache'] }), entry('investigation_review', { decision: 'none_required' }),
+  entry('diagnosis', { diagnosis: 'Recorded assessment', prescription: [] }), entry('prescription', { decision: 'none_required', prescription: [] }), entry('injection_order', { required: false }),
+];
+
+describe('one visit order, enforced on the device and the server', () => {
+  it('lists the testing decision, order and results before the diagnosis', () => {
+    const data = { ...structuredClone(EMPTY_ENCOUNTER_DATA), lab_order: { tests: ['Full blood count'] } };
+    expect(stepsFor(data).map((s) => s.key)).toEqual(['vitals', 'complaint', 'investigation_review', 'lab_order', 'lab_results', 'result_review', 'diagnosis', 'prescription', 'injection_order', 'disposition']);
+    expect(stepsFor(structuredClone(EMPTY_ENCOUNTER_DATA)).map((s) => s.key)).toEqual(['vitals', 'complaint', 'investigation_review', 'diagnosis', 'prescription', 'injection_order', 'disposition']);
+  });
+  it('requires vitals before the complaint, and the complaint before deciding on tests', () => {
+    const vitals = entry('vitals', { pulseBpm: 80 }), complaint = entry('complaint', { complaints: ['Fever'] });
+    expect(careEntryIssues(complaint, [])).toEqual(['Record at least one vital sign before the complaint']);
+    expect(careEntryIssues(complaint, [vitals])).toEqual([]);
+    expect(careEntryIssues(entry('investigation_review', { decision: 'none_required' }), [vitals])).toEqual(['Record the complaint and clinical note before deciding on tests']);
+    expect(careEntryIssues(entry('lab_order', { tests: ['Malaria RDT'] }), [vitals])).not.toEqual([]);
+  });
+  it('requires the testing decision, and every ordered result reviewed, before the diagnosis unless a reason is recorded', () => {
+    const start = [entry('vitals', { pulseBpm: 80 }), entry('complaint', { complaints: ['Fever'] })];
+    expect(careEntryIssues(entry('diagnosis', { diagnosis: 'Malaria' }), start)).toEqual(['Record the testing decision before the diagnosis']);
+    const order = entry('lab_order', { tests: ['Malaria RDT', 'Full blood count'] });
+    const ordered = [...start, order, entry('investigation_review', { decision: 'ordered', orderEntryId: order.id })];
+    expect(careEntryIssues(entry('diagnosis', { diagnosis: 'Malaria' }), ordered)).toEqual(['Review every ordered test result before the diagnosis, or record why you are continuing without them']);
+    expect(careEntryIssues(entry('diagnosis', { diagnosis: 'Malaria', pendingResultsReason: 'Treating on clinical grounds while the count is processed' }), ordered)).toEqual([]);
+    const results = entry('lab_results', { results: [{ test: 'Malaria RDT', result: 'Positive' }, { test: 'Full blood count', result: 'Normal' }] });
+    expect(careEntryIssues(entry('diagnosis', { diagnosis: 'Malaria' }), [...ordered, results])).not.toEqual([]);
+    const reviewed = [...ordered, results, entry('result_review', { resultEntryIds: [results.id] })];
+    expect(careEntryIssues(entry('diagnosis', { diagnosis: 'Malaria' }), reviewed)).toEqual([]);
+  });
+  it('requires the diagnosis before treatment, and every treatment decision before disposition', () => {
+    const visit = treatedVisit();
+    expect(careEntryIssues(entry('prescription', { decision: 'none_required', prescription: [] }), visit.slice(0, 3))).toEqual(['Record the diagnosis before treatment decisions']);
+    expect(careEntryIssues(entry('injection_order', { required: false }), visit.slice(0, 3))).toEqual(['Record the diagnosis before treatment decisions']);
+    expect(careEntryIssues(entry('disposition', { kind: 'home_care', note: 'Advice' }), visit.slice(0, 5))).toEqual(['Record the medication and injection decisions before disposition']);
+  });
+  it('refuses the retired follow-up and admission steps whatever the workflow version', () => {
+    for (const step of ['follow_up', 'admission'] as const) expect(careEntryIssues({ step, values: {} }, treatedVisit())).toEqual(['Record an explicit disposition for this consultation']);
+    expect(careEntryIssues({ step: 'diagnosis', values: { diagnosis: 'Assessment', prescription: [{ drug: 'Paracetamol', dose: '1 g' }] } }, treatedVisit())).not.toEqual([]);
+  });
+});
+
 describe('independent clinical decisions', () => {
   it('completes a consultation with no medication, investigations or admission', () => {
-    const diagnosis = entry('diagnosis', { diagnosis: 'Recorded assessment', prescription: [] });
-    const review = entry('investigation_review', { decision: 'none_required' });
+    const before = treatedVisit();
     const disposition = entry('disposition', { kind: 'home_care', note: 'Advice and review instructions recorded' });
-    expect(careEntryIssues(disposition, [diagnosis, review])).toEqual([]);
-    const state = project([diagnosis, review, disposition]);
+    expect(careEntryIssues(disposition, before)).toEqual([]);
+    const state = project([...before, disposition]);
     expect(state.closed).toBe(true);
     expect(state.admitted).toBe(false);
     expect(state.data.lab_order.tests).toEqual([]);
     expect(state.data.prescription.rx).toEqual([]);
-    expect(stationQueues([diagnosis, review, disposition])).toEqual({ lab: [], results: [], pharmacy: [] });
+    expect(stationQueues([...before, disposition])).toEqual({ lab: [], results: [], pharmacy: [] });
   });
   it('keeps a new encounter in the independent workflow after diagnosis is signed first', () => {
     const state = project([entry('diagnosis', { diagnosis: 'Assessment', prescription: [] })]);
@@ -38,7 +80,7 @@ describe('independent clinical decisions', () => {
   });
   it('requires an observation owner and reassessment, and preserves observation until a successor', () => {
     expect(ENCOUNTER_STEP_VALUES.disposition.safeParse({ kind: 'observation', note: 'Observe' }).success).toBe(false);
-    const prior = [entry('diagnosis', { diagnosis: 'Assessment' }), entry('investigation_review', { decision: 'none_required' })];
+    const prior = treatedVisit();
     const observation = entry('disposition', { kind: 'observation', note: 'Reassess', responsibleService: 'Observation unit', reassessOn: '2026-10-30T12:00:00Z' });
     expect(closesEncounter(observation)).toBe(false);
     expect(project([...prior, observation]).closed).toBe(false);

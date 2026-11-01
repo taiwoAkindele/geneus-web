@@ -11,6 +11,7 @@ const KIND_ICON: Record<NotificationKind, IconName> = {
   referral: 'referrals',
   conflict: 'warning',
   shift: 'clock',
+  result: 'laboratory',
 };
 
 type Props = {

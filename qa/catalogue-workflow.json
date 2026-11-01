@@ -1,0 +1,196 @@
+[
+  {
+    "role": "facility_admin",
+    "path": "/investigations/catalogue",
+    "evaluate": "window.seedCatalogueScenario()"
+  },
+  {
+    "name": "catalogue-empty",
+    "assert": "document.body.innerText.includes('This facility has no lab tests yet')&&document.body.innerText.includes('Choose from standard tests')&&document.body.innerText.includes('Upload a list of tests')&&document.body.innerText.includes('Add a single test')&&!document.body.innerText.includes('unlisted requests')",
+    "description": "An empty catalogue offers standard tests, upload and single entry, without the unlisted-requests switch"
+  },
+  {
+    "click": "Choose from standard tests",
+    "name": "catalogue-standard-sheet",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Full blood count')&&document.querySelector('dialog[open]').innerText.includes('Select all 3 available')&&!document.querySelector('dialog[open]').innerText.includes('Performed by')&&!document.querySelector('dialog[open] select')",
+    "description": "Standard tests are read from the server, with no unit or location to choose"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('dialog[open] input[type=checkbox]')].slice(0,2).forEach(box=>box.click());true"
+  },
+  {
+    "click": "Add 2 selected tests",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Added 2 tests')&&document.querySelector('dialog[open]').innerText.includes('Select all 1 available')",
+    "description": "Chosen standard tests are added by the server and the list refreshes"
+  },
+  {
+    "click": "Done",
+    "name": "catalogue-table",
+    "assert": "document.querySelectorAll('tbody tr').length===2&&document.body.innerText.includes('Standard')&&document.body.innerText.includes('—')&&document.body.innerText.includes('Classification')&&!/\\d+ of \\d+ tests/.test(document.body.innerText)&&!document.querySelector('[role=tablist]')",
+    "description": "One table without tabs or a row count, unpriced standard tests show a dash"
+  },
+  {
+    "click": "Edit",
+    "fill": {
+      "label": "Price (NGN)",
+      "value": "3500"
+    }
+  },
+  {
+    "click": "Save price",
+    "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('3,500')",
+    "description": "A price can be entered for a standard test"
+  },
+  {
+    "label": "Add tests",
+    "assert": "[...document.querySelectorAll('[role=menu] button')].map(n=>n.textContent.trim()).join('|')==='Add a single test|Upload a list of tests|Choose from standard tests'",
+    "description": "Add tests offers single entry, upload and standard tests"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000001-K2&visit=encounter%3Aopen",
+    "fill": {
+      "label": "Patient's complaints",
+      "value": "Fever for three days"
+    }
+  },
+  {
+    "click": "Review & sign complaint"
+  },
+  {
+    "click": "Confirm & lock"
+  },
+  {
+    "fill": {
+      "label": "Testing decision",
+      "value": "ordered"
+    }
+  },
+  {
+    "click": "Choose investigations",
+    "name": "visit-lab-order",
+    "assert": "document.body.innerText.includes('Full blood count')&&document.body.innerText.includes('Haemoglobin')&&document.body.innerText.includes('Unlisted investigation request')",
+    "description": "Tests added to the catalogue can be requested in a visit, alongside a test not on the list"
+  },
+  {
+    "click": "Add"
+  },
+  {
+    "fill": {
+      "label": "Unlisted investigation request",
+      "value": "Serum ferritin"
+    }
+  },
+  {
+    "click": "Add unpriced request"
+  },
+  {
+    "click": "Review & sign lab order"
+  },
+  {
+    "click": "Confirm & lock"
+  },
+  {
+    "path": "/encounters?queue=lab",
+    "name": "lab-queue",
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&document.body.innerText.includes('Full blood count')&&document.body.innerText.includes('Serum ferritin')",
+    "description": "Requested catalogue and unlisted tests appear in the Laboratory queue"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000001-K2&visit=encounter%3Aopen",
+    "name": "visit-waiting-results",
+    "assert": "document.body.innerText.includes('Waiting for laboratory results')&&document.body.innerText.includes('Full blood count, Serum ferritin')&&[...[...document.querySelectorAll('nav')].find(n=>n.getAttribute('aria-label')==='Visit tasks').querySelectorAll('button')].map(n=>n.querySelector('span').textContent).join('|')==='Vitals|Complaint|Testing decision|Lab order|Results|Result review|Diagnosis|Prescription|Injection order|Disposition'",
+    "description": "After ordering, the visit waits for results before the diagnosis, in the one visit order"
+  },
+  {
+    "click": "Continue to diagnosis without results",
+    "assert": "document.body.innerText.includes('Record why you are continuing without the results')",
+    "description": "Continuing without results needs a reason"
+  },
+  {
+    "fill": {
+      "label": "Reason for continuing without results",
+      "value": "Treating on clinical grounds; results will be reviewed when back"
+    }
+  },
+  {
+    "click": "Continue to diagnosis without results"
+  },
+  {
+    "fill": {
+      "label": "Diagnosis",
+      "value": "Suspected malaria"
+    }
+  },
+  {
+    "click": "Review & sign diagnosis",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Continued without all results')",
+    "description": "The reason for continuing without results is signed with the diagnosis"
+  },
+  {
+    "click": "Confirm & lock",
+    "name": "visit-diagnosed-without-results",
+    "assert": "document.body.innerText.includes('Diagnosis signed and saved on this device')",
+    "description": "The diagnosis is accepted with the recorded reason"
+  },
+  {
+    "path": "/investigations/catalogue",
+    "label": "Add tests"
+  },
+  {
+    "click": "Add a single test",
+    "fill": {
+      "label": "Test name",
+      "value": "hb"
+    }
+  },
+  {
+    "fill": {
+      "label": "Specimen",
+      "value": "Blood"
+    }
+  },
+  {
+    "fill": {
+      "label": "Classification",
+      "value": "Haematology"
+    }
+  },
+  {
+    "click": "Add test",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('already in the catalogue')&&!document.querySelector('dialog[open]').innerText.includes('Performed by')",
+    "description": "A single test matching another test's other name is refused"
+  },
+  {
+    "fill": {
+      "label": "Test name",
+      "value": ""
+    }
+  },
+  {
+    "fill": {
+      "label": "Specimen",
+      "value": ""
+    }
+  },
+  {
+    "key": "Escape",
+    "evaluate": "window.seedCatalogueScenario({offline:true})"
+  },
+  {
+    "click": "Choose from standard tests",
+    "name": "catalogue-offline",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Connect to the internet to add tests')",
+    "description": "Adding tests offline explains that a connection is needed"
+  },
+  {
+    "key": "Escape",
+    "width": 320,
+    "path": "/investigations/catalogue",
+    "evaluate": "window.seedCatalogueScenario()"
+  },
+  {
+    "name": "catalogue-phone",
+    "assert": "document.documentElement.scrollWidth<=320",
+    "description": "The catalogue fits a 320px phone"
+  }
+]

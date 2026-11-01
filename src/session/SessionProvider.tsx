@@ -5,6 +5,10 @@ import { extendShift as persistExtension, findShift, listShifts, listStaff } fro
 import { authorizationFor, nobody, freshAuthorization } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
 import { listOpenRejections } from '@/data/repos/syncRejections';
+import { entriesAtSteps } from '@/data/repos/encounters';
+import { listPatients } from '@/data/repos/patients';
+import { RESULT_ALERT_STEPS, resultAlerts } from '@/features/encounter/resultAlerts';
+import { visitRecordPath } from '@/features/patients/patientRoutes';
 import { checkPin, needsLongerPin } from './credentials';
 import { approvePinSetup } from './pinApproval';
 import { accessFor, maySignIn, mayStaySignedIn, SESSION_IDLE_MS, shiftEnd, type Access } from './accessPolicy';
@@ -38,7 +42,7 @@ export type SessionUser = {
 export type Facility = { name: string; code: string };
 export type Shift = { label: string; endsAtLabel: string; endsOn: string; minutesLeft: number; ended: boolean };
 
-export type NotificationKind = 'referral' | 'conflict' | 'shift';
+export type NotificationKind = 'referral' | 'conflict' | 'shift' | 'result';
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
@@ -131,10 +135,23 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [facilityIdentity, setFacilityIdentity] = useState(pendingFacilityIdentity);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const rejections = useLiveQuery(listOpenRejections);
-  const notifications = useMemo<AppNotification[]>(() => (rejections.data ?? []).map((rejection) => ({
-    id: rejection.id, kind: 'conflict', title: 'A record needs review',
-    body: 'A queued change was refused. Open Sync & device to review it.', to: '/sync', read: readIds.has(rejection.id),
-  })), [rejections.data, readIds]);
+  // Results back from the laboratory for tests this clinician ordered; each alert ends once the result is reviewed.
+  const results = useLiveQuery(useCallback(async () => {
+    if (!staffId) return [];
+    const [entries, patients] = await Promise.all([entriesAtSteps(RESULT_ALERT_STEPS), listPatients()]);
+    const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
+    return resultAlerts(entries, staffId).map((alert) => ({ ...alert, name: names.get(alert.patientId) ?? alert.patientId }));
+  }, [staffId]));
+  const notifications = useMemo<AppNotification[]>(() => [
+    ...(results.data ?? []).map((alert) => ({
+      id: 'result:' + alert.id, kind: 'result' as const, title: `${alert.tests.join(', ')} result${alert.tests.length === 1 ? '' : 's'} ready`,
+      body: alert.name, to: visitRecordPath(alert.patientId, alert.encounterId) + '&task=result_review', read: readIds.has('result:' + alert.id),
+    })),
+    ...(rejections.data ?? []).map((rejection) => ({
+      id: rejection.id, kind: 'conflict' as const, title: 'A record needs review',
+      body: 'A queued change was refused. Open Sync & device to review it.', to: '/sync', read: readIds.has(rejection.id),
+    })),
+  ], [results.data, rejections.data, readIds]);
   useEffect(() => setReadIds(new Set()), [staffId]);
   const [now, setNow] = useState(() => Date.now());
   const lastActivity = useRef<number | undefined>(readLastActivity());
@@ -322,13 +339,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             }
           : undefined,
       notifications,
-      notificationsLoading: rejections.loading,
-      notificationsError: rejections.error,
+      notificationsLoading: rejections.loading || results.loading,
+      notificationsError: rejections.error ?? results.error,
       unreadCount: notifications.filter((item) => !item.read).length,
       extendShift: extend,
       markAllRead,
     };
-  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead, rejections.loading, rejections.error]);
+  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead, rejections.loading, rejections.error, results.loading, results.error]);
 
   return (
     <AuthContext.Provider value={auth}>

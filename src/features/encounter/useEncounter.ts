@@ -50,7 +50,9 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
         { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
         ...(data.diagnosis.code || data.diagnosis.certainty ? [{ label: 'Diagnosis details', value: [data.diagnosis.codingSystem, data.diagnosis.code, data.diagnosis.certainty].filter(Boolean).join(' · ') }] : []),
         ...(data.diagnosis.diagnoses ?? []).map((diagnosis, index) => ({ label: `Additional diagnosis ${index + 1}`, value: [diagnosis.label, diagnosis.codingSystem, diagnosis.code, diagnosis.certainty].filter(Boolean).join(' · ') })),
-        ...(data.workflowVersion === 1 ? [] : [
+        ...(data.diagnosis.pendingResultsReason ? [{ label: 'Continued without all results', value: data.diagnosis.pendingResultsReason }] : []),
+        // A visit recorded in the retired order carried its treatment plan on the diagnosis.
+        ...(!data.diagnosis.rx.length && !data.diagnosis.injection && !data.diagnosis.admit ? [] : [
         { label: 'Prescription', value: data.diagnosis.rx.map((m) => `${m.name} — ${[m.dose, m.frequency, m.duration, m.route, m.quantity ? `Quantity ${m.quantity}` : ''].filter(Boolean).join(' · ')}`).join('; ') || 'None' },
         { label: 'Plan', value: plan.join(' · ') },
         ]),
@@ -72,7 +74,7 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
         { label: 'Admitting note', value: data.admission.note || '—' },
       ];
     case 'dispense': {
-      const rx = data.workflowVersion === 1 ? data.prescription.rx : data.diagnosis.rx;
+      const rx = data.prescription.rx.length ? data.prescription.rx : data.diagnosis.rx;
       const { done, reasons } = data.dispense;
       return [
         { label: 'Dispensed', value: rx.filter((_, i) => done[i]).map((m) => m.name).join(', ') || 'None' },
@@ -299,17 +301,17 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
         const unsigned = (Object.keys(STEP_DEFS) as StepKey[]).filter((candidate) => candidate !== key && !enc.entries[candidate] && !blankDraft(draft[candidate]));
         if (unsigned.length) throw new Error('Sign or clear these draft sections before completing: ' + unsigned.map((candidate) => STEP_DEFS[candidate].short).join(', '));
       }
-      const followUpOn = key === 'follow_up' ? enc.data.follow_up.when : key === 'disposition' ? enc.data.disposition.followUpOn : '';
+      const followUpOn = key === 'disposition' ? enc.data.disposition.followUpOn : '';
       const entry = await saveStep(
         {
           encounterId: enc.id,
           appointmentId,
           patientId,
           step: key,
-          values: key === 'diagnosis' && enc.data.workflowVersion === 1 ? { ...toStepValues(key, enc.data), prescription: [] } : toStepValues(key, enc.data),
+          values: key === 'diagnosis' ? { ...toStepValues(key, enc.data), prescription: [] } : toStepValues(key, enc.data),
           collectLaterReason,
           investigationReason: enc.data.investigation_review.reason,
-          workflowVersion: enc.data.workflowVersion,
+          workflowVersion: 1,
           followUp: followUpOn
             ? {
                 reason: enc.data.follow_up.reason.trim() || 'Follow-up review',

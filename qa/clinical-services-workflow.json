@@ -1,0 +1,99 @@
+[
+  {
+    "role": "doctor",
+    "path": "/clinical/patients",
+    "name": "clinical-patients",
+    "assert": "[...[...document.querySelectorAll('nav')].find(n=>n.getAttribute('aria-label')==='Clinical navigation').querySelectorAll('a')].map(a=>a.textContent.trim()).filter(t=>t!=='Overview').join('|')==='Patients|Wards & admissions|Laboratory|Pharmacy|Referrals|Documents'",
+    "description": "Clinical sidebar lists Patients first, without Results ready or the unit queue"
+  },
+  {
+    "assert": "['Allergies','Active problems','Status','Last visit','View chart','Penicillin','Hypertension'].every(t=>document.body.innerText.includes(t))&&!document.body.innerText.includes('Review duplicate')&&![...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add patient')&&!/\\d+ of \\d+ patients/.test(document.body.innerText)",
+    "description": "Clinical patients table shows allergies, problems and care status, without front-desk actions or a row count"
+  },
+  {
+    "path": "/laboratory",
+    "name": "laboratory-open",
+    "assert": "document.body.innerText.includes('Open requests')&&document.body.innerText.includes('Completed requests')&&!document.querySelector('main select')&&document.querySelectorAll('main input').length===1&&!['Wards & admissions','Appointments','Patients'].some(t=>[...document.querySelectorAll('main button')].some(b=>b.textContent.trim()===t))&&document.body.innerText.includes('Demo Second Patient')&&document.body.innerText.includes('Synthetic test')&&document.body.innerText.includes('Awaiting results')",
+    "description": "Laboratory shows open and completed requests with only a search"
+  },
+  {
+    "fill": {
+      "label": "Search",
+      "value": "synthetic"
+    },
+    "assert": "document.body.innerText.includes('Demo Second Patient')",
+    "description": "Search finds a request by test name"
+  },
+  {
+    "fill": {
+      "label": "Search",
+      "value": "no such test"
+    },
+    "assert": "document.body.innerText.includes('No requests match this search')",
+    "description": "Search narrows requests"
+  },
+  {
+    "path": "/pharmacy",
+    "name": "pharmacy",
+    "assert": "document.body.innerText.includes('Open requests')&&document.body.innerText.includes('Completed requests')&&!document.querySelector('main select')&&document.querySelectorAll('main input').length===1",
+    "description": "Pharmacy shows open and completed requests with only a search"
+  },
+  {
+    "path": "/admissions",
+    "name": "wards",
+    "assert": "!document.body.innerText.includes('Clinical patient list')&&!document.body.innerText.includes('Show all patients')",
+    "description": "Wards & admissions has no patient list link"
+  },
+  {
+    "path": "/laboratory",
+    "click": "Record results"
+  },
+  {
+    "fill": {
+      "label": "Synthetic test",
+      "value": "Negative"
+    }
+  },
+  {
+    "click": "Review & sign results"
+  },
+  {
+    "click": "Confirm & lock",
+    "evaluate": "[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Notifications')).click();true"
+  },
+  {
+    "name": "result-alert",
+    "assert": "document.body.innerText.includes('Synthetic test result ready')&&document.body.innerText.includes('Demo Second Patient')",
+    "description": "The ordering clinician is alerted in the bell when a result is ready"
+  },
+  {
+    "key": "Escape",
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Alab&task=vitals",
+    "name": "result-banner",
+    "assert": "document.body.innerText.includes('Synthetic test result ready')&&[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Review results')",
+    "description": "An open visit shows a banner when a result is ready"
+  },
+  {
+    "click": "Review results"
+  },
+  {
+    "click": "Review & sign result review"
+  },
+  {
+    "click": "Confirm & lock",
+    "assert": "!document.body.innerText.includes('Synthetic test result ready')&&![...document.querySelectorAll('button')].some(b=>(b.getAttribute('aria-label')||'').includes('unread'))",
+    "description": "The alert and banner end once the result is reviewed"
+  },
+  {
+    "path": "/laboratory?tab=completed",
+    "assert": "document.body.innerText.includes('Demo Second Patient')&&document.body.innerText.includes('Resulted')",
+    "description": "A resulted request moves to Completed requests"
+  },
+  {
+    "width": 320,
+    "path": "/laboratory",
+    "name": "laboratory-phone",
+    "assert": "document.documentElement.scrollWidth<=320",
+    "description": "Laboratory fits a 320px phone"
+  }
+]

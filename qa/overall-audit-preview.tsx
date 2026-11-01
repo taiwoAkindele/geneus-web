@@ -10,7 +10,7 @@ import { AppointmentsProvider } from '@/features/appointments';
 import { RegistersProvider } from '@/features/registers';
 import { RegistrationDraftProvider } from '@/features/registration';
 import { setDatabaseForTests } from '@/data/database';
-import { recordServerContact } from '@/data/deviceCredential';
+import { recordServerContact, saveDeviceCredential } from '@/data/deviceCredential';
 import { fakeDatabase } from '@/data/testing/fakeDatabase';
 import { toRow } from '@/data/rows';
 import { DevicesScreen } from '@/pages/facility-onboarding/DevicesScreen';
@@ -45,9 +45,12 @@ import { FeeScheduleScreen } from '@/pages/billing/FeeScheduleScreen';
 import { UnavailableScreen } from '@/app/UnavailableScreen';
 import { InpatientScreen } from '@/pages/inpatient/InpatientScreen';
 import { RequireCapability } from '@/app/RequireCapability';
-import { Location } from '@shared';
+import { Location, ServiceDefinition, ServiceOffering } from '@shared';
 import { InpatientEvent } from '@shared';
 import { DocumentsScreen } from '@/pages/documents/DocumentsScreen';
+import { InvestigationCatalogueScreen } from '@/pages/investigations/InvestigationCatalogueScreen';
+import { ClinicalPatientsScreen } from '@/pages/clinical-patients/ClinicalPatientsScreen';
+import { ServiceQueueScreen } from '@/pages/service-queue/ServiceQueueScreen';
 import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsAccess';
 import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
@@ -122,9 +125,24 @@ db.execute = async (sql, parameters = []) => {
   if(['library_documents','visit_documents'].includes(match[1]))(db.rows.ps_crud??=[]).push({id:record.id});
   if (!['encounter_drafts', 'register_builder_drafts'].includes(match[1])) window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
 };
+// The lab catalogue reads one page with COUNT/LIKE/LIMIT, which the fake cannot evaluate; answer it in JS.
+// The SQL itself is exercised against real SQLite in src/data/investigations.test.ts.
+const labDefinitions = (sql: string, parameters: unknown[]) => {
+  const [facilityId, like] = parameters as string[], needle = String(like).slice(1, -1).replace(/\\(.)/g, '$1').toLowerCase();
+  return (db.rows.service_definitions ?? []).filter((row) => row.facilityId === facilityId && row.category === 'laboratory' && Number(row.active) === 1 && row.investigation && [row.name, row.investigation].some((value) => String(value).toLowerCase().includes(needle)))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }) * (/\bDESC\b/.test(sql) ? -1 : 1));
+};
+const originalAll = db.getAll;
+db.getAll = async <T,>(sql: string, parameters: unknown[] = []) => {
+  if (/FROM service_definitions WHERE "facilityId" = \?/.test(sql)) { const [limit, offset] = parameters.slice(-2) as number[]; return labDefinitions(sql, parameters).slice(offset, offset + limit) as T[]; }
+  const within = /FROM (\w+) WHERE "?(\w+)"? IN \(/.exec(sql);
+  if (within) return (db.rows[within[1]] ?? []).filter((row) => parameters.includes(row[within[2]])) as T[];
+  return originalAll<T>(sql, parameters);
+};
 const originalOptional = db.getOptional;
 db.getOptional = async <T,>(sql: string, parameters: unknown[] = []) => {
   if (sql.includes('json_group_array')) return { records: JSON.stringify(db.rows[/FROM\s+(\w+)/i.exec(sql)?.[1] ?? ''] ?? []) } as T;
+  if (/COUNT\(\*\) AS total FROM service_definitions/.test(sql)) return { total: labDefinitions(sql, parameters).length } as T;
   return originalOptional<T>(sql, parameters);
 };
 db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
@@ -132,6 +150,45 @@ setDatabaseForTests(db);
 localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
 recordServerContact(now);
+/**
+ * Stands in for the server's catalogue routes (geneus-server/src/routes/investigations.ts,
+ * proven against PostgreSQL in tests/labCatalogue.test.ts): answers as the server does, filing
+ * tests under the Laboratory unit (unit:2), and inserts the rows sync would deliver. `offline` makes every catalogue request fail to connect.
+ */
+const STANDARD_SAMPLE = [
+  { key: 'fbc', name: 'Full blood count', specimen: 'Whole blood (EDTA)', classification: 'Haematology', aliases: ['FBC', 'CBC'], concept: { system: 'http://loinc.org', code: '58410-2', label: 'Full blood count' } },
+  { key: 'haemoglobin', name: 'Haemoglobin', specimen: 'Whole blood (EDTA)', classification: 'Haematology', aliases: ['Hb'], concept: { system: 'http://loinc.org', code: '718-7', label: 'Haemoglobin' } },
+  { key: 'widal', name: 'Widal test', specimen: 'Serum', classification: 'Microbiology', aliases: ['Widal'], concept: { system: 'urn:geneus:standard-test', code: 'widal', label: 'Widal test' } },
+];
+const catalogueKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+const catalogueTaken = () => new Set((db.rows.service_definitions ?? []).flatMap((row) => [String(row.name), ...(JSON.parse(String(row.investigation ?? '{}')).aliases ?? [])].map(catalogueKey)));
+const originalFetch = window.fetch.bind(window);
+Object.assign(window, { seedCatalogueScenario: async ({ offline = false } = {}) => {
+  db.rows.locations = [toRow('location', Location.parse({ ...envelope, schemaVersion: 5, id: 'location:lab', type: 'location', name: 'Laboratory', kind: 'room' }))];
+  db.rows.service_definitions = []; db.rows.service_offerings = [];
+  await saveDeviceCredential({ deviceId: envelope.deviceId, facilityId: envelope.facilityId, credential: 'qa-credential', syncEndpoint: 'https://sync.example.org' });
+  window.fetch = async (input, init) => {
+    const path = new URL(String(input), location.href).pathname;
+    if (!path.includes('/investigations/')) return originalFetch(input, init);
+    if (offline) throw new TypeError('Failed to fetch');
+    const body = JSON.parse(String(init?.body ?? '{}')), json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (path.endsWith('/standard-tests')) { const taken = catalogueTaken(); return json({ tests: STANDARD_SAMPLE.map(({ concept: _concept, ...test }) => ({ ...test, added: [test.name, ...test.aliases].some((n) => taken.has(catalogueKey(n))) })) }); }
+    const drafts = path.endsWith('/adopt') ? STANDARD_SAMPLE.filter((test) => body.keys.includes(test.key)) : body.tests;
+    const taken = catalogueTaken(), added: string[] = [], skipped: string[] = [];
+    for (const draft of drafts) {
+      const keys = [draft.name, ...draft.aliases].map(catalogueKey);
+      if (keys.some((key) => taken.has(key))) { skipped.push(draft.name); continue; }
+      keys.forEach((key) => taken.add(key)); added.push(draft.name);
+      const id = 'service_definition:' + crypto.randomUUID();
+      db.rows.service_definitions.push(toRow('service_definition', ServiceDefinition.parse({ ...envelope, schemaVersion: 5, id, type: 'service_definition', name: draft.name, category: 'laboratory', concept: draft.concept ?? { system: 'local', code: id, label: draft.name }, orderable: true, active: true, revision: 1, investigation: { specimen: draft.specimen, department: draft.classification, aliases: draft.aliases } })));
+      db.rows.service_offerings.push(toRow('service_offering', ServiceOffering.parse({ ...envelope, schemaVersion: 5, id: 'service_offering:' + crypto.randomUUID(), type: 'service_offering', serviceDefinitionId: id, unitId: 'unit:2', name: draft.name, locationIds: ['location:lab'], delivery: 'physical', requiredActions: ['perform_test', 'record_result'], intakePolicy: 'both', timeZone: 'Africa/Lagos', configuration: 'active', resourceReadiness: 'available', revision: 1 })));
+    }
+    window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
+    return json({ added, skipped });
+  };
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 Object.assign(window, { seedAdmissionScenario: () => {
   const source = entry('entry:admission-request', 'encounter:open', 'admission', { ward: 'Surgical team', note: 'Synthetic request for inpatient care.' });
   db.rows.encounter_entries.push(toRow('encounter_entry', source));
@@ -173,6 +230,10 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/workspace/:moduleId" element={<WorkspaceScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen /></ClinicalDocumentsAccess>} />
+  <Route path="/investigations/catalogue" element={<InvestigationCatalogueScreen />} />
+  <Route path="/clinical/patients" element={<ClinicalPatientsScreen />} />
+  <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
+  <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
   <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
   <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />

@@ -23,7 +23,8 @@ describe('visit list next actions', () => {
   it('matches the current task after earlier sections were skipped', () => {
     const diagnosis = entry('diagnosis', { diagnosis: 'Recorded diagnosis', prescription: [], giveInjection: false, admit: false });
     const summary = summariseEncounter(encounter, [diagnosis]);
-    expect(summary.nextAction).toBe('Follow-up');
+    // A visit begun in the retired order continues in the current one: treatment decisions follow the diagnosis.
+    expect(summary.nextAction).toBe('Prescription');
     expect(summary.hasSignedEntries).toBe(true);
   });
   it('shows the presenting complaint rather than a storage step name', () => {
@@ -149,7 +150,7 @@ describe('the encounter on screen', () => {
   it('marks sections passed over before a later save as skipped, without writing them', () => {
     const state = project([entry('vitals', { temperatureC: 37 }), entry('diagnosis', { diagnosis: 'Malaria' })]);
 
-    expect(state.skipped).toEqual(['complaint', 'lab_order', 'lab_results']);
+    expect(state.skipped).toEqual(['complaint', 'investigation_review']);
     expect(state.entries.lab_order).toBeUndefined();
   });
 

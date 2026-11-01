@@ -1,8 +1,8 @@
 import { PatientChartAccess } from '@/features/patients/PatientChartAccess';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { conflictingCorrections, type EncounterEntry } from '@shared';
-import { ActionMenu, Button, TextField, useToast } from '@/ui';
+import { conflictingCorrections, effectiveEncounterEntries, outstandingResults, type EncounterEntry } from '@shared';
+import { ActionMenu, Button, TextAreaField, TextField, useToast } from '@/ui';
 import { AuthorizationError } from '@/data';
 import { useAuthorizationContext, useSession } from '@/session';
 import { AmendSheet, isClosingStep, ReviewSaveSheet, STEP_DEFS, StepForm, stepsFor, summarize, useEncounter, type EncounterNavState, type StepKey } from '@/features/encounter';
@@ -56,12 +56,13 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
     heading.current?.focus({ preventScroll: true });
   }, [chosen?.key, ctl.loading]);
   useEffect(() => {
-    if (!ctl.loading && enc.closed && enc.id) {
+    // A closed visit opens on its record, unless arriving for work still allowed after closure (a late result, its review, dispensing).
+    if (!ctl.loading && enc.closed && enc.id && !(initialTask && ['lab_results', 'result_review', 'dispense', 'injection'].includes(initialTask))) {
       const next = new URLSearchParams(returnTo.startsWith('/patients/profile?') ? returnTo.split('?')[1] : { patient: patientId });
       next.set('tab', 'visits'); next.set('visit', enc.id); next.delete('panel'); next.delete('visitSection');
       navigate('/patients/profile?' + next, { replace: true });
     }
-  }, [ctl.loading, enc.closed, enc.id, navigate, patientId, returnTo]);
+  }, [ctl.loading, enc.closed, enc.id, navigate, patientId, returnTo, initialTask]);
 
   if (patient.loading || (ctl.loading && !enc.id)) return <p role="status" className="p-6">Opening the visit…</p>;
   if (patient.error || ctl.error) return <div role="alert" className="p-6"><p>{ctl.error?.message ?? 'The patient record could not be read.'}</p><Button variant="ghost" onClick={() => { patient.reload(); ctl.reload(); }}>Try again</Button><Button variant="outlined" onClick={() => navigate(returnTo)}>Back to patient / visits</Button></div>;
@@ -88,12 +89,21 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
       setError(cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.'); setReviewKey(undefined);
     } finally { busy.current = false; setSaving(false); }
   };
-  const skip = () => {
-    ctl.skip(chosen.key);
-    if (chosen.key === 'lab_order' && !enc.sig.lab_order) ctl.skip('lab_results');
-    setSelected(undefined); setError('');
-    requestAnimationFrame(() => heading.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  // Results the diagnosis is waiting for: tests without a result, and results not yet reviewed.
+  const outstanding = outstandingResults(effectiveEncounterEntries(ctl.rawEntries));
+  const resultsOutstanding = !enc.sig.diagnosis && !enc.closed && (outstanding.pending.length > 0 || outstanding.unreviewed.length > 0);
+  // Results that arrived and are not yet reviewed, named by test, for the banner at the top of the visit.
+  const readyTests = ctl.rawEntries.filter((entry) => outstanding.unreviewed.includes(entry.id)).flatMap((entry) => (entry.values.results as { test: string }[]).map((result) => result.test));
+  const continueWithoutResults = () => {
+    if (!enc.data.diagnosis.pendingResultsReason?.trim()) { setError('Record why you are continuing without the results'); return; }
+    ctl.skip('lab_results'); ctl.skip('result_review'); setError(''); setSelected('diagnosis');
   };
+  const pendingResultsPanel = resultsOutstanding && canRecord && ['lab_results', 'result_review', 'diagnosis'].includes(chosen.key) ? <section aria-label="Outstanding results" className="mb-5 space-y-3 rounded-field border border-amber-border bg-amber-bg p-4 text-sm">
+    <h3 className="font-bold">{outstanding.pending.length ? 'Waiting for laboratory results' : 'Results waiting for your review'}</h3>
+    {outstanding.pending.length ? <p>Not yet resulted: {outstanding.pending.join(', ')}. The laboratory enters results from its queue.</p> : <p>Review the results before the diagnosis.</p>}
+    <TextAreaField label="Reason for continuing without results" value={enc.data.diagnosis.pendingResultsReason ?? ''} placeholder="Example: Patient is unstable; treating on clinical grounds while culture is processed" onChange={(event) => ctl.setField('diagnosis', 'pendingResultsReason', event.target.value)} />
+    {chosen.key !== 'diagnosis' ? <Button variant="outlined" fullWidth={false} onClick={continueWithoutResults}>Continue to diagnosis without results</Button> : <p className="text-amber-text">The reason is signed with the diagnosis. Results that arrive later appear in Results ready for review.</p>}
+  </section> : null;
   const viewSaved = () => enc.id && navigate(patientChartPath(patientId, 'visits', { visit: enc.id }));
   return <div className="min-h-screen bg-white px-4 pb-8 pt-4 md:px-8">
     <button type="button" className="mb-4 min-h-[44px] font-bold text-brand" onClick={() => navigate(returnTo)}>{returnTo.startsWith('/patients/') ? 'Back to patient record' : 'Back to visits'}</button>
@@ -101,6 +111,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
     <div className="my-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold">Current visit</h2><p className="mt-1 text-sm text-ink-soft">{enc.id ? 'Opened ' + enc.openedDate : 'The visit starts when its first clinical entry is signed.'}</p></div>{enc.id && canRecord && !enc.closed ? <ActionMenu label="Additional entries" actions={[{ label: 'Record another observation', onSelect: () => setEntryEditor({ step: 'vitals' }) }, { label: 'Add progress note', onSelect: () => setEntryEditor({ step: 'complaint' }) }, ...(enc.data.disposition.kind === 'observation' ? [{ label: 'Record next disposition', onSelect: () => setEntryEditor({ step: 'disposition' }) }] : [])]} /> : null}</div>
     {awaitingPayment && canRecord ? <section className="mb-5 space-y-2 rounded-field border border-amber-border bg-amber-bg p-4"><h3 className="font-bold">See now — collect later</h3><p className="text-sm">Care can continue before payment. Record a reason; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" help={ENCOUNTER_FIELD_HELP.collectLater} value={collectLaterReason} onChange={(event) => setCollectLaterReason(event.target.value)} /></section> : null}
     {conflictingCorrections(ctl.rawEntries).length ? <p role="alert" className="mb-4 rounded-field bg-amber-bg p-4 text-sm text-amber-text">Competing corrections need reconciliation. Review signed entries and Sync &amp; device.</p> : null}
+    {readyTests.length && canRecord && chosen.key !== 'result_review' ? <section role="status" aria-label="Results ready" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-field border border-brand-tint bg-brand-wash p-4"><p className="font-bold text-brand">{readyTests.join(', ')} result{readyTests.length === 1 ? '' : 's'} ready</p><Button fullWidth={false} onClick={() => choose('result_review')}>Review results</Button></section> : null}
     {ctl.draftRestoredAt ? <p role="status" className="mb-4 rounded-field bg-amber-bg p-3 text-sm text-amber-text">Unsaved work restored from {new Date(ctl.draftRestoredAt).toLocaleString('en-GB')}. Review it before signing.</p> : null}
     <div className="grid items-start gap-6 lg:grid-cols-[210px_minmax(0,1fr)]">
       <nav aria-label="Visit tasks" className="flex gap-2 overflow-x-auto border-b border-outline-soft pb-3 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">{steps.map((step) => {
@@ -109,12 +120,12 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
       })}</nav>
       <section className="min-w-0" aria-label="Current task">
         <h2 ref={heading} tabIndex={-1} className="scroll-mt-20 text-2xl font-extrabold outline-none">{chosen.title}</h2><p className="mb-5 mt-1 text-sm text-ink-soft">{chosen.hint}</p>
+        {pendingResultsPanel}
         {locked ? <><dl className="space-y-4 text-sm">{summarize(enc.data, chosen.key).map((row) => <div key={row.label}><dt className="font-bold text-ink-soft">{row.label}</dt><dd className="mt-1 whitespace-pre-wrap">{row.value}</dd></div>)}</dl>{signature ? <p className="mt-5 border-t border-outline-soft pt-4 text-sm">Signed by {signature.actor} · {signature.role} · {signature.date} {signature.time}</p> : null}{enc.amend[chosen.key]?.map((amendment, index) => <p key={index} className="mt-3 whitespace-pre-wrap border-l-2 border-brand-tint pl-3 text-sm">{amendment.note} · {amendment.by} · {amendment.date} {amendment.time}</p>)}{canRecord ? <div className="mt-4 flex flex-wrap gap-2">{chosen.key === 'result_review' && ctl.rawEntries.some((e) => e.step === 'lab_results' && !ctl.rawEntries.some((r) => r.step === 'result_review' && (r.values.resultEntryIds as string[]).includes(e.id))) ? <Button variant="outlined" onClick={() => setEntryEditor({ step: 'result_review' })}>Review pending results</Button> : null}{chosen.key === 'lab_results' && enc.data.lab_order.tests.some((t, index) => !enc.data.lab_results[enc.data.lab_order.items?.[index]?.id ?? t]) ? <Button variant="outlined" onClick={() => setEntryEditor({ step: 'lab_results' })}>Record pending results</Button> : null}<Button variant="outlined" fullWidth={false} onClick={() => setAmendKey(chosen.key)}>Add amendment</Button>{['vitals', 'complaint', 'lab_results', 'diagnosis', 'prescription', 'injection_order', 'injection'].includes(chosen.key) ? <Button variant="outlined" fullWidth={false} onClick={() => setEntryEditor({ step: chosen.key, target: ctl.rawEntries.find((entry) => entry.id === enc.entries[chosen.key]?.id) })}>Correct recorded values</Button> : null}</div> : null}{current ? <Button className="mt-5" onClick={() => setSelected(undefined)}>Continue to {STEP_DEFS[current].short}</Button> : null}</> : editable ? <>
           <StepForm stepKey={chosen.key} ctl={ctl} />
           {error ? <p role="alert" className="mt-5 rounded-field border border-danger bg-danger-bg p-4 text-sm text-danger-strong">{error}</p> : null}
           <p className="mt-5 rounded-field bg-amber-bg p-3 text-sm text-amber-text">Draft on this device · not signed</p>
           <Button className="mt-4" disabled={saving || ctl.loading} onClick={chosen.key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered' ? () => { ctl.skip('investigation_review'); setSelected('lab_order'); } : review}>{chosen.key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered' ? 'Choose investigations' : chosen.key === 'disposition' && enc.data.disposition.kind === 'observation' ? 'Review & sign observation plan' : isClosingStep(chosen.key) ? 'Review & complete visit' : 'Review & sign ' + chosen.short.toLowerCase()}</Button>
-          {!isClosingStep(chosen.key) ? <><Button variant="ghost" disabled={saving} onClick={skip}>Skip for now</Button><p className="text-sm text-ink-soft">Skipped tasks are kept with your draft on this device. They are not signed findings. You can revisit them before closing the visit.</p></> : null}
         </> : <p className="text-sm text-ink-soft">{!canRecord ? 'You have view access. A clinician records this task.' : 'Continue the current task before recording this section.'}</p>}
       </section>
     </div>

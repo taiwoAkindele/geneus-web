@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AuthorizationContext, Staff } from '@shared';
+import { EncounterEntry, type AuthorizationContext, type Staff } from '@shared';
+import { toRow } from '../rows';
 import { authorizationFor, AuthorizationError, nobody } from '@/auth/authorization';
 import { recordServerContact } from '../deviceCredential';
 import { ContractError } from '../db';
@@ -167,18 +168,22 @@ describe('repositories', () => {
     });
 
     it('adds later steps to the same encounter, writing nothing else', async () => {
-      await saveStep({ encounterId: 'encounter:1', patientId, step: 'diagnosis', values: { diagnosis: 'Malaria' } }, contextFor('doctor'));
+      await saveStep({ encounterId: 'encounter:1', patientId, step: 'vitals', values: { pulseBpm: 88 } }, contextFor('doctor'));
 
       expect(tables()).toEqual(['encounter_entries']);
     });
 
-    it('books the follow-up in the same save that closes the encounter', async () => {
+    it('books the follow-up in the same save as the disposition that closes the encounter', async () => {
+      // The visit so far, in order: the disposition is the last decision.
+      db.rows.encounter_entries = ([['vitals', { pulseBpm: 88 }], ['complaint', { complaints: ['Fever'] }], ['investigation_review', { decision: 'none_required' }], ['diagnosis', { diagnosis: 'Malaria' }], ['prescription', { decision: 'none_required', prescription: [] }], ['injection_order', { required: false }]] as const)
+        .map(([step, values], index) => toRow('encounter_entry', EncounterEntry.parse({ id: `entry:${index}`, type: 'encounter_entry', workflowVersion: 1, facilityId: existingPatient.facilityId, deviceId: 'device:test', createdBy: 'staff:doctor', createdOn: `2026-10-02T09:0${index}:00.000Z`, schemaVersion: 4, encounterId: 'encounter:1', patientId, actorRole: 'doctor', step, values })));
       const entry = await saveStep(
         {
           encounterId: 'encounter:1',
           patientId,
-          step: 'follow_up',
-          values: { followUpOn: '2026-10-09' },
+          step: 'disposition',
+          values: { kind: 'home_care', note: 'Return if fever persists', followUpOn: '2026-10-09' },
+          workflowVersion: 1,
           followUp: { reason: 'Malaria review', scheduledFor: '2026-10-09T08:00:00.000Z' },
         },
         contextFor('doctor'),

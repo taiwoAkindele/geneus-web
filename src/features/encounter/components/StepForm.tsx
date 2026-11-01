@@ -3,7 +3,7 @@ import { zonedInput, zonedInstant } from '@/lib/workforceTime';
 import { InvestigationPicker } from './InvestigationPicker';
 import { Button, ChoiceChip, FieldLabel, Icon, SelectField, SelectOrTextField, TextAreaField, TextField } from '@/ui';
 import { ENCOUNTER_FIELD_HELP as H, PRESCRIPTION_DURATIONS, PRESCRIPTION_FREQUENCIES, PRESCRIPTION_ROUTES } from '../fieldHelp';
-import { followUpOptions, INJECTION_ROUTES, WARD_OPTIONS } from '../steps';
+import { INJECTION_ROUTES } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 export type StepFormController = Pick<EncounterController, 'setField' | 'toggleIn' | 'setResult' | 'addRx' | 'setRx' | 'removeRx' | 'setDispenseReason' | 'toggleDispense'> & { enc: Pick<EncounterController['enc'], 'data'> };
@@ -14,7 +14,7 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
   const { facility } = useDeviceContext();
   const zone = facility?.timeZone ?? 'Africa/Lagos';
   const d = enc.data;
-  const rx = d.workflowVersion === 1 ? d.prescription.rx : d.diagnosis.rx;
+  const rx = d.prescription.rx.length ? d.prescription.rx : d.diagnosis.rx;
 
   if (stepKey === 'vitals') {
     return (
@@ -142,31 +142,6 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
     );
   }
 
-  if (stepKey === 'admission') {
-    return (
-      <>
-        <FieldLabel label="Ward" help={H.ward} />
-        <div className="mb-4 flex flex-wrap gap-2">
-          {WARD_OPTIONS.map((w) => (
-            <ChoiceChip key={w} selected={d.admission.ward === w} onClick={() => setField('admission', 'ward', w)}>
-              {w}
-            </ChoiceChip>
-          ))}
-        </div>
-        <TextField label="Bed" help={H.bed} name="ad_bed" value={d.admission.bed} onChange={(e) => setField('admission', 'bed', e.target.value)} />
-        <div className="mt-4"><FieldLabel label="Admitting diagnosis" help={H.admittingDiagnosis} /></div>
-        <div className="rounded-field bg-surface-muted px-3.5 py-3 text-[15px] font-semibold text-ink">{d.diagnosis.dx || '—'}</div>
-        <div className="mt-4"><TextAreaField label="Admitting note" name="admission_note" help={H.admissionNote}
-          value={d.admission.note} placeholder={`Example: ${H.admissionNote.example}`}
-          onChange={(event) => setField('admission', 'note', event.target.value)} /></div>
-        <div className="mt-4 rounded-card border border-slate-bg bg-slate-bg p-3.5 text-[13px] leading-relaxed text-slate-text">
-          Saving this step <b>admits the patient</b> and locks the encounter as an inpatient episode — no follow-up is
-          booked. The patient shows as admitted on their profile.
-        </div>
-      </>
-    );
-  }
-
   if (stepKey === 'dispense') {
     return (
       <>
@@ -208,23 +183,6 @@ export const StepForm = ({ stepKey, ctl, correcting = false }: { stepKey: StepKe
     );
   }
 
-  // follow_up
-  return (
-    <>
-      <FieldLabel label="Book a follow-up" help={H.followUp} />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {followUpOptions().map((o) => (
-          <ChoiceChip key={o.label} selected={d.follow_up.when === o.value} onClick={() => setField('follow_up', 'when', o.value)}>
-            {o.label}
-          </ChoiceChip>
-        ))}
-      </div>
-      <TextField label="Other review date" help={H.reviewDate} type="date" name="follow_up_date" value={d.follow_up.when} onChange={(e) => setField('follow_up', 'when', e.target.value)} />
-      <TextField label="Reason for review" help={H.reviewReason} name="fu_reason" value={d.follow_up.reason} onChange={(e) => setField('follow_up', 'reason', e.target.value)} />
-      <div className="mt-4 rounded-card border border-amber-border bg-amber-bg p-3.5 text-[13px] leading-relaxed text-amber-text">
-        Saving this step <b>closes the encounter</b> — every section becomes permanent. A follow-up is added to the
-        appointments list for the chosen day.
-      </div>
-    </>
-  );
+  // Admission and follow-up belong to the retired visit order; old visits only display them.
+  return null;
 };

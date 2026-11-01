@@ -67,8 +67,9 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
             ...(text(line.route ?? '') ? { route: line.route!.trim() } : {}),
             ...(text(line.quantity ?? '') ? { quantity: measured(line.quantity!) } : {}),
           })),
-        giveInjection: data.workflowVersion === 1 ? false : data.diagnosis.injection,
-        admit: data.workflowVersion === 1 ? false : data.diagnosis.admit,
+        giveInjection: false,
+        admit: false,
+        ...(text(data.diagnosis.pendingResultsReason ?? '') ? { pendingResultsReason: data.diagnosis.pendingResultsReason!.trim() } : {}),
       };
     case 'injection':
       return {
@@ -80,7 +81,7 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
       };
     case 'dispense':
       return {
-        lines: (data.workflowVersion === 1 && data.prescription.rx.length ? data.prescription.rx : data.diagnosis.rx).map((line, index) => ({
+        lines: (data.prescription.rx.length ? data.prescription.rx : data.diagnosis.rx).map((line, index) => ({
           drug: line.name,
           dispensed: Boolean(data.dispense.done[index]),
           reason: data.dispense.done[index] ? undefined : text(data.dispense.reasons[index] ?? ''),
@@ -166,6 +167,7 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
           ...(v.diagnoses?.length ? { code: v.diagnoses[0].code, codingSystem: v.diagnoses[0].codingSystem, certainty: v.diagnoses[0].certainty, diagnoses: v.diagnoses.slice(1) } : {}),
           injection: v.giveInjection,
           admit: v.admit,
+          ...(v.pendingResultsReason ? { pendingResultsReason: v.pendingResultsReason } : {}),
         },
       };
     }

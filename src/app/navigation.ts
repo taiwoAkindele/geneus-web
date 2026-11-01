@@ -1,6 +1,9 @@
 import type { AuthorizationContext } from '@shared';
 import type { IconName } from '@/ui';
 
+/** Handoffs & unit queue is hidden until a facility needs it; /units still opens by address. */
+export const UNIT_QUEUE_VISIBLE = false;
+
 export type NavItem = { key: string; label: string; to: string; match: string; icon: IconName; bottom?: boolean; group?: 'Daily work' | 'Money' | 'Facility' };
 type NavContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
@@ -29,7 +32,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
     { key: 'encounters', label: 'Visits', to: '/encounters', match: '/encounters', icon: 'encounter', bottom: clinicalShortcut, group: 'Daily work' },
     { key: 'appointments', label: 'Appointments', to: '/appointments', match: '/appointments', icon: 'clock', bottom: frontDesk, group: 'Daily work' },
     { key: 'registers', label: 'Registers', to: '/registers', match: '/registers', icon: 'registers', group: 'Daily work' },
-    ...(clinical || admin || context.permissions.includes('handoff:update') ? [{ key: 'units', label: 'Unit queue', to: '/units', match: '/units', icon: 'clock' as const, group: 'Daily work' as const }] : []),
+    ...(UNIT_QUEUE_VISIBLE && (clinical || admin || context.permissions.includes('handoff:update')) ? [{ key: 'units', label: 'Unit queue', to: '/units', match: '/units', icon: 'clock' as const, group: 'Daily work' as const }] : []),
   );
   if (dailyWork) items.push(
     { key: 'stock', label: 'Medicine & stock', to: '/stock', match: '/stock', icon: 'stock', group: 'Facility' },
