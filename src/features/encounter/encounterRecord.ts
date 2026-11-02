@@ -72,7 +72,8 @@ export const projectEncounter = ({ patientId, encounter, entries, draft, skipped
     if (entry.step !== 'amendment') saved[entry.step] = entry;
   }
 
-  let data: EncounterData = { ...draft, workflowVersion: (encounter?.workflowVersion === 1 || entries.some((e) => e.workflowVersion === 1) || entries.some((e) => ['investigation_review', 'result_review', 'prescription', 'injection_order', 'disposition'].includes(e.step)) || !saved.diagnosis ? 1 : undefined) as 1 | undefined };
+  // Every visit continues in the current order, including one begun in the retired order.
+  let data: EncounterData = { ...draft, workflowVersion: 1 };
   for (const entry of effectiveEncounterEntries(byTime)) {
     if (entry.step !== 'amendment') data = fromStepValues(entry.step, entry.values, data);
   }

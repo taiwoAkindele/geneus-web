@@ -56,8 +56,10 @@ describe('module workspaces', () => {
     const available = workspacesFor(context('facility_admin'));
     const clinical = available.find((workspace) => workspace.id === 'clinical')!;
     const finance = available.find((workspace) => workspace.id === 'finance')!;
-    expect(activeWorkspaceLink(clinical, '/encounters', '?queue=lab')).toBe('laboratory');
-    expect(activeWorkspaceLink(clinical, '/encounters', '?queue=pharmacy')).toBe('pharmacy');
+    expect(activeWorkspaceLink(clinical, '/laboratory', '?tab=completed')).toBe('laboratory');
+    expect(activeWorkspaceLink(clinical, '/pharmacy', '')).toBe('pharmacy');
+    expect(activeWorkspaceLink(clinical, '/clinical/patients', '?q=amaka')).toBe('clinical-patients');
+    expect(clinical.links.map((link) => link.key)).toEqual(['clinical-patients', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'documents']);
     expect(activeWorkspaceLink(finance, '/billing', '?tab=transfers')).toBe('transfers');
     expect(activeWorkspaceLink(finance, '/billing/fees', '')).toBe('fees');
   });

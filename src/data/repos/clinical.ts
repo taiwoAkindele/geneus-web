@@ -1,6 +1,6 @@
 import { CLINICAL_VALUES, currentClinicalEvents, canReadPatientChart, type AuthorizationContext, type ClinicalEvent, type ClinicalKind, type Encounter } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
-import { allWhere, envelope, findRecord, insertRecord, newId } from '../db';
+import { allOfType, allWhere, envelope, findRecord, insertRecord, newId } from '../db';
 import { patientIdentityIds } from './patientIdentity';
 import { encountersForPatient, entriesForEncounter } from './encounters';
 import { listStaff } from './staff';
@@ -9,6 +9,8 @@ import { activeWorkspace } from '../facilityWorkspaces';
 
 export const clinicalEventsForPatient = (patientId: string) => allWhere<ClinicalEvent>('clinical_event', 'patientId', patientId);
 export const listAllergyEvents = () => allWhere<ClinicalEvent>('clinical_event', 'kind', 'allergy');
+/** Callers must check medical-history access first; this reads every patient's clinical record. */
+export const listClinicalEvents = () => allOfType<ClinicalEvent>('clinical_event');
 
 export const patientClinicalRecord = async (patientId: string, context:AuthorizationContext) => {
   if(!canReadPatientChart(context))throw new Error('Permission to view medical history is required');

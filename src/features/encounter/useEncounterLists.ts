@@ -3,6 +3,7 @@ import { useLiveQuery, type LiveQuery } from '@/data';
 import { encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters, listEncounterEntries } from '@/data/repos/encounters';
 import { summariseEncounter, type EncounterSummary } from './encounterSummary';
 import { QUEUE_STEPS, stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
+import { REQUEST_STEPS, requestQueues } from './requestQueues';
 import { patientIdentityIds } from '@/data/repos/patientIdentity';
 
 const newestFirst = (a: EncounterSummary, b: EncounterSummary) => b.openedOn.localeCompare(a.openedOn);
@@ -38,3 +39,6 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
 /** The lab, results-ready and pharmacy queues, kept current as steps are saved on any device. */
 export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient[]>> =>
   useLiveQuery(useCallback(async () => stationQueues(await entriesAtSteps(QUEUE_STEPS)), []));
+
+/** Laboratory and pharmacy requests, open and completed, kept current as steps are saved on any device. */
+export const useRequestQueues = () => useLiveQuery(useCallback(async () => requestQueues(await entriesAtSteps(REQUEST_STEPS)), []));

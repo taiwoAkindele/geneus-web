@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuthorizationContext, DocType, Staff } from '@shared';
+import type { AuthorizationContext, DocType, EncounterEntry, Staff } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { fieldKindsFor } from './contractShape';
 import { insertRecord, envelope, newId } from './db';
@@ -96,7 +96,7 @@ describe('the write path against a real SQLite', () => {
       expect(first.patientId).not.toBe(second.patientId);
       expect(first.fullName).not.toBe(second.fullName);
       expect(first.sex).toBeUndefined(); expect(first.ageYears).toBeUndefined(); expect(first.address).toBeUndefined();
-      const entry = await saveStep({ patientId: first.patientId, step: 'complaint', values: { complaints: ['Synthetic presenting concern'] } }, context);
+      const entry = await saveStep({ patientId: first.patientId, step: 'vitals', values: { pulseBpm: 96 } }, context);
       const resolved = await updatePatient(first.patientId, toPatientDetails({ ...fromPatient(first), identityStatus: 'identified', fullName: 'Synthetic Identified Patient', sex: 'F', age: '30', address: 'Synthetic address', identificationNote: 'Representative supplied identity information' }), context);
       expect(resolved.patientId).toBe(first.patientId);
       expect(resolved.provisionalReason).toBe(unknown.provisionalReason);
@@ -586,11 +586,17 @@ describe('the write path against a real SQLite', () => {
       expect(await entriesForEncounter(original.encounterId)).toHaveLength(3);
       expect(correction.values.correctedValues).toEqual({ temperatureC: 37 });
       await expect(amendEntry(original, 'Stale correction', contextFor('nurse'), { temperatureC: 36 }, null)).rejects.toThrow(/corrected while/);
-      await saveStep({ patientId, encounterId: original.encounterId, step: 'follow_up', values: {} }, contextFor('doctor'));
+      // The visit closes only by a disposition, after every earlier decision in order.
+      await expect(saveStep({ patientId, encounterId: original.encounterId, step: 'follow_up', values: {} }, contextFor('doctor'))).rejects.toThrow(/explicit disposition/);
+      for (const [step, values] of [['complaint', { complaints: ['Fever'] }], ['investigation_review', { decision: 'none_required' }], ['diagnosis', { diagnosis: 'Viral fever' }], ['prescription', { decision: 'none_required', prescription: [] }], ['injection_order', { required: false }], ['disposition', { kind: 'home_care', note: 'Fluids and rest' }]] as const)
+        await saveStep({ patientId, encounterId: original.encounterId, step, values, workflowVersion: 1 }, contextFor('doctor'));
       await expect(saveStep({ patientId, encounterId: repeat.encounterId, step: 'vitals', values: { temperatureC: 36 } }, contextFor('nurse'))).rejects.toThrow(/closed/);
     });
     it('protects dispositions and the current dispensed prescription before an offline correction is written', async () => {
-      const original = await saveStep({ patientId, step: 'diagnosis', values: { diagnosis: 'Initial', prescription: [{ drug: 'Original medicine', dose: '1 tablet' }] } }, contextFor('doctor'));
+      // A visit recorded in the retired order, already on the device: its diagnosis carries the prescription.
+      const doctor = contextFor('doctor'), encounterId = newId('encounter');
+      await insertRecord(doctor, 'encounter:record', 'encounter', { ...envelope(doctor), id: encounterId, type: 'encounter', patientId, openedOn: envelope(doctor).createdOn });
+      const original = await insertRecord<EncounterEntry>(doctor, 'encounter:record', 'encounter_entry', { ...envelope(doctor), id: newId('encounter_entry'), type: 'encounter_entry', encounterId, patientId, actorRole: 'doctor', step: 'diagnosis', values: { diagnosis: 'Initial', prescription: [{ drug: 'Original medicine', dose: '1 tablet' }] } });
       const correctedPrescription = { diagnosis: 'Reviewed', prescription: [{ drug: 'Reviewed medicine', dose: '1 tablet' }] };
       const revision = await amendEntry(original, 'Reviewed before dispensing', contextFor('doctor'), correctedPrescription, null);
       await saveStep({ patientId, encounterId: original.encounterId, step: 'dispense', values: { lines: [{ drug: 'Reviewed medicine', dispensed: true }] } }, contextFor('nurse'));

@@ -126,6 +126,8 @@ const SyncCenterScreen = lazy(() =>
 const EncountersScreen = lazy(() =>
   import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
 );
+const ServiceQueueScreen = lazy(() => import('@/pages/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
+const ClinicalPatientsScreen = lazy(() => import('@/pages/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
 const InpatientScreen = lazy(() => import('@/pages/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const DocumentsScreen = lazy(()=>import('@/pages/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
 const PatientProfileScreen = lazy(() =>
@@ -193,6 +195,9 @@ const App = () => {
             <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
             <Route path="/encounters" element={<EncountersScreen />} />
+            <Route path="/clinical/patients" element={<ClinicalPatientsScreen />} />
+            <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
+            <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
             <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
             <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen/></ClinicalDocumentsAccess>}/>
             <Route path="/encounters/record" element={<EncounterScreen />} />

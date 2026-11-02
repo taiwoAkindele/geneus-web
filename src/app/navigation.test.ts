@@ -17,12 +17,13 @@ describe('role workspaces', () => {
   it('keeps clinical and configuration work out of the cashier navigation', () => {
     expect(keys('cashier')).toEqual(['home', 'patients', 'billing']);
   });
-  it('prioritizes appointments for records staff and visits for clinicians, with unit work still reachable', () => {
+  it('prioritizes appointments for records staff and visits for clinicians, with the unit queue hidden', () => {
     const records = navigationFor({ role: 'records_officer', permissions: [...permissionsFor('records_officer', 'read_write')] });
     expect(records.find((item) => item.key === 'appointments')?.bottom).toBe(true);
     const nurse = navigationFor({ role: 'nurse', permissions: [...permissionsFor('nurse', 'read_write')] });
     expect(nurse.find((item) => item.key === 'encounters')?.bottom).toBe(true);
-    expect(nurse.find((item) => item.key === 'units')?.to).toBe('/units');
+    // Handoffs & unit queue is hidden until a facility needs it.
+    expect(nurse.find((item) => item.key === 'units')).toBeUndefined();
     expect(keys('nurse')).not.toContain('admin');
     expect(keys('facility_admin')).toContain('admin');
   });
@@ -30,7 +31,7 @@ describe('role workspaces', () => {
     const roles: Role[] = ['doctor', 'facility_admin'];
     const items = navigationFor({ role: 'doctor', roles, permissions: staffPermissions({ role: 'doctor', additionalRoles: ['facility_admin'], permission: 'read_write' }) });
     expect(items.filter((item) => item.bottom).map((item) => item.key)).toEqual(['home', 'patients', 'encounters']);
-    expect(items.map((item) => item.key)).toEqual(expect.arrayContaining(['billing', 'units', 'admin', 'staff']));
+    expect(items.map((item) => item.key)).toEqual(expect.arrayContaining(['billing', 'admin', 'staff']));
     expect(activeNavigationKey(items, '/admin/staff/access')).toBe('staff');
   });
   it('preserves reception and cashier shortcuts when administrator access is added', () => {

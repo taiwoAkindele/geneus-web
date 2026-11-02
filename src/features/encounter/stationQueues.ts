@@ -48,7 +48,7 @@ export const stationQueues = (entries: readonly EncounterEntry[]): Record<Statio
       if (pending.length) queues.lab.push({ encounterId, patientId, waitingSince: order.createdOn, detail: pending.join(', ') });
     }
     const reviewedIds = new Set(saved.filter((e) => e.step === 'result_review').flatMap((e) => e.values.resultEntryIds as string[]));
-    if (results && (saved.some((e) => e.workflowVersion === 1) ? saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id)) : !diagnosis)) {
+    if (results && saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id))) {
       queues.results.push({ encounterId, patientId, waitingSince: results.createdOn, detail: 'Lab results are back' });
     }
     const medication = firstAt(saved, 'prescription');

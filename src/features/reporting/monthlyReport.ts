@@ -1,4 +1,4 @@
-import { effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
 import { calendarDate } from '@/lib/calendarDate';
 
 export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[] };
@@ -11,7 +11,8 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
   const visits = encounters.filter((encounter) => inMonth(encounter.openedOn, month));
   const ids = new Set(visits.map((encounter) => encounter.id));
   const entries = effectiveEncounterEntries(data.entries).filter((entry) => ids.has(entry.encounterId));
-  const closed = new Set(entries.filter((entry) => entry.step === 'follow_up' || entry.step === 'admission').map((entry) => entry.encounterId));
+  // Closed by a disposition (other than observation), or by the retired follow-up and admission steps.
+  const closed = new Set(entries.filter(closesEncounter).map((entry) => entry.encounterId));
   const diagnoses = new Map<string, { label: string; visits: Set<string> }>();
   for (const entry of entries.filter((entry) => entry.step === 'diagnosis')) {
     const label = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values).diagnosis.trim();

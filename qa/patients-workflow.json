@@ -6,7 +6,7 @@
   },
   {
     "name": "front-desk-patients",
-    "assert": "document.body.innerText.includes('Last visit date')&&document.body.innerText.includes('Never Visited Patient')&&!document.body.innerText.includes('Reason / diagnosis')",
+    "assert": "document.body.innerText.includes('Created at')&&document.body.innerText.includes('Never Visited Patient')&&!document.body.innerText.includes('Reason / diagnosis')&&!document.body.innerText.includes('Last visit date')",
     "description": "Front desk sees a complete operational patient directory without clinical findings"
   },
   {
@@ -69,8 +69,8 @@
   },
   {
     "name": "clinical-patients",
-    "assert": "document.body.innerText.includes('Reason / diagnosis')&&[...document.querySelectorAll('nav a')].filter(node=>node.getClientRects().length&&node.textContent.trim()==='Patients').length>=1&&!document.body.innerText.includes('Consultation & nursing')",
-    "description": "Clinical has a single Patients entry and permitted clinical context"
+    "assert": "document.body.innerText.includes('Created at')&&!document.body.innerText.includes('Reason / diagnosis')&&!document.body.innerText.includes('Next action')&&[...document.querySelectorAll('nav a')].filter(node=>node.getClientRects().length&&node.textContent.trim()==='Patients').length>=1&&!document.body.innerText.includes('Consultation & nursing')",
+    "description": "Clinical has a single Patients entry with the same front-desk table"
   },
   {
     "click": "Amaka Okoro"

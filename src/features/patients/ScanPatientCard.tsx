@@ -23,7 +23,7 @@ export const ScanPatientCard = ({ onRead }: { onRead: (id: string) => void }) =>
     } catch { setMessage('The card could not be scanned. Try another photo or enter its full ID.'); }
     finally { image?.close(); setBusy(false); }
   };
-  if (!(globalThis as unknown as { BarcodeDetector?: BarcodeConstructor }).BarcodeDetector) return <p className="text-xs text-ink-muted">To use a patient card, enter its full Patient ID. Camera scanning is unavailable in this browser.</p>;
+  if (!(globalThis as unknown as { BarcodeDetector?: BarcodeConstructor }).BarcodeDetector) return null;
   return <div className="space-y-2">
     <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-field border border-outline bg-white px-4 text-sm font-bold">{busy ? 'Reading card…' : 'Scan patient card'}<input aria-label="Scan patient card" type="file" accept="image/*" capture="environment" disabled={busy} className="sr-only" onChange={(event) => { void scan(event.target.files?.[0]); event.target.value = ''; }} /></label>
     {message ? <p role="status" className="text-sm text-ink-muted">{message}</p> : null}

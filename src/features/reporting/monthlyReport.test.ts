@@ -17,6 +17,14 @@ describe('monthly operational reporting', () => {
     expect(report.trends[report.trends.length - 1]).toEqual({ month: '2026-10', visits: 1 });
     expect(monthlyReport(data, '2026-09').visits).toBe(0);
   });
+  it('counts a visit closed by its disposition as completed, but not one still under observation', () => {
+    const data = empty();
+    const visit = (id: string) => Encounter.parse({ ...base, type: 'encounter', id, patientId, openedOn: base.createdOn, workflowVersion: 1 });
+    data.encounters = [visit('encounter:home'), visit('encounter:observed')];
+    const disposition = (encounterId: string, values: Record<string, unknown>) => EncounterEntry.parse({ ...base, type: 'encounter_entry', id: 'entry:' + encounterId, patientId, encounterId, step: 'disposition', actorRole: 'doctor', workflowVersion: 1, values });
+    data.entries = [disposition('encounter:home', { kind: 'home_care', note: 'Fluids and rest' }), disposition('encounter:observed', { kind: 'observation', note: 'Reassess', responsibleService: 'Observation unit', reassessOn: '2026-10-26T14:00:00Z' })];
+    expect(monthlyReport(data, '2026-10')).toMatchObject({ visits: 2, completed: 1, inProgress: 1 });
+  });
   it('calculates commodity balances by movement date and excludes later movements', () => {
     const data = empty();
     data.items = [StockItem.parse({ ...base, createdOn: '2026-08-01T10:00:00Z', type: 'stock_item', id: 'stock:one', name: 'Gloves', quantityOnHand: 10, unitOfMeasure: 'boxes' })];

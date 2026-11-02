@@ -64,7 +64,7 @@ export const EntryEditorSheet = ({ patientId, encounterId, step, entries, target
     busy.current = true; setSaving(true); setError('');
     try {
       if (target) await amendEntry(target, note, context, toStepValues(step, data), previousCorrectionId);
-      else await saveStep({ patientId, encounterId, step, workflowVersion: entries.some((e) => e.workflowVersion === 1) ? 1 : undefined, values: toStepValues(step, data) }, context);
+      else await saveStep({ patientId, encounterId, step, workflowVersion: 1, values: toStepValues(step, data) }, context);
       toast(target ? 'Correction saved; the original remains in the history' : 'Additional entry saved'); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the entry'); }
     finally { busy.current = false; setSaving(false); }

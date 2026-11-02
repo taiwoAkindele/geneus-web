@@ -21,54 +21,31 @@ export const STEP_DEFS: Record<StepKey, StepDef> = {
   follow_up: { key: 'follow_up', title: 'Follow-up & close encounter', hint: 'Book a review, then lock the encounter', short: 'Follow-up' },
 };
 
-const HEAD_KEYS: StepKey[] = ['vitals', 'complaint', 'lab_order', 'lab_results', 'diagnosis'];
+/** Saving a disposition (other than observation) closes the encounter, so it can never be skipped. */
+export const isClosingStep = (key: StepKey): boolean => key === 'disposition';
 
-/** Saving one of these closes the encounter, so it can never be skipped. */
-export const isClosingStep = (key: StepKey): boolean => key === 'admission' || key === 'follow_up' || key === 'disposition';
+/** Steps recorded by laboratory staff from the laboratory queue, not by the consulting clinician. */
+export const LAB_STEPS: readonly StepKey[] = ['lab_results'];
 
 /**
- * The ordered sections for one encounter. The head is fixed; the tail grows from
- * the doctor's plan at diagnosis (PRD §9.8): an injection step if ordered, a
- * pharmacy step if anything was prescribed, and either an admission step (locks
- * the encounter as inpatient) or a follow-up step (closes with a review booked).
+ * The one order every visit follows (enforced again by careEntryIssues on the device
+ * and the server): vitals and complaint, the testing decision and any order, the
+ * results and their review, then the diagnosis made with them, the treatment
+ * decisions and the disposition. Dispensing and injections given are recorded
+ * afterwards by pharmacy and nursing. Visits recorded in the retired order are only
+ * displayed, never continued in it.
  */
 export const stepsFor = (data: EncounterData): StepDef[] => {
-  if (data.workflowVersion === 1) {
-    const keys: StepKey[] = ['vitals', 'complaint', 'diagnosis', 'investigation_review'];
-    if (data.investigation_review.decision === 'ordered') keys.push('lab_order');
-    keys.push('prescription', 'injection_order', 'disposition');
-    if (data.lab_order.tests.length) keys.push('lab_results', 'result_review');
-    if (data.prescription.rx.length) keys.push('dispense');
-    if (data.injection_order.required) keys.push('injection');
-    return keys.map((key) => STEP_DEFS[key]);
-  }
-  const tail: StepKey[] = [];
-  if (data.diagnosis.injection) tail.push('injection');
-  if (data.diagnosis.rx.length > 0) tail.push('dispense');
-  if (data.diagnosis.admit) tail.push('admission');
-  else tail.push('follow_up');
-  return [...HEAD_KEYS, ...tail].map((k) => STEP_DEFS[k]);
+  const keys: StepKey[] = ['vitals', 'complaint', 'investigation_review'];
+  if (data.investigation_review.decision === 'ordered' || data.lab_order.tests.length) keys.push('lab_order');
+  if (data.lab_order.tests.length) keys.push('lab_results', 'result_review');
+  keys.push('diagnosis', 'prescription', 'injection_order', 'disposition');
+  if (data.prescription.rx.length || data.diagnosis.rx.length) keys.push('dispense');
+  if (data.injection_order.required) keys.push('injection');
+  return keys.map((key) => STEP_DEFS[key]);
 };
 
-export const TEST_OPTIONS = ['Malaria RDT', 'FBC', 'Widal', 'Blood glucose', 'Urinalysis'];
 export const INJECTION_ROUTES = ['IM', 'IV', 'SC', 'ID'];
-export const WARD_OPTIONS = ['General ward', 'Maternity', 'Paediatric', 'Observation'];
-
-const FOLLOW_UP_AFTER_DAYS = [
-  { days: 3, label: '3 days' },
-  { days: 7, label: '1 week' },
-  { days: 14, label: '2 weeks' },
-];
-
-/** Review dates counted from today; blank means the patient goes home with no review. */
-export const followUpOptions = (today = new Date()): { value: string; label: string }[] => [
-  ...FOLLOW_UP_AFTER_DAYS.map(({ days, label }) => {
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + days);
-    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    return { value, label: `${label} · ${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` };
-  }),
-  { value: '', label: 'No follow-up' },
-];
 
 export const AUDIT_LABEL: Record<StepKey, string> = {
   result_review: 'Laboratory results reviewed',

@@ -32,13 +32,13 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
     { id: 'clinical', label: 'Clinical', description: 'Consultation, laboratory and pharmacy', icon: 'encounter', links: [
+      // In order of use. Results reach the visit and alert the ordering clinician, so there is no results page;
+      // Handoffs & unit queue (/units) stays reachable by address but is hidden until a facility needs it.
+      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Patients', 'Find a patient and open their chart.', '/clinical/patients', 'patients')] : []),
       ...(has(context, 'admission:manage') ? [link('admissions', 'Wards & admissions', 'Receive requests, allocate beds and manage inpatient stays.', '/admissions', 'patients')] : []),
-      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [link('clinical-patients', 'Patients', 'View patient details, admissions and permitted medical history.', '/patients/search', 'patients')] : []),
-      ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open the laboratory queue and record results.', '/encounters?queue=lab', 'laboratory')] : []),
-      ...(keys.has('encounters') && consultation ? [link('results', 'Results ready', 'Review visits with laboratory results ready.', '/encounters?queue=results', 'registers')] : []),
-      ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open prescriptions waiting for dispensing.', '/encounters?queue=pharmacy', 'pharmacy')] : []),
+      ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open and completed test requests.', '/laboratory', 'laboratory')] : []),
+      ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open and completed prescriptions.', '/pharmacy', 'pharmacy')] : []),
       ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
-      ...(keys.has('units') ? [link('handoffs', 'Handoffs & unit queue', 'Review incoming work and the next step of care.', '/units', 'referrals')] : []),
       ...(clinicalDocumentAccess(context)?[link('documents','Documents','Manage hospital files and review visit documents.','/documents','registers')]:[]),
     ] },
     { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: keys.has('billing') ? [
@@ -78,7 +78,7 @@ export const workspaceForLocation = (pathname: string, search: string, available
   if (pathname.startsWith('/referrals')) return find('clinical');
   if (pathname.startsWith('/investigations')) return find('operations');
   if (pathname.startsWith('/organization')) return find('administration');
-  if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
+  if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/clinical/') || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');
   if (pathname.startsWith('/stock')) return find('inventory');
