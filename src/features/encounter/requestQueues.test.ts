@@ -43,4 +43,12 @@ describe('result alerts', () => {
     const review = entry('encounter:5', 'result_review', { resultEntryIds: [result.id] }, 'staff:ordering');
     expect(resultAlerts([order, result, review], 'staff:ordering')).toEqual([]);
   });
+  it('marks a result critical when the scientist flagged a value critical, including in its latest correction', () => {
+    const order = entry('encounter:6', 'lab_order', { tests: ['Full blood count'] }, 'staff:ordering');
+    const report = (flag?: string) => ({ patient: {}, items: [{ test: 'Full blood count', values: [{ kind: 'number', key: 'hb', label: 'Haemoglobin', value: 5.1, ...(flag ? { flag } : {}) }] }] });
+    const result = { ...entry('encounter:6', 'lab_results', { results: [{ test: 'Full blood count', result: 'Haemoglobin 5.1' }] }, 'staff:lab'), labReport: report() } as EncounterEntry;
+    expect(resultAlerts([order, result], 'staff:ordering')[0].critical).toBe(false);
+    const correction = { ...entry('encounter:6', 'amendment', { note: 'Flag added', correctedValues: result.values }, 'staff:lab'), amends: result.id, labReport: report('critically_low') } as EncounterEntry;
+    expect(resultAlerts([order, result, correction], 'staff:ordering')[0].critical).toBe(true);
+  });
 });

@@ -46,7 +46,10 @@
   },
   {
     "path": "/laboratory",
-    "click": "Record results"
+    "click": "Record results",
+    "name": "lab-request",
+    "assert": "window.designAudit.path==='/laboratory/request'&&[...document.querySelectorAll('a,button')].some(b=>b.textContent.trim()==='Back to Laboratory')&&document.body.innerText.includes('Request')&&document.body.innerText.includes('Enter results')&&!document.body.innerText.includes('Continue to diagnosis')&&!document.body.innerText.includes('Vital signs')",
+    "description": "Record results opens the Laboratory request screen, without the visit steps"
   },
   {
     "fill": {
@@ -55,11 +58,18 @@
     }
   },
   {
-    "click": "Review & sign results"
+    "click": "Preview report"
   },
   {
-    "click": "Confirm & lock",
-    "evaluate": "[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Notifications')).click();true"
+    "click": "Publish results",
+    "assert": "document.body.innerText.includes('Publish these results?')&&document.body.innerText.includes('1 result, 0 flagged')",
+    "description": "Publishing asks for confirmation, naming the results and flags"
+  },
+  {
+    "click": "Publish",
+    "evaluate": "[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Notifications')).click();true",
+    "assert": "window.designAudit.path==='/laboratory'&&document.body.innerText.includes('Open requests')&&document.body.style.overflow!=='hidden'",
+    "description": "Publishing from the Laboratory returns to the Laboratory queue, and the page scrolls again"
   },
   {
     "name": "result-alert",
@@ -88,6 +98,48 @@
     "path": "/laboratory?tab=completed",
     "assert": "document.body.innerText.includes('Demo Second Patient')&&document.body.innerText.includes('Resulted')",
     "description": "A resulted request moves to Completed requests"
+  },
+  {
+    "click": "View",
+    "name": "lab-request-completed",
+    "assert": "window.designAudit.path==='/laboratory/request'&&document.body.innerText.includes('Published results')&&document.body.innerText.includes('Negative')&&!document.body.innerText.includes('Enter results')",
+    "description": "A completed request opens read-only with its published results"
+  },
+  {
+    "path": "/pharmacy",
+    "evaluate": "window.seedPrescriptionScenario()",
+    "assert": "document.body.innerText.includes('Amoxicillin 500 mg')",
+    "description": "A prescription waits at the Pharmacy"
+  },
+  {
+    "click": "Dispense",
+    "name": "dispense",
+    "assert": "window.designAudit.path==='/pharmacy/request'&&[...document.querySelectorAll('a,button')].some(b=>b.textContent.trim()==='Back to Pharmacy')&&document.body.innerText.includes('Dispense medication')&&document.body.innerText.includes('Amoxicillin 500 mg')&&!document.body.innerText.includes('Vital signs')",
+    "description": "Dispense opens the Pharmacy dispense screen, without the visit steps"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('button[aria-pressed]')].find(b=>b.textContent.includes('Amoxicillin')).click();true"
+  },
+  {
+    "click": "Review & sign dispense"
+  },
+  {
+    "click": "Confirm & lock",
+    "assert": "window.designAudit.path==='/pharmacy'&&window.designAudit.rows.encounter_entries.some(r=>r.step==='dispense'&&r.encounterId==='encounter:rx')&&document.body.style.overflow!=='hidden'",
+    "description": "Dispensing is saved to the visit and returns to the Pharmacy, and the page scrolls again"
+  },
+  {
+    "path": "/pharmacy?tab=completed",
+    "click": "View",
+    "assert": "window.designAudit.path==='/pharmacy/request'&&document.body.innerText.includes('Dispensed')&&document.body.innerText.includes('Signed by')&&!document.body.innerText.includes('Review & sign')",
+    "description": "A dispensed prescription opens read-only"
+  },
+  {
+    "width": 320,
+    "path": "/pharmacy/request?patient=QA-PHC-000002-K3&visit=encounter%3Arx",
+    "name": "dispense-phone",
+    "assert": "document.documentElement.scrollWidth<=320",
+    "description": "The dispense screen fits a 320px phone"
   },
   {
     "width": 320,

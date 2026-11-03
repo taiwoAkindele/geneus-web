@@ -1,0 +1,95 @@
+[
+  {
+    "role": "laboratory_staff",
+    "path": "/laboratory",
+    "evaluate": "window.seedLabResultScenario()"
+  },
+  {
+    "path": "/laboratory/request?patient=QA-PHC-000002-K3&visit=encounter%3Afbc",
+    "name": "lab-entry-form",
+    "assert": "document.body.innerText.includes('Template: Full blood count')&&document.body.innerText.includes('Normal range (man, 41): 13–17 g/dL')&&Boolean(document.querySelector('select[aria-label=\"Flag for Haemoglobin\"]'))&&document.body.innerText.includes('Requested by')&&!document.body.innerText.includes('Vital signs')&&[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Preview report')",
+    "description": "The FBC is entered on the Laboratory request screen, part by part, with the man's range and an optional flag"
+  },
+  {
+    "evaluate": "(()=>{const i=document.querySelector('input[aria-label=\"Haemoglobin\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,'ten');i.dispatchEvent(new Event('input',{bubbles:true}));return true})()"
+  },
+  {
+    "click": "Preview report",
+    "assert": "document.querySelector('[role=alert]')?.innerText.includes('Haemoglobin: enter a number')&&!document.querySelector('dialog[open]')",
+    "description": "A value that is not a number is named before previewing"
+  },
+  {
+    "evaluate": "(()=>{const set=(sel,v,ev)=>{const i=document.querySelector(sel);Object.getOwnPropertyDescriptor(i.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(i,v);i.dispatchEvent(new Event(ev,{bubbles:true}));};set('input[aria-label=\"Haemoglobin\"]','10.8','input');set('select[aria-label=\"Flag for Haemoglobin\"]','low','change');return true})()"
+  },
+  {
+    "click": "Preview report",
+    "name": "lab-preview",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Not published')&&document.querySelector('dialog[open]').innerText.includes('10.8')&&document.querySelector('dialog[open]').innerText.includes('13–17')&&document.querySelector('dialog[open]').innerText.includes('Low')&&document.querySelector('dialog[open]').innerText.includes('Normal ranges are for a man, 41')",
+    "description": "The preview shows the report as it will be published"
+  },
+  {
+    "click": "Publish results",
+    "name": "lab-publish-confirm",
+    "assert": "document.body.innerText.includes('Publish these results?')&&document.body.innerText.includes('1 result, 1 flagged')&&document.body.innerText.includes('Corrections are made by amendment')",
+    "description": "Publishing asks for confirmation"
+  },
+  {
+    "click": "Publish",
+    "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('Results published on this device')&&window.designAudit.rows.encounter_entries.some(r=>r.step==='lab_results'&&String(r.labReport).includes('Haemoglobin')&&String(r.values).includes('Haemoglobin 10.8 g/dL (Low)'))&&window.designAudit.path==='/laboratory'&&document.body.style.overflow!=='hidden'",
+    "description": "The result is saved with its structured report and plain summary, and the Laboratory queue opens again, and the page scrolls again"
+  },
+  {
+    "width": 320,
+    "path": "/laboratory/request?patient=QA-PHC-000002-K3&visit=encounter%3Afbc",
+    "evaluate": "window.seedLabResultScenario()",
+    "name": "lab-entry-phone",
+    "assert": "document.body.innerText.includes('Template: Full blood count')&&document.documentElement.scrollWidth<=320",
+    "description": "Entering results fits a 320px phone"
+  },
+  {
+    "role": "doctor",
+    "width": 1440,
+    "path": "/clinical/patients",
+    "evaluate": "window.seedPublishedLabResultScenario();[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Notifications')).click();true"
+  },
+  {
+    "name": "lab-critical-alert",
+    "assert": "document.body.innerText.includes('Critical result: Full blood count')&&document.body.innerText.includes('Demo Second Patient')",
+    "description": "A critical flag makes the ordering doctor's alert say Critical result"
+  },
+  {
+    "key": "Escape",
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Afbc&task=vitals",
+    "name": "lab-critical-banner",
+    "assert": "document.querySelector('[aria-label=\"Results ready\"]')?.innerText.includes('Critical result: Full blood count')",
+    "description": "The visit shows a critical result banner"
+  },
+  {
+    "click": "Review results",
+    "name": "lab-doctor-review",
+    "assert": "document.body.innerText.includes('Laboratory report')&&document.body.innerText.includes('6.2')&&document.body.innerText.includes('Critically low')&&document.body.innerText.includes('13–17')&&document.body.innerText.includes('Hypochromic microcytic red cells')&&document.body.innerText.includes('Phoned to ward')&&[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Print report')&&!document.querySelector('main input[aria-label=\"Haemoglobin\"]')",
+    "description": "The doctor reviews the published report read-only, with its range, flag and comments"
+  },
+  {
+    "click": "Review & sign result review"
+  },
+  {
+    "click": "Confirm & lock",
+    "assert": "!document.querySelector('[aria-label=\"Results ready\"]')",
+    "description": "Reviewing ends the critical alert"
+  },
+  {
+    "path": "/patients/profile?patient=QA-PHC-000002-K3&tab=visits&visit=encounter%3Afbc",
+    "name": "lab-visit-record",
+    "assert": "document.body.innerText.includes('Laboratory report')&&document.body.innerText.includes('Critically low')&&document.body.innerText.includes('Print report')",
+    "description": "The visit record shows the published report"
+  },
+  {
+    "width": 320,
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Afbc&task=result_review",
+    "evaluate": "window.seedPublishedLabResultScenario()",
+    "name": "lab-review-phone",
+    "assert": "document.body.innerText.includes('Critically low')&&document.documentElement.scrollWidth<=320",
+    "description": "The report fits a 320px phone"
+  }
+]

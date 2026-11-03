@@ -144,7 +144,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [staffId]));
   const notifications = useMemo<AppNotification[]>(() => [
     ...(results.data ?? []).map((alert) => ({
-      id: 'result:' + alert.id, kind: 'result' as const, title: `${alert.tests.join(', ')} result${alert.tests.length === 1 ? '' : 's'} ready`,
+      id: 'result:' + alert.id, kind: 'result' as const, title: alert.critical ? `Critical result: ${alert.tests.join(', ')}` : `${alert.tests.join(', ')} result${alert.tests.length === 1 ? '' : 's'} ready`,
       body: alert.name, to: visitRecordPath(alert.patientId, alert.encounterId) + '&task=result_review', read: readIds.has('result:' + alert.id),
     })),
     ...(rejections.data ?? []).map((rejection) => ({

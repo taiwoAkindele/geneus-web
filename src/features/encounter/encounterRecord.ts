@@ -15,6 +15,7 @@ export const EMPTY_ENCOUNTER_DATA: EncounterData = {
   complaint: { text: '', note: '' },
   lab_order: { tests: [] },
   lab_results: {},
+  lab_report: {},
   diagnosis: { dx: '', rx: [], injection: false, admit: false },
   injection: { drug: '', dose: '', route: '', site: '', note: '' },
   dispense: { done: {}, reasons: {} },

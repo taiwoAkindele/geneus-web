@@ -28,6 +28,8 @@ const FacilityWorkspacesScreen = lazy(() => import('@/pages/facilities/FacilityW
 const OrganizationScreen = lazy(() => import('@/pages/facilities/OrganizationScreen').then((m) => ({ default: m.OrganizationScreen })));
 const AddFacilityScreen = lazy(() => import('@/pages/facilities/AddFacilityScreen').then((m) => ({ default: m.AddFacilityScreen })));
 const InvestigationCatalogueScreen = lazy(() => import('@/pages/investigations/InvestigationCatalogueScreen').then((m) => ({ default: m.InvestigationCatalogueScreen })));
+const CatalogueSettingsScreen = lazy(() => import('@/pages/investigations/CatalogueSettingsScreen').then((m) => ({ default: m.CatalogueSettingsScreen })));
+const ResultTemplateEditorScreen = lazy(() => import('@/pages/investigations/ResultTemplateEditorScreen').then((m) => ({ default: m.ResultTemplateEditorScreen })));
 const FacilityReferralsScreen = lazy(() => import('@/pages/referral/FacilityReferralsScreen').then((m) => ({ default: m.FacilityReferralsScreen })));
 const WorkspaceScreen = lazy(() => import('@/pages/workspace/WorkspaceScreen').then((m) => ({ default: m.WorkspaceScreen })));
 const MagicLinkSentScreen = lazy(() =>
@@ -127,6 +129,8 @@ const EncountersScreen = lazy(() =>
   import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
 );
 const ServiceQueueScreen = lazy(() => import('@/pages/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
+const LabRequestScreen = lazy(() => import('@/pages/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
+const DispenseScreen = lazy(() => import('@/pages/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
 const ClinicalPatientsScreen = lazy(() => import('@/pages/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
 const InpatientScreen = lazy(() => import('@/pages/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const DocumentsScreen = lazy(()=>import('@/pages/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
@@ -198,6 +202,8 @@ const App = () => {
             <Route path="/clinical/patients" element={<ClinicalPatientsScreen />} />
             <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
             <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
+            <Route path="/laboratory/request" element={<LabRequestScreen />} />
+            <Route path="/pharmacy/request" element={<DispenseScreen />} />
             <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
             <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen/></ClinicalDocumentsAccess>}/>
             <Route path="/encounters/record" element={<EncounterScreen />} />
@@ -224,6 +230,9 @@ const App = () => {
             <Route path="/organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
             <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
             <Route path="/investigations/catalogue" element={<InvestigationCatalogueScreen />} />
+            <Route path="/investigations/settings" element={<RequireCapability permissions={['result_template:manage']}><CatalogueSettingsScreen /></RequireCapability>} />
+            <Route path="/investigations/settings/templates/new" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
+            <Route path="/investigations/settings/templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
             <Route path="/clinical-reviews" element={<ClinicalReviewsScreen />} />
             <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />

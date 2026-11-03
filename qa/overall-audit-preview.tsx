@@ -45,12 +45,16 @@ import { FeeScheduleScreen } from '@/pages/billing/FeeScheduleScreen';
 import { UnavailableScreen } from '@/app/UnavailableScreen';
 import { InpatientScreen } from '@/pages/inpatient/InpatientScreen';
 import { RequireCapability } from '@/app/RequireCapability';
-import { Location, ServiceDefinition, ServiceOffering } from '@shared';
+import { Location, ServiceDefinition, ServiceOffering, ResultTemplate, StandardTest, StandardTemplate } from '@shared';
+import { CatalogueSettingsScreen } from '@/pages/investigations/CatalogueSettingsScreen';
+import { ResultTemplateEditorScreen } from '@/pages/investigations/ResultTemplateEditorScreen';
 import { InpatientEvent } from '@shared';
 import { DocumentsScreen } from '@/pages/documents/DocumentsScreen';
 import { InvestigationCatalogueScreen } from '@/pages/investigations/InvestigationCatalogueScreen';
 import { ClinicalPatientsScreen } from '@/pages/clinical-patients/ClinicalPatientsScreen';
 import { ServiceQueueScreen } from '@/pages/service-queue/ServiceQueueScreen';
+import { LabRequestScreen } from '@/pages/service-queue/LabRequestScreen';
+import { DispenseScreen } from '@/pages/service-queue/DispenseScreen';
 import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsAccess';
 import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
@@ -132,8 +136,31 @@ const labDefinitions = (sql: string, parameters: unknown[]) => {
   return (db.rows.service_definitions ?? []).filter((row) => row.facilityId === facilityId && row.category === 'laboratory' && Number(row.active) === 1 && row.investigation && [row.name, row.investigation].some((value) => String(value).toLowerCase().includes(needle)))
     .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }) * (/\bDESC\b/.test(sql) ? -1 : 1));
 };
+// Result template settings read with json_each and LIKE, which the fake cannot evaluate either; answer
+// them in JS. The SQL itself is exercised against real SQLite in src/data/resultTemplates.test.ts.
+const json = (value: unknown) => typeof value === 'string' ? JSON.parse(value) : value ?? [];
+const needleOf = (like: unknown) => String(like).slice(1, -1).replace(/\\(.)/g, '$1').toLowerCase();
+const byText = (text: (row: Record<string, unknown>) => string) => (a: Record<string, unknown>, b: Record<string, unknown>) => text(a).localeCompare(text(b), undefined, { sensitivity: 'base' });
+const templateMatches = (parameters: unknown[]) => {
+  const [facilityId, like] = parameters, needle = needleOf(like), names = new Map((db.rows.service_definitions ?? []).map((d) => [d.id, String(d.name).toLowerCase()]));
+  return (db.rows.result_templates ?? []).filter((t) => t.facilityId === facilityId && (String(t.name).toLowerCase().includes(needle) || json(t.serviceDefinitionIds).some((id: string) => names.get(id)?.includes(needle)))).sort(byText((t) => String(t.name)));
+};
+const partMatches = (parameters: unknown[]) => (db.rows.result_parts ?? []).filter((p) => p.facilityId === parameters[0] && String(json(p.part).label).toLowerCase().includes(needleOf(parameters[1]))).sort(byText((p) => String(json(p.part).label)));
+const listMatches = (parameters: unknown[]) => (db.rows.answer_lists ?? []).filter((l) => l.facilityId === parameters[0] && [l.name, l.answers].some((value) => String(value).toLowerCase().includes(needleOf(parameters[1])))).sort(byText((l) => String(l.name)));
+const templateQuery = (sql: string, parameters: unknown[]): unknown[] | undefined => {
+  const page = (rows: unknown[]) => { const [limit, offset] = parameters.slice(-2) as number[]; return rows.slice(offset, offset + limit); };
+  if (sql.includes('json_each(t."serviceDefinitionIds") j WHERE t."status"')) return (db.rows.result_templates ?? []).filter((t) => t.status === 'active').flatMap((t) => json(t.serviceDefinitionIds).filter((id: string) => parameters.includes(id)).map((id: string) => ({ test: id, name: t.name, parts: json(t.parts).length })));
+  if (/FROM result_templates t WHERE t\."facilityId"/.test(sql)) return page(templateMatches(parameters));
+  if (/FROM result_parts WHERE "facilityId"/.test(sql)) return page(partMatches(parameters));
+  if (/FROM answer_lists WHERE "facilityId"/.test(sql)) return page(listMatches(parameters));
+  const usage = /json_extract\(p\.value, '\$\.(\w+)'\) IN/.exec(sql);
+  if (usage) return parameters.map((id) => ({ id, uses: (db.rows.result_templates ?? []).filter((t) => json(t.parts).some((p: Record<string, unknown>) => p[usage[1]] === id)).length }));
+  return undefined;
+};
 const originalAll = db.getAll;
 db.getAll = async <T,>(sql: string, parameters: unknown[] = []) => {
+  const templates = templateQuery(sql, parameters);
+  if (templates) return templates as T[];
   if (/FROM service_definitions WHERE "facilityId" = \?/.test(sql)) { const [limit, offset] = parameters.slice(-2) as number[]; return labDefinitions(sql, parameters).slice(offset, offset + limit) as T[]; }
   const within = /FROM (\w+) WHERE "?(\w+)"? IN \(/.exec(sql);
   if (within) return (db.rows[within[1]] ?? []).filter((row) => parameters.includes(row[within[2]])) as T[];
@@ -143,6 +170,9 @@ const originalOptional = db.getOptional;
 db.getOptional = async <T,>(sql: string, parameters: unknown[] = []) => {
   if (sql.includes('json_group_array')) return { records: JSON.stringify(db.rows[/FROM\s+(\w+)/i.exec(sql)?.[1] ?? ''] ?? []) } as T;
   if (/COUNT\(\*\) AS total FROM service_definitions/.test(sql)) return { total: labDefinitions(sql, parameters).length } as T;
+  if (/COUNT\(\*\) AS total FROM result_templates/.test(sql)) return { total: templateMatches(parameters).length } as T;
+  if (/COUNT\(\*\) AS total FROM result_parts/.test(sql)) return { total: partMatches(parameters).length } as T;
+  if (/COUNT\(\*\) AS total FROM answer_lists/.test(sql)) return { total: listMatches(parameters).length } as T;
   return originalOptional<T>(sql, parameters);
 };
 db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
@@ -151,41 +181,83 @@ localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
 recordServerContact(now);
 /**
- * Stands in for the server's catalogue routes (geneus-server/src/routes/investigations.ts,
- * proven against PostgreSQL in tests/labCatalogue.test.ts): answers as the server does, filing
- * tests under the Laboratory unit (unit:2), and inserts the rows sync would deliver. `offline` makes every catalogue request fail to connect.
+ * The catalogue and templates are saved on the device and checked by the server on sync
+ * (geneus-server tests/offlineCatalogue.test.ts). These seeds put this facility's copy of the
+ * standard lists on the device, as sync delivers them. `offline` makes every network request fail.
  */
 const STANDARD_SAMPLE = [
   { key: 'fbc', name: 'Full blood count', specimen: 'Whole blood (EDTA)', classification: 'Haematology', aliases: ['FBC', 'CBC'], concept: { system: 'http://loinc.org', code: '58410-2', label: 'Full blood count' } },
   { key: 'haemoglobin', name: 'Haemoglobin', specimen: 'Whole blood (EDTA)', classification: 'Haematology', aliases: ['Hb'], concept: { system: 'http://loinc.org', code: '718-7', label: 'Haemoglobin' } },
   { key: 'widal', name: 'Widal test', specimen: 'Serum', classification: 'Microbiology', aliases: ['Widal'], concept: { system: 'urn:geneus:standard-test', code: 'widal', label: 'Widal test' } },
 ];
-const catalogueKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
-const catalogueTaken = () => new Set((db.rows.service_definitions ?? []).flatMap((row) => [String(row.name), ...(JSON.parse(String(row.investigation ?? '{}')).aliases ?? [])].map(catalogueKey)));
 const originalFetch = window.fetch.bind(window);
+const standardEnvelope = { ...envelope, schemaVersion: 5, createdBy: 'system' };
 Object.assign(window, { seedCatalogueScenario: async ({ offline = false } = {}) => {
   db.rows.locations = [toRow('location', Location.parse({ ...envelope, schemaVersion: 5, id: 'location:lab', type: 'location', name: 'Laboratory', kind: 'room' }))];
   db.rows.service_definitions = []; db.rows.service_offerings = [];
+  db.rows.standard_tests = STANDARD_SAMPLE.map((test) => toRow('standard_test', StandardTest.parse({ ...standardEnvelope, id: `standard_test:${envelope.facilityId}:${test.key}`, type: 'standard_test', ...test })));
   await saveDeviceCredential({ deviceId: envelope.deviceId, facilityId: envelope.facilityId, credential: 'qa-credential', syncEndpoint: 'https://sync.example.org' });
-  window.fetch = async (input, init) => {
-    const path = new URL(String(input), location.href).pathname;
-    if (!path.includes('/investigations/')) return originalFetch(input, init);
-    if (offline) throw new TypeError('Failed to fetch');
-    const body = JSON.parse(String(init?.body ?? '{}')), json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
-    if (path.endsWith('/standard-tests')) { const taken = catalogueTaken(); return json({ tests: STANDARD_SAMPLE.map(({ concept: _concept, ...test }) => ({ ...test, added: [test.name, ...test.aliases].some((n) => taken.has(catalogueKey(n))) })) }); }
-    const drafts = path.endsWith('/adopt') ? STANDARD_SAMPLE.filter((test) => body.keys.includes(test.key)) : body.tests;
-    const taken = catalogueTaken(), added: string[] = [], skipped: string[] = [];
-    for (const draft of drafts) {
-      const keys = [draft.name, ...draft.aliases].map(catalogueKey);
-      if (keys.some((key) => taken.has(key))) { skipped.push(draft.name); continue; }
-      keys.forEach((key) => taken.add(key)); added.push(draft.name);
-      const id = 'service_definition:' + crypto.randomUUID();
-      db.rows.service_definitions.push(toRow('service_definition', ServiceDefinition.parse({ ...envelope, schemaVersion: 5, id, type: 'service_definition', name: draft.name, category: 'laboratory', concept: draft.concept ?? { system: 'local', code: id, label: draft.name }, orderable: true, active: true, revision: 1, investigation: { specimen: draft.specimen, department: draft.classification, aliases: draft.aliases } })));
-      db.rows.service_offerings.push(toRow('service_offering', ServiceOffering.parse({ ...envelope, schemaVersion: 5, id: 'service_offering:' + crypto.randomUUID(), type: 'service_offering', serviceDefinitionId: id, unitId: 'unit:2', name: draft.name, locationIds: ['location:lab'], delivery: 'physical', requiredActions: ['perform_test', 'record_result'], intakePolicy: 'both', timeZone: 'Africa/Lagos', configuration: 'active', resourceReadiness: 'available', revision: 1 })));
-    }
-    window.setTimeout(() => listeners.forEach((listener) => listener()), 0);
-    return json({ added, skipped });
-  };
+  window.fetch = offline ? async () => { throw new TypeError('Failed to fetch'); } : originalFetch;
+  listeners.forEach((listener) => listener());
+  return true;
+} });
+const adultRange = { ageFrom: { value: 18, unit: 'years' } } as const;
+const TEMPLATE_SAMPLE = [
+  { key: 'fbc', name: 'Full blood count', tests: ['fbc'], parts: [
+    { key: 'haemoglobin', label: 'Haemoglobin', kind: 'number', unit: 'g/dL', decimals: 1, required: true, ranges: [{ ...adultRange, sex: 'male', low: 13, high: 17 }, { ...adultRange, sex: 'female', low: 12, high: 15 }] },
+    { key: 'wbc', label: 'White cell count', kind: 'number', unit: '×10⁹/L', decimals: 1, required: true, ranges: [{ ...adultRange, low: 4, high: 11 }] },
+    { key: 'film', label: 'Film comment', kind: 'text', required: false },
+  ] },
+  { key: 'rapid-reactive', name: 'Rapid test: Reactive / Non-reactive', tests: [], parts: [{ key: 'result', label: 'Result', kind: 'choice', required: true, answers: ['Non-reactive', 'Reactive', 'Invalid, repeat test'] }] },
+  { key: 'imaging', name: 'Imaging report', tests: [], parts: [{ key: 'findings', label: 'Findings', kind: 'section', required: true }, { key: 'impression', label: 'Impression', kind: 'section', required: true }, { key: 'images', label: 'Images', kind: 'images', maxFiles: 6, required: false }] },
+];
+Object.assign(window, { seedResultTemplateScenario: async ({ offline = false, withFbc = false } = {}) => {
+  await (window as unknown as { seedCatalogueScenario: (options: { offline: boolean }) => Promise<boolean> }).seedCatalogueScenario({ offline });
+  // The FBC and Widal tests are already in the catalogue, as sync would deliver them.
+  for (const test of STANDARD_SAMPLE.filter((t) => ['fbc', 'widal'].includes(t.key))) {
+    const id = `service_definition:${test.key}`;
+    db.rows.service_definitions.push(toRow('service_definition', ServiceDefinition.parse({ ...envelope, schemaVersion: 5, id, type: 'service_definition', name: test.name, category: 'laboratory', concept: test.concept, orderable: true, active: true, revision: 1, investigation: { specimen: test.specimen, department: test.classification, aliases: test.aliases } })));
+    db.rows.service_offerings.push(toRow('service_offering', ServiceOffering.parse({ ...envelope, schemaVersion: 5, id: `service_offering:${test.key}`, type: 'service_offering', serviceDefinitionId: id, unitId: 'unit:2', name: test.name, locationIds: ['location:lab'], delivery: 'physical', requiredActions: ['perform_test', 'record_result'], intakePolicy: 'both', timeZone: 'Africa/Lagos', configuration: 'active', resourceReadiness: 'available', revision: 1 })));
+  }
+  db.rows.result_templates = []; db.rows.result_parts = []; db.rows.answer_lists = [];
+  db.rows.standard_templates = TEMPLATE_SAMPLE.map((template) => toRow('standard_template', StandardTemplate.parse({ ...standardEnvelope, id: `standard_template:${envelope.facilityId}:${template.key}`, type: 'standard_template', ...template })));
+  // An FBC template already adopted, for checks that start from a populated list.
+  if (withFbc) db.rows.result_templates.push(toRow('result_template', ResultTemplate.parse({ ...envelope, schemaVersion: 5, id: 'result_template:fbc', type: 'result_template', name: 'Full blood count', status: 'active', parts: TEMPLATE_SAMPLE[0].parts, serviceDefinitionIds: ['service_definition:fbc'], source: 'standard', standardKey: 'fbc', revision: 1 })));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
+/** A visit for the second (male, 41) patient whose catalogue FBC is entered with a result template. */
+Object.assign(window, { seedLabResultScenario: () => {
+  const fbcParts = [
+    { key: 'haemoglobin', label: 'Haemoglobin', kind: 'number', unit: 'g/dL', decimals: 1, required: true, ranges: [{ ...adultRange, sex: 'male', low: 13, high: 17 }, { ...adultRange, sex: 'female', low: 12, high: 15 }] },
+    { key: 'wbc', label: 'White cell count', kind: 'number', unit: '×10⁹/L', decimals: 1, required: false, ranges: [{ ...adultRange, low: 4, high: 11 }] },
+    { key: 'film', label: 'Film comment', kind: 'text', required: false },
+  ];
+  db.rows.result_templates = [toRow('result_template', ResultTemplate.parse({ ...envelope, schemaVersion: 5, id: 'result_template:fbc', type: 'result_template', name: 'Full blood count', status: 'active', parts: fbcParts, serviceDefinitionIds: ['service_definition:fbc'], source: 'standard', standardKey: 'fbc', revision: 1 }))];
+  const item = { id: 'order_item:fbc', name: 'Full blood count', serviceDefinitionId: 'service_definition:fbc', offeringId: 'service_offering:fbc', catalogueRevision: 1, definitionRevision: 1, priority: 'routine' };
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: 'encounter:fbc', type: 'encounter', patientId: secondId, openedOn: now, workflowVersion: 1 })));
+  const visit = (id: string, step: string, values: Record<string, unknown>) => toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id, type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId: 'encounter:fbc', actorRole: 'doctor', step, values }));
+  db.rows.encounter_entries.push(visit('entry:fbc-vitals', 'vitals', { temperatureC: 37 }), visit('entry:fbc-complaint', 'complaint', { complaints: ['Tiredness'] }), visit('entry:fbc-order', 'lab_order', { tests: [item.name], items: [item] }), visit('entry:fbc-decision', 'investigation_review', { decision: 'ordered', orderEntryId: 'entry:fbc-order' }));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
+/** A visit for the second patient with one prescribed medicine waiting at the Pharmacy. */
+Object.assign(window, { seedPrescriptionScenario: () => {
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: 'encounter:rx', type: 'encounter', patientId: secondId, openedOn: now, workflowVersion: 1 })));
+  db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'entry:rx', type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId: 'encounter:rx', actorRole: 'doctor', step: 'prescription', values: { decision: 'prescribed', prescription: [{ drug: 'Amoxicillin 500 mg', dose: '1 capsule three times daily' }] } })));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
+/** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
+Object.assign(window, { seedPublishedLabResultScenario: () => {
+  (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();
+  const range = { ...adultRange, sex: 'male' as const, low: 13, high: 17 };
+  const labReport = { patient: { sex: 'male' as const, age: { years: 41 } }, items: [{ test: 'Full blood count', orderItemId: 'order_item:fbc', template: { id: 'result_template:fbc', revision: 1 }, values: [
+    { kind: 'number' as const, key: 'haemoglobin', label: 'Haemoglobin', unit: 'g/dL', value: 6.2, range, flag: 'critically_low' as const },
+    { kind: 'text' as const, key: 'film', label: 'Film comment', text: 'Hypochromic microcytic red cells' },
+  ], comment: 'Phoned to ward' }] };
+  db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'entry:fbc-result', type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId: 'encounter:fbc', actorRole: 'laboratory_staff', createdBy: 'staff:sample-0', step: 'lab_results',
+    values: { results: [{ test: 'Full blood count', orderItemId: 'order_item:fbc', result: 'Haemoglobin 6.2 g/dL (Critically low); Film comment: Hypochromic microcytic red cells; Comment: Phoned to ward' }] }, labReport })));
   listeners.forEach((listener) => listener());
   return true;
 } });
@@ -231,9 +303,14 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen /></ClinicalDocumentsAccess>} />
   <Route path="/investigations/catalogue" element={<InvestigationCatalogueScreen />} />
+  <Route path="/investigations/settings" element={<RequireCapability permissions={['result_template:manage']}><CatalogueSettingsScreen /></RequireCapability>} />
+  <Route path="/investigations/settings/templates/new" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
+  <Route path="/investigations/settings/templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
   <Route path="/clinical/patients" element={<ClinicalPatientsScreen />} />
   <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
   <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
+  <Route path="/laboratory/request" element={<LabRequestScreen />} />
+  <Route path="/pharmacy/request" element={<DispenseScreen />} />
   <Route path="/reports/month" element={<MonthlySummaryScreen />} />
   <Route path="/admissions" element={<RequireCapability permissions={['admission:manage']}><InpatientScreen /></RequireCapability>} />
   <Route path="/patients/new/details" element={<NewPatientStep2Screen />} />

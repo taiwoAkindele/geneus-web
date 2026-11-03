@@ -57,6 +57,11 @@ export const TABLE_FOR: Record<DocType, string> = {
   session_event: 'session_events',
   work_ownership_event: 'work_ownership_events',
   appointment_reservation: 'appointment_reservations',
+  result_template: 'result_templates',
+  result_part: 'result_parts',
+  answer_list: 'answer_lists',
+  standard_test: 'standard_tests',
+  standard_template: 'standard_templates',
 };
 
 /**

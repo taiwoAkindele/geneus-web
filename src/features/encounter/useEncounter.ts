@@ -1,6 +1,6 @@
 import { registerWorkspaceFlusher } from '@/data/facilityWorkspaces';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { closesEncounter, type Encounter, type EncounterEntry } from '@shared';
+import { closesEncounter, type Encounter, type EncounterEntry, type LabReport } from '@shared';
 import { useLiveQuery, useDeviceContext } from '@/data';
 import { zonedInstant } from '@/lib/workforceTime';
 import { discardDraft, discardDrafts, readDrafts, writeDraft, type DraftOwner } from '@/data/repos/drafts';
@@ -10,7 +10,7 @@ import { useAuthorizationContext } from '@/session';
 import { EMPTY_ENCOUNTER_DATA, projectEncounter } from './encounterRecord';
 import { isClosingStep, STEP_DEFS, stepsFor } from './steps';
 import { stepProblems, toStepValues } from './stepValues';
-import type { EncounterData, RxLine, StepKey } from './types';
+import type { EncounterData, LabItemDraft, RxLine, StepKey } from './types';
 
 /** Plain-text summary rows for a step — used by both the Review sheet and the locked view. */
 export const summarize = (data: EncounterData, key: StepKey): { label: string; value: string }[] => {
@@ -104,6 +104,8 @@ const REVIEW_HOUR = 9;
 const DRAFT_PAUSE_MS = 800;
 const blankDraft = (value: unknown): boolean => value === undefined || value === null || value === '' || value === false || (Array.isArray(value) ? value.every(blankDraft) : typeof value === 'object' ? Object.values(value).every(blankDraft) : false);
 const NAVIGATION_DRAFT = '_navigation';
+/** Results being entered against templates, kept beside the lab results section's own draft. */
+const LAB_REPORT_DRAFT = '_lab_report';
 
 const ownerKey = (owner: DraftOwner) => `${owner.staffId}|${owner.patientId}|${owner.encounterKey}`;
 
@@ -196,6 +198,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
         const skipped = typeof navigation === 'object' && navigation !== null && 'skipped' in navigation ? navigation.skipped : undefined;
         setSkippedNow(Array.isArray(skipped) ? skipped.filter((key): key is StepKey => typeof key === 'string' && Object.keys(STEP_DEFS).includes(key) && !isClosingStep(key as StepKey) && !saved.has(key)) : []);
         const unsaved = drafts.filter((stored) => !saved.has(stored.step) && fitsSection(stored.step, stored.data));
+        const labReport = drafts.find((stored) => stored.step === LAB_REPORT_DRAFT);
+        if (labReport && typeof labReport.data === 'object' && labReport.data !== null && !saved.has('lab_results')) setDraft((current) => ({ ...current, lab_report: labReport.data as EncounterData['lab_report'] }));
         if (unsaved.length > 0) {
           setDraft((current) => unsaved.reduce((data, stored) => ({ ...data, [stored.step]: stored.data }), current));
           setDraftRestoredAt(unsaved.reduce((latest, stored) => (stored.updatedOn > latest ? stored.updatedOn : latest), ''));
@@ -227,7 +231,9 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     const untouched = JSON.stringify(section) === JSON.stringify(EMPTY_ENCOUNTER_DATA[activeKey]);
     const keep = () => {
       pendingDraft.current = undefined;
-      return untouched ? discardDraft(owner, activeKey) : writeDraft(owner, activeKey, section);
+      const kept = untouched ? discardDraft(owner, activeKey) : writeDraft(owner, activeKey, section);
+      if (activeKey !== 'lab_results') return kept;
+      return Promise.all([kept, Object.keys(draft.lab_report).length ? writeDraft(owner, LAB_REPORT_DRAFT, draft.lab_report) : discardDraft(owner, LAB_REPORT_DRAFT)]);
     };
     pendingDraft.current = keep;
     const timer = window.setTimeout(() => void keep().catch(keepDraftWarning), DRAFT_PAUSE_MS);
@@ -255,6 +261,10 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
 
   const setResult = useCallback((test: string, value: string) => {
     setDraft((d) => ({ ...d, lab_results: { ...d.lab_results, [test]: value } }));
+  }, []);
+
+  const setLabReport = useCallback((key: string, item: LabItemDraft) => {
+    setDraft((d) => ({ ...d, lab_report: { ...d.lab_report, [key]: item } }));
   }, []);
 
   const addRx = useCallback(() => {
@@ -295,7 +305,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
 
   /** Saves the section, locked to the signed-in staff member. */
   const lockStep = useCallback(
-    async (key: StepKey, collectLaterReason?: string) => {
+    async (key: StepKey, collectLaterReason?: string, labSubmission?: { values: Record<string, unknown>; labReport: LabReport }) => {
       if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') { setSkippedNow((keys) => [...keys, key]); return; }
       if (isClosingStep(key) && !(key === 'disposition' && enc.data.disposition.kind === 'observation')) {
         const unsigned = (Object.keys(STEP_DEFS) as StepKey[]).filter((candidate) => candidate !== key && !enc.entries[candidate] && !blankDraft(draft[candidate]));
@@ -308,7 +318,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
           appointmentId,
           patientId,
           step: key,
-          values: key === 'diagnosis' ? { ...toStepValues(key, enc.data), prescription: [] } : toStepValues(key, enc.data),
+          values: labSubmission ? labSubmission.values : key === 'diagnosis' ? { ...toStepValues(key, enc.data), prescription: [] } : toStepValues(key, enc.data),
+          ...(labSubmission ? { labReport: labSubmission.labReport } : {}),
           collectLaterReason,
           investigationReason: enc.data.investigation_review.reason,
           workflowVersion: 1,
@@ -324,6 +335,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
       // Saved: the draft has become the record. Once the encounter closes, nothing typed for it can be saved.
       pendingDraft.current = undefined;
       discardDraft(owner, key).catch(keepDraftWarning);
+      if (key === 'lab_results') { discardDraft(owner, LAB_REPORT_DRAFT).catch(keepDraftWarning); setDraft((current) => ({ ...current, lab_report: {} })); }
       if (closesEncounter(entry)) {
         discardDrafts({ ...owner, encounterKey: entry.encounterId }).catch(keepDraftWarning);
         discardDrafts({ ...owner, encounterKey: 'new' }).catch(keepDraftWarning);
@@ -349,8 +361,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
   );
 
   const actions = useMemo(
-    () => ({ setField, toggleIn, setResult, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep }),
-    [setField, toggleIn, setResult, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
+    () => ({ setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep }),
+    [setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
   );
 
   return { enc, rawEntries: live.data?.entries ?? [], draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, flushDraft: () => pendingDraft.current?.(), ...actions };

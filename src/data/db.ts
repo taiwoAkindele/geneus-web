@@ -153,7 +153,7 @@ export const updateRecord = async <T extends AnyDocument>(
   const merged = validate<T>({ ...current, ...stamped });
   assertFacilityContext(context, merged);
   const revision = (changes as Record<string, unknown>).revision;
-  const cas = typeof revision === 'number' && ['unit','billing_department','location','service_definition','service_offering','practitioner_profile'].includes(type);
+  const cas = typeof revision === 'number' && ['unit','billing_department','location','service_definition','service_offering','practitioner_profile','result_template','result_part','answer_list'].includes(type);
   if (cas && revision !== Number((current as Record<string,unknown>).revision ?? 1) + 1) throw new Error('This configuration changed. Reopen the current record before saving');
   const row = toRow(type, stamped);
   const columns = Object.keys(row);

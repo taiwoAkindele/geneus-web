@@ -48,7 +48,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(has(context, 'fee_item:manage') || roleIn(context, 'facility_admin') ? [link('fees', 'Fees', 'Manage the prices attached to facility services.', '/billing/fees', 'registers'), link('receiving', 'Payment setup', 'Manage departments and receiving accounts.', '/billing/settings', 'settings')] : []),
     ] : [] },
     { id: 'operations', label: 'Operations', description: 'Services, teams and schedules', icon: 'calendar', links: [
-      ...(has(context, 'service:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
+      ...(has(context, 'service:manage', 'result_template:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
       ...(keys.has('facility') ? [link('facility', 'Facility setup', 'Manage services, accountable teams and locations.', '/facility', 'referrals')] : []),
       ...(keys.has('staff') ? [link('staff', 'Staff & roster', 'Manage people, assignments and planned shifts.', '/admin/staff', 'patients')] : []),
     ] },
@@ -78,7 +78,7 @@ export const workspaceForLocation = (pathname: string, search: string, available
   if (pathname.startsWith('/referrals')) return find('clinical');
   if (pathname.startsWith('/investigations')) return find('operations');
   if (pathname.startsWith('/organization')) return find('administration');
-  if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/clinical/') || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
+  if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/clinical/') || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/laboratory/') || pathname.startsWith('/pharmacy/') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');
   if (pathname.startsWith('/stock')) return find('inventory');
