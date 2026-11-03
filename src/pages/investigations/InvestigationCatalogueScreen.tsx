@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { loadCataloguePage, setInvestigationPrice, type CatalogueRow } from '@/data/repos/investigations';
-import { ApiError } from '@/lib/api/client';
-import { addOwnTests, adoptStandardTests, listStandardTests, type AddedTests, type OwnTest, type StandardTestOption } from '@/lib/api/investigations';
-import { ActionMenu, Button, DataTable, Icon, Sheet, SheetCancelButton, Tag, TextField, type TableColumn } from '@/ui';
+import { addOwnTests, adoptStandardTests, loadCataloguePage, loadStandardTests, setInvestigationPrice, type AddedTests, type CatalogueRow, type OwnTest } from '@/data/repos/investigations';
+import { ActionMenu, Button, DataTable, Icon, SelectAllCheckbox, Sheet, SheetCancelButton, Tag, TextField, type TableColumn } from '@/ui';
 import { amountInput, formatMoney, parseAmount } from '@/lib/money';
 import { parseTestCsv, TEST_CSV_TEMPLATE, type CsvIssue } from '@/features/investigations/testCsv';
 
 type Panel = 'single' | 'upload' | 'standard' | { edit: CatalogueRow };
-/** Adding tests needs the server; say so plainly instead of a transport error. */
-const errorText = (cause: unknown) => cause instanceof ApiError && cause.code === 'offline' ? 'Connect to the internet to add tests. The catalogue itself keeps working offline.' : cause instanceof Error ? cause.message : 'Could not save';
+const errorText = (cause: unknown) => cause instanceof Error ? cause.message : 'Could not save';
 const isStandard = (row: CatalogueRow) => row.definition.concept.system !== 'local';
 const plural = (count: number) => `${count} ${count === 1 ? 'test' : 'tests'}`;
 
 const AddedMessage = ({ added, skipped }: AddedTests) => <div role="status" className="space-y-1 rounded-field border border-outline-soft bg-brand-wash p-3 text-sm">
-  <p className="font-bold">{added.length ? `Added ${plural(added.length)}. They appear in the table when this device next syncs. Set prices with Edit.` : 'No new tests were added.'}</p>
+  <p className="font-bold">{added.length ? `Added ${plural(added.length)}. Set prices with Edit.` : 'No new tests were added.'}</p>
   {skipped.length ? <p>Skipped because they are already in the catalogue: {skipped.join(', ')}</p> : null}
 </div>;
 
@@ -27,7 +24,7 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
   const save = async () => {
     setBusy(true); setError('');
     try {
-      const result = await addOwnTests(context.userId, [{ ...draft, aliases: draft.aliases.split(/[;,]/).map((alias) => alias.trim()).filter(Boolean) }]);
+      const result = await addOwnTests([{ ...draft, aliases: draft.aliases.split(/[;,]/).map((alias) => alias.trim()).filter(Boolean) }], context);
       if (result.added.length) onClose(); else setError('A test with this name or other name is already in the catalogue');
     } catch (cause) { setError(errorText(cause)); } finally { setBusy(false); }
   };
@@ -37,7 +34,7 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
       <TextField label="Specimen" value={draft.specimen} onChange={(e) => setDraft({ ...draft, specimen: e.target.value })} />
       <TextField label="Classification" value={draft.classification} onChange={(e) => setDraft({ ...draft, classification: e.target.value })} />
       <TextField label="Other names (optional)" value={draft.aliases} onChange={(e) => setDraft({ ...draft, aliases: e.target.value })} />
-      <p className="text-sm text-ink-soft">Separate other names with commas, for example "FBC, CBC". Set the price with Edit after adding. Adding a test needs an internet connection.</p>
+      <p className="text-sm text-ink-soft">Separate other names with commas, for example "FBC, CBC". Set the price with Edit after adding.</p>
       {error ? <p role="alert" className="text-danger-strong">{error}</p> : null}
       <div className="flex flex-wrap gap-2"><SheetCancelButton /><Button fullWidth={false} loading={busy} disabled={busy || !draft.name.trim() || !draft.specimen.trim() || !draft.classification.trim()} onClick={() => void save()}>Add test</Button></div>
     </div>
@@ -53,7 +50,7 @@ const UploadSheet = ({ onClose }: { onClose: () => void }) => {
   const read = async (chosen?: File) => { setResult(undefined); setError(''); if (!chosen) return; setFile(chosen.name); setParsed(parseTestCsv(await chosen.text())); };
   const add = async () => {
     if (!parsed) return; setBusy(true); setError('');
-    try { setResult(await addOwnTests(context.userId, parsed.tests)); setParsed(undefined); setFile(''); }
+    try { setResult(await addOwnTests(parsed.tests, context)); setParsed(undefined); setFile(''); }
     catch (cause) { setError(errorText(cause)); } finally { setBusy(false); }
   };
   return <Sheet title="Upload a list of tests" placement="side" onClose={onClose} hasUnsavedChanges={Boolean(parsed?.tests.length)}>
@@ -75,27 +72,29 @@ const UploadSheet = ({ onClose }: { onClose: () => void }) => {
 
 const StandardTestsSheet = ({ onClose }: { onClose: () => void }) => {
   const context = useAuthorizationContext();
-  const [tests, setTests] = useState<StandardTestOption[]>(), [loadError, setLoadError] = useState('');
+  const standards = useLiveQuery(useCallback(() => loadStandardTests(), [context.facilityId])), tests = standards.data;
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [result, setResult] = useState<AddedTests>();
-  const load = useCallback(() => { setLoadError(''); listStandardTests(context.userId).then((response) => setTests(response.tests)).catch((cause) => setLoadError(errorText(cause))); }, [context.userId]);
-  useEffect(load, [load]);
-  const available = (tests ?? []).filter((test) => !test.added);
-  const groups = [...new Set((tests ?? []).map((test) => test.classification))];
+  const [query, setQuery] = useState(''), needle = query.trim().toLowerCase();
+  // Searches names, other names and specimens; ticks are kept while the list is filtered.
+  const shown = (tests ?? []).filter((test) => !needle || [test.name, test.specimen, ...test.aliases].some((text) => text.toLowerCase().includes(needle)));
+  const groups = [...new Set(shown.map((test) => test.classification))];
   const toggle = (key: string) => setPicked((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   const add = async () => {
     setBusy(true); setError('');
-    try { setResult(await adoptStandardTests(context.userId, [...picked])); setPicked(new Set()); load(); }
+    try { setResult(await adoptStandardTests([...picked], context)); setPicked(new Set()); standards.reload(); }
     catch (cause) { setError(errorText(cause)); } finally { setBusy(false); }
   };
   return <Sheet title="Choose from standard tests" placement="side" onClose={onClose} hasUnsavedChanges={picked.size > 0}>
     <div className="space-y-4">
       <p className="text-sm">Commonly used tests based on the WHO Essential Diagnostics List. Tick the ones this facility performs. Tests already in your catalogue are marked and can't be added twice.</p>
-      {loadError ? <div role="alert" className="space-y-2"><p className="text-danger-strong">{loadError}</p><Button variant="outlined" fullWidth={false} onClick={load}>Try again</Button></div>
-        : !tests ? <p role="status">Reading standard tests…</p> : <>
-          <Button variant="outlined" fullWidth={false} disabled={!available.length} onClick={() => setPicked(picked.size === available.length ? new Set() : new Set(available.map((t) => t.key)))}>{picked.size === available.length && available.length ? 'Clear selection' : `Select all ${available.length} available`}</Button>
+      {standards.error ? <div role="alert" className="space-y-2"><p className="text-danger-strong">{standards.error.message}</p><Button variant="outlined" fullWidth={false} onClick={standards.reload}>Try again</Button></div>
+        : !tests ? <p role="status">Reading standard tests…</p> : !tests.length ? <p role="status" className="rounded-field border border-dashed border-outline p-4 text-sm">The standard list hasn't reached this device yet. It arrives with the device's first sync after the update; until then you can upload or add your own tests.</p> : <>
+          <TextField label="Search standard tests" type="search" value={query} placeholder="Test name, other name or specimen" onChange={(e) => setQuery(e.target.value)} />
+          {shown.length ? null : <p role="status" className="text-sm">No standard tests match this search.</p>}
+          <SelectAllCheckbox keys={shown.filter((test) => !test.added).map((test) => test.key)} picked={picked} onChange={setPicked} />
           {groups.map((group) => <fieldset key={group} className="space-y-1"><legend className="text-xs font-bold uppercase tracking-wider text-brand-strong">{group}</legend>
-            {tests.filter((test) => test.classification === group).map((test) => <label key={test.key} className={`flex min-h-[44px] items-start gap-3 rounded-field px-2 py-2 ${test.added ? 'text-ink-muted' : 'hover:bg-surface'}`}>
+            {shown.filter((test) => test.classification === group).map((test) => <label key={test.key} className={`flex min-h-[44px] items-start gap-3 rounded-field px-2 py-2 ${test.added ? 'text-ink-muted' : 'hover:bg-surface'}`}>
               <input type="checkbox" className="mt-1 h-5 w-5 min-h-0 accent-brand" checked={picked.has(test.key)} disabled={test.added} onChange={() => toggle(test.key)} />
               <span className="text-sm"><b>{test.name}</b>{test.added ? <Tag className="ml-2">Already added</Tag> : null}<span className="block text-xs text-ink-soft">{test.specimen} · Also: {test.aliases.join(', ')}</span></span>
             </label>)}
@@ -133,11 +132,11 @@ const EditSheet = ({ row, onClose }: { row: CatalogueRow; onClose: () => void })
 };
 
 export const InvestigationCatalogueScreen = () => {
-  const context = useAuthorizationContext(), [params, setParams] = useSearchParams();
+  const context = useAuthorizationContext(), [params, setParams] = useSearchParams(), navigate = useNavigate();
   const query = params.get('q') ?? '', page = Math.max(0, Number(params.get('page')) || 0), descending = params.get('descending') === '1';
   const data = useLiveQuery(useCallback(() => loadCataloguePage(context, { query, page, descending }), [context.facilityId, query, page, descending]));
   const [panel, setPanel] = useState<Panel>();
-  const canManage = context.permissions.includes('service:manage');
+  const canManage = context.permissions.includes('service:manage'), canTemplate = context.permissions.includes('result_template:manage');
   useEffect(() => { document.title = 'Investigation catalogue · Geneus Health'; }, []);
   const set = (changes: Record<string, string>) => setParams((current) => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); } return next; }, { replace: true });
   const close = () => { setPanel(undefined); data.reload(); };
@@ -146,13 +145,19 @@ export const InvestigationCatalogueScreen = () => {
     { key: 'name', label: 'Test', sortValue: (row) => row.definition.name, render: (row) => <div className="min-w-[160px]"><p className="font-bold text-brand">{row.definition.name}</p>{row.definition.investigation?.aliases.length ? <p className="text-xs text-ink-soft">Also: {row.definition.investigation.aliases.join(', ')}</p> : null}</div> },
     { key: 'specimen', label: 'Specimen', className: 'hidden md:table-cell', render: (row) => row.definition.investigation?.specimen },
     { key: 'classification', label: 'Classification', className: 'hidden md:table-cell', render: (row) => row.definition.investigation?.department },
+    { key: 'template', label: 'Result template', className: 'hidden lg:table-cell', render: (row) => row.template ? <div><p>{row.template.name}</p><p className="text-xs text-ink-soft">{row.template.parts} {row.template.parts === 1 ? 'part' : 'parts'}</p></div> : <Tag tone="amber">Text result only</Tag> },
     { key: 'source', label: 'Source', className: 'hidden lg:table-cell', render: (row) => isStandard(row) ? <Tag tone="green">Standard</Tag> : <Tag>Own test</Tag> },
     { key: 'price', label: 'Price', render: (row) => row.fee ? formatMoney(row.fee.amountMinor, row.fee.currency) : <span className="text-ink-soft">—</span> },
     ...(canManage ? [{ key: 'actions', label: 'Action', render: (row: CatalogueRow) => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => setPanel({ edit: row })}>Edit</Button> }] : []),
   ];
   const addActions = [{ label: 'Add a single test', onSelect: () => setPanel('single') }, { label: 'Upload a list of tests', onSelect: () => setPanel('upload') }, { label: 'Choose from standard tests', onSelect: () => setPanel('standard') }];
+  const settingsActions = [
+    { label: 'Result templates', onSelect: () => navigate('/investigations/settings') },
+    { label: 'Result parts library', onSelect: () => navigate('/investigations/settings?tab=parts') },
+    { label: 'Answer lists', onSelect: () => navigate('/investigations/settings?tab=answers') },
+  ];
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Investigation catalogue</h1>{canManage && !empty ? <ActionMenu label="Add tests" title="Add tests" actions={addActions} /> : null}</header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Investigation catalogue</h1><div className="flex flex-wrap gap-2">{canTemplate ? <ActionMenu label="Settings" title="Catalogue settings" actions={settingsActions} /> : null}{canManage && !empty ? <ActionMenu label="Add tests" title="Add tests" actions={addActions} /> : null}</div></header>
     {empty ? <section aria-label="No tests yet" className="flex flex-col items-center gap-3 rounded-card border border-dashed border-outline px-6 py-10 text-center">
       <h2 className="text-xl font-extrabold">This facility has no lab tests yet</h2>
       <p className="max-w-xl text-ink-soft">Start with standard tests used in most facilities, with specimens and other names already filled in. You can set prices, or add your own tests afterwards.</p>

@@ -1,4 +1,4 @@
-import { FACILITY_DOCUMENT_POLICY, FACILITY_DOCUMENT_TYPES, parseDocument, currentFacilityRevisions, facilityReferenceIssues, facilityHeadIssues, unitHierarchyIssues, hierarchyIssues, billingOrganizationIssues, facilityRetirementImpact, sessionConflictIssues, sessionRosterIssues, sessionBookingIssues, sessionEventIssues, sessionEventHeadIssues, workOwnershipIssues, workOwnershipHeadIssues, workOwnershipReferenceIssues, reviewerDecisionIssues, withReviewerAuthority, clinicalActivityIssues, sessionClinicalCoverageIssues, effectiveFacilityRevisions, appointmentAllocationIssues, assignmentEligibilityIssues, staffPermissions, reservationMatchesAppointment, type AnyDocument, type AuthorizationContext, type FacilityRecords, type Staff, type Unit, type Location, type ServiceDefinition, type ServiceOffering, type PractitionerProfile, type StaffAssignment, type ServiceSession, type SessionEvent, type WorkOwnershipEvent, type AuthoritySnapshot, type AppointmentReservation, type Appointment, type Handoff, type RosterShift, type BillingDepartment, type Permission, type CapabilityDecision, type ReviewerDelegation, } from '@shared';
+import { FACILITY_DOCUMENT_POLICY, FACILITY_DOCUMENT_TYPES, parseDocument, labTestIssues, resultTemplateIssues, type StandardTest, type StandardTemplate, type ResultTemplate, type ResultPartDefinition, type AnswerList, currentFacilityRevisions, facilityReferenceIssues, facilityHeadIssues, unitHierarchyIssues, hierarchyIssues, billingOrganizationIssues, facilityRetirementImpact, sessionConflictIssues, sessionRosterIssues, sessionBookingIssues, sessionEventIssues, sessionEventHeadIssues, workOwnershipIssues, workOwnershipHeadIssues, workOwnershipReferenceIssues, reviewerDecisionIssues, withReviewerAuthority, clinicalActivityIssues, sessionClinicalCoverageIssues, effectiveFacilityRevisions, appointmentAllocationIssues, assignmentEligibilityIssues, staffPermissions, reservationMatchesAppointment, type AnyDocument, type AuthorizationContext, type FacilityRecords, type Staff, type Unit, type Location, type ServiceDefinition, type ServiceOffering, type PractitionerProfile, type StaffAssignment, type ServiceSession, type SessionEvent, type WorkOwnershipEvent, type AuthoritySnapshot, type AppointmentReservation, type Appointment, type Handoff, type RosterShift, type BillingDepartment, type Permission, type CapabilityDecision, type ReviewerDelegation, } from '@shared';
 import { assertAllowed, freshAuthorization } from '@/auth/authorization';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 import { getDatabase } from '../database';
@@ -83,6 +83,13 @@ export const validateWorkforce = async (record: AnyDocument, context: Authorizat
     failIssues(facilityReferenceIssues(record as never, data));
   if (record.type === 'location')
     failIssues(hierarchyIssues(record, data.locations));
+  // The same catalogue and template checks the server runs when this change syncs.
+  if (record.type === 'service_definition' && record.investigation)
+    failIssues(labTestIssues(record, data.definitions, current ? undefined : await allOfType<StandardTest>('standard_test')));
+  if (record.type === 'result_template') {
+    const [templates, parts, lists, standards] = await Promise.all([allOfType<ResultTemplate>('result_template'), allOfType<ResultPartDefinition>('result_part'), allOfType<AnswerList>('answer_list'), allOfType<StandardTemplate>('standard_template')]);
+    failIssues(resultTemplateIssues(record, { templates, tests: data.definitions, library: { parts, lists }, standards }));
+  }
   if (record.type === 'practitioner_profile' && current?.type === 'practitioner_profile' && record.staffId !== current.staffId)
     throw new Error('A professional profile belongs to its original staff identity. Update that person without moving their history');
   if (policy && ['versioned', 'append_only'].includes(policy.change)) {
@@ -136,6 +143,7 @@ export const validateWorkforce = async (record: AnyDocument, context: Authorizat
   }
   return trusted;
 };
+const TEMPLATE_SETTINGS: readonly string[] = ['result_template', 'result_part', 'answer_list'];
 /** The editor passes a canonical shape, never SQL or server-owned provenance. */
 export const saveWorkforce = async (type: AnyDocument['type'], fields: Record<string, unknown>, context: AuthorizationContext, previous?: AnyDocument, operationId?: string): Promise<AnyDocument> => {
   fields={...fields};
@@ -143,14 +151,16 @@ export const saveWorkforce = async (type: AnyDocument['type'], fields: Record<st
   const policy = type === 'unit' || type === 'billing_department' ? { change: 'revision', permission: type === 'unit' ? 'unit:manage' : 'fee_item:manage' } : FACILITY_DOCUMENT_POLICY[type as keyof typeof FACILITY_DOCUMENT_POLICY];
   if (!policy || !('permission' in policy))
     throw new Error('This record is managed by the server');
-  if (previous && (await pendingWorkforceIds()).has(previous.id))
+  // Result templates may be edited again while an earlier edit waits to sync; the server applies revisions in order.
+  if (previous && !TEMPLATE_SETTINGS.includes(type) && (await pendingWorkforceIds()).has(previous.id))
     throw new Error('This proposal is still syncing. Wait for acceptance or resolve its refusal before editing it again');
+  const schemaVersion = TEMPLATE_SETTINGS.includes(type) ? 5 : 4;
   const configuration = policy.change === 'revision';
   const id = configuration && previous ? previous.id : operationId || newId(type);
   const versioned = policy.change === 'versioned';
   const streamKey = ({ credential: 'credentialId', capability_decision: 'capabilityId', reviewer_delegation: 'delegationId', staff_assignment: 'assignmentId', service_session: 'sessionId' } as Record<string, string>)[type];
   const record = parseDocument({
-    ...(configuration && previous ? previous : envelope(context)), ...fields, id, type, schemaVersion: 4,
+    ...(configuration && previous ? previous : envelope(context)), ...fields, id, type, schemaVersion,
     ...(type === 'unit' ? { unitId: previous && previous.type === 'unit' ? previous.unitId : id } : {}),
     ...(configuration ? { revision: previous && 'revision' in previous ? (previous.revision as number ?? 1) + 1 : previous ? 2 : 1 } : {}),
     ...(versioned ? { [streamKey]: previous ? (previous as Record<string, unknown>)[streamKey] : id, version: previous && 'version' in previous ? Number(previous.version) + 1 : 1, previousId: previous?.id } : {}),
@@ -160,7 +170,7 @@ export const saveWorkforce = async (type: AnyDocument['type'], fields: Record<st
   const trusted = await validateWorkforce(record.data, context, previous);
   if (configuration && previous)
     return updateRecord(trusted, policy.permission as Permission, type, previous.id, {
-      ...fields, schemaVersion: 4, revision: (record.data as {
+      ...fields, schemaVersion, revision: (record.data as {
         revision: number;
       }).revision
     } as Partial<AnyDocument>);

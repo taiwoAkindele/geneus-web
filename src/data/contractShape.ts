@@ -13,6 +13,7 @@ interface ZodDef {
   type?: string;
   innerType?: ZodLike;
   in?: ZodLike;
+  options?: ZodLike[];
 }
 interface ZodLike {
   _zod?: { def?: ZodDef };
@@ -28,6 +29,8 @@ const kindOf = (schema: ZodLike): FieldKind => {
     if (def.type === 'boolean') return 'boolean';
     if (def.type === 'number') return 'number';
     if (def.type && JSON_TYPES.has(def.type)) return 'json';
+    // A union of objects (a result part of any kind) is stored as one JSON value.
+    if (def.type === 'union' && def.options?.length && def.options.every((option) => kindOf(option) === 'json')) return 'json';
     if (!def.innerType && !def.in) return 'text';
     current = def.innerType ?? def.in;
   }

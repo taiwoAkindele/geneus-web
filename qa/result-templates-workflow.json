@@ -1,0 +1,250 @@
+[
+  {
+    "role": "facility_admin",
+    "path": "/investigations/catalogue",
+    "evaluate": "window.seedResultTemplateScenario({offline:true})"
+  },
+  {
+    "name": "templates-catalogue-before",
+    "assert": "[...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='Settings')&&document.body.innerText.includes('Result template')&&document.body.innerText.includes('Text result only')",
+    "description": "The catalogue has a Settings menu and shows that tests without a template take a text result"
+  },
+  {
+    "click": "Settings"
+  },
+  {
+    "click": "Result templates",
+    "name": "templates-settings-empty",
+    "assert": "window.designAudit.path==='/investigations/settings'&&document.body.innerText.includes('Catalogue settings')&&document.body.innerText.includes('Result parts library')&&document.body.innerText.includes('Answer lists')&&document.body.innerText.includes('No result templates yet')",
+    "description": "Settings opens on result templates, with the parts library and answer lists alongside"
+  },
+  {
+    "click": "Create template"
+  },
+  {
+    "click": "Start from a standard template",
+    "name": "templates-standard-sheet",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Full blood count')&&document.querySelector('dialog[open]').innerText.includes('Imaging report')&&document.querySelector('dialog[open]').innerText.includes('typical adult values')",
+    "description": "Standard templates come from the server, with a warning to check adult ranges"
+  },
+  {
+    "fill": {
+      "label": "Search standard templates",
+      "value": "rapid"
+    },
+    "assert": "[...document.querySelectorAll('dialog[open] label b')].map(b=>b.textContent.trim()).join('|')==='Rapid test: Reactive / Non-reactive'",
+    "description": "Searching standard templates narrows the list"
+  },
+  {
+    "fill": {
+      "label": "Search standard templates",
+      "value": ""
+    }
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('dialog[open] label')].filter(l=>/^(Full blood count|Rapid test: Reactive)/.test(l.innerText.trim())).forEach(l=>l.querySelector('input').click());true"
+  },
+  {
+    "click": "Add 2 selected",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Added 2 templates')&&document.querySelector('dialog[open]').innerText.includes('Already added')",
+    "description": "Chosen standard templates are added by the server and marked as added"
+  },
+  {
+    "click": "Done",
+    "name": "templates-list",
+    "assert": "document.querySelectorAll('tbody tr').length===2&&document.querySelector('tbody').innerText.includes('In use')&&[...document.querySelectorAll('tbody tr')].find(r=>r.innerText.startsWith('Full blood count'))?.innerText.includes('Mixed')&&[...document.querySelectorAll('tbody .rounded-full')].every(t=>t.getClientRects().length===1&&t.getBoundingClientRect().height<30)&&[...document.querySelectorAll('tbody td span.truncate')].every(u=>u.title&&u.getBoundingClientRect().height<30)",
+    "description": "The list shows each template's result type, parts, tests and status; status pills stay on one line and Used by is one line with the full list as its tooltip"
+  },
+  {
+    "path": "/investigations/catalogue",
+    "assert": "[...document.querySelectorAll('tbody tr')].find(r=>r.innerText.includes('Full blood count'))?.innerText.includes('3 parts')&&[...document.querySelectorAll('tbody tr')].find(r=>r.innerText.includes('Widal test'))?.innerText.includes('Text result only')",
+    "description": "The adopted template is linked to the matching catalogue test only"
+  },
+  {
+    "path": "/investigations/settings",
+    "click": "Edit",
+    "name": "templates-editor",
+    "assert": "document.body.innerText.includes('Result parts')&&document.body.innerText.includes('Used by')&&document.body.innerText.includes('Preview')&&document.body.innerText.includes('Normal range: 12–15 g/dL')&&document.body.innerText.includes('Changes apply to results entered after you save')",
+    "description": "The editor shows parts, tests and a live preview with the woman's haemoglobin range"
+  },
+  {
+    "fill": {
+      "label": "Show ranges for",
+      "value": "man"
+    },
+    "assert": "document.body.innerText.includes('Normal range: 13–17 g/dL')",
+    "description": "The preview shows the range for a man"
+  },
+  {
+    "fill": {
+      "label": "Show ranges for",
+      "value": "child"
+    },
+    "assert": "document.body.innerText.split('No range set for this patient').length===3",
+    "description": "No adult range is shown for a child"
+  },
+  {
+    "click": "Edit",
+    "name": "templates-range-sheet",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Normal ranges')&&document.querySelectorAll('dialog[open] ol > li').length===2&&Boolean(document.querySelector('dialog[open] [aria-label=\"Range 2 for\"]'))",
+    "description": "Each part's ranges are edited as rows by sex and age"
+  },
+  {
+    "click": "Add range",
+    "evaluate": "(()=>{const set=(l,v)=>{const i=document.querySelector('dialog[open] [aria-label=\"'+l+'\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));};set('Range 3 low','1');set('Range 3 high','2');return true})()"
+  },
+  {
+    "click": "Save part",
+    "assert": "document.querySelector('dialog[open] [role=alert]')?.innerText.includes('Range 3: Two ranges cover the same patients')",
+    "description": "Overlapping ranges are refused before saving"
+  },
+  {
+    "label": "Remove range 3"
+  },
+  {
+    "click": "Save part",
+    "assert": "!document.querySelector('dialog[open]')",
+    "description": "Valid ranges save back into the template"
+  },
+  {
+    "fill": {
+      "label": "Template name",
+      "value": "Full blood count (adult)"
+    }
+  },
+  {
+    "click": "Save template",
+    "assert": "window.designAudit.path==='/investigations/settings'&&document.body.innerText.includes('Full blood count (adult) saved')&&document.querySelector('tbody').innerText.includes('Full blood count (adult)')",
+    "description": "Saving sends the template to the server and returns to the list"
+  },
+  {
+    "click": "Create template"
+  },
+  {
+    "click": "Start blank",
+    "assert": "window.designAudit.path==='/investigations/settings/templates/new'&&document.body.innerText.includes('No parts yet')",
+    "description": "A blank template starts with no parts"
+  },
+  {
+    "click": "New part"
+  },
+  {
+    "fill": {
+      "label": "Part name",
+      "value": "Result"
+    }
+  },
+  {
+    "fill": {
+      "label": "Answer type",
+      "value": "choice"
+    }
+  },
+  {
+    "fill": {
+      "label": "Answers",
+      "value": "Negative\nPositive"
+    }
+  },
+  {
+    "click": "Add part",
+    "assert": "!document.querySelector('dialog[open]')&&[...document.querySelectorAll('aside select')].some(s=>s.innerText.includes('Positive'))",
+    "description": "A new choice part appears in the preview"
+  },
+  {
+    "fill": {
+      "label": "Template name",
+      "value": "Pregnancy test"
+    }
+  },
+  {
+    "click": "Save template",
+    "assert": "[...document.querySelectorAll('tbody tr')].find(r=>r.innerText.includes('Pregnancy test'))?.innerText.includes('Draft')",
+    "description": "A new template is saved as a draft"
+  },
+  {
+    "click": "Rapid test: Reactive / Non-reactive",
+    "selector": "a"
+  },
+  {
+    "click": "Add tests",
+    "name": "templates-tests-sheet",
+    "assert": "[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.includes('Full blood count'))?.innerText.includes('Uses “Full blood count (adult)”')&&[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.includes('Full blood count')).querySelector('input').disabled",
+    "description": "A test already using another template cannot be added"
+  },
+  {
+    "key": "Escape",
+    "path": "/investigations/settings?tab=parts",
+    "assert": "document.body.innerText.includes('No shared parts yet')",
+    "description": "The parts library starts empty"
+  },
+  {
+    "click": "New part"
+  },
+  {
+    "fill": {
+      "label": "Part name",
+      "value": "Glucose"
+    }
+  },
+  {
+    "fill": {
+      "label": "Unit (optional)",
+      "value": "mmol/L"
+    }
+  },
+  {
+    "click": "Add range",
+    "evaluate": "(()=>{const set=(l,v)=>{const i=document.querySelector('dialog[open] [aria-label=\"'+l+'\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));};set('Range 1 low','3.9');set('Range 1 high','5.5');return true})()"
+  },
+  {
+    "click": "Add part",
+    "name": "templates-parts-library",
+    "assert": "!document.querySelector('dialog[open]')&&document.querySelector('tbody').innerText.includes('Glucose')&&document.querySelector('tbody').innerText.includes('3.9–5.5 · Anyone, 18 years and over')&&document.querySelector('tbody').innerText.includes('0 templates')",
+    "description": "A shared part is saved to the library with its range"
+  },
+  {
+    "path": "/investigations/settings?tab=answers",
+    "click": "New answer list"
+  },
+  {
+    "fill": {
+      "label": "List name",
+      "value": "Reactivity"
+    }
+  },
+  {
+    "fill": {
+      "label": "Answers",
+      "value": "Non-reactive\nReactive"
+    }
+  },
+  {
+    "click": "Add list",
+    "name": "templates-answer-lists",
+    "assert": "!document.querySelector('dialog[open]')&&document.querySelector('tbody').innerText.includes('Non-reactive · Reactive')",
+    "description": "An answer list is saved and listed"
+  },
+  {
+    "role": "laboratory_staff",
+    "path": "/investigations/settings",
+    "assert": "document.body.innerText.includes('View access')&&!document.body.innerText.includes('Catalogue settings')",
+    "description": "Lab staff without the permission cannot open template settings"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "evaluate": "window.seedResultTemplateScenario({offline:true,withFbc:true})",
+    "path": "/investigations/settings",
+    "name": "templates-settings-phone",
+    "assert": "document.documentElement.scrollWidth<=320&&document.body.innerText.includes('Full blood count')",
+    "description": "Template settings fit a 320px phone"
+  },
+  {
+    "click": "Full blood count",
+    "selector": "a",
+    "name": "templates-editor-phone",
+    "assert": "document.documentElement.scrollWidth<=320&&document.body.innerText.includes('Preview')",
+    "description": "The template editor fits a 320px phone"
+  }
+]

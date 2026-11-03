@@ -1,14 +1,19 @@
-import { DocumentFile,type UploadMutation } from '@shared';
+import { DocumentFile,LabReport,type UploadMutation } from '@shared';
 import { ApiError } from '@/lib/api/client';
 import { uploadDocumentBytes } from '@/lib/api/documents';
 import { cachedDocument,confirmDocumentBytes,type DocumentScope } from './documentFiles';
 /** Runs inside PowerSync's existing upload transaction loop, including when nobody is signed in. */
 export const transferDocumentFiles=async(credential:string,scope:DocumentScope,mutations:readonly UploadMutation[]):Promise<void>=>{
   const done=new Set<string>();
-  for(const mutation of mutations){
-    if(!['library_document','visit_document'].includes(mutation.table))continue;
-    const parsed=DocumentFile.safeParse(mutation.data.file);if(!parsed.success||done.has(parsed.data.id))continue;
-    const file=parsed.data,actor=mutation.data.createdBy;
+  // Documents carry one file; a lab result carries the images attached to its report.
+  const files=mutations.flatMap((mutation)=>{
+    if(['library_document','visit_document'].includes(mutation.table))return [{file:mutation.data.file,actor:mutation.data.createdBy}];
+    const report=LabReport.safeParse(mutation.table==='encounter_entry'?mutation.data.labReport:undefined);
+    return report.success?report.data.items.flatMap((item)=>item.values.flatMap((value)=>value.kind==='images'?value.files.map((file)=>({file,actor:mutation.data.createdBy})):[])):[];
+  });
+  for(const candidate of files){
+    const parsed=DocumentFile.safeParse(candidate.file);if(!parsed.success||done.has(parsed.data.id))continue;
+    const file=parsed.data,actor=candidate.actor;
     if(typeof actor!=='string')continue;
     const cached=await cachedDocument(scope,file).catch(()=>undefined);
     if(!cached || cached.remote)continue;

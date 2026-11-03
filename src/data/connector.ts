@@ -46,7 +46,7 @@ export const toMutation = (entry: CrudEntry): UploadMutation => {
     id: entry.id,
     data,
     ...(entry.previousValues ? { previous: decodeValues(table, entry.previousValues) } : {}),
-    ...((['unit','billing_department','location','service_definition','service_offering','practitioner_profile'].includes(table) && entry.op === 'PATCH' && typeof data.revision === 'number') ? { expectedRevision: data.revision - 1 } : {}),
+    ...((['unit','billing_department','location','service_definition','service_offering','practitioner_profile','result_template','result_part','answer_list'].includes(table) && entry.op === 'PATCH' && typeof data.revision === 'number') ? { expectedRevision: data.revision - 1 } : {}),
     ...((Object.prototype.hasOwnProperty.call(FACILITY_DOCUMENT_POLICY, table) && ['versioned','append_only'].includes(FACILITY_DOCUMENT_POLICY[table as keyof typeof FACILITY_DOCUMENT_POLICY].change)) ? { expectedPreviousId: typeof data.previousId === 'string' ? data.previousId : null } : {}),
   };
 };
@@ -93,7 +93,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
         mutations: transaction.crud.map(toMutation),
       };
       try {
-        if(fileScope && request.mutations.some((mutation)=>['library_document','visit_document'].includes(mutation.table))){const {transferDocumentFiles}=await import('./documentTransfer');await transferDocumentFiles(device.credential,fileScope,request.mutations);}
+        if(fileScope && request.mutations.some((mutation)=>['library_document','visit_document'].includes(mutation.table)||(mutation.table==='encounter_entry'&&mutation.data.labReport!==undefined))){const {transferDocumentFiles}=await import('./documentTransfer');await transferDocumentFiles(device.credential,fileScope,request.mutations);}
         const response = await uploadMutations(device.credential, request);
         await confirmWorkforceReceipts(device.credential, request.mutations.filter((mutation) => requiresFacilityContract(mutation) || ['inpatient_event','bed_ready_event','library_document','visit_document'].includes(mutation.table)));
         recordServerContact(response.serverTime, device.deviceId);

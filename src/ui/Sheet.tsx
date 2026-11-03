@@ -16,10 +16,22 @@ type Props = {
   closeDisabled?: boolean;
   placement?: 'center' | 'side';
   hasUnsavedChanges?: boolean;
+  /** A wider side sheet, for content such as a report table that needs the room. */
+  wide?: boolean;
+};
+
+// Open sheets share one page-scroll lock: nested sheets can close in any order
+// (React closes the outer one first when both go together), and the page scrolls once the last has closed.
+let openSheets = 0, pageOverflow = '';
+const lockPageScroll = () => {
+  if (openSheets++ === 0) { pageOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
+};
+const unlockPageScroll = () => {
+  if (--openSheets === 0) document.body.style.overflow = pageOverflow;
 };
 
 /** Native modal supplies focus containment and makes the page behind it inert. */
-export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false, placement = 'center', hasUnsavedChanges = false }: Props) => {
+export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false, placement = 'center', hasUnsavedChanges = false, wide = false }: Props) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
@@ -42,13 +54,12 @@ export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false
     const element = dialog.current;
     if (!element) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    lockPageScroll();
     element.showModal();
     (heading.current ?? element).focus({ preventScroll: true });
     return () => {
       element.close();
-      document.body.style.overflow = overflow;
+      unlockPageScroll();
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
@@ -74,7 +85,7 @@ export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false
       }}
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
       className={`fixed inset-0 m-0 h-[100dvh] max-h-none w-screen max-w-none flex-col justify-end border-0 bg-transparent p-0 text-ink backdrop:bg-black/40 open:flex ${placement === 'side' ? 'sm:items-end sm:justify-start' : 'sm:items-center sm:justify-center sm:p-6'}`}>
-      <div className={`relative w-full overflow-auto bg-white px-5 pb-6 pt-5 shadow-sheet ${placement === 'side' ? 'h-[100dvh] max-h-[100dvh] sm:max-w-lg sm:border-l sm:border-outline-soft' : 'max-h-[90dvh] rounded-t-sheet sm:max-w-lg sm:rounded-sheet'}`}>
+      <div className={`relative w-full overflow-auto bg-white px-5 pb-6 pt-5 shadow-sheet ${placement === 'side' ? `h-[100dvh] max-h-[100dvh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:border-l sm:border-outline-soft` : 'max-h-[90dvh] rounded-t-sheet sm:max-w-lg sm:rounded-sheet'}`}>
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-outline-hair sm:hidden" />
         {(title || eyebrow) ? (
           <div className="mb-4 flex items-start justify-between gap-3">

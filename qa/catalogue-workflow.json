@@ -12,16 +12,40 @@
   {
     "click": "Choose from standard tests",
     "name": "catalogue-standard-sheet",
-    "assert": "document.querySelector('dialog[open]').innerText.includes('Full blood count')&&document.querySelector('dialog[open]').innerText.includes('Select all 3 available')&&!document.querySelector('dialog[open]').innerText.includes('Performed by')&&!document.querySelector('dialog[open] select')",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Full blood count')&&[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all')&&![...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').disabled&&![...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').checked&&!document.querySelector('dialog[open]').innerText.includes('Performed by')&&!document.querySelector('dialog[open] select')",
     "description": "Standard tests are read from the server, with no unit or location to choose"
   },
   {
-    "evaluate": "[...document.querySelectorAll('dialog[open] input[type=checkbox]')].slice(0,2).forEach(box=>box.click());true"
+    "fill": {
+      "label": "Search standard tests",
+      "value": "cbc"
+    },
+    "assert": "[...document.querySelectorAll('dialog[open] label')].filter(l=>l.querySelector('b')).length===1&&document.querySelector('dialog[open]').innerText.includes('Full blood count')",
+    "description": "Searching standard tests by another name narrows the list"
+  },
+  {
+    "fill": {
+      "label": "Search standard tests",
+      "value": ""
+    }
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('dialog[open] label')].filter(l=>l.querySelector('b')).slice(0,2).forEach(l=>l.querySelector('input').click());true"
   },
   {
     "click": "Add 2 selected tests",
-    "assert": "document.querySelector('dialog[open]').innerText.includes('Added 2 tests')&&document.querySelector('dialog[open]').innerText.includes('Select all 1 available')",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Added 2 tests')&&[...document.querySelectorAll('dialog[open] label')].filter(l=>l.querySelector('b')&&!l.querySelector('input').disabled).length===1",
     "description": "Chosen standard tests are added by the server and the list refreshes"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').click();true",
+    "assert": "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add 1 selected test')&&[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').checked",
+    "description": "Select all ticks every test still available"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').click();true",
+    "assert": "![...document.querySelectorAll('dialog[open] label')].find(l=>l.innerText.trim()==='Select all').querySelector('input').checked&&[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add 0 selected tests')",
+    "description": "Unticking Select all clears them"
   },
   {
     "click": "Done",
@@ -179,8 +203,8 @@
   {
     "click": "Choose from standard tests",
     "name": "catalogue-offline",
-    "assert": "document.querySelector('dialog[open]').innerText.includes('Connect to the internet to add tests')",
-    "description": "Adding tests offline explains that a connection is needed"
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Full blood count')&&!document.querySelector('dialog[open]').innerText.includes('Connect to the internet')",
+    "description": "Standard tests are listed with no connection, from the device's own copy"
   },
   {
     "key": "Escape",

@@ -1,4 +1,4 @@
-import type { EncounterEntry, EncounterStep, InvestigationItem } from '@shared';
+import type { DocumentFile, EncounterEntry, EncounterStep, InvestigationItem, ResultFlag } from '@shared';
 
 /**
  * The Patient Encounter (PRD §9.8). One encounter is one record split into
@@ -9,7 +9,16 @@ import type { EncounterEntry, EncounterStep, InvestigationItem } from '@shared';
 export type StepKey = Exclude<EncounterStep, 'amendment'>;
 
 export type RxLine = { name: string; dose: string; frequency?: string; duration?: string; route?: string; quantity?: string };
-export type DiagnosisLine = { label: string; code?: string; codingSystem?: 'ICD-10' | 'SNOMED CT' | 'local'; certainty?: 'unknown' | 'suspected' | 'confirmed' };
+/** One template part as the lab scientist is filling it in — strings as typed. */
+export type LabPartDraft = {
+  value?: string; flag?: ResultFlag | '';
+  growth?: '' | 'no_growth' | 'growth';
+  organisms?: { name: string; count: string; susceptibility: Record<string, '' | 'S' | 'I' | 'R'> }[];
+  files?: DocumentFile[];
+};
+/** A test entered with a result template: its parts by key, and a comment for the doctor. */
+export type LabItemDraft = { values: Record<string, LabPartDraft>; comment: string };
+export type DiagnosisLine ={ label: string; code?: string; codingSystem?: 'ICD-10' | 'SNOMED CT' | 'local'; certainty?: 'unknown' | 'suspected' | 'confirmed' };
 
 /** What each section's form holds while it is being recorded — strings as typed. */
 export type EncounterData = {
@@ -25,6 +34,8 @@ export type EncounterData = {
   complaint: { text: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
   lab_order: { tests: string[]; items?: InvestigationItem[]; reason?: string };
   lab_results: Record<string, string>;
+  /** Tests with a result template, by order item (or test name); others use `lab_results` text. */
+  lab_report: Record<string, LabItemDraft>;
   // `rx`, `injection` and `admit` are read only from visits recorded in the retired order.
   diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean; pendingResultsReason?: string; code?: string; codingSystem?: DiagnosisLine['codingSystem']; certainty?: DiagnosisLine['certainty']; diagnoses?: DiagnosisLine[] };
   injection: { drug: string; dose: string; route: string; site: string; note: string };

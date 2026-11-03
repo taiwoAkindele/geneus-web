@@ -1,8 +1,9 @@
-import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport } from '@shared';
 import { allOfType, allWhere, findRecord, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
 import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
+import { labReportSaveIssues } from './resultTemplates';
 
 /**
  * Encounters (PRD §9.8, SCHEMA.md §13): a header and add-only entries, one per
@@ -40,6 +41,8 @@ export type StepSave = {
   collectLaterReason?: string;
   investigationReason?: string;
   workflowVersion?: 1;
+  /** The structured form of a `lab_results` save, kept beside its plain summary values. */
+  labReport?: LabReport;
 };
 
 /**
@@ -94,6 +97,10 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
   }
   const issues = careEntryIssues({ step: save.step, values, workflowVersion: save.workflowVersion }, prior);
   if (issues.length) throw new Error(issues.join('. '));
+  if (save.labReport) {
+    const reportIssues = await labReportSaveIssues(save.patientId, prior, save.labReport, values.results as { test: string; result: string }[], savedOn);
+    if (reportIssues.length) throw new Error(reportIssues.join('. '));
+  }
   if (save.followUp) {
     const followUp = await bookingRecords({ ...save.followUp, patientId: save.patientId, visitType: 'follow_up' }, context, savedOn);
     records.push(...followUp);
@@ -111,6 +118,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     step: save.step,
     actorRole: context.role,
     values,
+    ...(save.labReport ? { labReport: save.labReport } : {}),
   };
   records.push({ permission: 'encounter:record', type: 'encounter_entry', record: entry });
   if (save.step === 'lab_order' && Array.isArray(values.items)) {
@@ -133,8 +141,14 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
 };
 
 /** Adds a correction beside a saved entry; the original is never touched (PRD §9.8.3). */
-export const amendEntry = async (entry: EncounterEntry, note: string, context: AuthorizationContext, correctedValues?: Record<string, unknown>, expectedCorrectionId?: string | null) => {
+export const amendEntry = async (entry: EncounterEntry, note: string, context: AuthorizationContext, correctedValues?: Record<string, unknown>, expectedCorrectionId?: string | null, labReport?: LabReport) => {
   let previousAmendmentId: string | undefined;
+  const createdOn = nowIso();
+  if (labReport) {
+    if (entry.step !== 'lab_results' || !correctedValues) throw new Error('A structured result corrects only a lab result');
+    const reportIssues = await labReportSaveIssues(entry.patientId, await entriesForEncounter(entry.encounterId), labReport, ENCOUNTER_STEP_VALUES.lab_results.parse(correctedValues).results, createdOn);
+    if (reportIssues.length) throw new Error(reportIssues.join('. '));
+  }
   if (correctedValues) {
     if (!['vitals', 'complaint', 'lab_results', 'diagnosis', 'prescription', 'injection_order', 'injection'].includes(entry.step)) throw new Error('This section supports explanatory amendments only');
     ENCOUNTER_STEP_VALUES[entry.step].parse(correctedValues);
@@ -162,7 +176,8 @@ export const amendEntry = async (entry: EncounterEntry, note: string, context: A
     }
   }
   return insertRecord<EncounterEntry>(context, 'encounter:record', 'encounter_entry', {
-    ...envelope(context),
+    ...envelope(context, createdOn),
+    ...(labReport ? { labReport } : {}),
     id: newId('encounter_entry'),
     type: 'encounter_entry',
     workflowVersion: entry.workflowVersion,

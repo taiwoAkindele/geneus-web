@@ -5,12 +5,13 @@ import { usePatients } from '@/features/search';
 import { useRequestQueues, type ServiceRequest } from '@/features/encounter';
 import { visitDate } from '@/features/encounter/VisitTable';
 import { PatientChartAccess } from '@/features/patients/PatientChartAccess';
-import { patientChartPath, visitRecordPath } from '@/features/patients/patientRoutes';
+import { labRequestPath } from './LabRequestScreen';
+import { dispensePath } from './DispenseScreen';
 
 type Station = 'lab' | 'pharmacy';
 const COPY = {
-  lab: { title: 'Laboratory', items: 'Tests', search: 'Patient name, ID or test', task: 'lab_results', open: 'Record results', empty: 'No test requests' },
-  pharmacy: { title: 'Pharmacy', items: 'Medicines', search: 'Patient name, ID or medicine', task: 'dispense', open: 'Dispense', empty: 'No prescriptions' },
+  lab: { title: 'Laboratory', items: 'Tests', search: 'Patient name, ID or test', open: 'Record results', empty: 'No test requests' },
+  pharmacy: { title: 'Pharmacy', items: 'Medicines', search: 'Patient name, ID or medicine', open: 'Dispense', empty: 'No prescriptions' },
 } as const;
 
 /** One service's requests: open until resulted or dispensed, then completed. Only a search narrows them. */
@@ -25,7 +26,6 @@ const ServiceQueue = ({ station }: { station: Station }) => {
   const patient = useMemo(() => new Map((patients.data ?? []).map((p) => [p.patientId, p])), [patients.data]);
   const queue = queues.data?.[station];
   const rows = useMemo(() => (queue?.[tab] ?? []).filter((request) => !query || [patient.get(request.patientId)?.fullName ?? '', request.patientId, ...request.items].some((text) => text.toLowerCase().includes(query))), [queue, tab, query, patient]);
-  const here = `/${station === 'lab' ? 'laboratory' : 'pharmacy'}?${params}`;
   const columns: TableColumn<ServiceRequest>[] = [
     { key: 'patient', label: 'Patient', sortValue: (r) => patient.get(r.patientId)?.fullName ?? r.patientId, render: (r) => <div className="min-w-[140px]"><p className="font-bold">{patient.get(r.patientId)?.fullName ?? 'Patient not on this device'}</p><p className="break-all font-mono text-xs text-ink-soft">{r.patientId}</p></div> },
     { key: 'requested', label: 'Requested', sortValue: (r) => r.requestedOn, className: 'hidden md:table-cell', render: (r) => visitDate(r.requestedOn) },
@@ -33,9 +33,10 @@ const ServiceQueue = ({ station }: { station: Station }) => {
     { key: 'status', label: 'Status', className: 'hidden md:table-cell', render: (r) => tab === 'open'
       ? <Tag tone="amber">{station === 'lab' ? (r.pending.length === r.items.length ? 'Awaiting results' : `${r.items.length - r.pending.length} of ${r.items.length} resulted`) : 'To dispense'}</Tag>
       : <><Tag tone="green">{station === 'lab' ? 'Resulted' : 'Dispensed'}</Tag>{r.completedOn ? <p className="mt-1 text-xs text-ink-soft">{visitDate(r.completedOn)}</p> : null}</> },
-    { key: 'action', label: 'Action', render: (r) => tab === 'open'
-      ? <Button fullWidth={false} className="px-3 text-sm" onClick={() => navigate(visitRecordPath(r.patientId, r.encounterId, here) + '&task=' + copy.task)}>{copy.open}</Button>
-      : <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(patientChartPath(r.patientId, 'visits', { visit: r.encounterId }))}>View</Button> },
+    // A request is worked on its own Laboratory or Pharmacy screen, open or completed.
+    { key: 'action', label: 'Action', render: (r) => { const to = (station === 'lab' ? labRequestPath : dispensePath)(r.patientId, r.encounterId); return tab === 'open'
+      ? <Button fullWidth={false} className="px-3 text-sm" onClick={() => navigate(to)}>{copy.open}</Button>
+      : <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(to)}>View</Button>; } },
   ];
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
     <h1 className="text-[28px] font-extrabold">{copy.title}</h1>

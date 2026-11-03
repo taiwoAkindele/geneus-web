@@ -12,6 +12,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'patient_chart:read': 'View patient medical history',
   'admission:manage': 'Manage admissions and ward beds',
   'location:manage': 'Manage care locations', 'service:manage': 'Manage services',
+  'result_template:manage': 'Manage lab result templates',
   'practitioner:manage': 'Manage professional profiles', 'credential:manage': 'Record credential evidence',
   'credential:read': 'Read restricted credential evidence', 'clinical_capability:review': 'Independently review clinical authority',
   'staff_assignment:manage': 'Manage service assignments', 'service_session:manage': 'Plan service coverage',
