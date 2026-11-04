@@ -1,11 +1,13 @@
 import {
   validateRegisterEntry,
   registerDefinitionIssues,
+  registerEntryLinkIssues,
   type AuthorizationContext,
   type RegisterDefinition,
   type RegisterEntry,
   type RegisterEntryValue,
   type RegisterFieldDef,
+  type RegisterVisitLink,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { allOfType, envelope, insertRecord, newId } from '../db';
@@ -16,6 +18,8 @@ export type RegisterDraft = {
   category: string;
   description: string;
   fields: RegisterFieldDef[];
+  /** Present when the register fills itself from visits. */
+  visitLink?: RegisterVisitLink;
 };
 
 export const listDefinitions = () => allOfType<RegisterDefinition>('register_definition');
@@ -56,7 +60,16 @@ const saveDefinition = async (
   const id = registerId ?? newId('register_definition');
   const version = highestVersion(definitions, id) + 1;
   if (expectedVersion !== undefined && version !== expectedVersion + 1) throw new Error('A newer register version is available. Reopen its configuration before saving your changes. Your private recovery is kept.');
-  const values = { ...draft, name: draft.name.trim(), category: draft.category.trim(), status, fields: draft.fields.map((field) => ({ ...field, label: field.label.trim(), options: field.options?.map((option) => option.trim()) })) };
+  const words = (list: readonly string[]) => list.map((word) => word.trim()).filter(Boolean);
+  const { visitLink, ...rest } = draft;
+  const values = {
+    ...rest, name: draft.name.trim(), category: draft.category.trim(), status,
+    ...(visitLink ? { visitLink: { visits: visitLink.visits, words: words(visitLink.words), codes: words(visitLink.codes), visitTypes: [...new Set(visitLink.visitTypes ?? [])] } } : {}),
+    fields: draft.fields.map(({ fromVisit, ...field }) => ({
+      ...field, label: field.label.trim(), options: field.options?.map((option) => option.trim()),
+      ...(fromVisit ? { fromVisit: { fact: fromVisit.fact, ...(fromVisit.words && words(fromVisit.words).length ? { words: words(fromVisit.words) } : {}) } } : {}),
+    })),
+  };
   const issues = registerDefinitionIssues(values, definitions.filter((definition) => definition.registerId === id));
   if (issues.length) throw new Error(issues.join(' '));
   return insertRecord<RegisterDefinition>(context, 'register_definition:publish', 'register_definition', {
@@ -76,6 +89,8 @@ export const publishDefinition = (draft: RegisterDraft, registerId: string | nul
 export type EntryDraft = {
   registerId: string;
   values: Record<string, RegisterEntryValue>;
+  /** For a visit-linked register: the visit whose row this entry completes. */
+  visit?: { encounterId: string; patientId: string };
 };
 
 export type AddEntryResult = { saved: true } | { saved: false; issues: string[] };
@@ -88,8 +103,11 @@ export const addEntry = async (draft: EntryDraft, context: AuthorizationContext)
   const definition = currentPublished(await listDefinitions(), draft.registerId);
   if (!definition) return { saved: false, issues: ['Publish this register before recording entries'] };
 
-  const issues = validateRegisterEntry(definition.fields, draft.values);
-  const known = new Set(definition.fields.filter((field) => field.type !== 'section').map((field) => field.id));
+  // In a visit-linked register staff record only the fields the visit does not fill.
+  const asked = definition.fields.filter((field) => field.type !== 'section' && !field.fromVisit);
+  const issues = validateRegisterEntry(asked, draft.values);
+  issues.push(...registerEntryLinkIssues(definition, { ...draft.visit, values: draft.values }));
+  const known = new Set(asked.map((field) => field.id));
   if (Object.keys(draft.values).some((field) => !known.has(field))) issues.push('The entry includes a field outside this register version');
   if (issues.length > 0) return { saved: false, issues };
 
@@ -101,6 +119,7 @@ export const addEntry = async (draft: EntryDraft, context: AuthorizationContext)
     registerVersion: definition.version,
     entryDate: calendarDate(),
     setting: 'facility',
+    ...(draft.visit ? { patientId: draft.visit.patientId, encounterId: draft.visit.encounterId } : {}),
     values: draft.values,
   });
   return { saved: true };

@@ -1,0 +1,90 @@
+[
+  {
+    "role": "nurse",
+    "path": "/registers",
+    "evaluate": "window.seedProgrammeScenario()"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000004-K5",
+    "name": "visit-for",
+    "assert": "[...document.querySelectorAll('label')].some(l=>l.textContent.trim()==='Visit for')&&document.querySelector('main select').value==='general'&&!document.body.innerText.includes('Programme details')",
+    "description": "A new visit asks what it is for, General by default"
+  },
+  {
+    "evaluate": "(()=>{const s=document.querySelector('main select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(s,'antenatal');s.dispatchEvent(new Event('change',{bubbles:true}));return true})()"
+  },
+  {
+    "fill": {
+      "label": "Temp (°C)",
+      "value": "36.8"
+    }
+  },
+  {
+    "click": "Review & sign vitals"
+  },
+  {
+    "click": "Confirm & lock",
+    "name": "visit-programme-panel",
+    "assert": "window.designAudit.rows.encounters.some(r=>r.patientId==='QA-PHC-000004-K5'&&r.visitType==='antenatal')&&document.body.innerText.includes('Antenatal visit')&&document.body.innerText.includes('Programme details')&&document.body.innerText.includes('Antenatal register')&&document.body.innerText.includes('Not recorded yet')&&![...document.querySelectorAll('label')].some(l=>l.textContent.trim()==='Visit for')",
+    "description": "The visit is saved as antenatal and offers the antenatal register's programme details"
+  },
+  {
+    "click": "Record details",
+    "name": "visit-programme-sheet",
+    "assert": "document.querySelector('dialog[open]')?.innerText.toLowerCase().includes('details for this visit')&&document.querySelector('dialog[open]').innerText.includes('Gestational age (weeks)')&&!document.querySelector('dialog[open]').innerText.includes('Blood pressure')",
+    "description": "Programme details ask only for what the visit does not record"
+  },
+  {
+    "fill": {
+      "label": "Gestational age (weeks)",
+      "value": "24"
+    }
+  },
+  {
+    "click": "Review entry"
+  },
+  {
+    "click": "Sign & save entry",
+    "assert": "!document.querySelector('dialog[open]')&&window.designAudit.rows.register_entries.some(r=>r.registerId==='register:anc'&&r.patientId==='QA-PHC-000004-K5'&&String(r.values).includes('24'))&&[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Update details')",
+    "description": "The details are saved as the register entry for this visit"
+  },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('article')].find(a=>a.innerText.includes('Antenatal register')).querySelector('a').click();true",
+    "name": "visit-programme-register",
+    "assert": "document.body.innerText.includes('Every antenatal visit adds a row')&&document.body.innerText.includes('Ada Expecting')&&document.body.innerText.includes('Antenatal')&&document.body.innerText.includes('24')&&document.body.innerText.includes('0 to complete')&&!document.body.innerText.includes('Amaka Okoro')",
+    "description": "The antenatal register takes only antenatal visits, with the details recorded in the visit"
+  },
+  {
+    "assert": "![...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Configure')",
+    "description": "Nurses record details but do not configure registers"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000001-K2&visit=encounter%3Aopen",
+    "assert": "document.body.innerText.includes('General visit')&&!document.body.innerText.includes('Programme details')",
+    "description": "A visit recorded before visit types counts as general and shows no programme details"
+  },
+  {
+    "role": "records_officer",
+    "path": "/registers",
+    "evaluate": "window.seedProgrammeScenario()"
+  },
+  {
+    "path": "/registers/register%3Aanc/configure",
+    "name": "visit-programme-builder",
+    "assert": "[...document.querySelectorAll('select')].some(s=>s.value==='visit_types')&&[...document.querySelectorAll('label')].some(l=>l.textContent.trim()==='Antenatal'&&l.querySelector('input').checked)&&[...document.querySelectorAll('select')].some(s=>s.value==='visit_type')",
+    "description": "The builder shows the register takes antenatal visits, and the visit type as a source"
+  },
+  {
+    "role": "nurse",
+    "width": 320,
+    "path": "/registers",
+    "evaluate": "window.seedProgrammeScenario()"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000004-K5",
+    "name": "visit-for-phone",
+    "assert": "[...document.querySelectorAll('label')].some(l=>l.textContent.trim()==='Visit for')&&document.documentElement.scrollWidth<=320",
+    "description": "The Visit for choice fits a 320px phone"
+  }
+]

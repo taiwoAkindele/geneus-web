@@ -248,6 +248,38 @@ Object.assign(window, { seedPrescriptionScenario: () => {
   listeners.forEach((listener) => listener());
   return true;
 } });
+/** A general consultation for the second patient: fever, a positive malaria RDT, malaria diagnosed, ACT dispensed, sent home. */
+Object.assign(window, { seedMalariaVisitScenario: () => {
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: 'encounter:malaria', type: 'encounter', patientId: secondId, openedOn: now, workflowVersion: 1 })));
+  const visit = (id: string, step: string, values: Record<string, unknown>) => toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id, type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId: 'encounter:malaria', actorRole: 'doctor', step, values }));
+  db.rows.encounter_entries.push(
+    visit('entry:mal-vitals', 'vitals', { temperatureC: 38.6, weightKg: 70 }),
+    visit('entry:mal-complaint', 'complaint', { complaints: ['Fever'] }),
+    visit('entry:mal-order', 'lab_order', { tests: ['Malaria RDT'] }),
+    visit('entry:mal-result', 'lab_results', { results: [{ test: 'Malaria RDT', result: 'Positive' }] }),
+    visit('entry:mal-diagnosis', 'diagnosis', { diagnosis: 'Malaria', prescription: [] }),
+    visit('entry:mal-rx', 'prescription', { decision: 'prescribed', prescription: [{ drug: 'Artemether-lumefantrine', dose: '4 tablets twice daily' }] }),
+    visit('entry:mal-dispense', 'dispense', { lines: [{ drug: 'Artemether-lumefantrine', dispensed: true }] }),
+    visit('entry:mal-home', 'disposition', { kind: 'home_care', note: 'Complete the course' }),
+  );
+  listeners.forEach((listener) => listener());
+  return true;
+} });
+/** A patient with no visits yet, and an antenatal register that takes antenatal visits and asks for programme details. */
+Object.assign(window, { seedProgrammeScenario: () => {
+  db.rows.patients.push(toRow('patient', Patient.parse({ ...envelope, id: 'QA-PHC-000004-K5', patientId: 'QA-PHC-000004-K5', type: 'patient', fullName: 'Ada Expecting', address: 'Synthetic address', phone: '08011112222', sex: 'female', ageYears: 26 })));
+  db.rows.register_definitions.push(toRow('register_definition', RegisterDefinition.parse({ ...envelope, id: 'register:anc:v1', registerId: 'register:anc', type: 'register_definition', version: 1, name: 'Antenatal register', category: 'Maternal', status: 'published',
+    visitLink: { visits: 'visit_types', visitTypes: ['antenatal'] },
+    fields: [
+      { id: 'anc-name', type: 'text', label: 'Name', fromVisit: { fact: 'patient_name' } },
+      { id: 'anc-type', type: 'text', label: 'Visit', fromVisit: { fact: 'visit_type' } },
+      { id: 'anc-bp', type: 'text', label: 'Blood pressure', fromVisit: { fact: 'blood_pressure' } },
+      { id: 'anc-ga', type: 'number', label: 'Gestational age (weeks)' },
+      { id: 'anc-llin', type: 'select', label: 'Net (LLIN) given', options: ['Yes', 'No'] },
+    ] })));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {
   (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();

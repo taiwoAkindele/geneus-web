@@ -28,6 +28,8 @@ export type BookedAppointment = {
   group: AppointmentGroup;
   encounterId?: string;
   paymentStatus?: 'Awaiting payment' | 'Confirmed';
+  /** What the visit is for; a visit started from this booking takes it. */
+  visitType?: VisitType;
 };
 
 export type NewAppointment = {

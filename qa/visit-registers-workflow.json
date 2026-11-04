@@ -1,0 +1,71 @@
+[
+  {
+    "role": "records_officer",
+    "path": "/registers",
+    "evaluate": "window.seedMalariaVisitScenario()",
+    "name": "registers-ready-made",
+    "assert": "document.body.innerText.includes('Registers filled from visits')&&document.body.innerText.includes('General outpatient register')&&[...document.querySelectorAll('li')].filter(li=>[...li.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')).length===2",
+    "description": "Both ready-made registers can be added; the hand-made Malaria register does not count as the ready-made one"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('General outpatient register')).querySelector('button').click();true",
+    "name": "register-opd",
+    "assert": "window.designAudit.path.startsWith('/registers/')&&document.body.innerText.includes('Every visit adds a row')&&document.body.innerText.includes('Demo Second Patient')&&document.body.innerText.includes('Malaria RDT: Positive')&&document.body.innerText.includes('Sent home')&&!document.body.innerText.includes('to complete')&&!document.body.innerText.includes('Add entry')",
+    "description": "The general outpatient register is filled from the visits, with nothing for staff to add"
+  },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Malaria register')).querySelector('button').click();true",
+    "name": "register-malaria",
+    "assert": "document.body.innerText.includes('Visits whose diagnosis, tests or results mention malaria')&&document.body.innerText.includes('1 visit in')&&document.body.innerText.includes('1 to complete')&&document.body.innerText.includes('Malaria RDT: Positive')&&document.body.innerText.includes('Artemether-lumefantrine')&&document.body.innerText.includes('38.6 °C')&&!document.body.innerText.includes('Amaka Okoro')",
+    "description": "Only the malaria visit fills the malaria register: RDT result, diagnosis, antimalarial and outcome come from the visit"
+  },
+  {
+    "click": "Complete",
+    "name": "register-complete-sheet",
+    "assert": "document.querySelector('dialog[open]')?.innerText.toLowerCase().includes('complete visit row')&&document.querySelector('dialog[open]').innerText.includes('Date fever started')&&document.querySelector('dialog[open]').innerText.includes('Pregnant')&&!document.querySelector('dialog[open]').innerText.includes('RDT result')&&document.querySelector('dialog[open]').innerText.includes('Demo Second Patient')",
+    "description": "Completing a row asks only for the fields the visit does not hold"
+  },
+  {
+    "fill": {
+      "label": "Date fever started",
+      "value": "2026-11-01"
+    }
+  },
+  {
+    "click": "Review entry"
+  },
+  {
+    "click": "Sign & save entry",
+    "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('0 to complete')&&document.body.innerText.includes('2026-11-01')&&window.designAudit.rows.register_entries.some(r=>r.encounterId==='encounter:malaria'&&String(r.values).includes('2026-11-01'))",
+    "description": "The staff fields are saved as an entry naming the visit, and the row is complete"
+  },
+  {
+    "click": "Configure",
+    "name": "register-configure",
+    "assert": "[...document.querySelectorAll('select')].some(s=>s.value==='matching')&&[...document.querySelectorAll('textarea')].some(t=>t.value.includes('malaria'))&&[...document.querySelectorAll('select')].some(s=>s.value==='results')",
+    "description": "The builder shows which visits fill the register and where each field comes from"
+  },
+  {
+    "path": "/registers",
+    "assert": "[...document.querySelectorAll('li')].filter(li=>li.innerText.includes('Added')).length===2&&document.body.innerText.includes('Fills from visits')",
+    "description": "Added ready-made registers are marked, and their cards say they fill from visits"
+  },
+  {
+    "path": "/reports/month",
+    "name": "register-monthly",
+    "assert": "document.body.innerText.includes('General outpatient register')&&document.body.innerText.includes('Malaria register')",
+    "description": "The monthly report counts the visits in each register"
+  },
+  {
+    "width": 320,
+    "path": "/registers",
+    "evaluate": "window.seedMalariaVisitScenario()"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Malaria register')).querySelector('button').click();true",
+    "name": "register-phone",
+    "assert": "document.body.innerText.includes('Malaria register')&&document.body.innerText.includes('1 to complete')&&document.documentElement.scrollWidth<=320",
+    "description": "A register filled from visits fits a 320px phone"
+  }
+]

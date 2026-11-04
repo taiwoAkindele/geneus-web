@@ -1,4 +1,4 @@
-import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport, type VisitType } from '@shared';
 import { allOfType, allWhere, findRecord, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
 import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
@@ -33,6 +33,8 @@ export type StepSave = {
   /** Absent when this save opens the encounter (PRD §9.8.1, step 2). */
   encounterId?: string;
   appointmentId?: string;
+  /** What a new visit is for; its appointment's type when not chosen. Ignored once the visit exists. */
+  visitType?: VisitType;
   patientId: string;
   step: RecordedStep;
   values: Record<string, unknown>;
@@ -75,7 +77,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
-      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', workflowVersion: save.workflowVersion, patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined },
+      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', workflowVersion: save.workflowVersion, patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined, visitType: save.visitType ?? appointment?.visitType },
     });
   }
 

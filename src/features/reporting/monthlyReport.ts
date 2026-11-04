@@ -1,7 +1,7 @@
-import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, visitRegisterRows, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type Appointment, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
 import { calendarDate } from '@/lib/calendarDate';
 
-export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[] };
+export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[]; appointments?: Appointment[] };
 export const validMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 const inMonth = (iso: string, month: string) => calendarDate(iso).slice(0, 7) === month;
 
@@ -23,7 +23,15 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
   }
   const names = new Map(data.definitions.map((definition) => [definition.registerId, definition.name]));
   const registerCounts = new Map<string, number>();
-  for (const entry of data.registerEntries) if (entry.entryDate.slice(0, 7) === month) registerCounts.set(entry.registerId, (registerCounts.get(entry.registerId) ?? 0) + 1);
+  for (const entry of data.registerEntries) if (!entry.encounterId && entry.entryDate.slice(0, 7) === month) registerCounts.set(entry.registerId, (registerCounts.get(entry.registerId) ?? 0) + 1);
+  // A register filled from visits counts the month's visits in it; its staff entries only complete those rows.
+  const linked = new Map<string, RegisterDefinition>();
+  for (const definition of data.definitions) if (definition.status === 'published' && definition.version > (linked.get(definition.registerId)?.version ?? 0)) linked.set(definition.registerId, definition);
+  for (const definition of linked.values()) {
+    if (!definition.visitLink) continue;
+    const rows = visitRegisterRows(definition, { encounters: visits, entries: data.entries.filter((entry) => ids.has(entry.encounterId)), patients: data.patients, appointments: data.appointments, localDate: calendarDate });
+    registerCounts.set(definition.registerId, rows.filter((row) => row.visitedOn.slice(0, 7) === month).length);
+  }
   const movementsByItem = new Map<string, StockMovement[]>();
   for (const movement of data.movements) { const group = movementsByItem.get(movement.itemId) ?? []; group.push(movement); movementsByItem.set(movement.itemId, group); }
   const commodities = data.items.filter((item) => calendarDate(item.createdOn).slice(0, 7) <= month).map((item) => {
