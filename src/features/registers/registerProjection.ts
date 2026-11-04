@@ -18,7 +18,9 @@ export const projectRegisters = (definitions: readonly RegisterDefinition[], ent
     id: definition.registerId, name: definition.name, category: definition.category, description: definition.description,
     status: definition.status, version: definition.version, fields: definition.fields,
     configuration, hasDraft: configuration.status === 'draft',
-    rows: entries.filter((entry) => entry.registerId === definition.registerId).sort((a, b) => b.createdOn.localeCompare(a.createdOn)).map((entry): RegisterRow => ({
+    ...(definition.visitLink ? { visitLink: definition.visitLink } : {}),
+    completions: entries.filter((entry) => entry.registerId === definition.registerId && entry.encounterId),
+    rows: entries.filter((entry) => entry.registerId === definition.registerId && !entry.encounterId).sort((a, b) => b.createdOn.localeCompare(a.createdOn)).map((entry): RegisterRow => ({
       id: entry.id, by: names.get(entry.createdBy) ?? entry.createdBy, when: new Date(entry.createdOn).toLocaleString('en-GB'),
       entryDate: entry.entryDate, registerVersion: entry.registerVersion, values: entry.values,
       fields: versions.get(entry.registerId + '|' + entry.registerVersion)?.fields ?? Object.keys(entry.values).map((id) => ({ id, label: id, type: 'text' as const, required: false })),

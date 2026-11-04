@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { validateRegisterEntry } from '@shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { validateRegisterEntry, type VisitRegisterRow } from '@shared';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Icon, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
+import { Button, DataTable, Icon, Sheet, SheetCancelButton, Tag, TextField, useToast, type TableColumn } from '@/ui';
+import { calendarDate } from '@/lib/calendarDate';
 import { downloadCsv } from '@/lib/csv';
 import { useAuthorizationContext, useSession } from '@/session';
-import { RegisterField, useRegisters, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
+import { RegisterField, useRegisters, useVisitRegister, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
 
 const fmtCell = (v: EntryValue | undefined): string => {
   if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
@@ -13,16 +14,18 @@ const fmtCell = (v: EntryValue | undefined): string => {
   return v === undefined || v === '' ? '—' : String(v);
 };
 
-const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: () => void }) => {
+/** A new entry, or, given a visit's `row`, the fields staff record to complete it. */
+const AddEntrySheet = ({ register, row, onClose }: { register: RegisterDef; row?: VisitRegisterRow; onClose: () => void }) => {
   const { addEntry } = useRegisters();
+  const fields = row ? register.fields.filter((field) => !field.fromVisit) : register.fields;
   const { user } = useSession();
   const toast = useToast();
 
   const [draft, setDraft] = useState<EntryValues>(() => {
     const seed: EntryValues = {};
-    register.fields.forEach((f) => {
+    fields.forEach((f) => {
       if (f.type === 'section') return;
-      seed[f.id] = f.type === 'multiselect' ? [] : f.type === 'checkbox' ? false : '';
+      seed[f.id] = row?.completion?.values[f.id] ?? (f.type === 'multiselect' ? [] : f.type === 'checkbox' ? false : '');
     });
     return seed;
   });
@@ -35,7 +38,7 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
   const savingRef = useRef(false);
   useEffect(() => { if (issues.length || reviewing) summary.current?.focus(); }, [issues, reviewing]);
   const review = () => {
-    const errors = validateRegisterEntry(register.fields, draft);
+    const errors = validateRegisterEntry(fields, draft);
     setIssues(errors);
     if (!errors.length) setReviewing(true);
   };
@@ -45,28 +48,29 @@ const AddEntrySheet = ({ register, onClose }: { register: RegisterDef; onClose: 
     savingRef.current = true;
     setSaving(true);
     try {
-      const issues = await addEntry(register.id, { values: draft });
+      const issues = await addEntry(register.id, { values: draft, ...(row ? { visit: { encounterId: row.encounterId, patientId: row.patientId } } : {}) });
       if (issues.length > 0) {
         setIssues(issues); setReviewing(false);
         return;
       }
-      toast(`Entry saved & locked — recorded by ${user.name}`);
+      toast(row ? `Visit row completed — recorded by ${user.name}` : `Entry saved & locked — recorded by ${user.name}`);
       onClose();
     } catch (cause) { setIssues([cause instanceof Error ? cause.message : 'Could not save the entry. Try again.']); }
     finally { savingRef.current = false; setSaving(false); }
   };
 
   return (
-    <Sheet onClose={onClose} closeDisabled={saving} hasUnsavedChanges={edited} eyebrow={`${register.category} · New entry`} title={reviewing ? `Review · ${register.name}` : register.name}>
+    <Sheet onClose={onClose} closeDisabled={saving} hasUnsavedChanges={edited} eyebrow={`${register.category} · ${row ? 'Complete visit row' : 'New entry'}`} title={reviewing ? `Review · ${register.name}` : register.name}>
       {issues.length ? <div ref={summary} tabIndex={-1} role="alert" className="mb-4 rounded-field border border-danger bg-danger-bg p-4 text-sm text-danger"><p className="font-bold">Check this entry</p><ul className="mt-2 list-disc pl-5">{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div> : null}
-      {reviewing ? <div ref={summary} tabIndex={-1} className="space-y-4 outline-none"><p className="text-sm text-ink-muted">Check the answers before signing. The saved entry is permanent and attributed to {user.name}.</p><dl className="divide-y divide-outline-soft">{register.fields.filter((field) => field.type !== 'section').map((field) => <div key={field.id} className="py-3"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="mt-1 break-words text-sm">{fmtCell(draft[field.id])}</dd></div>)}</dl></div> : <div className="flex flex-col gap-4">
-        {register.fields.map((f) => (
+      {row ? <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-2 rounded-field bg-surface-muted p-3 text-sm">{register.fields.filter((field) => field.fromVisit).slice(0, 6).map((field) => <div key={field.id} className="min-w-0"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="break-words">{fmtCell(row.values[field.id])}</dd></div>)}</dl> : null}
+      {reviewing ? <div ref={summary} tabIndex={-1} className="space-y-4 outline-none"><p className="text-sm text-ink-muted">Check the answers before signing. The saved entry is permanent and attributed to {user.name}.</p><dl className="divide-y divide-outline-soft">{fields.filter((field) => field.type !== 'section').map((field) => <div key={field.id} className="py-3"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="mt-1 break-words text-sm">{fmtCell(draft[field.id])}</dd></div>)}</dl></div> : <div className="flex flex-col gap-4">
+        {fields.map((f) => (
           <RegisterField
             key={f.id}
             field={f}
             value={draft[f.id]}
             error={issues.length ? validateRegisterEntry([f], draft)[0] : undefined}
-            onChange={(v) => { const next = { ...draft, [f.id]: v }; setEdited(true); setDraft(next); if (issues.length) setIssues(validateRegisterEntry(register.fields, next)); }}
+            onChange={(v) => { const next = { ...draft, [f.id]: v }; setEdited(true); setDraft(next); if (issues.length) setIssues(validateRegisterEntry(fields, next)); }}
           />
         ))}
       </div>}
@@ -112,6 +116,8 @@ export const RegisterEntriesScreen = () => {
       </div>
     );
   }
+
+  if (register.visitLink) return <VisitRegister register={register} />;
 
   const fieldMap = new Map(register.fields.filter((field) => field.type !== 'section').map((field) => [field.id, field]));
   for (const row of register.rows) for (const field of row.fields) if (field.type !== 'section' && !fieldMap.has(field.id)) fieldMap.set(field.id, field);
@@ -206,4 +212,56 @@ export const RegisterEntriesScreen = () => {
       {adding ? <AddEntrySheet register={register} onClose={() => setAdding(false)} /> : null}
     </div>
   );
+};
+
+const monthLabel = (month: string) => new Date(month + '-01T12:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+/**
+ * A register filled from visits: one row per matching visit, worked out on this
+ * device. Staff complete only the fields a visit does not record.
+ */
+const VisitRegister = ({ register }: { register: RegisterDef }) => {
+  const navigate = useNavigate(), context = useAuthorizationContext();
+  const visits = useVisitRegister(register);
+  const [month, setMonth] = useState(() => calendarDate().slice(0, 7)), [search, setSearch] = useState(''), [page, setPage] = useState(0);
+  const [completing, setCompleting] = useState<VisitRegisterRow>();
+  const fields = register.fields.filter((field) => field.type !== 'section');
+  const asked = fields.filter((field) => !field.fromVisit), canComplete = context.permissions.includes('register_entry:create');
+  const inMonth = useMemo(() => visits.rows.filter((row) => !month || row.visitedOn.startsWith(month)), [visits.rows, month]);
+  // Numbered like the book: the month's first visit is number 1.
+  const serial = useMemo(() => new Map(inMonth.map((row, index) => [row.encounterId, inMonth.length - index])), [inMonth]);
+  const query = search.trim().toLowerCase();
+  const shown = inMonth.filter((row) => !query || Object.values(row.values).map(fmtCell).join(' ').toLowerCase().includes(query));
+  const open = inMonth.filter((row) => !row.complete).length;
+  const link = register.visitLink!;
+  const columns: TableColumn<VisitRegisterRow>[] = [
+    { key: 'serial', label: 'No.', render: (row) => <span className="font-mono text-xs text-ink-muted">{String(serial.get(row.encounterId) ?? '').padStart(3, '0')}</span> },
+    // Kept beside the number so it stays in view however wide the register is.
+    ...(asked.length ? [{ key: 'complete', label: 'Staff fields', render: (row: VisitRegisterRow) => canComplete
+      ? <Button variant={row.complete ? 'outlined' : 'primary'} fullWidth={false} className="px-3 text-sm" onClick={() => setCompleting(row)}>{row.complete ? 'Edit' : 'Complete'}</Button>
+      : <Tag tone={row.complete ? 'green' : 'amber'}>{row.complete ? 'Completed' : 'To complete'}</Tag> }] : []),
+    ...fields.map((field): TableColumn<VisitRegisterRow> => ({ key: field.id, label: field.label, render: (row) => <span className={`block max-w-[260px] whitespace-pre-wrap break-words ${field.fromVisit ? '' : 'text-brand-strong'}`}>{fmtCell(row.values[field.id])}</span> })),
+  ];
+  const exportRows = () => downloadCsv('register-' + register.id.replace(/[^a-z0-9-]/gi, '-') + '-' + (month || 'all') + '.csv', [['No.', ...fields.map((field) => field.label)], ...shown.map((row) => [String(serial.get(row.encounterId) ?? ''), ...fields.map((field) => fmtCell(row.values[field.id]))])]);
+  const matching = [...link.words, ...link.codes.map((code) => 'code ' + code)].join(', ');
+  return <div className="min-h-screen bg-surface">
+    <div className="w-full space-y-4 px-5 py-4 pb-24 md:px-8">
+      <button type="button" onClick={() => navigate('/registers')} className="inline-flex items-center gap-1.5 text-[14px] font-bold text-brand"><Icon name="back" className="h-4 w-4" /> All registers</button>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="font-mono text-[12px] uppercase tracking-[0.16em] text-brand-strong">{register.category} · Filled from visits</div>
+          <h1 className="mt-1.5 text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">{register.name}</h1>
+          <p className="mt-1 max-w-[70ch] text-sm text-ink-soft">{link.visits === 'every' ? 'Every visit adds a row.' : `Visits whose diagnosis, tests or results mention ${matching}.`} Rows update as results, diagnoses and treatment are recorded.</p>
+        </div>
+        {context.permissions.includes('register_definition:publish') ? <Button variant="outlined" fullWidth={false} className="px-4" onClick={() => navigate(`/registers/${encodeURIComponent(register.id)}/configure`)}>Configure</Button> : null}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2"><TextField label="Month" type="month" value={month} onChange={(event) => { setMonth(event.target.value); setPage(0); }} /><TextField label="Search this register" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><p role="status" className="text-sm text-ink-muted">{visits.loading ? 'Reading visits…' : `${inMonth.length} ${inMonth.length === 1 ? 'visit' : 'visits'}${month ? ' in ' + monthLabel(month) : ''}${asked.length ? ` · ${open} to complete` : ''}`}</p><Button variant="outlined" fullWidth={false} disabled={!shown.length} onClick={exportRows}>Export shown rows</Button></div>
+      {visits.error ? <div role="alert"><p>Visits could not be read on this device.</p><Button variant="ghost" fullWidth={false} onClick={visits.reload}>Try again</Button></div>
+        : shown.length ? <DataTable caption={`${register.name} rows`} rows={shown} rowKey={(row) => row.encounterId} page={page} onPageChange={setPage} columns={columns} />
+        : visits.loading ? null : <p className="rounded-card border border-dashed border-outline p-6 text-sm text-ink-soft">{query ? 'No rows match this search.' : `No visits${month ? ' in ' + monthLabel(month) : ''} fill this register yet.`}</p>}
+      {asked.length ? <p className="max-w-[70ch] text-xs leading-relaxed text-ink-muted">Fields shown in green are recorded by staff; the visit fills the rest. A change is saved as a new entry attributed to whoever made it.</p> : null}
+    </div>
+    {completing ? <AddEntrySheet key={completing.encounterId} register={register} row={completing} onClose={() => setCompleting(undefined)} /> : null}
+  </div>;
 };

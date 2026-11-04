@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RegisterDefinition, RegisterFieldDef, type AuthorizationContext } from '@shared';
+import { RegisterDefinition, RegisterFieldDef, RegisterVisitLink, VisitFact, type AuthorizationContext } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { getDatabase } from '../database';
 import { nowIso } from '../db';
@@ -9,7 +9,9 @@ import type { RegisterDraft } from './registers';
 /** Private unfinished typing can be incomplete; only an explicit save publishes a synced snapshot. */
 const Recovery = RegisterDefinition.pick({ name: true, category: true, description: true }).extend({
   name: z.string(), category: z.string(), baseVersion: z.number().int().nonnegative(),
-  fields: z.array(RegisterFieldDef.extend({ label: z.string() })),
+  fields: z.array(RegisterFieldDef.extend({ label: z.string(), fromVisit: z.strictObject({ fact: VisitFact, words: z.array(z.string()).optional() }).optional() })),
+  // Word lists are kept as typed, blank lines included, until an explicit save.
+  visitLink: RegisterVisitLink.extend({ words: z.array(z.string()), codes: z.array(z.string()) }).optional(),
 });
 export type RegisterRecovery = z.infer<typeof Recovery>;
 const idOf = (context: AuthorizationContext, key: string) => [context.facilityId, context.userId, key].join('|');

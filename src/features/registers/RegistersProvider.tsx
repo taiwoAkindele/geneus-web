@@ -11,7 +11,8 @@ import type { EntryValues, RegisterDef, RegisterDraft } from './types';
  * with its entries attached. Data lives in the local replica, so a register
  * survives a reload and will sync once replication is switched on.
  */
-type NewEntry = { values: EntryValues };
+/** `visit` names the visit whose row the entry completes, in a visit-linked register. */
+type NewEntry = { values: EntryValues; visit?: { encounterId: string; patientId: string } };
 
 type Value = {
   registers: RegisterDef[];
@@ -54,7 +55,7 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
 
   const record = useCallback(
     async (registerId: string, entry: NewEntry) => {
-      const result = await addEntry({ registerId, values: entry.values }, context);
+      const result = await addEntry({ registerId, values: entry.values, ...(entry.visit ? { visit: entry.visit } : {}) }, context);
       return result.saved ? [] : result.issues;
     },
     [context],

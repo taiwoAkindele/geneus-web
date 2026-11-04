@@ -10,6 +10,7 @@ import type {
   RegisterFieldDef,
   RegisterFieldType,
   RegisterStatus,
+  RegisterVisitLink,
 } from '@shared';
 
 export type FieldType = RegisterFieldType;
@@ -46,8 +47,13 @@ export type RegisterDef = {
   /** Latest authoring snapshot, which can be newer than the published form. */
   configuration: RegisterDefinition;
   hasDraft: boolean;
+  /** Entries staff added one by one; a visit-linked register has none. */
   rows: RegisterRow[];
+  /** Present when rows are worked out from visits. */
+  visitLink?: RegisterVisitLink;
+  /** Entries completing a visit's row with the staff-recorded fields. */
+  completions: RegisterEntry[];
 };
 
 /** The editable shape while building — becomes a NEW definition version on publish. */
-export type RegisterDraft = Pick<RegisterDef, 'name' | 'category' | 'description' | 'fields'>;
+export type RegisterDraft = Pick<RegisterDef, 'name' | 'category' | 'description' | 'fields' | 'visitLink'>;

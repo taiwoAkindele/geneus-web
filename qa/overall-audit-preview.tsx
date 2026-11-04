@@ -248,6 +248,23 @@ Object.assign(window, { seedPrescriptionScenario: () => {
   listeners.forEach((listener) => listener());
   return true;
 } });
+/** A general consultation for the second patient: fever, a positive malaria RDT, malaria diagnosed, ACT dispensed, sent home. */
+Object.assign(window, { seedMalariaVisitScenario: () => {
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: 'encounter:malaria', type: 'encounter', patientId: secondId, openedOn: now, workflowVersion: 1 })));
+  const visit = (id: string, step: string, values: Record<string, unknown>) => toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id, type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId: 'encounter:malaria', actorRole: 'doctor', step, values }));
+  db.rows.encounter_entries.push(
+    visit('entry:mal-vitals', 'vitals', { temperatureC: 38.6, weightKg: 70 }),
+    visit('entry:mal-complaint', 'complaint', { complaints: ['Fever'] }),
+    visit('entry:mal-order', 'lab_order', { tests: ['Malaria RDT'] }),
+    visit('entry:mal-result', 'lab_results', { results: [{ test: 'Malaria RDT', result: 'Positive' }] }),
+    visit('entry:mal-diagnosis', 'diagnosis', { diagnosis: 'Malaria', prescription: [] }),
+    visit('entry:mal-rx', 'prescription', { decision: 'prescribed', prescription: [{ drug: 'Artemether-lumefantrine', dose: '4 tablets twice daily' }] }),
+    visit('entry:mal-dispense', 'dispense', { lines: [{ drug: 'Artemether-lumefantrine', dispensed: true }] }),
+    visit('entry:mal-home', 'disposition', { kind: 'home_care', note: 'Complete the course' }),
+  );
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {
   (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();

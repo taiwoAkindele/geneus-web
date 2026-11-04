@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Encounter, EncounterEntry, StockItem, StockMovement } from '@shared';
+import { Encounter, EncounterEntry, RegisterDefinition, RegisterEntry, StockItem, StockMovement } from '@shared';
 import { monthlyReport, type MonthlyData } from './monthlyReport';
 
 const base = { facilityId: 'TEST', createdBy: 'staff:one', createdOn: '2026-10-26T10:00:00Z', deviceId: 'device:one' };
@@ -33,5 +33,15 @@ describe('monthly operational reporting', () => {
     ].map(([id, change, reason, day]) => StockMovement.parse({ ...base, id: 'movement:' + id, type: 'stock_movement', itemId: 'stock:one', change, reason, movedOn: day + 'T10:00:00Z' }));
     expect(monthlyReport(data, '2026-10').commodities[0]).toMatchObject({ opening: 13, received: 5, used: 2, expired: 1, adjusted: -1, closing: 14, unit: 'boxes' });
     expect(() => monthlyReport(data, '2026-13')).toThrow('valid report month');
+  });
+  it("counts the month's visits in a register filled from visits, not the entries completing them", () => {
+    const data = empty();
+    const visit = (id: string, openedOn: string) => Encounter.parse({ ...base, type: 'encounter', id, patientId, openedOn });
+    data.encounters = [visit('encounter:malaria', '2026-10-20T10:00:00Z'), visit('encounter:cough', '2026-10-21T10:00:00Z'), visit('encounter:earlier', '2026-09-20T10:00:00Z')];
+    const order = (id: string, encounterId: string, test: string) => EncounterEntry.parse({ ...base, type: 'encounter_entry', id, patientId, encounterId, step: 'lab_order', actorRole: 'doctor', values: { tests: [test] } });
+    data.entries = [order('entry:rdt', 'encounter:malaria', 'Malaria RDT'), order('entry:xray', 'encounter:cough', 'Chest X-ray'), order('entry:old', 'encounter:earlier', 'Malaria RDT')];
+    data.definitions = [RegisterDefinition.parse({ ...base, type: 'register_definition', id: 'register:malaria:v1', registerId: 'register:malaria', name: 'Malaria register', category: 'Disease', status: 'published', visitLink: { visits: 'matching', words: ['malaria'] }, fields: [{ id: 'name', type: 'text', label: 'Name', fromVisit: { fact: 'patient_name' } }, { id: 'onset', type: 'date', label: 'Fever started' }] })];
+    data.registerEntries = [RegisterEntry.parse({ ...base, type: 'register_entry', id: 'register_entry:one', registerId: 'register:malaria', registerVersion: 1, entryDate: '2026-10-20', patientId, encounterId: 'encounter:malaria', values: { onset: '2026-10-18' } })];
+    expect(monthlyReport(data, '2026-10').registers).toEqual([{ id: 'register:malaria', name: 'Malaria register', count: 1 }]);
   });
 });
