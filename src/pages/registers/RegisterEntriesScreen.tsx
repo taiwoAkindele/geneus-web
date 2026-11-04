@@ -1,88 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { validateRegisterEntry, type VisitRegisterRow } from '@shared';
+import { useEffect, useMemo, useState } from 'react';
+import { VISIT_TYPE_NAMES, type VisitRegisterRow } from '@shared';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, DataTable, Icon, Sheet, SheetCancelButton, Tag, TextField, useToast, type TableColumn } from '@/ui';
+import { Button, DataTable, Icon, Tag, TextField, type TableColumn } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { downloadCsv } from '@/lib/csv';
-import { useAuthorizationContext, useSession } from '@/session';
-import { RegisterField, useRegisters, useVisitRegister, type EntryValue, type EntryValues, type RegisterDef } from '@/features/registers';
-
-const fmtCell = (v: EntryValue | undefined): string => {
-  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
-  if (v === true) return 'Yes';
-  if (v === false) return 'No';
-  return v === undefined || v === '' ? '—' : String(v);
-};
-
-/** A new entry, or, given a visit's `row`, the fields staff record to complete it. */
-const AddEntrySheet = ({ register, row, onClose }: { register: RegisterDef; row?: VisitRegisterRow; onClose: () => void }) => {
-  const { addEntry } = useRegisters();
-  const fields = row ? register.fields.filter((field) => !field.fromVisit) : register.fields;
-  const { user } = useSession();
-  const toast = useToast();
-
-  const [draft, setDraft] = useState<EntryValues>(() => {
-    const seed: EntryValues = {};
-    fields.forEach((f) => {
-      if (f.type === 'section') return;
-      seed[f.id] = row?.completion?.values[f.id] ?? (f.type === 'multiselect' ? [] : f.type === 'checkbox' ? false : '');
-    });
-    return seed;
-  });
-
-  const [saving, setSaving] = useState(false);
-  const [issues, setIssues] = useState<string[]>([]);
-  const [reviewing, setReviewing] = useState(false);
-  const [edited, setEdited] = useState(false);
-  const summary = useRef<HTMLDivElement>(null);
-  const savingRef = useRef(false);
-  useEffect(() => { if (issues.length || reviewing) summary.current?.focus(); }, [issues, reviewing]);
-  const review = () => {
-    const errors = validateRegisterEntry(fields, draft);
-    setIssues(errors);
-    if (!errors.length) setReviewing(true);
-  };
-
-  const save = async () => {
-    if (savingRef.current || !reviewing) return;
-    savingRef.current = true;
-    setSaving(true);
-    try {
-      const issues = await addEntry(register.id, { values: draft, ...(row ? { visit: { encounterId: row.encounterId, patientId: row.patientId } } : {}) });
-      if (issues.length > 0) {
-        setIssues(issues); setReviewing(false);
-        return;
-      }
-      toast(row ? `Visit row completed — recorded by ${user.name}` : `Entry saved & locked — recorded by ${user.name}`);
-      onClose();
-    } catch (cause) { setIssues([cause instanceof Error ? cause.message : 'Could not save the entry. Try again.']); }
-    finally { savingRef.current = false; setSaving(false); }
-  };
-
-  return (
-    <Sheet onClose={onClose} closeDisabled={saving} hasUnsavedChanges={edited} eyebrow={`${register.category} · ${row ? 'Complete visit row' : 'New entry'}`} title={reviewing ? `Review · ${register.name}` : register.name}>
-      {issues.length ? <div ref={summary} tabIndex={-1} role="alert" className="mb-4 rounded-field border border-danger bg-danger-bg p-4 text-sm text-danger"><p className="font-bold">Check this entry</p><ul className="mt-2 list-disc pl-5">{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div> : null}
-      {row ? <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-2 rounded-field bg-surface-muted p-3 text-sm">{register.fields.filter((field) => field.fromVisit).slice(0, 6).map((field) => <div key={field.id} className="min-w-0"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="break-words">{fmtCell(row.values[field.id])}</dd></div>)}</dl> : null}
-      {reviewing ? <div ref={summary} tabIndex={-1} className="space-y-4 outline-none"><p className="text-sm text-ink-muted">Check the answers before signing. The saved entry is permanent and attributed to {user.name}.</p><dl className="divide-y divide-outline-soft">{fields.filter((field) => field.type !== 'section').map((field) => <div key={field.id} className="py-3"><dt className="text-xs font-bold text-ink-muted">{field.label}</dt><dd className="mt-1 break-words text-sm">{fmtCell(draft[field.id])}</dd></div>)}</dl></div> : <div className="flex flex-col gap-4">
-        {fields.map((f) => (
-          <RegisterField
-            key={f.id}
-            field={f}
-            value={draft[f.id]}
-            error={issues.length ? validateRegisterEntry([f], draft)[0] : undefined}
-            onChange={(v) => { const next = { ...draft, [f.id]: v }; setEdited(true); setDraft(next); if (issues.length) setIssues(validateRegisterEntry(fields, next)); }}
-          />
-        ))}
-      </div>}
-      <div className="mt-5 flex flex-wrap gap-2.5">
-        <Button variant="primary" fullWidth={false} className="flex-1" loading={saving} onClick={reviewing ? save : review}>
-          {reviewing ? 'Sign & save entry' : 'Review entry'}
-        </Button>
-        {reviewing ? <Button variant="outlined" fullWidth={false} className="px-6" disabled={saving} onClick={() => setReviewing(false)}>Keep editing</Button> : <SheetCancelButton disabled={saving} />}
-      </div>
-    </Sheet>
-  );
-};
+import { useAuthorizationContext } from '@/session';
+import { RegisterEntrySheet, fmtCell, useRegisters, useVisitRegister, type RegisterDef } from '@/features/registers';
 
 /** A register's append-only logbook — every entry locked to its recorder (PRD §9.4 / §9.8.3). */
 export const RegisterEntriesScreen = () => {
@@ -209,7 +132,7 @@ export const RegisterEntriesScreen = () => {
         )}
       </div>
 
-      {adding ? <AddEntrySheet register={register} onClose={() => setAdding(false)} /> : null}
+      {adding ? <RegisterEntrySheet register={register} onClose={() => setAdding(false)} /> : null}
     </div>
   );
 };
@@ -251,7 +174,7 @@ const VisitRegister = ({ register }: { register: RegisterDef }) => {
         <div>
           <div className="font-mono text-[12px] uppercase tracking-[0.16em] text-brand-strong">{register.category} · Filled from visits</div>
           <h1 className="mt-1.5 text-[24px] font-extrabold tracking-[-0.02em] md:text-[28px]">{register.name}</h1>
-          <p className="mt-1 max-w-[70ch] text-sm text-ink-soft">{link.visits === 'every' ? 'Every visit adds a row.' : `Visits whose diagnosis, tests or results mention ${matching}.`} Rows update as results, diagnoses and treatment are recorded.</p>
+          <p className="mt-1 max-w-[70ch] text-sm text-ink-soft">{link.visits === 'every' ? 'Every visit adds a row.' : link.visits === 'visit_types' ? `Every ${link.visitTypes.map((type) => VISIT_TYPE_NAMES[type].toLowerCase()).join(' or ')} visit adds a row.` : `Visits whose diagnosis, tests or results mention ${matching}.`} Rows update as results, diagnoses and treatment are recorded.</p>
         </div>
         {context.permissions.includes('register_definition:publish') ? <Button variant="outlined" fullWidth={false} className="px-4" onClick={() => navigate(`/registers/${encodeURIComponent(register.id)}/configure`)}>Configure</Button> : null}
       </div>
@@ -262,6 +185,6 @@ const VisitRegister = ({ register }: { register: RegisterDef }) => {
         : visits.loading ? null : <p className="rounded-card border border-dashed border-outline p-6 text-sm text-ink-soft">{query ? 'No rows match this search.' : `No visits${month ? ' in ' + monthLabel(month) : ''} fill this register yet.`}</p>}
       {asked.length ? <p className="max-w-[70ch] text-xs leading-relaxed text-ink-muted">Fields shown in green are recorded by staff; the visit fills the rest. A change is saved as a new entry attributed to whoever made it.</p> : null}
     </div>
-    {completing ? <AddEntrySheet key={completing.encounterId} register={register} row={completing} onClose={() => setCompleting(undefined)} /> : null}
+    {completing ? <RegisterEntrySheet key={completing.encounterId} register={register} visit={{ encounterId: completing.encounterId, patientId: completing.patientId, completion: completing.completion, values: completing.values }} onClose={() => setCompleting(undefined)} /> : null}
   </div>;
 };

@@ -1,7 +1,7 @@
-import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, visitRegisterRows, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, visitRegisterRows, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type Appointment, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
 import { calendarDate } from '@/lib/calendarDate';
 
-export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[] };
+export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[]; appointments?: Appointment[] };
 export const validMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 const inMonth = (iso: string, month: string) => calendarDate(iso).slice(0, 7) === month;
 
@@ -29,7 +29,7 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
   for (const definition of data.definitions) if (definition.status === 'published' && definition.version > (linked.get(definition.registerId)?.version ?? 0)) linked.set(definition.registerId, definition);
   for (const definition of linked.values()) {
     if (!definition.visitLink) continue;
-    const rows = visitRegisterRows(definition, { encounters: visits, entries: data.entries.filter((entry) => ids.has(entry.encounterId)), patients: data.patients, localDate: calendarDate });
+    const rows = visitRegisterRows(definition, { encounters: visits, entries: data.entries.filter((entry) => ids.has(entry.encounterId)), patients: data.patients, appointments: data.appointments, localDate: calendarDate });
     registerCounts.set(definition.registerId, rows.filter((row) => row.visitedOn.slice(0, 7) === month).length);
   }
   const movementsByItem = new Map<string, StockMovement[]>();

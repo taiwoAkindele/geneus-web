@@ -265,6 +265,21 @@ Object.assign(window, { seedMalariaVisitScenario: () => {
   listeners.forEach((listener) => listener());
   return true;
 } });
+/** A patient with no visits yet, and an antenatal register that takes antenatal visits and asks for programme details. */
+Object.assign(window, { seedProgrammeScenario: () => {
+  db.rows.patients.push(toRow('patient', Patient.parse({ ...envelope, id: 'QA-PHC-000004-K5', patientId: 'QA-PHC-000004-K5', type: 'patient', fullName: 'Ada Expecting', address: 'Synthetic address', phone: '08011112222', sex: 'female', ageYears: 26 })));
+  db.rows.register_definitions.push(toRow('register_definition', RegisterDefinition.parse({ ...envelope, id: 'register:anc:v1', registerId: 'register:anc', type: 'register_definition', version: 1, name: 'Antenatal register', category: 'Maternal', status: 'published',
+    visitLink: { visits: 'visit_types', visitTypes: ['antenatal'] },
+    fields: [
+      { id: 'anc-name', type: 'text', label: 'Name', fromVisit: { fact: 'patient_name' } },
+      { id: 'anc-type', type: 'text', label: 'Visit', fromVisit: { fact: 'visit_type' } },
+      { id: 'anc-bp', type: 'text', label: 'Blood pressure', fromVisit: { fact: 'blood_pressure' } },
+      { id: 'anc-ga', type: 'number', label: 'Gestational age (weeks)' },
+      { id: 'anc-llin', type: 'select', label: 'Net (LLIN) given', options: ['Yes', 'No'] },
+    ] })));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {
   (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();

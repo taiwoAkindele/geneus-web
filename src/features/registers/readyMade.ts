@@ -21,7 +21,7 @@ export const READY_MADE_REGISTERS: readonly ReadyMadeRegister[] = [
     draft: {
       name: 'General outpatient register', category: 'General',
       description: 'One row for every visit. Filled from the visit: nothing is entered twice.',
-      visitLink: { visits: 'every', words: [], codes: [] },
+      visitLink: { visits: 'every', words: [], codes: [], visitTypes: [] },
       fields: [
         fromVisit('opd-date', 'Date', 'visit_date'), fromVisit('opd-patient-id', 'Patient ID', 'patient_id'),
         fromVisit('opd-name', 'Name', 'patient_name'), fromVisit('opd-age', 'Age', 'age'), fromVisit('opd-sex', 'Sex', 'sex'),
@@ -41,7 +41,7 @@ export const READY_MADE_REGISTERS: readonly ReadyMadeRegister[] = [
     draft: {
       name: 'Malaria register', category: 'Disease',
       description: 'Every visit where malaria was tested for or diagnosed. Record when the fever started and pregnancy; the visit fills the rest.',
-      visitLink: { visits: 'matching', words: ['malaria', 'RDT', 'mRDT', 'MP', 'plasmodium', 'antimalarial'], codes: ['B50', 'B51', 'B52', 'B53', 'B54'] },
+      visitLink: { visits: 'matching', words: ['malaria', 'RDT', 'mRDT', 'MP', 'plasmodium', 'antimalarial'], codes: ['B50', 'B51', 'B52', 'B53', 'B54'], visitTypes: [] },
       fields: [
         fromVisit('mal-date', 'Date', 'visit_date'), fromVisit('mal-patient-id', 'Patient ID', 'patient_id'),
         fromVisit('mal-name', 'Name', 'patient_name'), fromVisit('mal-age', 'Age', 'age'), fromVisit('mal-sex', 'Sex', 'sex'),

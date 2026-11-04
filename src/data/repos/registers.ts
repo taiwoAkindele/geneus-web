@@ -64,7 +64,7 @@ const saveDefinition = async (
   const { visitLink, ...rest } = draft;
   const values = {
     ...rest, name: draft.name.trim(), category: draft.category.trim(), status,
-    ...(visitLink ? { visitLink: { visits: visitLink.visits, words: words(visitLink.words), codes: words(visitLink.codes) } } : {}),
+    ...(visitLink ? { visitLink: { visits: visitLink.visits, words: words(visitLink.words), codes: words(visitLink.codes), visitTypes: [...new Set(visitLink.visitTypes ?? [])] } } : {}),
     fields: draft.fields.map(({ fromVisit, ...field }) => ({
       ...field, label: field.label.trim(), options: field.options?.map((option) => option.trim()),
       ...(fromVisit ? { fromVisit: { fact: fromVisit.fact, ...(fromVisit.words && words(fromVisit.words).length ? { words: words(fromVisit.words) } : {}) } } : {}),
