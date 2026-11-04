@@ -2,9 +2,9 @@ import type { RegisterFieldDef, VisitFact } from '@shared';
 import type { RegisterDraft } from './types';
 
 /**
- * Ready-made registers a facility can add in one step. They are starting points
- * shaped on the NHMIS daily registers, not the official forms: once added, each
- * is an ordinary register the facility can rename, extend or trim.
+ * Ready-made visit summaries a facility can add in one step, then rename,
+ * extend or trim. These are original operational starting points, not official
+ * programme forms or reporting profiles; one row always represents one visit.
  */
 export type ReadyMadeRegister = { key: string; summary: string; draft: RegisterDraft };
 
@@ -54,6 +54,75 @@ export const READY_MADE_REGISTERS: readonly ReadyMadeRegister[] = [
         fromVisit('mal-diagnosis', 'Diagnosis', 'diagnoses'),
         fromVisit('mal-treatment', 'Antimalarial given', 'medicines_dispensed', ANTIMALARIALS),
         fromVisit('mal-outcome', 'Outcome', 'outcome'),
+      ],
+    },
+  },
+  {
+    key: 'antenatal',
+    summary: 'One row per antenatal visit, with pregnancy and contact details recorded during care.',
+    draft: {
+      name: 'Antenatal register', category: 'Maternal',
+      description: 'One row per antenatal visit. Record pregnancy and contact details; patient details, observations, tests and treatment come from the visit.',
+      visitLink: { visits: 'visit_types', words: [], codes: [], visitTypes: ['antenatal'] },
+      fields: [
+        fromVisit('anc-date', 'Date', 'visit_date'), fromVisit('anc-patient-id', 'Patient ID', 'patient_id'),
+        fromVisit('anc-name', 'Name', 'patient_name'), fromVisit('anc-age', 'Age', 'age'),
+        fromVisit('anc-address', 'Address', 'address'), fromVisit('anc-phone', 'Phone', 'phone'),
+        asked({ id: 'anc-contact', type: 'number', label: 'Contact number for this pregnancy' }),
+        asked({ id: 'anc-ga', type: 'number', label: 'Gestational age (weeks)' }),
+        asked({ id: 'anc-gravida', type: 'number', label: 'Gravida' }),
+        asked({ id: 'anc-parity', type: 'number', label: 'Parity' }),
+        asked({ id: 'anc-edd', type: 'date', label: 'Expected delivery date' }),
+        fromVisit('anc-weight', 'Weight', 'weight'), fromVisit('anc-bp', 'Blood pressure', 'blood_pressure'),
+        fromVisit('anc-tests', 'Tests requested', 'tests'), fromVisit('anc-results', 'Test results', 'results'),
+        fromVisit('anc-medicines', 'Medicines dispensed', 'medicines_dispensed'),
+        fromVisit('anc-injections', 'Injections given', 'injections'),
+        asked({ id: 'anc-llin', type: 'select', label: 'Net (LLIN) given', options: ['Yes', 'No', 'Not recorded', 'Not applicable'] }),
+        fromVisit('anc-outcome', 'Outcome', 'outcome'), fromVisit('anc-next', 'Next visit', 'follow_up_date'),
+        fromVisit('anc-seen-by', 'Seen by', 'seen_by'),
+      ],
+    },
+  },
+  {
+    key: 'immunisation',
+    summary: 'One row per immunisation visit, reusing injections given and adding dose and card details.',
+    draft: {
+      name: 'Immunisation register', category: 'Child health',
+      description: 'One row per immunisation visit, which may include several doses. Injections come from the visit; record additional dose, oral vaccine, batch and card details here.',
+      visitLink: { visits: 'visit_types', words: [], codes: [], visitTypes: ['immunisation'] },
+      fields: [
+        fromVisit('imm-date', 'Date', 'visit_date'), fromVisit('imm-patient-id', 'Patient ID', 'patient_id'),
+        fromVisit('imm-name', 'Name', 'patient_name'), fromVisit('imm-age', 'Age', 'age'), fromVisit('imm-sex', 'Sex', 'sex'),
+        fromVisit('imm-address', 'Address', 'address'), fromVisit('imm-phone', 'Phone', 'phone'),
+        fromVisit('imm-injections', 'Injections given', 'injections'),
+        asked({ id: 'imm-dose-details', type: 'textarea', label: 'Dose / series details', help: 'Add dose or series numbers for the vaccines recorded in the visit. Leave unknown details blank.' }),
+        asked({ id: 'imm-other-vaccines', type: 'textarea', label: 'Other vaccines given', help: 'Record vaccines actually given that are not already in the injection record, including oral vaccines. Include the vaccine and dose.' }),
+        asked({ id: 'imm-batch', type: 'textarea', label: 'Vaccine batch details', help: 'Name the vaccine alongside each batch number.' }),
+        asked({ id: 'imm-card', type: 'text', label: 'Vaccination card number' }),
+        fromVisit('imm-next', 'Next visit', 'follow_up_date'), fromVisit('imm-seen-by', 'Seen by', 'seen_by'),
+      ],
+    },
+  },
+  {
+    key: 'family-planning',
+    summary: 'One row per family planning visit, with method and client details alongside recorded care.',
+    draft: {
+      name: 'Family planning register', category: 'Maternal',
+      description: 'One row per family planning visit. Record method and client details; medicines, injections and the next visit come from the clinical record.',
+      visitLink: { visits: 'visit_types', words: [], codes: [], visitTypes: ['family_planning'] },
+      fields: [
+        fromVisit('fp-date', 'Date', 'visit_date'), fromVisit('fp-patient-id', 'Patient ID', 'patient_id'),
+        fromVisit('fp-name', 'Name', 'patient_name'), fromVisit('fp-age', 'Age', 'age'), fromVisit('fp-sex', 'Sex', 'sex'),
+        fromVisit('fp-address', 'Address', 'address'), fromVisit('fp-phone', 'Phone', 'phone'),
+        asked({ id: 'fp-method', type: 'text', label: 'Method / service provided' }),
+        asked({ id: 'fp-client-status', type: 'select', label: 'Client status for this method', options: ['First use', 'Continuing', 'Switching method', 'Not recorded'], help: 'Record the client\'s method history. A first visit to this facility does not establish first use.' }),
+        fromVisit('fp-weight', 'Weight', 'weight'), fromVisit('fp-bp', 'Blood pressure', 'blood_pressure'),
+        fromVisit('fp-medicines', 'Medicines dispensed', 'medicines_dispensed'),
+        fromVisit('fp-injections', 'Injections given', 'injections'),
+        asked({ id: 'fp-other-supply', type: 'textarea', label: 'Other commodities supplied', help: 'Record actual supply not already in the dispensing or injection record. Include item and quantity.' }),
+        asked({ id: 'fp-notes', type: 'textarea', label: 'Counselling / procedure notes', help: 'Record additional programme information not already in the visit.' }),
+        fromVisit('fp-outcome', 'Outcome', 'outcome'), fromVisit('fp-next', 'Next visit', 'follow_up_date'),
+        fromVisit('fp-seen-by', 'Seen by', 'seen_by'),
       ],
     },
   },

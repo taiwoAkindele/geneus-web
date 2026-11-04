@@ -1,5 +1,9 @@
 # Clinical browser acceptance
 
+Programme register starters are covered by
+[programme-starters-qa.md](programme-starters-qa.md), including commands for the new
+three-programme workflow and the existing visit/register regression scenarios.
+
 Run `node qa/clinical-browser.mjs` from `geneus-web` with dependencies installed and Google Chrome available. Set `CHROME_PATH` to use another Chromium executable.
 
 The script starts Vite on loopback port 5194 and headless Chrome with debugging port 9334 and a newly created temporary profile. It exercises the clinical workspace against synthetic in-memory records, captures phone/desktop screenshots and writes `artifacts/results.json`. Generated artifacts are ignored by Git. It closes its own server/browser and removes only its temporary profile.
