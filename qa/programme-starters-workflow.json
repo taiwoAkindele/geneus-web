@@ -1,0 +1,127 @@
+[
+  {
+    "role": "facility_admin",
+    "path": "/registers",
+    "evaluate": "window.seedProgrammeTemplateScenario()",
+    "name": "programme-starters-list",
+    "assert": "document.body.innerText.includes('Each row represents one visit')&&[...document.querySelectorAll('li')].filter(li=>[...li.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')).length===5",
+    "description": "All five visit-summary starters are available to an administrator"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Antenatal register')).querySelector('button').click();true",
+    "assert": "document.body.innerText.includes('Every antenatal visit adds a row')&&document.body.innerText.includes('1 visit in')&&document.body.innerText.includes('1 to complete')&&document.body.innerText.includes('120/80 mmHg')&&document.body.innerText.includes('Synthetic antenatal injection')&&!document.body.innerText.includes('Synthetic immunisation injection')",
+    "description": "Adding the antenatal starter publishes it and derives only antenatal care"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Astarter-antenatal",
+    "click": "Record details",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Gestational age (weeks)')&&!document.querySelector('dialog[open]').innerText.includes('Blood pressure')&&![...document.querySelectorAll('dialog input,dialog textarea')].some(i=>i.value)",
+    "description": "Antenatal details start blank and omit facts already supplied by the visit"
+  },
+  { "fill": { "label": "Gestational age (weeks)", "value": "24" } },
+  { "fill": { "label": "Contact number for this pregnancy", "value": "2" } },
+  { "click": "Review entry" },
+  {
+    "click": "Sign & save entry",
+    "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('Update details')&&window.designAudit.rows.register_entries.some(r=>r.encounterId==='encounter:starter-antenatal'&&JSON.parse(r.values)['anc-ga']==='24'&&JSON.parse(r.values)['anc-contact']==='2'&&!Object.keys(JSON.parse(r.values)).some(k=>k==='anc-bp'||k==='anc-injections'))",
+    "description": "Signing stores only additional antenatal details against the source visit"
+  },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('article')].find(a=>a.innerText.includes('Antenatal register')).querySelector('a').click();true",
+    "name": "programme-starter-antenatal",
+    "assert": "document.body.innerText.includes('0 to complete')&&document.body.innerText.includes('24')&&document.body.innerText.includes('Synthetic antenatal injection')",
+    "description": "The antenatal row combines saved details and the existing clinical record"
+  },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Immunisation register')).querySelector('button').click();true",
+    "assert": "document.body.innerText.includes('Every immunisation visit adds a row')&&document.body.innerText.includes('1 visit in')&&document.body.innerText.includes('Synthetic immunisation injection')&&document.body.innerText.includes('Synthetic second vaccine')&&!document.body.innerText.includes('Synthetic antenatal injection')",
+    "description": "The immunisation starter keeps multiple injections in a single visit row"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Astarter-immunisation",
+    "click": "Record details",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Other vaccines given')&&!document.querySelector('dialog[open]').innerText.includes('Injections given')",
+    "description": "Immunisation details add dose, oral vaccine and batch information without asking again for injections"
+  },
+  { "fill": { "label": "Dose / series details", "value": "Synthetic vaccine: dose 2" } },
+  { "fill": { "label": "Other vaccines given", "value": "Synthetic oral vaccine: dose 1" } },
+  { "fill": { "label": "Vaccine batch details", "value": "Synthetic vaccine: QA-BATCH-01" } },
+  { "click": "Review entry" },
+  { "click": "Sign & save entry" },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('article')].find(a=>a.innerText.includes('Immunisation register')).querySelector('a').click();true",
+    "name": "programme-starter-immunisation",
+    "assert": "document.body.innerText.includes('0 to complete')&&document.body.innerText.includes('Synthetic oral vaccine: dose 1')&&document.body.innerText.includes('QA-BATCH-01')&&document.body.innerText.includes('Synthetic second vaccine')",
+    "description": "The immunisation row combines dose details and both source injections"
+  },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Family planning register')).querySelector('button').click();true",
+    "assert": "document.body.innerText.includes('Every family planning visit adds a row')&&document.body.innerText.includes('1 visit in')&&document.body.innerText.includes('Synthetic supplied commodity')&&!document.body.innerText.includes('Synthetic antenatal injection')",
+    "description": "The family planning starter uses its own visit's supply evidence"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000002-K3&visit=encounter%3Astarter-family_planning",
+    "click": "Record details",
+    "assert": "document.querySelector('dialog[open]').innerText.includes('Client status for this method')&&[...document.querySelectorAll('dialog button[aria-pressed]')].every(b=>b.getAttribute('aria-pressed')==='false')&&!document.querySelector('dialog[open]').innerText.includes('Medicines dispensed')",
+    "description": "Client method history is not inferred from attendance, and supply is not re-entered"
+  },
+  { "fill": { "label": "Method / service provided", "value": "Synthetic method review" } },
+  { "click": "Continuing" },
+  { "click": "Review entry" },
+  { "click": "Sign & save entry" },
+  {
+    "path": "/registers",
+    "evaluate": "[...document.querySelectorAll('article')].find(a=>a.innerText.includes('Family planning register')).querySelector('a').click();true",
+    "name": "programme-starter-family-planning",
+    "assert": "document.body.innerText.includes('0 to complete')&&document.body.innerText.includes('Synthetic method review')&&document.body.innerText.includes('Continuing')&&document.body.innerText.includes('Synthetic supplied commodity')",
+    "description": "The family planning row combines staff-recorded method history and source supply"
+  },
+  { "click": "Edit" },
+  { "fill": { "label": "Method / service provided", "value": "Synthetic method follow-up" } },
+  { "click": "Review entry" },
+  {
+    "click": "Sign & save entry",
+    "assert": "window.designAudit.rows.register_entries.filter(r=>r.encounterId==='encounter:starter-family_planning').length===2&&document.body.innerText.includes('Synthetic method follow-up')&&!document.body.innerText.includes('Synthetic method review')&&document.body.innerText.includes('1 visit in')",
+    "description": "Updating programme details preserves both entries and keeps one visit row"
+  },
+  {
+    "path": "/reports/month",
+    "assert": "['Antenatal register','Immunisation register','Family planning register'].every(name=>[...document.querySelectorAll('tr')].some(row=>row.innerText.includes(name)&&row.querySelector('td:last-child')?.textContent.trim()==='1'))",
+    "description": "Monthly reporting counts one visit for each programme, including the amended completion"
+  },
+  {
+    "path": "/registers",
+    "assert": "[...document.querySelectorAll('li')].filter(li=>li.innerText.includes('Added')).length===3&&[...document.querySelectorAll('li')].filter(li=>[...li.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')).length===2",
+    "description": "The three installed programme starters are marked Added"
+  },
+  {
+    "role": "facility_admin",
+    "width": 320,
+    "path": "/registers",
+    "evaluate": "window.seedProgrammeTemplateScenario()",
+    "assert": "document.documentElement.scrollWidth<=320&&document.body.innerText.includes('Family planning register')",
+    "description": "All five starters fit a 320px phone"
+  },
+  {
+    "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('Immunisation register')).querySelector('button').click();true",
+    "name": "programme-starter-phone",
+    "assert": "document.body.innerText.includes('1 visit in')&&document.documentElement.scrollWidth<=320",
+    "description": "The programme register fits a 320px phone"
+  },
+  {
+    "click": "Complete",
+    "name": "programme-starter-sheet-phone",
+    "assert": "Boolean(document.querySelector('dialog[open]'))&&document.querySelector('dialog[open]').scrollWidth<=document.querySelector('dialog[open]').clientWidth&&document.documentElement.scrollWidth<=320",
+    "description": "Programme detail inputs fit a 320px phone"
+  },
+  {
+    "role": "nurse",
+    "path": "/registers",
+    "assert": "!document.body.innerText.includes('Registers filled from visits')&&![...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')",
+    "description": "Clinical entry access alone does not permit installing programme starters"
+  }
+]

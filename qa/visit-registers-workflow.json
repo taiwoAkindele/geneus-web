@@ -4,8 +4,8 @@
     "path": "/registers",
     "evaluate": "window.seedMalariaVisitScenario()",
     "name": "registers-ready-made",
-    "assert": "document.body.innerText.includes('Registers filled from visits')&&document.body.innerText.includes('General outpatient register')&&[...document.querySelectorAll('li')].filter(li=>[...li.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')).length===2",
-    "description": "Both ready-made registers can be added; the hand-made Malaria register does not count as the ready-made one"
+    "assert": "document.body.innerText.includes('Registers filled from visits')&&document.body.innerText.includes('General outpatient register')&&[...document.querySelectorAll('li')].filter(li=>[...li.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add register')).length===5",
+    "description": "All five ready-made registers can be added; the hand-made Malaria register does not count as the ready-made one"
   },
   {
     "evaluate": "[...document.querySelectorAll('li')].find(li=>li.innerText.includes('General outpatient register')).querySelector('button').click();true",

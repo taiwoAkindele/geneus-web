@@ -280,6 +280,22 @@ Object.assign(window, { seedProgrammeScenario: () => {
   listeners.forEach((listener) => listener());
   return true;
 } });
+/** Typed visits with recorded care, ready for adding the actual programme starters through the UI. */
+Object.assign(window, { seedProgrammeTemplateScenario: () => {
+  for (const visitType of ['antenatal', 'immunisation', 'family_planning'] as const) {
+    const encounterId = `encounter:starter-${visitType}`;
+    db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: encounterId, type: 'encounter', patientId: secondId, openedOn: now, workflowVersion: 1, visitType })));
+    const care = (suffix: string, step: string, values: Record<string, unknown>) => toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: `entry:starter-${visitType}-${suffix}`, type: 'encounter_entry', workflowVersion: 1, patientId: secondId, encounterId, actorRole: 'nurse', step, values }));
+    db.rows.encounter_entries.push(
+      care('vitals', 'vitals', { temperatureC: 36.8, weightKg: 64, systolicMmHg: 120, diastolicMmHg: 80 }),
+      care('injection', 'injection', { drug: `Synthetic ${visitType} injection`, dose: 'Synthetic dose', route: 'IM' }),
+    );
+    if (visitType === 'immunisation') db.rows.encounter_entries.push(care('second-injection', 'injection', { drug: 'Synthetic second vaccine', dose: 'Synthetic dose', route: 'IM' }));
+    if (visitType === 'family_planning') db.rows.encounter_entries.push(care('dispense', 'dispense', { lines: [{ drug: 'Synthetic supplied commodity', dispensed: true }] }));
+  }
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {
   (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();

@@ -589,3 +589,28 @@ Final facility-workspace validation: 306 web tests, 414 server/shared tests incl
 ## Clinical Documents (31 October 2026)
 
 Clinical ? Documents provides an unclassified hospital Library and review-only Visit documents list with patient/visit/ward/bed/signature filters and chart links. Upload/replace/rename/archive/restore and history preserve issued copies. Attachments, returned signed scans and signature review are available only in an active inpatient chart Documents tab. Existing clinical/read-only access applies without new document permission settings. Encrypted device-scoped IndexedDB bytes accompany SQLite metadata; binary transfer runs inside the existing PowerSync uploader and files download on demand. Refused files remain previewable/downloadable in Sync & review. Patient-portal sending and electronic signature capture are later scope. See [Clinical Documents](../docs/CLINICAL-DOCUMENTS.md), [QA](qa/documents-qa.md).
+
+## Visit-linked registers and programme starters (4 November 2026)
+
+Visit-linked registers derive rows from encounters and amended clinical entries.
+Staff record only additional fields, through the same RegisterEntrySheet inside
+the visit or from a register row. A visit's saved type selects its programme;
+older records retain the existing appointment-type/General fallback.
+
+READY_MADE_REGISTERS includes General outpatient, Malaria, Antenatal, Immunisation
+and Family planning. The three programme starters reuse patient details and clinical
+care, and ask for additional contact, dose, batch or method information. Optional
+inputs start blank. Family planning method history is staff-recorded rather than
+inferred from first facility attendance. Installation uses the existing register
+publication permission and immutable definitions; facilities can configure each copy.
+
+Each starter row and monthly register count represents a visit. Multi-dose visits
+are not dose counts, and pregnancy episodes, official profiles/indicators and
+reference-pack conversion remain later work. This addition needs no new dependency,
+contract change or migration beyond the existing 0026/0027 checkpoint. See
+[programme starter validation](qa/programme-starters-qa.md) for checks and limits.
+
+Validation: frontend typecheck, 372 unit tests, 36 connected browser assertions
+and the validation-mode Vite/PWA build pass. Initial JavaScript is 185.9 KB gzip
+within 300 KB. Browser evidence covers desktop and 320px layouts with synthetic
+data; PostgreSQL, live sync and physical-device acceptance remain separate checks.
