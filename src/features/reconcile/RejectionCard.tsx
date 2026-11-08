@@ -74,7 +74,7 @@ export const RejectionCard = ({
     setChosen((now) => (now.includes(column) ? now.filter((c) => c !== column) : [...now, column]));
   const what = rejection.operation === 'patch' ? 'change' : rejection.operation === 'delete' ? 'removal' : 'new record';
 
-  if(!canReadPatientChart(context)&&['encounter','encounter_entry','clinical_event','visit_document','library_document','referral','handoff','inpatient_event'].includes(rejection.entityType))return <div className="rounded-card border border-outline-soft p-4 text-sm">A clinical change needs review. Permission to view medical history is required to inspect or resolve it.</div>;
+  if(!canReadPatientChart(context)&&['encounter','encounter_entry','clinical_event','visit_document','library_document','referral','handoff','inpatient_event','ward_care_event'].includes(rejection.entityType))return <div className="rounded-card border border-outline-soft p-4 text-sm">A clinical change needs review. Permission to view medical history is required to inspect or resolve it.</div>;
   return (
     <div className="rounded-card border border-outline-soft bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -95,7 +95,7 @@ export const RejectionCard = ({
       </p>
       {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId,'details')} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
       {['library_document','visit_document'].includes(rejection.entityType)?<RetainedDocument rejection={rejection}/>:null}
-      {['encounter_entry','clinical_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext?<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Independent clinical review · preserve original authorship</Link>:null}
+      {['encounter_entry','clinical_event','ward_care_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext?<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Independent clinical review · preserve original authorship</Link>:null}
       {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
       {rejection.entityType === 'register_definition' && typeof rejection.refusedRecord?.registerId === 'string' ? <Link to={`/registers/${encodeURIComponent(rejection.refusedRecord.registerId)}/configure`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review register configuration</Link> : null}
       <details className="mt-3 rounded-field border border-outline-soft p-3 text-sm"><summary className="cursor-pointer font-semibold text-ink-soft">Technical details for review or support</summary><p className="mt-3 break-words text-xs text-ink-muted">{rejection.reason.replace(/^held: /, '')}</p><p className="mt-2 break-all font-mono text-xs">{rejection.entityType} · {rejection.entityId}</p>{kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}</details>

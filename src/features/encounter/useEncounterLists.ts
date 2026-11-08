@@ -15,7 +15,7 @@ export const useEncounterList = (enabled=true): LiveQuery<{ open: EncounterSumma
     const [encounters, entries] = await Promise.all([listEncounters(), listEncounterEntries()]);
     const byEncounter = new Map<string, typeof entries>();
     for (const entry of entries) { const group = byEncounter.get(entry.encounterId) ?? []; group.push(entry); byEncounter.set(entry.encounterId, group); }
-    const summaries = encounters.map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
+    const summaries = encounters.filter((encounter) => !encounter.inpatientContext).map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
     return {
       open: summaries.filter((summary) => summary.status === 'Open').sort(newestFirst),
       closed: summaries.filter((summary) => summary.status !== 'Open').sort(newestFirst),
@@ -29,7 +29,7 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
   const load = useCallback(async () => {
     const encounters = (await Promise.all((await patientIdentityIds(patientId)).map(encountersForPatient))).flat();
     const summaries = await Promise.all(
-      encounters.map(async (encounter) => summariseEncounter(encounter, await entriesForEncounter(encounter.id))),
+      encounters.filter((encounter) => !encounter.inpatientContext).map(async (encounter) => summariseEncounter(encounter, await entriesForEncounter(encounter.id))),
     );
     return summaries.sort(newestFirst);
   }, [patientId]);

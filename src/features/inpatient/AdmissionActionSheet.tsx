@@ -15,6 +15,7 @@ export const AdmissionActionSheet = ({ task, data, patientName, onClose, onSaved
   const [ward, setWard] = useState(task.admission?.wardId ?? '');
   const [bed, setBed] = useState('');
   const [note, setNote] = useState('');
+  const [exception, setException] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const allocation = task.action === 'reserve' || task.action === 'transfer';
@@ -26,7 +27,7 @@ export const AdmissionActionSheet = ({ task, data, patientName, onClose, onSaved
     event.preventDefault(); setSaving(true); setError('');
     try {
       if (task.action === 'confirm' && task.request) await confirmAdmission(task.request, unit, note, context);
-      else if (task.action !== 'confirm' && task.admission) await changeAdmission(task.admission, task.action, context, { ...(allocation ? { wardId: ward, bedId: bed, receivingUnitId: unit } : {}), note });
+      else if (task.action !== 'confirm' && task.admission) await changeAdmission(task.admission, task.action, context, { ...(allocation ? { wardId: ward, bedId: bed, receivingUnitId: unit } : {}), note, departureException: exception || undefined });
       else throw new Error('Reopen this request before saving');
       onSaved();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The change could not be saved. Try again'); }
@@ -44,6 +45,7 @@ export const AdmissionActionSheet = ({ task, data, patientName, onClose, onSaved
       {task.action === 'arrive' ? <p className="rounded-field bg-brand-wash p-4">Confirm this only after the patient has physically arrived at the reserved ward and bed.</p> : null}
       {task.action === 'transfer' ? <p className="text-sm text-ink-soft">This records a completed move to the selected bed. The previous bed will await cleaning.</p> : null}
       {task.action === 'discharge' ? <p className="rounded-field bg-amber-bg p-4 text-amber-text">Confirm actual departure after the responsible team has completed discharge arrangements. The bed will await cleaning.</p> : null}
+      {['ready_for_discharge','discharge'].includes(task.action) ? <><p className="text-sm">Continuing ward care uses the current signed discharge summary. Prepare it from Ward care before confirming readiness.</p><TextAreaField label="Departure exception (only if discharge documentation could not be completed)" value={exception} onChange={(e) => setException(e.target.value)} /><p className="text-xs text-ink-soft">An exception records the actual circumstances; it does not claim that a discharge summary was completed.</p></> : null}
       <TextAreaField label={requiredNote ? 'Reason / handover note' : 'Handover note (optional)'} required={requiredNote} value={note} onChange={(event) => setNote(event.target.value)} maxLength={4000} />
       <p className="text-sm text-ink-soft">Saved on this device first. Bed allocation remains pending until the server checks other devices.</p>
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}

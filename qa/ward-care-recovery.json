@@ -1,0 +1,14 @@
+[
+  { "role": "nurse", "width": 390, "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=ward", "evaluate": "window.seedWardCareScenario()" },
+  { "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=ward&admission=admission%3Award", "assert": "document.body.innerText.includes('Add nursing note')", "description": "The nurse's chart offers continuing care" },
+  { "click": "Add nursing note" },
+  { "fill": { "label": "Clinical note", "value": "Synthetic private nursing draft after interrupted check" } },
+  { "click": "Save draft & close", "assert": "!document.querySelector('dialog[open]')&&!window.designAudit.rows.encounters.some(e=>e.inpatientContext)", "description": "A private draft creates no signed care or empty ward session" },
+  { "path": "/clinical/patients" },
+  { "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=ward&admission=admission%3Award", "assert": "document.body.innerText.includes('Resume private draft')", "description": "Returning to the same stay offers the author's saved draft" },
+  { "click": "Resume private draft", "assert": "[...document.querySelectorAll('textarea')].some(e=>e.value==='Synthetic private nursing draft after interrupted check')", "description": "The original nursing text is recovered before signing" },
+  { "name": "ward-nursing-phone-draft", "assert": "document.documentElement.scrollWidth<=innerWidth", "description": "The editable nursing sheet fits a 390px phone" },
+  { "click": "Review section" },
+  { "click": "Confirm & sign section", "assert": "!document.querySelector('dialog[open]')&&window.designAudit.rows.encounter_entries.filter(e=>e.actorRole==='nurse'&&JSON.parse(e.values).note==='Synthetic private nursing draft after interrupted check').length===1", "description": "The recovered note signs once with nurse authorship" },
+  { "assert": "!document.body.innerText.includes('Resume private draft')", "description": "Signing clears only the completed private draft" }
+]

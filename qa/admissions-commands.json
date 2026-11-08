@@ -90,10 +90,7 @@
     "description": "Clinical inpatient tab shows ward and bed"
   },
   {
-    "fill": {
-      "label": "Visits from",
-      "value": "2099-01-01"
-    },
+    "path": "/clinical/patients?care=inpatient&visitFrom=2099-01-01",
     "assert": "document.body.innerText.includes('Amaka Okoro')",
     "description": "Date filters do not hide active inpatients"
   },
@@ -192,7 +189,7 @@
   },
   {
     "path": "/encounters?care=outpatient&queue=all",
-    "assert": "!document.body.innerText.includes('Amaka Okoro')",
+    "assert": "window.designAudit.rows.encounters.filter(e=>e.patientId==='QA-PHC-000001-K2').length===2 && document.body.innerText.includes('Not admitted')",
     "description": "Discharge does not create an outpatient attendance"
   },
   {
@@ -211,6 +208,11 @@
     "click": "Open patient chart",
     "selector": "a",
     "name": "10b-discharged-chart",
+    "assert": "document.body.innerText.includes('Ward care') && document.body.innerText.includes('Discharged')",
+    "description": "The historical chart opens the discharged stay's ward workspace"
+  },
+  {
+    "path": "/encounters/record?patient=QA-PHC-000001-K2&visit=encounter%3Aopen",
     "assert": "document.querySelector('section[aria-label=\"Saved visit\"]').innerText.includes('Hospital stay · Discharged')",
     "description": "Saved visit displays the actual discharged stay rather than the original admission decision"
   },

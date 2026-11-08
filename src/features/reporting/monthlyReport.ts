@@ -7,7 +7,7 @@ const inMonth = (iso: string, month: string) => calendarDate(iso).slice(0, 7) ==
 
 export const monthlyReport = (data: MonthlyData, month: string) => {
   if (!validMonth(month)) throw new Error('Choose a valid report month.');
-  const encounters = [...new Map(data.encounters.map((encounter) => [encounter.id, encounter])).values()];
+  const encounters = [...new Map(data.encounters.filter((encounter) => !encounter.inpatientContext).map((encounter) => [encounter.id, encounter])).values()];
   const visits = encounters.filter((encounter) => inMonth(encounter.openedOn, month));
   const ids = new Set(visits.map((encounter) => encounter.id));
   const entries = effectiveEncounterEntries(data.entries).filter((entry) => ids.has(entry.encounterId));

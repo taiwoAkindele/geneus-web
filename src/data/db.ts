@@ -111,7 +111,7 @@ export type NewRecord = { permission: Permission; type: DocType; record: unknown
  * its first saved step. Every permission and every record is checked before
  * the first INSERT, so a refusal or a contract failure writes none of them.
  */
-export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[]): Promise<AnyDocument[]> => {
+export const insertRecords = async (context: AuthorizationContext, records: readonly NewRecord[], checkUnderLock?: (transaction: Pick<LocalDatabase, 'execute' | 'getOptional'>) => Promise<void>): Promise<AnyDocument[]> => {
   assertFacilityContext(context);
   for (const { permission } of records) assertAllowed(context, permission);
   const {prepareClinicalBundle,clearClinicalReview}=await import('./repos/clinicalReviews');
@@ -119,6 +119,7 @@ export const insertRecords = async (context: AuthorizationContext, records: read
   const validated=bundle.records.map(({type,record})=>({type,record:validate(record)}));
   for (const { record } of validated) assertFacilityContext(context, record);
   await getDatabase().writeTransaction(async (transaction) => {
+    if (checkUnderLock) await checkUnderLock(transaction);
     for (const { type, record } of validated) {
       const row = toRow(type, record);
       const columns = Object.keys(row);

@@ -54,6 +54,13 @@ export type StepSave = {
  */
 export const saveStep = async (save: StepSave, context: AuthorizationContext): Promise<EncounterEntry> => {
   if (save.encounterId) {
+    const header = await findRecord<Encounter>('encounter', save.encounterId);
+    if (header?.inpatientContext) {
+      const { saveWardStep } = await import('./wardCare');
+      return saveWardStep({ id: header.id, admissionId: header.inpatientContext.admissionId, patientId: header.patientId, purpose: header.inpatientContext.purpose }, save.step, save.values, context, { labReport: save.labReport });
+    }
+  }
+  if (save.encounterId) {
     const prior = await entriesForEncounter(save.encounterId);
     if (prior.some(closesEncounter) && !(POST_CONSULTATION_STEPS as readonly string[]).includes(save.step)) throw new Error('This encounter is closed. Add an amendment instead');
     if (!(REPEATABLE_STEPS as readonly string[]).includes(save.step) && prior.some((entry) => entry.step === save.step)) throw new Error('This section is already saved. Add an amendment instead');
@@ -184,6 +191,7 @@ export const amendEntry = async (entry: EncounterEntry, note: string, context: A
     type: 'encounter_entry',
     workflowVersion: entry.workflowVersion,
     encounterId: entry.encounterId,
+    admissionId: entry.admissionId,
     patientId: entry.patientId,
     step: 'amendment',
     actorRole: context.role,

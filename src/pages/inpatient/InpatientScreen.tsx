@@ -15,7 +15,7 @@ const availableActions = (event: InpatientEvent): [InpatientAction, string][] =>
   if (event.action === 'confirm') return [['reserve', 'Reserve bed'], ['cancel', 'Cancel admission']];
   if (event.action === 'reserve') return [['arrive', 'Confirm arrival'], ['reserve', 'Change reservation'], ['cancel', 'Cancel admission']];
   if (event.action === 'ready_for_discharge') return [['discharge', 'Confirm departure'], ['continue_care', 'Continue ward care']];
-  if (['arrive','transfer','continue_care'].includes(event.action)) return [['transfer', 'Transfer bed'], ['ready_for_discharge', 'Ready for discharge']];
+  if (['arrive','transfer','continue_care'].includes(event.action)) return [['transfer', 'Transfer bed'], ['ready_for_discharge', 'Ready for discharge'], ['discharge', 'Record unexpected departure']];
   return [];
 };
 export const InpatientScreen = () => {
@@ -38,7 +38,7 @@ export const InpatientScreen = () => {
   const teamName = (id: string) => data.units.find((unit) => unit.id === id)?.name ?? id;
   const matches = (id: string) => (!params.get('patient') || params.get('patient') === id) && `${name(id)} ${id}`.toLowerCase().includes(search.toLowerCase());
   const supported = inpatientSupported(context);
-  const patientLink = (id: string, encounterId: string) => <Link className="inline-flex min-h-[52px] items-center font-bold text-brand underline" to={patientChartPath(id, 'visits', { visit: encounterId })}>Open patient chart</Link>;
+  const patientLink = (id: string, encounterId: string) => <Link className="inline-flex min-h-[52px] items-center font-bold text-brand underline" to={data.heads.some((e) => e.encounterId === encounterId) ? patientChartPath(id, 'ward', { admission: data.heads.find((e) => e.encounterId === encounterId)!.admissionId }) : patientChartPath(id, 'visits', { visit: encounterId })}>Open patient chart</Link>;
   const requests = data.requests.filter((request) => matches(request.patientId));
   const stays = (history ? data.heads : data.active).filter((event) => matches(event.patientId));
   const bedStates = inpatientBedStates(data.events, data.ready);

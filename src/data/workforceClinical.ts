@@ -1,4 +1,4 @@
-import { parseDocument, clinicalActivityIssues, clinicalEventActions, encounterClinicalActions, workforceEnforcementActive, scopeAllows, intervalContains, type AnyDocument, type AuthorizationContext, type ClinicalActorContext, type EncounterEntry, type AuthoritySnapshot } from '@shared';
+import { clinicalPerformedOn, clinicalRecordActions, parseDocument, clinicalActivityIssues, workforceEnforcementActive, scopeAllows, intervalContains, type AnyDocument, type AuthorizationContext, type ClinicalActorContext, type EncounterEntry, type AuthoritySnapshot } from '@shared';
 import { acceptedAuthority } from './workforceAuthority';
 import { freshAuthorization } from '@/auth/authorization';
 import { secureGet, secureSet } from '@/lib/secureStorage';
@@ -8,7 +8,7 @@ import { loadCareContext, clinicalAssignments, clinicalWitnesses, ownProof, fail
 const selectionKey = (context: AuthorizationContext) => `geneus.careService:${context.facilityId}:${context.deviceId}:${context.userId}`;
 export const selectedCareService = (context: AuthorizationContext): string => JSON.parse(secureGet('geneus.workforce.selections') ?? '{}')[selectionKey(context)] ?? '';
 export const selectCareService = (context: AuthorizationContext, id: string) => secureSet('geneus.workforce.selections', JSON.stringify({ ...JSON.parse(secureGet('geneus.workforce.selections') ?? '{}'), [selectionKey(context)]: id }));
-const instantFields = new Set(['createdOn', 'updatedOn', 'issuedOn', 'expiresOn', 'startsAt', 'endsAt', 'checkedOn', 'occurredOn', 'effectiveOn']);
+const instantFields = new Set(['createdOn', 'updatedOn', 'issuedOn', 'expiresOn', 'startsAt', 'endsAt', 'checkedOn', 'occurredOn', 'performedOn', 'effectiveOn']);
 const canonical = (value: unknown, root = true): unknown => Array.isArray(value) ? value.map((v) => canonical(v, false)) : value && typeof value === 'object'
   ? Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => [k, root && instantFields.has(k) && typeof v === 'string' && Number.isFinite(Date.parse(v)) ? new Date(v).toISOString() : canonical(v, false)])) : value;
 export const clinicalPayloadHash = async (record: unknown): Promise<string> => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(canonical(record))))), (b) => b.toString(16).padStart(2, '0')).join('');
@@ -22,7 +22,7 @@ export const prepareClinical = async (input: unknown, context: AuthorizationCont
   if (!parsed.success)
     throw new Error(parsed.error.issues.map((i) => i.message).join('. '));
   const candidate = parsed.data;
-  if (candidate.type !== 'encounter_entry' && candidate.type !== 'clinical_event')
+  if (candidate.type !== 'encounter_entry' && candidate.type !== 'clinical_event' && candidate.type !== 'ward_care_event')
     return input;
   const facility = await getFacility();
   if (!workforceEnforcementActive(facility?.workforcePolicy, Date.now()))
@@ -37,7 +37,7 @@ export const prepareClinical = async (input: unknown, context: AuthorizationCont
     throw new Error('Connect to refresh your accepted clinical approval before signing. Your form remains available');
   }
   const original = candidate.type === 'encounter_entry' && candidate.amends ? await findRecord<EncounterEntry>('encounter_entry', candidate.amends) : undefined;
-  const actions = candidate.type === 'encounter_entry' ? encounterClinicalActions(candidate, original) : clinicalEventActions(candidate);
+  const actions = clinicalRecordActions(candidate, original);
   const eligible = data.offerings.filter((o) => o.configuration === 'active' && actions.every((action) => proof.snapshot.grants.some((g) => intervalContains(g, Date.now()) && scopeAllows(g.scope, action, o.id))));
   const offeringId = selectedCareService(context) || (eligible.length === 1 ? eligible[0].id : '');
   if (!offeringId) {
@@ -73,7 +73,7 @@ export const prepareClinical = async (input: unknown, context: AuthorizationCont
     }
     const issues = clinicalActivityIssues(worker, context, proof, { action, offeringId, availableQualifiedActorIds: qualified }, Date.now());
     if (historic)
-      issues.push(...clinicalActivityIssues(worker, { ...context, lastServerContactOn: capturedProof!.issuedOn }, historic, { action, offeringId, availableQualifiedActorIds: qualified }, Date.parse(record.createdOn)));
+      issues.push(...clinicalActivityIssues(worker, { ...context, lastServerContactOn: capturedProof!.issuedOn }, historic, { action, offeringId, availableQualifiedActorIds: qualified }, Date.parse(clinicalPerformedOn(record))));
     const other = issues.filter((message) => !message.includes('Required independent supervisor/checker'));
     failIssues(other);
     if (issues.length)

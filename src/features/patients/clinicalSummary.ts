@@ -45,6 +45,6 @@ export const loadPatientClinicalSummaries = async (context: AuthorizationContext
   const [events, encounters, entries] = await Promise.all([listClinicalEvents(), listEncounters(), listEncounterEntries()]);
   const byEncounter = new Map<string, typeof entries>();
   for (const entry of entries) { const group = byEncounter.get(entry.encounterId) ?? []; group.push(entry); byEncounter.set(entry.encounterId, group); }
-  const visits = encounters.filter((encounter) => encounter.facilityId === context.facilityId).map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
+  const visits = encounters.filter((encounter) => encounter.facilityId === context.facilityId && !encounter.inpatientContext).map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
   return summariseClinicalRows(rows, events.filter((event) => event.facilityId === context.facilityId), visits, calendarDate());
 };

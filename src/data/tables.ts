@@ -17,6 +17,7 @@ export const TABLE_FOR: Record<DocType, string> = {
   visit: 'visits',
   encounter: 'encounters',
   encounter_entry: 'encounter_entries',
+  ward_care_event: 'ward_care_events',
   clinical_event: 'clinical_events',
   inpatient_event: 'inpatient_events', bed_ready_event: 'bed_ready_events',
   library_document:'library_documents',visit_document:'visit_documents',

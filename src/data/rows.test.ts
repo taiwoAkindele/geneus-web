@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import type { Patient, StockItem } from '@shared';
+import { describe, expect, it, vi } from 'vitest';
+import { Encounter, EncounterEntry, parseDocument, type Patient, type StockItem } from '@shared';
 import { fieldKindsFor } from './contractShape';
 import { decodeValues, fromRow, toRow } from './rows';
 
@@ -34,6 +34,13 @@ const wirePatient = {
 };
 
 describe('field kinds', () => {
+  it('keeps numeric literal fields numeric through optional and default wrappers', () => {
+    expect(fieldKindsFor('encounter').workflowVersion).toBe('number');
+    expect(fieldKindsFor('encounter_entry').workflowVersion).toBe('number');
+    expect(fieldKindsFor('result_template').schemaVersion).toBe('number');
+    expect(fieldKindsFor('visit_document').schemaVersion).toBe('number');
+    expect(fieldKindsFor('encounter_entry').actorRole).toBe('text');
+  });
   it('reads booleans, numbers and lists off the contract', () => {
     const kinds = fieldKindsFor('patient');
     expect(kinds.dobEstimated).toBe('boolean');
@@ -47,6 +54,23 @@ describe('field kinds', () => {
 });
 
 describe('fromRow', () => {
+  it('reads existing text-stored workflow versions without weakening contract validation', () => {
+    const base = { id: 'entry:version', facilityId: 'TEST', schemaVersion: 5, createdBy: 'staff:doctor', createdOn: '2026-11-05T09:00:00Z', deviceId: 'device:one', patientId: 'TEST-000001-K2' };
+    const records = [
+      Encounter.parse({ ...base, type: 'encounter', workflowVersion: 1, openedOn: base.createdOn }),
+      EncounterEntry.parse({ ...base, type: 'encounter_entry', workflowVersion: 1, encounterId: 'visit:one', actorRole: 'doctor', step: 'complaint', values: { note: 'Synthetic care' } }),
+    ];
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      for (const record of records) {
+        const stored = { ...toRow(record.type, record), workflowVersion: '1' };
+        expect(fromRow(record.type, stored)).toMatchObject({ workflowVersion: 1 });
+        expect(parseDocument({ ...decodeValues(record.type, { ...stored, workflowVersion: '2' }), type: record.type }).success).toBe(false);
+        expect(fromRow<typeof record>(record.type, { ...stored, workflowVersion: null }).workflowVersion).toBeUndefined();
+      }
+      expect(warning).not.toHaveBeenCalled();
+    } finally { warning.mockRestore(); }
+  });
   it('turns a synced row back into a contract record', () => {
     const patient = fromRow<Patient>('patient', wirePatient);
 
