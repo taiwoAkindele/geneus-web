@@ -13,6 +13,8 @@ import { inpatientSupported } from '../inpatientSupport';
 import { listWorkforceReceipts } from './workforceReceipts';
 import { pendingWorkforceIds } from './workforce';
 import { listStaff } from './staff';
+import { readWardRecords } from './wardCare';
+import { dischargeHeads, wardReadinessIssues } from '@shared';
 
 type Reader = Pick<LocalDatabase, 'getOptional'>;
 /** PowerSync transactions expose getOptional; aggregate rows so checks share the insertion's write lock. */
@@ -61,9 +63,11 @@ export const confirmAdmission = async (request: EncounterEntry, receivingUnitId:
     encounterId: request.encounterId, requestEntryId: request.id, action: 'confirm', receivingUnitId, actorRole: context.role, note: note.trim() || undefined });
   return writeEvent(event, context);
 };
-export const changeAdmission = async (previous: InpatientEvent, action: Exclude<InpatientAction, 'confirm'>, context: AuthorizationContext, changes: { wardId?: string; bedId?: string; receivingUnitId?: string; note?: string } = {}) => {
+export const changeAdmission = async (previous: InpatientEvent, action: Exclude<InpatientAction, 'confirm'>, context: AuthorizationContext, changes: { wardId?: string; bedId?: string; receivingUnitId?: string; note?: string; departureException?: string } = {}) => {
   assertSupport(context);
+  const summaries = ['ready_for_discharge','discharge'].includes(action) ? dischargeHeads((await readWardRecords(previous.admissionId)).events) : [];
   const event = InpatientEvent.parse({ ...previous, ...envelope(context), id: newId('inpatient_event'), previousId: previous.id, action,
+    dischargeSummaryId: summaries.length === 1 ? summaries[0].id : undefined, departureException: changes.departureException?.trim() || undefined,
     actorRole: context.role, note: changes.note?.trim() || undefined,
     wardId: changes.wardId ?? previous.wardId, bedId: changes.bedId ?? previous.bedId, receivingUnitId: changes.receivingUnitId ?? previous.receivingUnitId });
   return writeEvent(event, context);
@@ -72,6 +76,10 @@ const writeEvent = (event: InpatientEvent, context: AuthorizationContext) => ins
   checkUnderLock: async (transaction) => {
     const data = await records(transaction, event);
     const issues = inpatientIssues(event, data);
+    if (['ready_for_discharge','discharge'].includes(event.action)) {
+      const ward = await readWardRecords(event.admissionId, transaction);
+      issues.push(...wardReadinessIssues(event, ward.events, ward.encounters.some((e) => e.inpatientContext)));
+    }
     if (issues.length) throw new Error(issues.join('. '));
   },
 });

@@ -27,7 +27,7 @@ export const loadPatientDirectory = async (context:AuthorizationContext):Promise
     else groups.set(key,{patient,ids:[patient.patientId],searchRecords:[patient]});
   }
   const byPatient=new Map<string,Encounter[]>();
-  for(const visit of visits.filter(row=>row.facilityId===context.facilityId)){
+  for(const visit of visits.filter(row=>row.facilityId===context.facilityId && !row.inpatientContext)){
     const key=canonicalPatientId(visit.patientId,identities),group=byPatient.get(key)??[];group.push(visit);byPatient.set(key,group);
   }
   const acceptedOwners=owners.filter(owner=>!pending.has(owner.id)&&!rejected.has(owner.id));

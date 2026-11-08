@@ -155,6 +155,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     if (!currentId && appointmentId) encounter = encounters.find((candidate) => candidate.appointmentId === appointmentId);
     if (!currentId && !appointmentId) {
       for (const candidate of [...encounters].sort((a, b) => b.openedOn.localeCompare(a.openedOn))) {
+        if (candidate.inpatientContext) continue;
         const entries = await entriesForEncounter(candidate.id);
         if (!entries.some(closesEncounter)) {
           encounter = candidate;

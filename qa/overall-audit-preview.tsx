@@ -58,7 +58,18 @@ import { DispenseScreen } from '@/pages/service-queue/DispenseScreen';
 import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsAccess';
 import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
+import { rememberWardCareSupport } from '@/data/wardCareSupport';
 import '../src/index.css';
+
+const wardDemo = location.pathname === '/qa/ward-care-demo.html';
+if (wardDemo) {
+  const localFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    if (url.origin !== location.origin) return Promise.reject(new Error('Live services are unavailable in the synthetic demo'));
+    return localFetch(input, init);
+  };
+}
 
 await unlockSecureStorage();
 const now = new Date().toISOString();
@@ -296,6 +307,17 @@ Object.assign(window, { seedProgrammeTemplateScenario: () => {
   listeners.forEach((listener) => listener());
   return true;
 } });
+Object.assign(window, { seedWardCareScenario: () => {
+  (window as unknown as { seedAdmissionScenario: () => void }).seedAdmissionScenario();
+  const confirmation = InpatientEvent.parse({ ...envelope, schemaVersion: 5, id: 'admission:ward', admissionId: 'admission:ward', type: 'inpatient_event', patientId, encounterId: 'encounter:open', requestEntryId: 'entry:admission-request', receivingUnitId: 'unit:1', action: 'confirm', actorRole: 'doctor' });
+  const reservation = InpatientEvent.parse({ ...confirmation, id: 'admission:ward-reserved', previousId: confirmation.id, action: 'reserve', wardId: 'ward:surgical', bedId: 'bed:01' });
+  const arrival = InpatientEvent.parse({ ...reservation, id: 'admission:ward-arrived', previousId: reservation.id, action: 'arrive' });
+  db.rows.inpatient_events = [confirmation,reservation,arrival].map((e) => toRow('inpatient_event', e));
+  db.rows.ward_care_events = [];
+  rememberWardCareSupport({ facilityId: envelope.facilityId, deviceId: envelope.deviceId }, 1);
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {
   (window as unknown as { seedLabResultScenario: () => boolean }).seedLabResultScenario();
@@ -346,7 +368,10 @@ const Ready = ({ children }: { children: React.ReactNode }) => {
   const auth = useAuth();
   return auth.signedIn ? children : <p>Preparing synthetic staff session…</p>;
 };
-createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={[auditParams.get('start')?.startsWith('/') && !auditParams.get('start')?.startsWith('//') ? auditParams.get('start')! : '/home']}><RouteObserver /><Routes><Route element={<AppShell />}>
+if (wardDemo) (window as unknown as { seedWardCareScenario: () => void }).seedWardCareScenario();
+const initialPath = auditParams.get('start')?.startsWith('/') && !auditParams.get('start')?.startsWith('//') ? auditParams.get('start')!
+  : wardDemo ? '/patients/profile?patient=QA-PHC-000001-K2&tab=ward&admission=admission%3Award' : '/home';
+createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvider><Ready><AppointmentsProvider><RegistersProvider><RegistrationDraftProvider><MemoryRouter initialEntries={[initialPath]}><RouteObserver /><Routes><Route element={<AppShell />}>
   <Route path="/home" element={<FacilityHomeScreen />} /><Route path="/workspace/:moduleId" element={<WorkspaceScreen />} /><Route path="/patients/search" element={<PatientSearchScreen />} /><Route path="/patients/profile" element={<PatientProfileScreen />} /><Route path="/patients/new" element={<NewPatientStep1Screen />} /><Route path="/encounters" element={<EncountersScreen />} /><Route path="/encounters/record" element={<EncounterScreen />} /><Route path="/appointments" element={<AppointmentsScreen />} /><Route path="/units" element={<UnitQueueScreen />} /><Route path="/registers" element={<RegistersListScreen />} /><Route path="/sync" element={<SyncCenterScreen />} />
   <Route path="/admin" element={<AdminDashboardScreen />} /><Route path="/admin/staff" element={<ManageStaffScreen />} /><Route path="/admin/staff/invite" element={<InviteStaffScreen />} /><Route path="/admin/staff/access" element={<RolesPermissionsScreen />} /><Route path="/admin/units" element={<UnitsScreen />} /><Route path="/admin/devices" element={<DevicesScreen />} /><Route path="/admin/devices/add" element={<AddDeviceScreen />} /><Route path="/registers/new" element={<RegisterBuilderScreen />} /><Route path="/registers/:id" element={<RegisterEntriesScreen />} /><Route path="/registers/:id/configure" element={<RegisterBuilderScreen />} /><Route path="/billing" element={<BillingScreen />} /><Route path="/billing/fees" element={<FeeScheduleScreen />} /><Route path="/billing/settings" element={<BillingSettingsScreen />} />
   <Route path="/documents" element={<ClinicalDocumentsAccess><DocumentsScreen /></ClinicalDocumentsAccess>} />

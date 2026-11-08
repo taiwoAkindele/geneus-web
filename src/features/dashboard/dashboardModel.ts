@@ -23,7 +23,7 @@ export const careSnapshot = (encounters: readonly Encounter[], entries: readonly
     group.push(entry); byEncounter.set(entry.encounterId, group);
   }
   const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
-  const visits = encounters.map((encounter) => ({ ...summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []), patientName: names.get(encounter.patientId) ?? encounter.patientId }));
+  const visits = encounters.filter((encounter) => !encounter.inpatientContext).map((encounter) => ({ ...summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []), patientName: names.get(encounter.patientId) ?? encounter.patientId }));
   return {
     today: visits.filter((visit) => calendarDate(visit.openedOn) === today).length,
     // Open visits are unfinished work, not proof that a patient is physically waiting.

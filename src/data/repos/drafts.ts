@@ -1,6 +1,16 @@
 import { getDatabase } from '../database';
 import { nowIso } from '../db';
 import { DRAFTS_TABLE } from '../tables';
+import type { WardSession } from './wardCare';
+import type { StepKey } from '@/features/encounter/types';
+
+export const listWardDrafts = async (owner: { staffId: string; patientId: string }, admissionId: string): Promise<{ session: WardSession; step: StepKey; changeOrderId?: string }[]> => {
+  const rows = await getDatabase().getAll<{ data: string }>(`SELECT data FROM ${DRAFTS_TABLE} WHERE staffId = ? AND patientId = ? AND step = ?`, [owner.staffId, owner.patientId, 'ward_form']);
+  return rows.flatMap((row) => {
+    try { const draft = JSON.parse(row.data) as { session?: WardSession; step?: StepKey; changeOrderId?: string }; return draft.session?.admissionId === admissionId && draft.session.patientId === owner.patientId && draft.step ? [{ session: draft.session, step: draft.step, changeOrderId: draft.changeOrderId }] : []; }
+    catch { return []; }
+  });
+};
 
 /**
  * Unsaved encounter work, kept on the device so a power cut or a closed tab

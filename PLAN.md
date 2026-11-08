@@ -7,6 +7,16 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Continuing inpatient care (5 November 2026)
+
+The patient chart's Ward care tab groups signed nursing checks, doctor reviews,
+investigations, medication decisions/actual administrations and versioned discharge
+summaries under one admission. Existing encounter forms, private drafts, clinical
+authorization, service worklists and correction/print patterns are reused. Ward
+sessions do not count as outpatient visits or create attendance fees. Migration
+0028 and negotiated `wardCareVersion: 1` precede client activation. See
+[implementation, evidence and release order](../docs/INPATIENT-CARE-IMPLEMENTATION-2026-11-05.md).
+
 ### Admissions and wards foundation (31 October 2026)
 
 Clinical patient lists now separate All / Inpatients / Outpatients while retaining service queues. Wards & admissions receives signed requests, confirms an inpatient stay linked to its existing encounter, reserves beds, records arrival/transfers, distinguishes readiness from actual departure and records bed cleaning. Patient charts expose current stay context. Phone ward lists keep identity/location/actions together. Additive schema-5 events, policy-11 admission permission, negotiated server support and upload receipts preserve offline state and refused history. Shared promotion, migration 0021 and regenerated Sync Streams precede PWA activation. See [scope and release order](../docs/INPATIENT-FOUNDATION.md).

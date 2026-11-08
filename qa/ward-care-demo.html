@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Geneus ward care demo — synthetic records</title>
+    <style>
+      .demo-notice { padding: 12px 16px; color: #422006; background: #fef3c7; font: 14px/1.5 system-ui, sans-serif; }
+      .demo-notice nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 4px; }
+      .demo-notice a { display: inline-flex; min-height: 44px; align-items: center; color: #422006; font-weight: 700; text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <aside class="demo-notice" aria-label="Synthetic demonstration">
+      <strong>Hospital workflow demo — sample records only.</strong>
+      <p>Changes stay in this preview. Refresh restarts the sample stay.</p>
+      <nav aria-label="Demo controls">
+        <a href="/qa/ward-care-demo.html">Restart with full access</a>
+        <a href="/qa/ward-care-demo.html?readonly=1">Restart with read-only access</a>
+      </nav>
+    </aside>
+    <div id="root"></div>
+    <script type="module" src="/qa/overall-audit-preview.tsx"></script>
+  </body>
+</html>

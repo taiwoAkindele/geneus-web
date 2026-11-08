@@ -2,7 +2,7 @@
 // Uses installed Chrome and Node's WebSocket; no browser-testing dependency.
 import { createServer } from 'vite';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm, mkdtemp } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm, mkdtemp, realpath } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -10,18 +10,20 @@ import { createInterface } from 'node:readline';
 
 const output = resolve(process.env.OVERALL_AUDIT_OUTPUT ?? (process.argv[2] ? 'qa/artifacts/overall-redesign' : '../docs/design-review/overall-product-2026-10-26'));
 const previewOrigin = process.env.PATIENT_FLOW_PREVIEW ?? 'http://127.0.0.1:5196';
+const previewPage = process.env.GENEUS_QA_PREVIEW_PAGE ?? '/qa/overall-audit.html';
+assert.match(previewPage, /^\/qa\/[a-z-]+\.html$/, 'Use a local QA preview page');
 assert.ok(/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(previewOrigin), 'Use a local synthetic preview origin');
 await mkdir(output, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), 'geneus-clinical-qa-'));
 const server = process.env.PATIENT_FLOW_PREVIEW ? undefined : await createServer({
-  configFile: false, root: process.cwd(), logLevel: 'error',
+  configFile: false, envFile: false, root: process.cwd(), logLevel: 'error',
   resolve: { alias: [
     { find: /^@\/data$/, replacement: resolve('qa/clinical-device.ts') },
     { find: '@shared', replacement: resolve(process.env.GENEUS_QA_CANONICAL_CONTRACT === '1' ? '../geneus-shared/src' : 'shared/src') },
     { find: /^zod$/, replacement: resolve('node_modules/zod/index.js') },
     { find: '@', replacement: resolve('src') },
   ] },
-  esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 5196, strictPort: true, fs: { allow: [process.cwd(), resolve('../geneus-shared')] } },
+  esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 5196, strictPort: true, fs: { allow: [process.cwd(), resolve('../geneus-shared'), await realpath(resolve('node_modules'))] } },
 });
 await server?.listen();
 const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
@@ -65,7 +67,7 @@ try {
     return response.result.value;
   };
   const waitFor = async (expression) => {
-    for (let attempt = 0; attempt < 100; attempt++) { if (await evaluate(expression)) return; await pause(100); }
+    for (let attempt = 0; attempt < 300; attempt++) { if (await evaluate(expression)) return; await pause(100); }
     throw new Error('Timed out: ' + expression + '\n' + await evaluate('document.body.innerText') + '\n' + errors.join('\n'));
   };
   const click = async (text, selector = 'button') => {
@@ -112,7 +114,7 @@ try {
       }
       if (role !== currentRole || width !== currentWidth || command.reload) {
         await cdp('Emulation.setDeviceMetricsOverride', { width, height: width > 800 ? 1024 : 844, deviceScaleFactor: 1, mobile: width <= 800 });
-        await cdp('Page.navigate', { url: previewOrigin + '/qa/overall-audit.html?role=' + encodeURIComponent(role) + (command.combined ? '&combined=1' : '') + (command.readonly ? '&readonly=1' : '') + (command.chartAccess ? '&chartAccess=1' : '') + (command.actor ? '&actor=' + encodeURIComponent(command.actor) : '') });
+        await cdp('Page.navigate', { url: previewOrigin + previewPage + '?role=' + encodeURIComponent(role) + (command.combined ? '&combined=1' : '') + (command.readonly ? '&readonly=1' : '') + (command.chartAccess ? '&chartAccess=1' : '') + (command.actor ? '&actor=' + encodeURIComponent(command.actor) : '') });
         await waitFor('Boolean(window.designAudit)&&Boolean(document.querySelector("h1"))');await evaluate('document.fonts.ready.then(()=>true)');
         currentRole = role; currentWidth = width;
       }
