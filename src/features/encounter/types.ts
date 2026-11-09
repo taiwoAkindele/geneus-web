@@ -8,7 +8,7 @@ import type { DocumentFile, EncounterEntry, EncounterStep, InvestigationItem, Re
  */
 export type StepKey = Exclude<EncounterStep, 'amendment'>;
 
-export type RxLine = { name: string; dose: string; frequency?: string; duration?: string; route?: string; quantity?: string };
+export type RxLine = { name: string; dose: string; frequency?: string; duration?: string; route?: string; quantity?: string; unitOfMeasure?: string };
 /** One template part as the lab scientist is filling it in — strings as typed. */
 export type LabPartDraft = {
   value?: string; flag?: ResultFlag | '';

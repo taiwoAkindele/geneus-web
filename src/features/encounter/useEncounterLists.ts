@@ -1,10 +1,15 @@
 import { useCallback } from 'react';
-import { useLiveQuery, type LiveQuery } from '@/data';
+import { useDeviceContext, useLiveQuery, type LiveQuery } from '@/data';
 import { encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters, listEncounterEntries } from '@/data/repos/encounters';
 import { summariseEncounter, type EncounterSummary } from './encounterSummary';
 import { QUEUE_STEPS, stationQueues, type QueuedPatient, type StationQueue } from './stationQueues';
 import { REQUEST_STEPS, requestQueues } from './requestQueues';
 import { patientIdentityIds } from '@/data/repos/patientIdentity';
+import { listDischargePrescriptions } from '@/data/repos/wardCare';
+import { pharmacySupported } from '@/data/pharmacySupport';
+import { usablePharmacyEntries } from '@/data/repos/pharmacyAcceptance';
+
+const dischargePrescriptions = (facilityId?: string, deviceId?: string) => facilityId && deviceId && pharmacySupported({ facilityId, deviceId }) ? listDischargePrescriptions() : Promise.resolve([]);
 
 const newestFirst = (a: EncounterSummary, b: EncounterSummary) => b.openedOn.localeCompare(a.openedOn);
 
@@ -37,8 +42,13 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
 };
 
 /** The lab, results-ready and pharmacy queues, kept current as steps are saved on any device. */
-export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient[]>> =>
-  useLiveQuery(useCallback(async () => stationQueues(await entriesAtSteps(QUEUE_STEPS)), []));
+export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient[]>> => {
+  const { facility, deviceId } = useDeviceContext();
+  return useLiveQuery(useCallback(async () => { const [entries, summaries] = await Promise.all([entriesAtSteps(QUEUE_STEPS).then(usablePharmacyEntries), dischargePrescriptions(facility?.id, deviceId)]); return stationQueues(entries, summaries); }, [facility?.id, deviceId]));
+};
 
 /** Laboratory and pharmacy requests, open and completed, kept current as steps are saved on any device. */
-export const useRequestQueues = () => useLiveQuery(useCallback(async () => requestQueues(await entriesAtSteps(REQUEST_STEPS)), []));
+export const useRequestQueues = () => {
+  const { facility, deviceId } = useDeviceContext();
+  return useLiveQuery(useCallback(async () => { const [entries, summaries] = await Promise.all([entriesAtSteps(REQUEST_STEPS).then(usablePharmacyEntries), dischargePrescriptions(facility?.id, deviceId)]); return requestQueues(entries, summaries); }, [facility?.id, deviceId]));
+};

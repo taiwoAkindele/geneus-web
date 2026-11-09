@@ -1,0 +1,12 @@
+[
+  { "role": "pharmacy_staff", "width": 390, "path": "/pharmacy", "evaluate": "window.seedPharmacyScenario()" },
+  { "path": "/pharmacy/request?patient=QA-PHC-000001-K2&visit=visit%3Apharmacy-demo" },
+  { "click": "Supply medicine" },
+  { "fill": { "label": "Medicine in stock", "value": "stock:pharmacy-demo" } },
+  { "fill": { "label": "Giving now", "value": "20" } },
+  { "click": "Review & save" },
+  { "click": "Confirm & save pharmacy record", "assert": "document.body.innerText.includes('Still needed: 0')", "description": "A full local supply initially completes the prescription" },
+  { "evaluate": "window.designAudit.rows.workforce_upload_receipts=[{id:window.designAudit.rows.encounter_entries.find(e=>e.pharmacyVersion===1).id,clientId:1,outcome:'rejected'}];true" },
+  { "path": "/pharmacy", "assert": "document.body.innerText.includes('Synthetic medicine')&&document.body.innerText.includes('Open requests (1)')", "description": "A refused full supply cannot hide the outstanding pharmacy request" },
+  { "path": "/pharmacy/request?patient=QA-PHC-000001-K2&visit=visit%3Apharmacy-demo", "name": "pharmacy-refused-supply", "assert": "document.body.innerText.includes('refused during sync')&&![...document.querySelectorAll('button')].some(e=>e.textContent.trim()==='Supply medicine')&&document.documentElement.scrollWidth<=390", "description": "The medicine explains the refusal and requires review of what was handed over before another supply" }
+]

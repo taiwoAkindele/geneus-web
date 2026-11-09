@@ -7,11 +7,18 @@ import { RequestHeader } from '@/features/encounter/components/RequestHeader';
 import { PatientChartAccess } from '@/features/patients/PatientChartAccess';
 import { usePatient } from '@/features/search';
 import { Button, Tag, useToast } from '@/ui';
+import { pharmacySupported } from '@/data/pharmacySupport';
+import { QuantityDispenseScreen } from '@/features/pharmacy/QuantityDispenseScreen';
 
 const QUEUE = '/pharmacy';
-export const dispensePath = (patientId: string, encounterId: string) => `/pharmacy/request?${new URLSearchParams({ patient: patientId, visit: encounterId })}`;
+export const dispensePath = (patientId: string, encounterId: string, prescriptionId?: string) => `/pharmacy/request?${new URLSearchParams({ patient: patientId, visit: encounterId, ...(prescriptionId ? { prescription: prescriptionId } : {}) })}`;
 
-export const DispenseScreen = () => <PatientChartAccess><Dispense /></PatientChartAccess>;
+export const DispenseScreen = () => {
+  const context = useAuthorizationContext();
+  const [supported, setSupported] = useState(() => pharmacySupported(context));
+  useEffect(() => { const refresh = () => setSupported(pharmacySupported(context)); window.addEventListener('geneus:pharmacySupport', refresh); return () => window.removeEventListener('geneus:pharmacySupport', refresh); }, [context.facilityId, context.deviceId]);
+  return <PatientChartAccess>{supported ? <QuantityDispenseScreen /> : <Dispense />}</PatientChartAccess>;
+};
 
 /**
  * One prescription, dispensed in the Pharmacy: the patient and their allergies,

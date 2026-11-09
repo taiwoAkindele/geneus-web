@@ -53,6 +53,10 @@ export type StepSave = {
  * refused save leaves no half-opened encounter or stray booking behind.
  */
 export const saveStep = async (save: StepSave, context: AuthorizationContext): Promise<EncounterEntry> => {
+  if (save.step === 'dispense') {
+    const { pharmacySupported } = await import('../pharmacySupport');
+    if (pharmacySupported(context)) throw new Error('Open Pharmacy to record the actual quantity supplied');
+  }
   if (save.encounterId) {
     const header = await findRecord<Encounter>('encounter', save.encounterId);
     if (header?.inpatientContext) {

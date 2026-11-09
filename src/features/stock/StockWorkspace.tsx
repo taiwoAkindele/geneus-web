@@ -6,6 +6,8 @@ import { useAuthorizationContext } from '@/session';
 import { createStockItem, recordStockMovement, type stockBalances } from '@/data/repos/stock';
 import { downloadCsv } from '@/lib/csv';
 import { useStock } from './useStock';
+import { StockPriceSheet } from './StockPriceSheet';
+import { pharmacySupported } from '@/data/pharmacySupport';
 
 const CATEGORIES = { drug: 'Medicine', vaccine: 'Vaccine', test_kit: 'Test kit', fp_commodity: 'Family planning commodity', consumable: 'Consumable', other: 'Other' };
 const REASONS = { received: 'Received', dispensed: 'Dispensed / used', expired: 'Expired / damaged', adjustment: 'Physical count adjustment', transfer: 'Transfer' };
@@ -60,6 +62,7 @@ export const StockWorkspace = () => {
   const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState(false), [moving, setMoving] = useState(false);
   useEffect(() => { document.title = 'Medicine & stock · Geneus Health'; }, []);
+  const [pricing, setPricing] = useState(false);
   const search = params.get('q') ?? '', filter = params.get('level') ?? '';
   const item = query.data?.items.find((candidate) => candidate.id === params.get('item'));
   const shown = (query.data?.items ?? []).filter((candidate) => candidate.name.toLowerCase().includes(search.toLowerCase()) && (!filter || (filter === 'low' ? candidate.balance <= (candidate.reorderLevel ?? 0) : candidate.balance < 0))).sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
@@ -80,6 +83,8 @@ export const StockWorkspace = () => {
       </section> : params.get('item') ? <p role="alert">The selected item is not available on this device.</p> : null}
     </>}
     <p className="text-xs leading-relaxed text-ink-muted">Saved movements are permanent. Correct a counted difference with a new adjustment and a reason. Other devices' movements arrive when this device syncs; this is not a live physical count.</p>
+    {item && context.permissions.includes('stock_item:manage') && pharmacySupported(context) ? <Button variant="outlined" fullWidth={false} onClick={() => setPricing(true)}>Set medicine selling price</Button> : null}
+    {pricing && item ? <StockPriceSheet item={item} onClose={() => setPricing(false)} onSaved={query.reload} /> : null}
     {adding ? <StockForm onClose={() => setAdding(false)} onSaved={query.reload} /> : null}
     {moving && item ? <StockForm item={item} onClose={() => setMoving(false)} onSaved={query.reload} /> : null}
   </div>;

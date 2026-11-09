@@ -49,6 +49,12 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
   const { enc } = ctl;
   const steps = stepsFor(enc.data);
   const chosen = steps.find((step) => step.key === selected) ?? steps[enc.activeIndex] ?? steps[0];
+  useEffect(() => {
+    if (chosen?.key !== 'dispense' || !enc.id) return;
+    let active = true;
+    import('@/data/pharmacySupport').then(({ pharmacySupported }) => { if (active && pharmacySupported(context)) navigate('/pharmacy/request?' + new URLSearchParams({ patient: patientId, visit: enc.id! }), { replace: true }); });
+    return () => { active = false; };
+  }, [chosen?.key, enc.id, patientId, context.facilityId, context.deviceId, navigate]);
   const [reviewKey, setReviewKey] = useState<StepKey>();
   const [amendKey, setAmendKey] = useState<StepKey>();
   const [saving, setSaving] = useState(false);

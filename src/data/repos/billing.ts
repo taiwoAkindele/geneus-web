@@ -17,16 +17,17 @@ import { assertAllowed } from '@/auth/authorization';
 import { assertAmountMinor } from '@/lib/money';
 import { mintReceiptNumber } from '@/lib/receiptNumber';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
+import { usablePharmacyEffects } from './pharmacyAcceptance';
 
 export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
 
 export const listFeeItems = () => allOfType<FeeItem>('fee_item');
-export const chargesForPatient = (patientId: string) => allWhere<Charge>('charge', 'patientId', patientId);
+export const chargesForPatient = (patientId: string) => allWhere<Charge>('charge', 'patientId', patientId).then(usablePharmacyEffects);
 export const paymentsForPatient = (patientId: string) => allWhere<Payment>('payment', 'patientId', patientId);
-export const adjustmentsForPatient = (patientId: string) => allWhere<BillingAdjustment>('billing_adjustment', 'patientId', patientId);
-export const listCharges = () => allOfType<Charge>('charge');
+export const adjustmentsForPatient = (patientId: string) => allWhere<BillingAdjustment>('billing_adjustment', 'patientId', patientId).then(usablePharmacyEffects);
+export const listCharges = () => allOfType<Charge>('charge').then(usablePharmacyEffects);
 export const listPayments = () => allOfType<Payment>('payment');
-export const listAdjustments = () => allOfType<BillingAdjustment>('billing_adjustment');
+export const listAdjustments = () => allOfType<BillingAdjustment>('billing_adjustment').then(usablePharmacyEffects);
 export const listIncomingTransfers = () => allOfType<IncomingTransfer>('incoming_transfer');
 export const listBillingDepartments = () => allOfType<BillingDepartment>('billing_department');
 export const patientBillingFacts = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'sex'> & Partial<Pick<Patient, 'createdOn' | 'ageObservedOn'>>, visitType?: VisitType): ExemptionFacts => {

@@ -16,6 +16,7 @@ const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
   location: ['parentId', 'unitId', 'capacity', 'description'],
   billing_department: ['organizationUnitId'],
   appointment: ['allocation'],
+  stock_item: ['feeItemId'],
 };
 
 /** Record → row values, ready to bind. `undefined` becomes NULL. */

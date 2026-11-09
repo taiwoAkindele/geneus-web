@@ -1,4 +1,5 @@
-import { CLOSING_STEPS, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type EncounterEntry, type EncounterStep } from '@shared';
+import { CLOSING_STEPS, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type EncounterEntry, type EncounterStep, type WardCareEvent } from '@shared';
+import { requestQueues } from './requestQueues';
 
 /**
  * The station queues (PRD §9.8.1): who is waiting for the laboratory, whose
@@ -29,7 +30,7 @@ const firstAt = (entries: readonly EncounterEntry[], step: EncounterStep) =>
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn))[0];
 
 /** Each open encounter in the queue it is waiting in, oldest first — the order patients arrived. */
-export const stationQueues = (entries: readonly EncounterEntry[]): Record<StationQueue, QueuedPatient[]> => {
+export const stationQueues = (entries: readonly EncounterEntry[], wardEvents: readonly WardCareEvent[] = []): Record<StationQueue, QueuedPatient[]> => {
   const byEncounter = new Map<string, EncounterEntry[]>();
   for (const entry of effectiveEncounterEntries(entries)) byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
 
@@ -38,7 +39,6 @@ export const stationQueues = (entries: readonly EncounterEntry[]): Record<Statio
 
     const order = firstAt(saved, 'lab_order');
     const results = firstAt(saved, 'lab_results');
-    const diagnosis = firstAt(saved, 'diagnosis');
     const patientId = saved[0].patientId;
 
     if (order) {
@@ -51,19 +51,8 @@ export const stationQueues = (entries: readonly EncounterEntry[]): Record<Statio
     if (results && saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id))) {
       queues.results.push({ encounterId, patientId, waitingSince: results.createdOn, detail: 'Lab results are back' });
     }
-    const medication = firstAt(saved, 'prescription');
-    if ((medication || diagnosis) && !firstAt(saved, 'dispense')) {
-      const { prescription } = medication ? ENCOUNTER_STEP_VALUES.prescription.parse(medication.values) : ENCOUNTER_STEP_VALUES.diagnosis.parse(diagnosis!.values);
-      if (prescription.length > 0) {
-        queues.pharmacy.push({
-          encounterId,
-          patientId,
-          waitingSince: (medication ?? diagnosis)!.createdOn,
-          detail: prescription.map((line) => line.drug).join(', '),
-        });
-      }
-    }
   }
+  queues.pharmacy = requestQueues(entries, wardEvents).pharmacy.open.map((request) => ({ encounterId: request.encounterId, patientId: request.patientId, waitingSince: request.requestedOn, detail: request.items.join(', ') }));
   for (const queue of STATION_QUEUES) queues[queue].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince));
   return queues;
 };

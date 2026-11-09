@@ -1,0 +1,10 @@
+[
+  { "role": "pharmacy_staff", "width": 390, "path": "/pharmacy", "evaluate": "window.seedDischargePharmacyScenario()", "assert": "document.body.innerText.includes('Synthetic medicine')", "description": "Signed take-home medicines appear in the ordinary Pharmacy queue" },
+  { "click": "Dispense", "assert": "document.body.innerText.includes('Recorded take-home instructions')&&document.body.innerText.includes('Prescribed: 20')", "description": "The queue opens the exact discharge prescription without retyping medicines" },
+  { "click": "Supply medicine" },
+  { "fill": { "label": "Medicine in stock", "value": "stock:pharmacy-demo" } },
+  { "fill": { "label": "Giving now", "value": "5" } },
+  { "click": "Review & save" },
+  { "click": "Confirm & save pharmacy record", "assert": "window.designAudit.rows.encounter_entries.some(e=>e.pharmacyVersion===1&&JSON.parse(e.values).supply.prescriptionEntryId==='summary:pharmacy-demo')&&window.designAudit.rows.charges.filter(e=>e.dispenseEntryId).length===1&&window.designAudit.rows.stock_movements.filter(e=>e.dispenseEntryId).length===1", "description": "A discharge supply retains its signed summary and updates stock and bill together" },
+  { "path": "/pharmacy", "name": "pharmacy-discharge-partial", "assert": "document.body.innerText.includes('Synthetic medicine')&&document.documentElement.scrollWidth<=390", "description": "The remaining discharge medicines stay open for a later top-up" }
+]

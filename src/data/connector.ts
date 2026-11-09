@@ -9,6 +9,7 @@ import type { LocalDatabase } from './database';
 import { getDeviceCredential, recordServerContact } from './deviceCredential';
 import { decodeValues } from './rows';
 import { TYPE_FOR } from './tables';
+import { rememberPharmacySupport } from './pharmacySupport';
 import { rememberWardCareSupport } from './wardCareSupport';
 import { rememberInpatientSupport } from './inpatientSupport';
 import { rememberDocumentSupport } from './documentSupport';
@@ -63,6 +64,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       const minted = await fetchSyncToken(device.credential);
       rememberInpatientSupport(device, minted.inpatientWorkflowVersion);
       rememberWardCareSupport(device, minted.wardCareVersion);
+      rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
       rememberDocumentSupport(device,minted.documentWorkflowVersion);
       recordServerContact(minted.serverTime, device.deviceId);
       await refreshWorkforceKeys();
@@ -84,7 +86,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);}
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }
@@ -97,7 +99,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       try {
         if(fileScope && request.mutations.some((mutation)=>['library_document','visit_document'].includes(mutation.table)||(mutation.table==='encounter_entry'&&mutation.data.labReport!==undefined))){const {transferDocumentFiles}=await import('./documentTransfer');await transferDocumentFiles(device.credential,fileScope,request.mutations);}
         const response = await uploadMutations(device.credential, request);
-        await confirmWorkforceReceipts(device.credential, request.mutations.filter((mutation) => requiresFacilityContract(mutation) || (mutation.table === 'encounter' && Boolean(mutation.data.inpatientContext)) || (mutation.table === 'encounter_entry' && Boolean(mutation.data.admissionId)) || ['ward_care_event','inpatient_event','bed_ready_event','library_document','visit_document'].includes(mutation.table)));
+        await confirmWorkforceReceipts(device.credential, request.mutations.filter((mutation) => requiresFacilityContract(mutation) || (mutation.table === 'encounter' && Boolean(mutation.data.inpatientContext)) || (mutation.table === 'encounter_entry' && Boolean(mutation.data.admissionId || mutation.data.pharmacyVersion)) || ['ward_care_event','inpatient_event','bed_ready_event','library_document','visit_document'].includes(mutation.table)));
         recordServerContact(response.serverTime, device.deviceId);
         if (response.rejected.length > 0) {
           console.warn('server rejected queued writes — see the reconcile queue', response.rejected);

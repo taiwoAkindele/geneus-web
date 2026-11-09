@@ -15,6 +15,21 @@ import { retainClinicalDraftForReview } from './clinicalReviews';
 import { activeWorkspace } from '../facilityWorkspaces';
 
 type Reader = Pick<LocalDatabase, 'getOptional'>;
+/** Signed take-home prescriptions share the Pharmacy queue with visit prescriptions. */
+export const listDischargePrescriptions = async (): Promise<WardCareEvent[]> => {
+  const [events, rejections, receipts] = await Promise.all([
+    allOfType<WardCareEvent>('ward_care_event'), allOfType<Extract<AnyDocument, { type: 'sync_rejection' }>>('sync_rejection'),
+    import('./workforceReceipts').then((m) => m.listWorkforceReceipts()),
+  ]);
+  const applied = new Set(receipts.filter((r) => r.outcome === 'applied').map((r) => r.id));
+  const blocked = new Set([...rejections.filter((r) => !applied.has(r.entityId)).map((r) => r.entityId), ...receipts.filter((r) => r.outcome === 'rejected' && !applied.has(r.id)).map((r) => r.id)]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of events) if (!blocked.has(e.id) && (blocked.has(e.admissionId) || blocked.has(e.encounterId) || ('previousId' in e.values && e.values.previousId && blocked.has(e.values.previousId)))) { blocked.add(e.id); changed = true; }
+  }
+  return events.filter((e) => e.values.kind === 'discharge' && !blocked.has(e.id));
+};
 export const readWardRecords = async (admissionId: string, reader?: Reader): Promise<WardRecords> => {
   const read = async <T extends AnyDocument>(type: DocType): Promise<T[]> => {
     if (!reader) return allOfType<T>(type);
