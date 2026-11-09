@@ -1,4 +1,4 @@
-import { Patient, patientAge, patientIdentificationIssues, patientIdentitySnapshot, provisionalPatientName, type AuthorizationContext } from '@shared';
+import { Patient, patientAge, patientIdentificationIssues, patientIdentitySnapshot, provisionalPatientName, type AuthorizationContext, type Charge, type FeeItem } from '@shared';
 import { mintPatientId } from '@/lib/patientId';
 import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
 import { listFeeItems, newCharge, patientBillingFacts } from './billing';
@@ -18,7 +18,10 @@ export type PatientDetails = Pick<
  * Registers a new patient under a Patient ID minted here, offline. The
  * facility's code is its id — the server holds the two equal (SCHEMA.md §4).
  */
-export const registerPatient = async (details: PatientDetails, context: AuthorizationContext, extraRecords?: (patientId: string) => NewRecord[]): Promise<Patient> => {
+/** What a registration has prepared, for records saved in the same write (an identity decision, a first booking). */
+export type RegisteredBundle = { patient: Patient; fees: FeeItem[]; charges: Charge[] };
+
+export const registerPatient = async (details: PatientDetails, context: AuthorizationContext, extraRecords?: (patientId: string, created: RegisteredBundle) => NewRecord[]): Promise<Patient> => {
   const existing = await listPatients();
   const patientId = mintPatientId(
     context.facilityId,
@@ -34,10 +37,12 @@ export const registerPatient = async (details: PatientDetails, context: Authoriz
     allergies: [],
   });
   // Visit-dependent policy cannot be decided until booking supplies the visit type.
-  const fees = (await listFeeItems()).filter((fee) => fee.active && fee.chargeWhen === 'first_visit' && !fee.exemptions.some((rule) => rule.visitTypes));
-  await insertRecords(context, [{ permission: 'patient:create', type: 'patient', record: patient }, ...fees.map((fee) => ({
-    permission: 'charge:create' as const, type: 'charge' as const, record: newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context),
-  })), ...(extraRecords?.(patientId) ?? [])]);
+  const allFees = await listFeeItems();
+  const fees = allFees.filter((fee) => fee.active && fee.chargeWhen === 'first_visit' && !fee.exemptions.some((rule) => rule.visitTypes));
+  const charges = fees.map((fee) => newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context));
+  await insertRecords(context, [{ permission: 'patient:create', type: 'patient', record: patient }, ...charges.map((record) => ({
+    permission: 'charge:create' as const, type: 'charge' as const, record,
+  })), ...(extraRecords?.(patientId, { patient, fees: allFees, charges }) ?? [])]);
   return patient;
 };
 

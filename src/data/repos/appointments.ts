@@ -1,4 +1,4 @@
-import { Appointment, type AppointmentAllocation, type AppointmentAction, type AppointmentActivity, type AuthorizationContext, type Encounter, type Patient, type VisitType } from '@shared';
+import { Appointment, type AppointmentAllocation, type AppointmentAction, type AppointmentActivity, type AuthorizationContext, type Charge, type Encounter, type FeeItem, type Patient, type VisitType } from '@shared';
 import { validateAllocation } from './workforce';
 import { assertAllowed } from '@/auth/authorization';
 import { allOfType, allWhere, ContractError, envelope, findRecord, insertRecords, newId, updateRecord, type NewRecord } from '../db';
@@ -30,23 +30,46 @@ export const newAppointment = (draft: AppointmentDraft, context: AuthorizationCo
   status: draft.scheduledFor ? ('scheduled' as const) : ('pending' as const),
 });
 
-export const bookingRecords = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<NewRecord[]> => {
-  assertAllowed(context, 'appointment:create');
+const checkedAppointment = (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string) => {
   const appointment = newAppointment(draft, context, createdOn);
   const parsed = Appointment.safeParse(appointment);
   if (!parsed.success) throw new ContractError(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
-  await validateAllocation(parsed.data);
-  const [patient, fees, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), listAppointments()]);
-  if (!patient) throw new Error('The patient is not available on this device');
-  const identityIds = await patientIdentityIds(draft.patientId);
-  const linkedCharges = (await Promise.all(identityIds.map(chargesForPatient))).flat();
-  const firstVisit = !appointments.some((a) => identityIds.includes(a.patientId));
+  return { appointment, parsed: parsed.data };
+};
+
+type BookingFacts = { patient: Patient; fees: readonly FeeItem[]; firstVisit: boolean; linkedCharges: readonly Charge[] };
+
+/** The appointment and the fees it raises, from facts already read. Pure, so registration can book in its own write. */
+const bookingRecordsFrom = (appointment: ReturnType<typeof newAppointment>, draft: AppointmentDraft, context: AuthorizationContext, { patient, fees, firstVisit, linkedCharges }: BookingFacts): NewRecord[] => {
   const selected = fees.filter((f) => f.active && (f.chargeWhen === 'every_visit' || (firstVisit && f.chargeWhen === 'first_visit' && !linkedCharges.some((c) => c.feeItemId === f.id))));
   const raised = selected.map((fee): NewRecord => ({
     permission: 'charge:create', type: 'charge', record: newCharge(fee, { patientId: draft.patientId, appointmentId: appointment.id, facts: patientBillingFacts(patient, draft.visitType) }, context),
   }));
   const firstVisitIds = firstVisit ? linkedCharges.filter((c) => fees.some((f) => f.id === c.feeItemId && f.chargeWhen === 'first_visit')).map((c) => c.id) : [];
   return [{ permission: 'appointment:create', type: 'appointment', record: { ...appointment, chargeIds: [...firstVisitIds, ...raised.map((r) => (r.record as { id: string }).id)] } }, ...raised];
+};
+
+export const bookingRecords = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<NewRecord[]> => {
+  assertAllowed(context, 'appointment:create');
+  const { appointment, parsed } = checkedAppointment(draft, context, createdOn);
+  await validateAllocation(parsed);
+  const [patient, fees, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), listAppointments()]);
+  if (!patient) throw new Error('The patient is not available on this device');
+  const identityIds = await patientIdentityIds(draft.patientId);
+  const linkedCharges = (await Promise.all(identityIds.map(chargesForPatient))).flat();
+  const firstVisit = !appointments.some((a) => identityIds.includes(a.patientId));
+  return bookingRecordsFrom(appointment, draft, context, { patient, fees, firstVisit, linkedCharges });
+};
+
+/**
+ * Books a visit for a patient being registered in the same write (registerPatient's
+ * extra records): their first visit, with the registration charges just raised.
+ * Resource reservations are not offered here; they need the scheduled booking flow.
+ */
+export const newPatientBookingRecords = (draft: Omit<AppointmentDraft, 'allocation'>, context: AuthorizationContext, created: { patient: Patient; fees: readonly FeeItem[]; charges: readonly Charge[] }): NewRecord[] => {
+  assertAllowed(context, 'appointment:create');
+  const { appointment } = checkedAppointment(draft, context);
+  return bookingRecordsFrom(appointment, draft, context, { patient: created.patient, fees: created.fees, firstVisit: true, linkedCharges: created.charges });
 };
 export const book = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<Appointment> =>
   (await insertRecords(context, await bookingRecords(draft, context, createdOn)))[0] as Appointment;

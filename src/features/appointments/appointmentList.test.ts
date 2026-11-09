@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Appointment, ClinicalEvent, Encounter, EncounterEntry, Patient } from '@shared';
-import { projectAppointments } from './appointmentList';
+import { BOOKING_SLOTS, projectAppointments, quickActionFor, slotLoad, splitToday } from './appointmentList';
 
 const now = new Date(2026, 9, 22, 14);
 const at = (day: number, hour = 10) => new Date(2026, 9, day, hour).toISOString();
@@ -51,5 +51,43 @@ describe('the working appointment day', () => {
     expect(rows.map((row) => row.group)).toEqual(['no_show', 'cancelled']);
     expect(rows[0].activity?.[0].reason).toBe('Patient did not attend');
     expect(rows.filter((row) => row.group === 'overdue' || row.group === 'today')).toHaveLength(0);
+  });
+});
+
+describe('front-desk shortcuts on the appointment list', () => {
+  it('offers arrival for today and rebooking for a missed booking, but no inline reversal of an arrival', () => {
+    expect(quickActionFor({ group: 'today', attendance: 'booked' })).toBe('arrive');
+    expect(quickActionFor({ group: 'today', attendance: undefined })).toBe('arrive');
+    expect(quickActionFor({ group: 'today', attendance: 'arrived' })).toBeUndefined();
+    expect(quickActionFor({ group: 'overdue', attendance: 'booked' })).toBe('rebook');
+  });
+
+  it('offers nothing once care has started, or for inactive, upcoming and completed bookings', () => {
+    expect(quickActionFor({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' })).toBeUndefined();
+    expect(quickActionFor({ group: 'today', attendance: 'cancelled' })).toBeUndefined();
+    expect(quickActionFor({ group: 'overdue', attendance: 'no_show' })).toBeUndefined();
+    expect(quickActionFor({ group: 'upcoming', attendance: 'booked' })).toBeUndefined();
+    expect(quickActionFor({ group: 'completed', attendance: 'arrived' })).toBeUndefined();
+  });
+
+  it('splits today into expected and arrived, counting a started visit as arrived', () => {
+    const rows = [{ id: 'a', attendance: 'booked' as const }, { id: 'b', attendance: 'arrived' as const }, { id: 'c', attendance: undefined, encounterId: 'encounter:1' }];
+    const { expected, arrived } = splitToday(rows);
+    expect(expected.map((row) => row.id)).toEqual(['a']);
+    expect(arrived.map((row) => row.id)).toEqual(['b', 'c']);
+  });
+
+  it('counts active scheduled bookings per local time on one day only', () => {
+    const day = '2026-10-23';
+    const load = slotLoad([
+      { scheduledFor: new Date(2026, 9, 23, 10, 30).toISOString(), attendance: 'booked' },
+      { scheduledFor: new Date(2026, 9, 23, 10, 30).toISOString(), attendance: 'arrived' },
+      { scheduledFor: new Date(2026, 9, 23, 10, 30).toISOString(), attendance: 'cancelled' },
+      { scheduledFor: new Date(2026, 9, 24, 10, 30).toISOString(), attendance: 'booked' },
+      { scheduledFor: undefined, attendance: 'booked' },
+    ], day);
+    expect([...load]).toEqual([['10:30', 2]]);
+    expect(BOOKING_SLOTS[0]).toBe('08:00');
+    expect(BOOKING_SLOTS[BOOKING_SLOTS.length - 1]).toBe('15:30');
   });
 });

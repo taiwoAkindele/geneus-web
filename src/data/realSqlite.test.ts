@@ -8,7 +8,7 @@ import { setDatabaseForTests, type LocalDatabase } from './database';
 import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/drafts';
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { assignShift, createStaff, editStaff, extendShift, findShift, listShifts, listStaff } from './repos/staff';
-import { registerPatient, updatePatient, getPatient } from './repos/patients';
+import { registerPatient, updatePatient, getPatient, listPatients } from './repos/patients';
 import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from '@/features/registration/registrationValues';
 import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from './repos/patientIdentity';
 import {
@@ -17,7 +17,7 @@ import {
   setFeeItemActive, updateFeeItem, type FeeDraft,
   adjustCharge, adjustmentsForPatient,
 } from './repos/billing';
-import { book, changeAppointment, listAppointments } from './repos/appointments';
+import { book, changeAppointment, listAppointments, newPatientBookingRecords } from './repos/appointments';
 import { clinicalEventsForPatient, patientClinicalRecord, saveClinicalRecord } from './repos/clinical';
 import { CLINICAL_REVIEWS_TABLE, DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR } from './tables';
 import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from './repos/registers';
@@ -271,6 +271,28 @@ describe('the write path against a real SQLite', () => {
     const entry = await saveStep({ patientId: alias.id, appointmentId: appointment.id, step: 'vitals', values: { temperatureC: 37 }, collectLaterReason: 'Urgent care authorised' }, contextFor('nurse'));
     expect(entry.patientId).toBe(alias.id);
     expect((await getPatient(primary.id))?.patientId).toBe(primary.id);
+  });
+
+  it('registers and books a first visit in one write, with the registration fee on the booking', async () => {
+    const context = contextFor('records_officer');
+    const admin = contextFor('facility_admin');
+    const registration = await createFeeItem({ name: 'Registration', category: 'registration', amountMinor: 100000, currency: 'NGN', chargeWhen: 'first_visit', exemptions: [] }, admin);
+    const consultation = await createFeeItem({ name: 'Consultation', category: 'consultation', amountMinor: 200000, currency: 'NGN', chargeWhen: 'every_visit', exemptions: [{ reason: 'Antenatal policy', visitTypes: ['antenatal'] }] }, admin);
+    const patient = await registerPatient({ fullName: 'Kemi Afolabi', address: 'Ring Road', sex: 'female', ageYears: 29 }, context,
+      (patientId, created) => newPatientBookingRecords({ patientId, reason: 'Antenatal', visitType: 'antenatal' }, context, created));
+    const [appointment] = await listAppointments();
+    const charges = await chargesForPatient(patient.id);
+    expect(appointment).toMatchObject({ patientId: patient.id, visitType: 'antenatal', status: 'pending' });
+    expect(charges.map((charge) => [charge.feeItemId, charge.amountMinor, charge.exemptionReason])).toEqual(expect.arrayContaining([[registration.id, 100000, undefined], [consultation.id, 0, 'Antenatal policy']]));
+    expect([...(appointment.chargeIds ?? [])].sort()).toEqual(charges.map((charge) => charge.id).sort());
+  });
+
+  it('writes neither the patient nor the booking when the booking is invalid', async () => {
+    const context = contextFor('records_officer');
+    await expect(registerPatient({ fullName: 'Half Saved', address: 'Test road', sex: 'male', ageYears: 40 }, context,
+      (patientId, created) => newPatientBookingRecords({ patientId, reason: '', visitType: 'not-a-visit' as never }, context, created))).rejects.toThrow();
+    expect(await listPatients()).toEqual([]);
+    expect(await listAppointments()).toEqual([]);
   });
 
   it('saves a register entry, which also keeps its answers in `values`', async () => {
