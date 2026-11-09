@@ -103,6 +103,7 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
                 <SelectOrTextField label="Route" name={`rx_${idx}_route`} value={m.route ?? ''}
                   options={PRESCRIPTION_ROUTES} help={H.medicationRoute} onChange={(value) => setRx(idx, 'route', value)} />
                 <TextField label="Quantity" help={H.quantity} name={`rx_${idx}_quantity`} value={m.quantity ?? ''} inputMode="decimal" onChange={(e) => setRx(idx, 'quantity', e.target.value)} />
+                <TextField label="Quantity unit (optional)" name={`rx_${idx}_unit`} value={m.unitOfMeasure ?? ''} placeholder="e.g. tablets, bottles or mL" onChange={(e) => setRx(idx, 'unitOfMeasure', e.target.value)} />
               </div>
               <button
                 type="button"

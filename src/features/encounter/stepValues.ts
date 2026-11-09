@@ -66,6 +66,7 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
             ...(text(line.duration ?? '') ? { duration: line.duration!.trim() } : {}),
             ...(text(line.route ?? '') ? { route: line.route!.trim() } : {}),
             ...(text(line.quantity ?? '') ? { quantity: measured(line.quantity!) } : {}),
+            ...(text(line.unitOfMeasure ?? '') ? { unitOfMeasure: text(line.unitOfMeasure!) } : {}),
           })),
         giveInjection: false,
         admit: false,
@@ -148,7 +149,7 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
     }
     case 'result_review': { const v = ENCOUNTER_STEP_VALUES.result_review.parse(values); return { ...data, result_review: { ...v, note: v.note ?? '' } }; }
     case 'investigation_review': { const v = ENCOUNTER_STEP_VALUES.investigation_review.parse(values); return { ...data, investigation_review: { ...v, reason: v.reason ?? '' } }; }
-    case 'prescription': { const v = ENCOUNTER_STEP_VALUES.prescription.parse(values); return { ...data, prescription: { decision: v.decision, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) }, diagnosis: { ...data.diagnosis, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) } }; }
+    case 'prescription': { const v = ENCOUNTER_STEP_VALUES.prescription.parse(values); return { ...data, prescription: { decision: v.decision, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, unitOfMeasure: line.unitOfMeasure, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) }, diagnosis: { ...data.diagnosis, rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, unitOfMeasure: line.unitOfMeasure, quantity: line.quantity === undefined ? undefined : String(line.quantity) })) } }; }
     case 'injection_order': { const v = ENCOUNTER_STEP_VALUES.injection_order.parse(values); return { ...data, injection_order: { required: v.required, drug: v.drug ?? '', dose: v.dose ?? '', route: v.route ?? '', instructions: v.instructions ?? '' } }; }
     case 'disposition': { const v = ENCOUNTER_STEP_VALUES.disposition.parse(values); return { ...data, disposition: { kind: v.kind, note: v.note, responsibleService: v.responsibleService ?? '', reassessOn: v.reassessOn ?? '', toFacilityId: v.toFacilityId ?? '', previousEntryId: v.previousEntryId, followUpOn: v.followUpOn ?? '' } }; }
     case 'lab_order':
@@ -163,7 +164,7 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
         ...data,
         diagnosis: {
           dx: v.diagnosis,
-          rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, quantity: line.quantity === undefined ? undefined : String(line.quantity) })),
+          rx: v.prescription.map((line) => ({ name: line.drug, dose: line.dose, frequency: line.frequency, duration: line.duration, route: line.route, unitOfMeasure: line.unitOfMeasure, quantity: line.quantity === undefined ? undefined : String(line.quantity) })),
           ...(v.diagnoses?.length ? { code: v.diagnoses[0].code, codingSystem: v.diagnoses[0].codingSystem, certainty: v.diagnoses[0].certainty, diagnoses: v.diagnoses.slice(1) } : {}),
           injection: v.giveInjection,
           admit: v.admit,

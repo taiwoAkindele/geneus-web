@@ -1,0 +1,20 @@
+[
+  { "role": "pharmacy_staff", "width": 390, "path": "/pharmacy", "evaluate": "window.seedPharmacyScenario()" },
+  { "path": "/pharmacy/request?patient=QA-PHC-000001-K2&visit=visit%3Apharmacy-demo" },
+  { "click": "Supply medicine" },
+  { "fill": { "label": "Medicine in stock", "value": "stock:pharmacy-demo" } },
+  { "fill": { "label": "Giving now", "value": "5" } },
+  { "click": "Save draft & close", "assert": "!window.designAudit.rows.encounter_entries.some(e=>e.pharmacyVersion===1)&&!window.designAudit.rows.stock_movements.some(e=>e.dispenseEntryId)", "description": "A private draft creates no supply, stock deduction or patient bill" },
+  { "path": "/pharmacy" },
+  { "path": "/pharmacy/request?patient=QA-PHC-000001-K2&visit=visit%3Apharmacy-demo" },
+  { "click": "Supply medicine", "assert": "[...document.querySelectorAll('input')].some(e=>e.value==='5')", "description": "Returning to the same medicine restores the pharmacist's private unfinished form" },
+  { "click": "Review & save" },
+  { "click": "Confirm & save pharmacy record", "assert": "window.designAudit.rows.encounter_entries.filter(e=>e.pharmacyVersion===1&&e.actorRole==='pharmacy_staff').length===1&&window.designAudit.rows.charges.filter(e=>e.dispenseEntryId).length===1&&window.designAudit.rows.stock_movements.filter(e=>e.dispenseEntryId).length===1", "description": "Pharmacy staff can save their exact supply and companions without broad billing or stock-management permissions" },
+  { "click": "Supply medicine", "assert": "![...document.querySelectorAll('input')].some(e=>e.value==='5')", "description": "A new top-up starts with a blank quantity after successful signing" },
+  { "fill": { "label": "Medicine in stock", "value": "stock:pharmacy-demo" } },
+  { "fill": { "label": "Giving now", "value": "21" } },
+  { "click": "Review & save", "assert": "document.querySelector('[role=alert]')?.innerText.includes('exceeds')&&window.designAudit.rows.charges.filter(e=>e.dispenseEntryId).length===1", "description": "A quantity above the remaining prescription is explained before signing" },
+  { "click": "Save draft & close" },
+  { "reload": true, "readonly": true, "width": 320, "path": "/pharmacy", "evaluate": "window.seedPharmacyScenario()" },
+  { "path": "/pharmacy/request?patient=QA-PHC-000001-K2&visit=visit%3Apharmacy-demo", "name": "pharmacy-readonly-phone", "assert": "![...document.querySelectorAll('button')].some(e=>e.textContent.trim()==='Supply medicine')&&document.body.innerText.includes('View access')&&document.documentElement.scrollWidth<=320", "description": "The read-only phone view shows the prescription without supply actions" }
+]

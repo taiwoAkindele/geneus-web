@@ -1,8 +1,14 @@
 import type { AuthorizationContext, StockItem, StockMovement } from '@shared';
-import { allOfType, envelope, insertRecord, newId } from '../db';
+import { allOfType, envelope, insertRecord, newId, updateRecord } from '../db';
+import { usablePharmacyEffects } from './pharmacyAcceptance';
+import { pharmacySupported } from '../pharmacySupport';
 
 export const listStockItems = () => allOfType<StockItem>('stock_item');
-export const listStockMovements = () => allOfType<StockMovement>('stock_movement');
+export const listStockMovements = () => allOfType<StockMovement>('stock_movement').then(usablePharmacyEffects);
+export const linkStockPrice = (id: string, feeItemId: string | undefined, context: AuthorizationContext) => {
+  if (!pharmacySupported(context)) throw new Error('Connect once to enable medicine selling-price links');
+  return updateRecord<StockItem>(context, 'stock_item:manage', 'stock_item', id, { feeItemId });
+};
 
 /** quantityOnHand is an opening balance. Later changes are immutable movements. */
 export const stockBalances = (items: readonly StockItem[], movements: readonly StockMovement[]) => {
@@ -19,7 +25,7 @@ export const stockMovementIssue = (change: number, reason: StockMovement['reason
   return undefined;
 };
 
-export const createStockItem = async (draft: Pick<StockItem, 'name' | 'category' | 'unitOfMeasure' | 'quantityOnHand' | 'reorderLevel'>, context: AuthorizationContext) => {
+export const createStockItem = async (draft: Pick<StockItem, 'name' | 'category' | 'unitOfMeasure' | 'quantityOnHand' | 'reorderLevel' | 'feeItemId'>, context: AuthorizationContext) => {
   if (!draft.name.trim() || !draft.unitOfMeasure?.trim()) throw new Error('Enter an item name and unit of measure.');
   if ((await listStockItems()).some((item) => item.name.toLowerCase() === draft.name.trim().toLowerCase() && item.unitOfMeasure?.toLowerCase() === draft.unitOfMeasure?.trim().toLowerCase())) throw new Error('This item and unit of measure already exist. Open its stock record instead.');
   return insertRecord<StockItem>(context, 'stock_item:manage', 'stock_item', { ...envelope(context), id: newId('stock_item'), type: 'stock_item', ...draft, name: draft.name.trim(), unitOfMeasure: draft.unitOfMeasure.trim() });

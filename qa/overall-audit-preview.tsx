@@ -1,5 +1,6 @@
 /** Overall UX audit fixture. Actual screens and providers; synthetic, in-memory records only. */
 import React, { useEffect } from 'react';
+import { WardCareEvent } from '@shared';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Appointment, BillingDepartment, Charge, ClinicalEvent, Device, Encounter, EncounterEntry, FeeItem, Handoff, Patient, Payment, RegisterDefinition, RegisterEntry, Staff, StockItem, StockMovement, SyncRejection, Unit } from '@shared';
@@ -59,6 +60,7 @@ import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsA
 import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
 import { rememberWardCareSupport } from '@/data/wardCareSupport';
+import { rememberPharmacySupport } from '@/data/pharmacySupport';
 import '../src/index.css';
 
 const wardDemo = location.pathname === '/qa/ward-care-demo.html';
@@ -317,6 +319,24 @@ Object.assign(window, { seedWardCareScenario: () => {
   rememberWardCareSupport({ facilityId: envelope.facilityId, deviceId: envelope.deviceId }, 1);
   listeners.forEach((listener) => listener());
   return true;
+} });
+Object.assign(window, { seedPharmacyScenario: () => {
+  const visitId = 'visit:pharmacy-demo';
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: visitId, type: 'encounter', patientId, openedOn: now, workflowVersion: 1 })));
+  db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'rx:pharmacy-demo', type: 'encounter_entry', patientId, encounterId: visitId, workflowVersion: 1, actorRole: 'doctor', step: 'prescription', values: { decision: 'prescribed', prescription: [{ lineId: 'line:pharmacy-demo', drug: 'Synthetic medicine', dose: 'Recorded demonstration instructions', quantity: 20, unitOfMeasure: 'tablets' }] } })));
+  db.rows.stock_items.push(toRow('stock_item', StockItem.parse({ ...envelope, type: 'stock_item', id: 'stock:pharmacy-demo', name: 'Synthetic medicine', category: 'drug', unitOfMeasure: 'tablets', quantityOnHand: 100, feeItemId: 'fee:pharmacy-demo' })));
+  db.rows.fee_items.push(toRow('fee_item', FeeItem.parse({ ...envelope, type: 'fee_item', id: 'fee:pharmacy-demo', name: 'Synthetic medicine', category: 'other', chargeWhen: 'when_ordered', amountMinor: 10000, currency: 'NGN' })));
+  rememberPharmacySupport(envelope, 1); listeners.forEach((listener) => listener()); return true;
+} });
+Object.assign(window, { seedDischargePharmacyScenario: () => {
+  (window as unknown as { seedWardCareScenario: () => void }).seedWardCareScenario();
+  (window as unknown as { seedPharmacyScenario: () => void }).seedPharmacyScenario();
+  const visitId = 'visit:discharge-pharmacy';
+  db.rows.encounter_entries = db.rows.encounter_entries.filter((e) => e.id !== 'rx:pharmacy-demo');
+  db.rows.encounters.push(toRow('encounter', Encounter.parse({ ...envelope, id: visitId, type: 'encounter', patientId, openedOn: now, workflowVersion: 1, inpatientContext: { admissionId: 'admission:ward', purpose: 'discharge' } })));
+  const summary = WardCareEvent.parse({ ...envelope, schemaVersion: 5, id: 'summary:pharmacy-demo', type: 'ward_care_event', admissionId: 'admission:ward', encounterId: visitId, patientId, occurredOn: now, values: { kind: 'discharge', admissionReason: 'Synthetic admission reason', diagnoses: 'Synthetic discharge diagnosis', course: 'Synthetic recorded care', instructions: 'Demonstration instructions', takeHome: [{ drug: 'Synthetic medicine', dose: 'Recorded take-home instructions', quantity: 20, unitOfMeasure: 'tablets' }], sourceEntryIds: ['entry:admission-request'], sourceWardEventIds: [], patientName: 'Synthetic patient', patientIdentifier: patientId, admittedOn: now } });
+  db.rows.ward_care_events.push(toRow('ward_care_event', summary));
+  listeners.forEach((listener) => listener()); return true;
 } });
 /** The same FBC already published by the laboratory, with haemoglobin flagged critically low. */
 Object.assign(window, { seedPublishedLabResultScenario: () => {

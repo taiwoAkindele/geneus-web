@@ -624,3 +624,18 @@ Validation: frontend typecheck, 372 unit tests, 36 connected browser assertions
 and the validation-mode Vite/PWA build pass. Initial JavaScript is 185.9 KB gzip
 within 300 KB. Browser evidence covers desktop and 320px layouts with synthetic
 data; PostgreSQL, live sync and physical-device acceptance remain separate checks.
+
+
+## Pharmacy quantity flow (8 November 2026)
+
+After pharmacy capability negotiation, Pharmacy shows per-medicine supplied and
+remaining quantities with private drafts, review/save, partial supplies, top-ups,
+outside supplies, optional stock tracking, returns and a Needs a price queue.
+Signed discharge take-home medicines use the same screen and exact signed source.
+Stock managers can link an existing selling price per stock unit; pharmacists use
+clinical:dispense to save only the derived movement/charge/credit with the supply.
+The repository writes one SQLite transaction, preserves source instructions, checks
+predecessors under lock, and retains rejected records for Sync & review. Billing
+shows paid returns as patient credit; it does not invent refund payments.
+See [implementation](../docs/PHARMACY-STOCK-BILLING-2026-11-08.md) and
+[QA](qa/pharmacy-stock-qa.md).
