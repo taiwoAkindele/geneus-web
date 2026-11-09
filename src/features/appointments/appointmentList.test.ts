@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Appointment, ClinicalEvent, Encounter, EncounterEntry, Patient } from '@shared';
-import { BOOKING_SLOTS, projectAppointments, quickActionFor, slotLoad, splitToday } from './appointmentList';
+import { BOOKING_SLOTS, bookingStatus, projectAppointments, quickActionFor, rowActionsFor, slotLoad, splitToday } from './appointmentList';
 
 const now = new Date(2026, 9, 22, 14);
 const at = (day: number, hour = 10) => new Date(2026, 9, day, hour).toISOString();
@@ -89,5 +89,28 @@ describe('front-desk shortcuts on the appointment list', () => {
     expect([...load]).toEqual([['10:30', 2]]);
     expect(BOOKING_SLOTS[0]).toBe('08:00');
     expect(BOOKING_SLOTS[BOOKING_SLOTS.length - 1]).toBe('15:30');
+  });
+});
+
+describe('appointment table rows', () => {
+  const all = { canUpdate: true, canRecord: true };
+  it('puts the row action first, then care, booking and patient', () => {
+    expect(rowActionsFor({ group: 'today', attendance: 'booked' }, all)).toEqual(['arrive', 'visit', 'booking', 'patient']);
+    expect(rowActionsFor({ group: 'overdue', attendance: 'booked' }, all)).toEqual(['rebook', 'visit', 'booking', 'patient']);
+    expect(rowActionsFor({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' }, all)).toEqual(['visit', 'booking', 'patient']);
+  });
+
+  it('offers only viewing to staff who cannot change bookings or record care', () => {
+    expect(rowActionsFor({ group: 'today', attendance: 'booked' }, { canUpdate: false, canRecord: false })).toEqual(['booking', 'patient']);
+    expect(rowActionsFor({ group: 'completed', attendance: 'arrived', encounterId: 'encounter:1' }, all)).toEqual(['booking', 'patient']);
+    expect(rowActionsFor({ group: 'cancelled', attendance: 'cancelled' }, all)).toEqual(['booking', 'patient']);
+  });
+
+  it('colours only what needs attention', () => {
+    expect(bookingStatus({ group: 'today', attendance: 'booked' })).toEqual({ label: 'Not arrived', tone: 'neutral' });
+    expect(bookingStatus({ group: 'overdue', attendance: 'booked' })).toEqual({ label: 'Not arrived', tone: 'amber' });
+    expect(bookingStatus({ group: 'today', attendance: 'arrived' })).toEqual({ label: 'Arrived', tone: 'green' });
+    expect(bookingStatus({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' })).toEqual({ label: 'Visit in progress', tone: 'green' });
+    expect(bookingStatus({ group: 'no_show', attendance: 'no_show' })).toEqual({ label: 'No-show', tone: 'neutral' });
   });
 });

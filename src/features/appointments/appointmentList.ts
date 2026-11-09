@@ -81,3 +81,25 @@ export const slotLoad = (bookings: readonly Pick<BookedAppointment, 'scheduledFo
   }
   return load;
 };
+
+/** What a row's action menu offers, most useful first. Permissions are checked again when each action saves. */
+export type RowAction = 'arrive' | 'rebook' | 'visit' | 'booking' | 'patient';
+export const rowActionsFor = (
+  booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>,
+  access: { canUpdate: boolean; canRecord: boolean },
+): RowAction[] => {
+  const quick = access.canUpdate ? quickActionFor(booking) : undefined;
+  return [
+    ...(quick ? [quick] : []),
+    ...(access.canRecord && booking.group !== 'completed' && !bookingIsInactive(booking) ? ['visit' as const] : []),
+    'booking', 'patient',
+  ];
+};
+
+/** The row's status as one tag: amber only when a due booking still has no arrival. */
+export const bookingStatus = (booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>): { label: string; tone: 'green' | 'amber' | 'neutral' } => {
+  const label = bookingAttendanceLabel(booking);
+  if (booking.group === 'completed' || booking.encounterId || booking.attendance === 'arrived') return { label, tone: 'green' };
+  if (booking.group === 'overdue' && !bookingIsInactive(booking)) return { label, tone: 'amber' };
+  return { label, tone: 'neutral' };
+};

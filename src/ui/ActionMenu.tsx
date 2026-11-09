@@ -1,22 +1,33 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 
 type Action = { label: string; onSelect: () => void; icon?: IconName };
 
 /** A portalled menu stays visible inside a horizontally scrollable table. */
-export const ActionMenu = ({ label, title, actions, compact = false }: { label: string; title?: string; actions: Action[]; compact?: boolean }) => {
+/**
+ * `openOnHover` also opens the menu when a mouse rests on the trigger. Click, tap
+ * and keyboard always work too, so touch and keyboard users are never excluded.
+ */
+export const ActionMenu = ({ label, title, actions, compact = false, openOnHover = false }: { label: string; title?: string; actions: Action[]; compact?: boolean; openOnHover?: boolean }) => {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  // A hover-opened menu does not take keyboard focus and closes when the pointer leaves; a click pins it open.
+  const openedBy = useRef<'hover' | 'click'>('click');
+  const closeTimer = useRef<number>();
+  const cancelClose = () => window.clearTimeout(closeTimer.current);
+  const hoverOpen = (event: ReactPointerEvent) => { if (!openOnHover || event.pointerType !== 'mouse') return; cancelClose(); if (!open) { openedBy.current = 'hover'; setOpen(true); } };
+  const hoverLeave = (event: ReactPointerEvent) => { if (!openOnHover || event.pointerType !== 'mouse' || openedBy.current !== 'hover') return; cancelClose(); closeTimer.current = window.setTimeout(() => setOpen(false), 180); };
+  useEffect(() => cancelClose, []);
   useLayoutEffect(() => {
     if (!open || !trigger.current || !menu.current) return;
     const rect = trigger.current.getBoundingClientRect();
     const height = menu.current.getBoundingClientRect().height;
     setPosition({ left: Math.max(8, Math.min(rect.right - 272, innerWidth - 280)), top: rect.bottom + height + 8 < innerHeight ? rect.bottom + 4 : Math.max(8, rect.top - height - 4) });
-    menu.current.querySelector<HTMLButtonElement>('button')?.focus();
+    if (openedBy.current === 'click') menu.current.querySelector<HTMLButtonElement>('button')?.focus();
   }, [open]);
   useEffect(() => {
     if (!open) return;
@@ -28,10 +39,10 @@ export const ActionMenu = ({ label, title, actions, compact = false }: { label: 
     return () => { document.removeEventListener('pointerdown', dismiss); window.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', scroll); };
   }, [open]);
   return <>
-    <button ref={trigger} type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-field font-bold text-brand hover:bg-brand-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${compact ? 'w-11' : 'border border-outline px-4'}`}>
+    <button ref={trigger} type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onPointerEnter={hoverOpen} onPointerLeave={hoverLeave} onClick={() => { cancelClose(); if (open && openedBy.current === 'hover') { openedBy.current = 'click'; menu.current?.querySelector<HTMLButtonElement>('button')?.focus(); return; } openedBy.current = 'click'; setOpen(!open); }} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-field font-bold text-brand hover:bg-brand-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${compact ? 'w-11' : 'border border-outline px-4'}`}>
       {compact ? <Icon name="more" /> : <>{label}<Icon name="chevron-down" className="h-4 w-4" /></>}
     </button>
-    {open ? createPortal(<div ref={menu} id={id} role="menu" aria-label={title ?? label} style={position} className="fixed z-50 w-[272px] max-w-[calc(100vw-16px)] rounded-field border border-outline-soft bg-white p-2 shadow-sheet" onKeyDown={(event) => {
+    {open ? createPortal(<div ref={menu} id={id} role="menu" aria-label={title ?? label} style={position} className="fixed z-50 w-[272px] max-w-[calc(100vw-16px)] rounded-field border border-outline-soft bg-white p-2 shadow-sheet" onPointerEnter={hoverOpen} onPointerLeave={hoverLeave} onKeyDown={(event) => {
       const buttons = [...(menu.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
       const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
       if (event.key === 'Escape' || event.key === 'Tab') { if (event.key === 'Escape') event.preventDefault(); setOpen(false); trigger.current?.focus(); }
