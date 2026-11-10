@@ -18,7 +18,7 @@ export const RegistrationRecoveryGate = ({ draftKey = 'new', children }: { draft
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState('');
   if (status.unreadable) return <div className="min-h-screen bg-surface">
-    <AppBar title="Registration recovery" onBack={() => navigate('/workspace/front-desk')} />
+    <AppBar title="Registration recovery" onBack={() => navigate('/patients/search')} />
     <section className="mx-auto max-w-lg space-y-5 px-5 py-8">
       <div role="alert"><h1 className="text-2xl font-extrabold">Your saved form could not be opened</h1><p className="mt-3 text-sm leading-relaxed text-ink-muted">Your existing draft has been kept. Reload to try opening it again. Keep this device without clearing its storage.</p></div>
       <Button onClick={() => window.location.reload()}>Reload recovery</Button>
@@ -26,7 +26,7 @@ export const RegistrationRecoveryGate = ({ draftKey = 'new', children }: { draft
   </div>;
   if (!choosing) return children;
   return <div className="min-h-screen bg-surface">
-    <AppBar title="Unfinished registration" onBack={() => navigate('/workspace/front-desk')} />
+    <AppBar title="Unfinished registration" onBack={() => navigate('/patients/search')} />
     <section className="mx-auto max-w-lg space-y-5 px-5 py-8">
       <Icon name="patients" className="h-9 w-9 text-brand" />
       <h1 className="text-2xl font-extrabold">Resume your unfinished form?</h1>

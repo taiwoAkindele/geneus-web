@@ -5,7 +5,7 @@ const CareContext=lazy(()=>import('@/features/workforce/CareContext').then((m)=>
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useSession } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
-import { activeWorkspaceLink, workspacePath, type WorkspaceId } from './workspaces';
+import { activeWorkspaceLink, moduleStart, workspacePath } from './workspaces';
 import { useWorkspace } from './useWorkspace';
 import { AppHeader, ShiftBanner, ShiftCountdownStrip } from './AppHeader';
 import { NotificationList } from './NotificationList';
@@ -87,7 +87,8 @@ const Sidebar = ({ onProfile }: { onProfile: () => void }) => {
       <Link to="/home" className="mb-7 flex min-h-11 items-center gap-2 rounded-field px-3 text-sm font-semibold text-brand-on-dark hover:bg-white/10"><Icon name="back" className="h-5 w-5" />All modules</Link>
       <div className="mb-5 flex items-center gap-3 px-3"><Icon name={current.icon} className="h-6 w-6 text-brand-accent-soft" /><h2 className="text-lg font-extrabold">{current.label}</h2></div>
       <nav aria-label={`${current.label} navigation`} className="min-h-0 space-y-1 overflow-y-auto">
-        <Link to={workspacePath(current.id)} aria-current={overview ? 'page' : undefined} className={`flex min-h-[52px] items-center gap-3 rounded-field px-3 text-sm font-semibold ${overview ? 'bg-white/15 text-white' : 'text-brand-on-dark hover:bg-white/10'}`}><Icon name="home" className="h-5 w-5" />Overview</Link>
+        {/* A module with a start page (Front Desk) opens on it and has no Overview. */}
+        {!current.start ? <Link to={workspacePath(current.id)} aria-current={overview ? 'page' : undefined} className={`flex min-h-[52px] items-center gap-3 rounded-field px-3 text-sm font-semibold ${overview ? 'bg-white/15 text-white' : 'text-brand-on-dark hover:bg-white/10'}`}><Icon name="home" className="h-5 w-5" />Overview</Link> : null}
         {current.links.map((item) => {
           const active = item.key === activeKey;
           return (
@@ -139,11 +140,12 @@ const BottomBar = ({ onMore }: { onMore: () => void }) => {
   const { current } = useWorkspace();
   if (!current) return null;
   const activeKey = activeWorkspaceLink(current, pathname, search);
-  const primary = current.links.slice(0, 1);
+  // Without an Overview button, the freed slot shows the module's second page (Front Desk: Patients, Appointments).
+  const primary = current.links.slice(0, current.start ? 2 : 1);
   const moreActive = Boolean(activeKey && !primary.some((item) => item.key === activeKey));
   return <nav aria-label={`${current.label} mobile navigation`} className="flex items-stretch justify-around border-t border-outline-soft bg-white px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 lg:hidden">
     <Link to="/home" className="flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-ink-muted"><Icon name="modules" className="h-[22px] w-[22px]" /><span className="text-[11px] font-semibold">All modules</span></Link>
-    <Link to={workspacePath(current.id)} aria-current={pathname === workspacePath(current.id) ? 'page' : undefined} className="flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-brand"><Icon name={current.icon} className="h-[22px] w-[22px]" /><span className="text-[11px] font-semibold">Overview</span></Link>
+    {!current.start ? <Link to={workspacePath(current.id)} aria-current={pathname === workspacePath(current.id) ? 'page' : undefined} className="flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-brand"><Icon name={current.icon} className="h-[22px] w-[22px]" /><span className="text-[11px] font-semibold">Overview</span></Link> : null}
     {primary.map((item) => <Link key={item.key} to={item.to} aria-current={item.key === activeKey ? 'page' : undefined} className="flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-brand"><Icon name={item.icon} className={item.key === activeKey ? 'h-[22px] w-[22px] text-brand' : 'h-[22px] w-[22px] text-ink-muted'} /><span className={item.key === activeKey ? 'text-[11px] font-bold text-brand' : 'text-[11px] font-semibold text-ink-muted'}>{item.label === 'Patient accounts' ? 'Accounts' : item.label}</span></Link>)}
     <button type="button" onClick={onMore} aria-label="More navigation" aria-haspopup="dialog" className="flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1"><Icon name="more" className={moreActive ? 'h-[22px] w-[22px] text-brand' : 'h-[22px] w-[22px] text-ink-muted'} /><span className={moreActive ? 'text-[11px] font-bold text-brand' : 'text-[11px] font-semibold text-ink-muted'}>More</span></button>
   </nav>;
@@ -181,7 +183,7 @@ export const AppShell = () => {
       <Sidebar onProfile={() => setProfileOpen(true)} />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col [--app-header-h:64px]">
         <AppHeader onProfile={() => setProfileOpen(true)} />
-        {!home ? <div className="flex min-h-[56px] flex-wrap items-center justify-between gap-2 border-b border-outline-soft bg-white px-4 py-2 md:px-6"><Link to="/home" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brand"><Icon name="modules" className="h-4 w-4" />All modules</Link><label className="flex min-w-0 items-center gap-2"><span className="sr-only">Switch module</span><select aria-label="Switch module" value={current?.id ?? ''} onChange={(event) => navigate(workspacePath(event.target.value as WorkspaceId))} className="min-h-11 w-[164px] max-w-[48vw] rounded-field border border-outline-soft bg-surface px-3 py-2 text-base font-semibold text-brand sm:w-auto sm:max-w-[220px] sm:text-sm"><option value="" disabled>Choose module</option>{available.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label></div> : null}
+        {!home ? <div className="flex min-h-[56px] flex-wrap items-center justify-between gap-2 border-b border-outline-soft bg-white px-4 py-2 md:px-6"><Link to="/home" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brand"><Icon name="modules" className="h-4 w-4" />All modules</Link><label className="flex min-w-0 items-center gap-2"><span className="sr-only">Switch module</span><select aria-label="Switch module" value={current?.id ?? ''} onChange={(event) => { const chosen = available.find((workspace) => workspace.id === event.target.value); if (chosen) navigate(moduleStart(chosen)); }} className="min-h-11 w-[164px] max-w-[48vw] rounded-field border border-outline-soft bg-surface px-3 py-2 text-base font-semibold text-brand sm:w-auto sm:max-w-[220px] sm:text-sm"><option value="" disabled>Choose module</option>{available.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label></div> : null}
         <ShiftBanner />
         <Content id="main-content" tabIndex={-1} className={`flex-1 outline-none ${current ? ending ? 'pb-44 lg:pb-0' : 'pb-24 lg:pb-0' : ''}`}>
           {current?.id === 'clinical' ? <Suspense fallback={null}><CareContext/></Suspense> : null}
