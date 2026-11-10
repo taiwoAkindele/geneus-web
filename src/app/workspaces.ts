@@ -5,7 +5,8 @@ import { navigationFor } from './navigation';
 
 export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'operations' | 'inventory' | 'reports' | 'administration';
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
-export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName };
+/** `also` lists other pages that belong to this link, so it stays highlighted there. */
+export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName; also?: readonly string[] };
 export type Workspace = { id: WorkspaceId; label: string; description: string; icon: IconName; links: WorkspaceLink[] };
 
 export const workspacePath = (id: WorkspaceId) => `/workspace/${id}`;
@@ -26,8 +27,8 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const reports = roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'register_entry:create', 'register_definition:publish');
   const modules: Workspace[] = [
     { id: 'front-desk', label: 'Patients & Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', links: [
-      link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'),
-      ...(has(context, 'patient:create') ? [link('registration', 'Register patient', 'Create a patient record after checking for duplicates.', '/patients/new', 'plus')] : []),
+      // Registration starts from the patient list's Register patient button, so its pages belong to Patients.
+      { ...link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'), also: ['/patients/new', '/patients/duplicate'] },
       ...(appointments ? [link('appointments', 'Appointments & arrivals', 'Plan bookings and record attendance.', '/appointments', 'clock')] : []),
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
@@ -92,6 +93,7 @@ export const activeWorkspaceLink = (workspace: Workspace, pathname: string, sear
   const current = new URLSearchParams(search);
   return [...workspace.links].sort((a, b) => b.to.split('?')[0].length - a.to.split('?')[0].length).find((item) => {
     const [path, query] = item.to.split('?');
+    if (item.also?.some((page) => pathname === page || pathname.startsWith(page + '/'))) return true;
     if (pathname !== path && !pathname.startsWith(path + '/')) return false;
     return [...new URLSearchParams(query)].every(([key, value]) => (current.get(key) ?? (key === 'queue' ? 'all' : key === 'tab' ? 'collections' : '')) === value);
   })?.key;

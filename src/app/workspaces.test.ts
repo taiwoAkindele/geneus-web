@@ -52,6 +52,19 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/home', '', available)).toBeUndefined();
   });
 
+  it('starts registration from the patient list rather than its own menu entry', () => {
+    for (const role of ['records_officer', 'facility_admin'] as const) {
+      const frontDesk = workspacesFor(context(role)).find((workspace) => workspace.id === 'front-desk')!;
+      expect(frontDesk.links.map((item) => item.key)).not.toContain('registration');
+      expect(frontDesk.links.some((item) => item.to === '/patients/new')).toBe(false);
+      expect(activeWorkspaceLink(frontDesk, '/patients/new', '')).toBe('patients');
+      expect(activeWorkspaceLink(frontDesk, '/patients/new/details', '')).toBe('patients');
+      expect(activeWorkspaceLink(frontDesk, '/patients/duplicate', '')).toBe('patients');
+      expect(activeWorkspaceLink(frontDesk, '/patients/search', '?q=amaka')).toBe('patients');
+      expect(activeWorkspaceLink(frontDesk, '/appointments', '')).toBe('appointments');
+    }
+  });
+
   it('selects the correct queue, billing tab and most specific route', () => {
     const available = workspacesFor(context('facility_admin'));
     const clinical = available.find((workspace) => workspace.id === 'clinical')!;
