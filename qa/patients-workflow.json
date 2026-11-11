@@ -72,25 +72,16 @@
   },
   {
     "name": "clinical-patients",
-    "assert": "document.body.innerText.includes('Created at')&&!document.body.innerText.includes('Reason / diagnosis')&&!document.body.innerText.includes('Next action')&&[...document.querySelectorAll('nav a')].filter(node=>node.getClientRects().length&&node.textContent.trim()==='Patients').length>=1&&!document.body.innerText.includes('Consultation & nursing')",
-    "description": "Clinical has a single Patients entry with the same front-desk table"
+    "assert": "document.body.innerText.includes('Allergies')&&document.body.innerText.includes('View chart')&&!document.body.innerText.includes('Created at')&&[...document.querySelectorAll('nav a')].filter(node=>node.getClientRects().length&&node.textContent.trim()==='Patients').length>=1&&!document.body.innerText.includes('Consultation & nursing')",
+    "description": "Clinical has a single Patients entry; clinicians see the shared list with care facts"
   },
   {
     "click": "Amaka Okoro"
   },
   {
     "name": "clinical-patient-details",
-    "assert": "document.body.innerText.includes('View medical history')",
-    "description": "Authorised staff get a medical-history button inside details"
-  },
-  {
-    "click": "View medical history",
-    "selector": "a"
-  },
-  {
-    "name": "authorised-medical-history",
-    "assert": "document.body.innerText.includes('Medical chart')&&document.body.innerText.includes('Hypertension')",
-    "description": "Explicit action opens the existing medical chart"
+    "assert": "document.body.innerText.includes('Summary')&&document.body.innerText.includes('Hypertension')&&[...document.querySelectorAll('nav[aria-label=\"Patient record sections\"] button')].some(b=>b.textContent.trim()==='Now'&&b.getAttribute('aria-current')==='page')",
+    "description": "Clinicians open a patient from the list straight into the chart (Now)"
   },
   {
     "role": "records_officer",
@@ -108,7 +99,7 @@
     "selector": "a"
   },
   {
-    "assert": "document.body.innerText.includes('Medical chart')&&!document.body.innerText.includes('Start visit')&&!document.body.innerText.includes('Continue visit')",
+    "assert": "document.body.innerText.includes('Summary')&&!document.body.innerText.includes('Start visit')&&!document.body.innerText.includes('Continue visit')",
     "description": "Medical-history reading does not grant care writing"
   },
   {
@@ -132,8 +123,8 @@
   },
   {
     "name": "phone-patient-details",
-    "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('View medical history')",
-    "description": "Patient details and medical-history entry fit a 320px phone"
+    "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('Summary')&&document.body.innerText.includes('Amaka Okoro')",
+    "description": "A clinician opening a patient on a 320px phone lands on the chart without sideways scrolling"
   },
   {
     "finish": true

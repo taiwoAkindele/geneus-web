@@ -56,6 +56,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
     return () => { active = false; };
   }, [chosen?.key, enc.id, patientId, context.facilityId, context.deviceId, navigate]);
   const [reviewKey, setReviewKey] = useState<StepKey>();
+  const [batch, setBatch] = useState<{ keys: StepKey[]; stoppedAt?: { key: StepKey; problems: string[] } }>();
   const [amendKey, setAmendKey] = useState<StepKey>();
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -77,7 +78,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
     // A closed visit opens on its record, unless arriving for work still allowed after closure (a late result, its review, dispensing).
     if (!ctl.loading && enc.closed && enc.id && !(initialTask && ['lab_results', 'result_review', 'dispense', 'injection'].includes(initialTask))) {
       const next = new URLSearchParams(returnTo.startsWith('/patients/profile?') ? returnTo.split('?')[1] : { patient: patientId });
-      next.set('tab', 'visits'); next.set('visit', enc.id); next.delete('panel'); next.delete('visitSection');
+      next.set('tab', 'history'); next.set('show', 'visits'); next.set('visit', enc.id); next.delete('panel'); next.delete('visitSection');
       navigate('/patients/profile?' + next, { replace: true });
     }
   }, [ctl.loading, enc.closed, enc.id, navigate, patientId, returnTo, initialTask]);
@@ -129,6 +130,30 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
       setError(cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.'); setReviewKey(undefined);
     } finally { busy.current = false; setSaving(false); }
   };
+  // One review for every consultation section that is ready, in clinical order.
+  const batchNow = ctl.signable();
+  const together = batchNow.keys.length > 1 && batchNow.keys.includes(chosen.key);
+  const batchCloses = batchNow.keys.some(isClosingStep) && enc.data.disposition.kind !== 'observation';
+  const nextStep = steps.slice(steps.findIndex((step) => step.key === chosen.key) + 1).find((step) => !enc.sig[step.key]);
+  const reviewBatch = () => {
+    ctl.flushDraft();
+    const ready = ctl.signable();
+    if (!ready.keys.length) { setError(ready.stoppedAt ? `${STEP_DEFS[ready.stoppedAt.key].short}: ${ready.stoppedAt.problems.join(' · ')}` : 'Nothing is ready to sign.'); return; }
+    setError(''); setBatch(ready);
+  };
+  const confirmBatch = async () => {
+    if (!batch || busy.current) return;
+    busy.current = true; setSaving(true); setError('');
+    try {
+      const signed = await ctl.lockSteps(batch.keys, collectLaterReason);
+      toast(signed.some(isClosingStep) && enc.data.disposition.kind !== 'observation' ? 'Visit completed and signed on this device' : `${signed.length} section${signed.length === 1 ? '' : 's'} signed and saved on this device`);
+      setBatch(undefined); setSelected(undefined);
+      requestAnimationFrame(() => heading.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    } catch (cause) {
+      if (!(cause instanceof AuthorizationError)) console.error('Visit save failed', cause);
+      setError(cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.'); setBatch(undefined);
+    } finally { busy.current = false; setSaving(false); }
+  };
   // Results the diagnosis is waiting for: tests without a result, and results not yet reviewed.
   const outstanding = outstandingResults(effectiveEncounterEntries(ctl.rawEntries));
   const resultsOutstanding = !enc.sig.diagnosis && !enc.closed && (outstanding.pending.length > 0 || outstanding.unreviewed.length > 0);
@@ -149,7 +174,7 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
   const viewSaved = () => enc.id && navigate(patientChartPath(patientId, 'visits', { visit: enc.id }));
   return <div className="min-h-screen bg-white px-4 pb-8 pt-4 md:px-8">
     <button type="button" className="mb-4 min-h-[44px] font-bold text-brand" onClick={() => navigate(returnTo)}>{returnTo.startsWith('/laboratory') ? 'Back to Laboratory' : returnTo.startsWith('/pharmacy') ? 'Back to Pharmacy' : returnTo.startsWith('/patients/') ? 'Back to patient record' : 'Back to visits'}</button>
-    <header className="border-b border-outline-soft pb-4"><div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-2xl font-extrabold">{record.fullName}</h1><p className="mt-1 break-all font-mono text-sm text-ink-soft">{record.patientId}</p></div><div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={() => navigate(patientChartPath(patientId))}>Full medical chart</Button>{enc.id ? <Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={viewSaved}>View signed entries</Button> : null}</div></div><div className="mt-3"><AllergyAlert patientId={patientId} /></div></header>
+    <header className="border-b border-outline-soft pb-4"><div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-2xl font-extrabold">{record.fullName}</h1><p className="mt-1 break-all font-mono text-sm text-ink-soft">{record.patientId}</p></div><div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={() => navigate(patientChartPath(patientId, 'history', { show: 'chart' }))}>Full medical chart</Button>{enc.id ? <Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={viewSaved}>View signed entries</Button> : null}</div></div><div className="mt-3"><AllergyAlert patientId={patientId} /></div></header>
     <div className="my-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold">Current visit</h2><p className="mt-1 text-sm text-ink-soft">{enc.id ? `Opened ${enc.openedDate} · ${VISIT_TYPE_NAMES[visitType]} visit` : 'The visit starts when its first clinical entry is signed.'}</p></div>{enc.id && canRecord && !enc.closed ? <ActionMenu label="Additional entries" actions={[{ label: 'Record another observation', onSelect: () => setEntryEditor({ step: 'vitals' }) }, { label: 'Add progress note', onSelect: () => setEntryEditor({ step: 'complaint' }) }, ...(enc.data.disposition.kind === 'observation' ? [{ label: 'Record next disposition', onSelect: () => setEntryEditor({ step: 'disposition' }) }] : [])]} /> : null}</div>
     {!enc.id && canRecord ? <div className="mb-4 max-w-sm"><SelectField label="Visit for" value={visitType} options={VisitType.options.map((type) => ({ value: type, label: VISIT_TYPE_NAMES[type] }))} onChange={(event) => ctl.setVisitType(event.target.value as VisitType)} /></div> : null}
     {enc.id ? <VisitProgrammeDetails patientId={patientId} encounterId={enc.id} visitType={visitType} /> : null}
@@ -169,13 +194,18 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
           <StepForm stepKey={chosen.key} ctl={ctl} patientId={patientId} />
           {error ? <p role="alert" className="mt-5 rounded-field border border-danger bg-danger-bg p-4 text-sm text-danger-strong">{error}</p> : null}
           <p className="mt-5 rounded-field bg-amber-bg p-3 text-sm text-amber-text">Draft on this device · not signed</p>
-          <Button className="mt-4" disabled={saving || ctl.loading} onClick={chosen.key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered' ? () => { ctl.skip('investigation_review'); setSelected('lab_order'); } : review}>{chosen.key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered' ? 'Choose investigations' : chosen.key === 'disposition' && enc.data.disposition.kind === 'observation' ? 'Review & sign observation plan' : isClosingStep(chosen.key) ? 'Review & complete visit' : chosen.key === 'lab_results' ? 'Preview report' : 'Review & sign ' + chosen.short.toLowerCase()}</Button>
+          {chosen.key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered' ? <Button className="mt-4" disabled={saving || ctl.loading} onClick={() => { ctl.skip('investigation_review'); setSelected('lab_order'); }}>Choose investigations</Button> : <div className="mt-4 flex flex-wrap gap-2">
+            {together ? <Button fullWidth={false} className="flex-1" disabled={saving || ctl.loading} onClick={reviewBatch}>{batchCloses ? `Review & complete visit (${batchNow.keys.length} sections)` : `Review & sign ${batchNow.keys.length} sections`}</Button> : null}
+            <Button fullWidth={!together} variant={together ? 'outlined' : 'primary'} disabled={saving || ctl.loading} onClick={review}>{together ? 'Sign this section only' : chosen.key === 'disposition' && enc.data.disposition.kind === 'observation' ? 'Review & sign observation plan' : isClosingStep(chosen.key) ? 'Review & complete visit' : chosen.key === 'lab_results' ? 'Preview report' : 'Review & sign ' + chosen.short.toLowerCase()}</Button>
+            {nextStep && !serviceTask ? <Button fullWidth={false} variant="ghost" disabled={saving} onClick={() => choose(nextStep.key)}>Next: {nextStep.short}</Button> : null}
+          </div>}
         </> : <p className="text-sm text-ink-soft">{!canRecord ? 'You have view access. A clinician records this task.' : 'Continue the current task before recording this section.'}</p>}
       </section>
     </div>
-    {reviewKey ? <ReviewSaveSheet title={STEP_DEFS[reviewKey].title} rows={summarize(enc.data, reviewKey)} actor={{ name: user.name, role: user.role }} confirmLabel={reviewKey === 'disposition' && enc.data.disposition.kind === 'observation' ? 'Confirm & save observation plan' : isClosingStep(reviewKey) ? 'Confirm & complete visit' : 'Confirm & lock'} onConfirm={() => void confirmSave()} onClose={() => setReviewKey(undefined)} saving={saving} /> : null}
+    {batch ? <ReviewSaveSheet title="Review this visit" rows={[]} sections={batch.keys.filter((key) => !(key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered')).map((key) => ({ title: STEP_DEFS[key].title, rows: summarize(enc.data, key) }))} note={batch.stoppedAt ? `Not included yet: ${STEP_DEFS[batch.stoppedAt.key].short} — ${batch.stoppedAt.problems.join(' · ')}` : undefined} actor={{ name: user.name, role: user.role }} confirmLabel={batch.keys.some(isClosingStep) && !(enc.data.disposition.kind === 'observation') ? 'Confirm & complete visit' : `Confirm & sign ${batch.keys.length} sections`} onConfirm={() => void confirmBatch()} onClose={() => setBatch(undefined)} saving={saving} patientId={patientId} /> : null}
+    {reviewKey ? <ReviewSaveSheet title={STEP_DEFS[reviewKey].title} rows={summarize(enc.data, reviewKey)} actor={{ name: user.name, role: user.role }} confirmLabel={reviewKey === 'disposition' && enc.data.disposition.kind === 'observation' ? 'Confirm & save observation plan' : isClosingStep(reviewKey) ? 'Confirm & complete visit' : 'Confirm & lock'} onConfirm={() => void confirmSave()} onClose={() => setReviewKey(undefined)} saving={saving} patientId={patientId} /> : null}
     {labPreview ? <PublishResultsSheet report={labPreview.labReport} patientName={record.fullName} heading={`Laboratory report · ${record.fullName} · ${record.patientId}`} enteredBy={user.name} saving={saving} onPublish={() => void publishResults()} onClose={() => setLabPreview(undefined)} /> : null}
-    {amendKey ? <AmendSheet onClose={() => setAmendKey(undefined)} onSave={async (note) => { try { await ctl.amendStep(amendKey, note); setAmendKey(undefined); ctl.reload(); toast('Amendment signed and saved on this device'); } catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not save amendment', { tone: 'error' }); } }} /> : null}
+    {amendKey ? <AmendSheet patientId={patientId} onClose={() => setAmendKey(undefined)} onSave={async (note) => { try { await ctl.amendStep(amendKey, note); setAmendKey(undefined); ctl.reload(); toast('Amendment signed and saved on this device'); } catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not save amendment', { tone: 'error' }); } }} /> : null}
     {entryEditor && enc.id ? <EntryEditorSheet patientId={patientId} encounterId={enc.id} entries={ctl.rawEntries} {...entryEditor} onClose={() => { setEntryEditor(undefined); ctl.reload(); }} /> : null}
   </div>;
 };

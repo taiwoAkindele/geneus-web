@@ -5,6 +5,7 @@ import { useAuthorizationContext } from '@/session';
 import { saveWardEvent, type WardSession } from '@/data/repos/wardCare';
 import { zonedInput, zonedInstant } from '@/lib/workforceTime';
 import { useDeviceContext } from '@/data';
+import { SigningPatient } from '@/modules/clinical/encounter/components/SigningPatient';
 
 export const WardMedicationSheet = ({ session, order, records, action = 'administration', previous, onClose, onSaved }: { session: WardSession; order: WardCareEvent; records: WardRecords; action?: 'administration' | 'continue' | 'stop'; previous?: WardCareEvent; onClose: () => void; onSaved: () => void }) => {
   const context = useAuthorizationContext(), { facility } = useDeviceContext(), zone = facility?.timeZone ?? 'Africa/Lagos';
@@ -33,6 +34,7 @@ export const WardMedicationSheet = ({ session, order, records, action = 'adminis
   const dirty = Boolean(reason || reviewing || at !== (previous ? zonedInput(previous.occurredOn, zone) : '') || outcome !== (prior?.outcome ?? 'given') || dose !== (prior?.dose ?? line?.dose ?? '') || route !== (prior?.route ?? line?.route ?? ''));
   return <Sheet title={previous ? 'Correct administration record' : action === 'administration' ? 'Record medication administration' : `${action === 'stop' ? 'Stop' : 'Continue'} medication order`} eyebrow={line?.drug ?? 'Medication'} onClose={onClose} closeDisabled={saving} hasUnsavedChanges={dirty}>
     <div className="space-y-4">
+      <SigningPatient patientId={session.patientId} />
       <p className="font-bold">{line?.drug} · {line?.dose} {line?.frequency} {line?.route}</p>
       <p className="text-sm text-ink-soft">This records an actual administration or an explicit order decision. Supplying medicine is recorded separately.</p>
       {reviewing ? <dl className="space-y-2"><dt className="font-bold">Decision</dt><dd>{action === 'administration' ? `${outcome === 'given' ? 'Given' : 'Not given'} · ${dose} · ${route} · ${at || 'At signing'}` : action}</dd><dt className="font-bold">Reason / note</dt><dd className="whitespace-pre-wrap">{reason || 'No additional note'}</dd></dl> : <>

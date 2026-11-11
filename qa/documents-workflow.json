@@ -80,7 +80,7 @@
   },
   {
     "name": "visit-review-populated",
-    "assert": "document.body.innerText.includes('Amaka Okoro')&&document.body.innerText.includes('Surgical ward')&&document.body.innerText.includes('Bed 01')&&document.querySelectorAll('a[href*=\"tab=documents\"]').length>=1",
+    "assert": "document.body.innerText.includes('Amaka Okoro')&&document.body.innerText.includes('Surgical ward')&&document.body.innerText.includes('Bed 01')&&document.querySelectorAll('a[href*=\"show=documents\"]').length>=1",
     "description": "Review lists patient, visit, ward, bed and chart link"
   },
   {

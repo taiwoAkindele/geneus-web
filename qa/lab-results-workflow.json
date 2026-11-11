@@ -28,13 +28,12 @@
     "description": "The preview shows the report as it will be published"
   },
   {
-    "click": "Publish results",
     "name": "lab-publish-confirm",
-    "assert": "document.body.innerText.includes('Publish these results?')&&document.body.innerText.includes('1 result, 1 flagged')&&document.body.innerText.includes('Corrections are made by amendment')",
-    "description": "Publishing asks for confirmation"
+    "assert": "document.body.innerText.includes('1 result, 1 flagged')&&document.body.innerText.includes('Corrections are made by amendment')&&document.body.innerText.includes('alerted when this device syncs')&&!document.body.innerText.includes('straight away')",
+    "description": "One preview states what publishing does and when the clinician is alerted"
   },
   {
-    "click": "Publish",
+    "click": "Publish results",
     "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('Results published on this device')&&window.designAudit.rows.encounter_entries.some(r=>r.step==='lab_results'&&String(r.labReport).includes('Haemoglobin')&&String(r.values).includes('Haemoglobin 10.8 g/dL (Low)'))&&window.designAudit.path==='/laboratory'&&document.body.style.overflow!=='hidden'",
     "description": "The result is saved with its structured report and plain summary, and the Laboratory queue opens again, and the page scrolls again"
   },

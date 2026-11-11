@@ -147,6 +147,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
   const [restoredFor, setRestoredFor] = useState<string>();
   const [draftRestoredAt, setDraftRestoredAt] = useState<string>();
   const pendingDraft = useRef<(() => Promise<unknown>) | undefined>(undefined);
+  /** True only while something the person typed has not yet reached the device draft. */
+  const typedUnsaved = useRef(false);
 
   const load = useCallback(async (): Promise<Loaded> => {
     const [encounters, staff] = await Promise.all([encountersForPatient(patientId), listStaff()]);
@@ -233,12 +235,13 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     const section = draft[activeKey];
     const untouched = JSON.stringify(section) === JSON.stringify(EMPTY_ENCOUNTER_DATA[activeKey]);
     const keep = () => {
-      pendingDraft.current = undefined;
+      pendingDraft.current = undefined; typedUnsaved.current = false;
       const kept = untouched ? discardDraft(owner, activeKey) : writeDraft(owner, activeKey, section);
       if (activeKey !== 'lab_results') return kept;
       return Promise.all([kept, Object.keys(draft.lab_report).length ? writeDraft(owner, LAB_REPORT_DRAFT, draft.lab_report) : discardDraft(owner, LAB_REPORT_DRAFT)]);
     };
     pendingDraft.current = keep;
+    if (!untouched) typedUnsaved.current = true;
     const timer = window.setTimeout(() => void keep().catch(keepDraftWarning), DRAFT_PAUSE_MS);
     return () => window.clearTimeout(timer);
   }, [draft, activeKey, owner, restoredFor]);
@@ -247,6 +250,18 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
 
   // Leaving the screen keeps whatever was typed since the last pause.
   useEffect(() => () => { void pendingDraft.current?.().catch(keepDraftWarning); }, []);
+
+  // Switching app, locking the phone or closing the tab writes the draft at once instead of
+  // waiting for the typing pause; closing during that brief window asks the browser to confirm.
+  useEffect(() => {
+    const flush = () => { const keep = pendingDraft.current; if (keep) void keep().catch(keepDraftWarning); };
+    const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    const unload = (event: BeforeUnloadEvent) => { if (!pendingDraft.current || !typedUnsaved.current) return; flush(); event.preventDefault(); event.returnValue = ''; };
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', unload);
+    return () => { document.removeEventListener('visibilitychange', hidden); window.removeEventListener('pagehide', flush); window.removeEventListener('beforeunload', unload); };
+  }, []);
 
   const setField = useCallback(<K extends StepKey, F extends keyof EncounterData[K]>(step: K, field: F, value: EncounterData[K][F]) => {
     setDraft((d) => ({ ...d, [step]: { ...d[step], [field]: value } }));
@@ -306,18 +321,21 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
   /** What must be fixed before the section may be reviewed; empty when it can be saved. */
   const problems = useCallback((key: StepKey) => stepProblems(key, enc.data), [enc.data]);
 
-  /** Saves the section, locked to the signed-in staff member. */
-  const lockStep = useCallback(
-    async (key: StepKey, collectLaterReason?: string, labSubmission?: { values: Record<string, unknown>; labReport: LabReport }) => {
-      if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') { setSkippedNow((keys) => [...keys, key]); return; }
+  /**
+   * Saves one section, locked to the signed-in staff member. `encounterId` is passed
+   * explicitly so several sections can be signed in sequence on a brand-new visit;
+   * `alsoSigning` lists sections signed earlier in the same batch.
+   */
+  const saveOne = useCallback(
+    async (key: StepKey, encounterId: string | undefined, alsoSigning: readonly StepKey[], collectLaterReason?: string, labSubmission?: { values: Record<string, unknown>; labReport: LabReport }) => {
       if (isClosingStep(key) && !(key === 'disposition' && enc.data.disposition.kind === 'observation')) {
-        const unsigned = (Object.keys(STEP_DEFS) as StepKey[]).filter((candidate) => candidate !== key && !enc.entries[candidate] && !blankDraft(draft[candidate]));
+        const unsigned = (Object.keys(STEP_DEFS) as StepKey[]).filter((candidate) => candidate !== key && !alsoSigning.includes(candidate) && !enc.entries[candidate] && !blankDraft(draft[candidate]));
         if (unsigned.length) throw new Error('Sign or clear these draft sections before completing: ' + unsigned.map((candidate) => STEP_DEFS[candidate].short).join(', '));
       }
       const followUpOn = key === 'disposition' ? enc.data.disposition.followUpOn : '';
       const entry = await saveStep(
         {
-          encounterId: enc.id,
+          encounterId,
           appointmentId,
           visitType: chosenVisitType,
           patientId,
@@ -350,10 +368,57 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
       }
       setSkippedNow((keys) => closesEncounter(entry) ? [] : keys.filter((skipped) => skipped !== key));
       setCurrentId(entry.encounterId);
+      return entry;
+    },
+    [context, facility?.timeZone, enc.data, enc.entries, draft, owner, patientId, appointmentId, skippedNow, chosenVisitType],
+  );
+
+  /** Saves the section, locked to the signed-in staff member. */
+  const lockStep = useCallback(
+    async (key: StepKey, collectLaterReason?: string, labSubmission?: { values: Record<string, unknown>; labReport: LabReport }) => {
+      if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') { setSkippedNow((keys) => [...keys, key]); return; }
+      await saveOne(key, enc.id, [], collectLaterReason, labSubmission);
       live.reload();
     },
-    [context, facility?.timeZone, enc.data, enc.entries, enc.id, draft, owner, patientId, appointmentId, live.reload, skippedNow, chosenVisitType],
+    [saveOne, enc.data.investigation_review.decision, enc.id, live.reload],
   );
+
+  /**
+   * The consultation sections that can be signed together now: unsigned sections
+   * in clinical order, stopping before work owned by another department (results,
+   * dispensing, administration) or before the first section that still needs input.
+   */
+  const signable = useCallback((): { keys: StepKey[]; stoppedAt?: { key: StepKey; problems: string[] } } => {
+    const keys: StepKey[] = [];
+    for (const step of stepsFor(enc.data)) {
+      const key = step.key;
+      if (enc.sig[key] || skippedNow.includes(key)) continue;
+      if (['lab_results', 'result_review', 'dispense', 'injection'].includes(key)) break;
+      if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') { keys.push(key); continue; }
+      const issues = stepProblems(key, enc.data);
+      if (issues.length) return { keys, stoppedAt: { key, problems: issues } };
+      keys.push(key);
+      if (isClosingStep(key)) break;
+    }
+    return { keys };
+  }, [enc.data, enc.sig, skippedNow]);
+
+  /** Signs several sections in order with one review; stops at the first refusal and reports it. */
+  const lockSteps = useCallback(async (keys: readonly StepKey[], collectLaterReason?: string): Promise<StepKey[]> => {
+    let encounterId = enc.id;
+    const signed: StepKey[] = [];
+    try {
+      for (const key of keys) {
+        if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') { setSkippedNow((current) => current.includes(key) ? current : [...current, key]); continue; }
+        const entry = await saveOne(key, encounterId, signed, collectLaterReason);
+        encounterId = entry.encounterId; signed.push(key);
+      }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Could not save.';
+      throw new Error(signed.length ? `${signed.map((key) => STEP_DEFS[key].short).join(', ')} signed. Stopped at ${STEP_DEFS[keys[signed.length]]?.short ?? 'the next section'}: ${message}` : message);
+    } finally { live.reload(); }
+    return signed;
+  }, [saveOne, enc.id, enc.data.investigation_review.decision, live.reload]);
 
   const amendStep = useCallback(
     async (key: StepKey, note: string) => {
@@ -365,8 +430,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
   );
 
   const actions = useMemo(
-    () => ({ setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep }),
-    [setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, amendStep],
+    () => ({ setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, lockSteps, signable, amendStep }),
+    [setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, lockSteps, signable, amendStep],
   );
 
   return { enc, rawEntries: live.data?.entries ?? [], encounter: live.data?.encounter, chosenVisitType, setVisitType, draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, flushDraft: () => pendingDraft.current?.(), ...actions };

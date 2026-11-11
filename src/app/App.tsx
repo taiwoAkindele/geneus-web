@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
 import { DataProvider } from '@/data';
@@ -131,7 +131,8 @@ const EncountersScreen = lazy(() =>
 const ServiceQueueScreen = lazy(() => import('@/modules/clinical/screens/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
 const LabRequestScreen = lazy(() => import('@/modules/clinical/screens/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
 const DispenseScreen = lazy(() => import('@/modules/clinical/screens/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
-const ClinicalPatientsScreen = lazy(() => import('@/modules/clinical/screens/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
+/** The clinical patient list became the shared list; older links keep their search. */
+const ClinicalPatientsRedirect = () => <Navigate to={'/patients/search' + useLocation().search} replace />;
 const InpatientScreen = lazy(() => import('@/modules/clinical/screens/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const DocumentsScreen = lazy(()=>import('@/modules/clinical/screens/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
 const PatientProfileScreen = lazy(() =>
@@ -199,7 +200,7 @@ const App = () => {
             <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
             <Route path="/encounters" element={<EncountersScreen />} />
-            <Route path="/clinical/patients" element={<ClinicalPatientsScreen />} />
+            <Route path="/clinical/patients" element={<ClinicalPatientsRedirect />} />
             <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
             <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
             <Route path="/laboratory/request" element={<LabRequestScreen />} />

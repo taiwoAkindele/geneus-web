@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { Button, Sheet, SheetCancelButton, TextAreaField } from '@/ui';
 import { ENCOUNTER_FIELD_HELP } from '../fieldHelp';
+import { SigningPatient } from './SigningPatient';
 
 /**
  * Add an amendment to a locked section (PRD §9.8.3). The original is never
  * touched; the note is appended and logged against the author.
  */
-export const AmendSheet = ({ onSave, onClose }: { onSave: (note: string) => Promise<void>; onClose: () => void }) => {
+export const AmendSheet = ({ onSave, onClose, patientId }: { onSave: (note: string) => Promise<void>; onClose: () => void; patientId?: string }) => {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -18,6 +19,7 @@ export const AmendSheet = ({ onSave, onClose }: { onSave: (note: string) => Prom
   };
   return (
     <Sheet onClose={onClose} title="Add an amendment" closeDisabled={saving} placement="side" hasUnsavedChanges={Boolean(note.trim())}>
+      {patientId ? <SigningPatient patientId={patientId} label="Amending the record of" /> : null}
       <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         The original record stays locked and unchanged. Your amendment is appended and logged against your name.
       </p>

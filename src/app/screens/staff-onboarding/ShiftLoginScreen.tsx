@@ -1,5 +1,6 @@
 import { accessFor, covers } from '@/session/accessPolicy';
 import { shiftRangeLabel } from '@/session/shiftLabels';
+import { takePlace } from '@/session/lastPlace';
 import { roleLabel } from '@/modules/operations/staff/staffAccess';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -60,7 +61,8 @@ export const ShiftLoginScreen = () => {
   const frozen = isFrozen(lastContact);
 
   useEffect(() => {
-    if (signedIn) navigate('/home', { replace: true });
+    // The same person signing back in returns to where they were; anyone else starts at Home.
+    if (signedIn) navigate((facility ? takePlace(staffId, facility.code) : undefined) ?? '/home', { replace: true });
   }, [signedIn, navigate]);
 
   const selected = roster.find((entry) => entry.staff.staffId === staffId);

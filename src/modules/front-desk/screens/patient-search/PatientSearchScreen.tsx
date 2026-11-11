@@ -5,27 +5,28 @@ import { Button,DataTable,Icon,SelectField,Tag } from '@/ui';
 import { currentAge,searchPatients } from '@/modules/front-desk/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
-import { loadPatientDirectory,type PatientDirectoryRow } from '@/data/repos/patientDirectory';
+import { DIRECTORY_TYPES,loadPatientDirectory,type PatientDirectoryRow } from '@/data/repos/patientDirectory';
 import { chargeBalances,listAdjustments,listCharges,listPayments } from '@/data/repos/billing';
 import { balanceOwed,todayStatus } from '@/modules/front-desk/patients/directoryView';
 import { ScanPatientCard } from '@/modules/front-desk/patients/ScanPatientCard';
-import { patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { opensChartFirst, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { ClinicalPatientList } from '@/modules/clinical/screens/clinical-patients/ClinicalPatientsScreen';
 
 /** The first registration across linked records is when this patient was created. */
 const createdOn=(row:PatientDirectoryRow)=>row.searchRecords.map(patient=>patient.createdOn).sort()[0]??row.patient.createdOn;
 
 const AdmissionStatus=({row}:{row:PatientDirectoryRow})=>row.stay?<><Tag tone="green">Admitted</Tag><p className="mt-1 text-xs text-ink-soft">{row.stay.ward} · {row.stay.bed}</p>{row.stay.pending?<p className="mt-1 text-xs text-amber-text">Pending server confirmation</p>:null}</>:<Tag>Not admitted</Tag>;
 
-export const PatientSearchScreen=()=>{
+const FrontDeskPatientList=()=>{
   const navigate=useNavigate(),[params,setParams]=useSearchParams(),context=useAuthorizationContext();
-  const directory=useLiveQuery(useCallback(()=>loadPatientDirectory(context),[context.userId,context.facilityId,context.deviceId]));
+  const directory=useLiveQuery(useCallback(()=>loadPatientDirectory(context),[context.userId,context.facilityId,context.deviceId]),DIRECTORY_TYPES);
   const query=params.get('q')??params.get('visitQuery')??'';
   const change=(key:string,value:string)=>setParams(current=>{const next=new URLSearchParams(current);next.delete('page');next.delete('visitPage');next.delete('visitQuery');if(value)next.set(key,value);else next.delete(key);return next;},{replace:true});
   useEffect(()=>{document.title='Patients · Geneus Health';},[]);
   const rows=directory.data??[];
   // Balances are financial facts: only staff who handle payments or fees see them.
   const canBill=context.permissions.some(permission=>['payment:receive','payment:waive','fee_item:manage'].includes(permission));
-  const balances=useLiveQuery(useCallback(async()=>canBill?chargeBalances(await listCharges(),await listPayments(),await listAdjustments()):[],[canBill]));
+  const balances=useLiveQuery(useCallback(async()=>canBill?chargeBalances(await listCharges(),await listPayments(),await listAdjustments()):[],[canBill]),['charge','payment','billing_adjustment','sync_rejection']);
   const owed=(row:PatientDirectoryRow)=>balanceOwed(row,balances.data??[]);
   // The Show select replaces the old tabs and keeps their ?care= address; anything unknown (or hidden from this role) shows all patients.
   const views=[
@@ -65,3 +66,6 @@ export const PatientSearchScreen=()=>{
     ]}/>:<p className="rounded-field border border-dashed border-outline p-6">{rows.length?'No patients match these filters.':'No patients registered on this device yet.'}</p>}</>}
   </div>;
 };
+
+/** One patient list for every module: clinicians see care facts and open the chart; front desk and cashiers see administrative facts and open details. */
+export const PatientSearchScreen=()=>opensChartFirst(useAuthorizationContext())?<ClinicalPatientList/>:<FrontDeskPatientList/>;

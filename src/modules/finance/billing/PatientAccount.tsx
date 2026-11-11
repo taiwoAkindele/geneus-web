@@ -20,6 +20,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   const identities = useLiveQuery(listIdentityEvents);
   const linkedIds = linkedPatientIds(patientId, identities.data ?? []);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [received, setReceived] = useState('');
   const [feeId, setFeeId] = useState('');
   const [adjusting, setAdjusting] = useState('');
   const [kind, setKind] = useState<'discount' | 'waiver'>('discount');
@@ -40,10 +41,26 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   const requestId = useRef(crypto.randomUUID());
   const rows = billingRows(data.charges.filter((c) => c.patientId === patientId), data.payments, data.adjustments);
   const patient = data.patients.find((p) => p.patientId === patientId);
-  const dirty = Object.values(amounts).some((value) => Boolean(value.trim())) || Boolean(feeId || adjusting || reduction || reason);
+  const dirty = Object.values(amounts).some((value) => Boolean(value.trim())) || Boolean(received.trim() || feeId || adjusting || reduction || reason);
   const requestLeave = (action: () => void) => { if (dirty) setLeaving(() => action); else action(); };
   const available = transfer ? transfer.amountMinor - transferAllocated(transfer.id, data.payments) : undefined;
   const checkPayment = () => preparePayment(rows, amounts, transfer, available);
+  // One amount for the whole account, applied to the oldest payable charges first.
+  // The split fills the per-charge boxes, which stay editable before the review.
+  const payable = rows.filter((r) => r.balanceMinor > 0 && context.permissions.includes('payment:receive') && (!transfer || (transfer.currency === r.charge.currency && (!transfer.departmentId || transfer.departmentId === r.charge.departmentId))))
+    .sort((a, b) => a.charge.createdOn.localeCompare(b.charge.createdOn) || a.charge.id.localeCompare(b.charge.id));
+  const currency = new Set(payable.map((r) => r.charge.currency)).size === 1 ? payable[0].charge.currency : undefined;
+  const due = payable.reduce((total, r) => total + r.balanceMinor, 0);
+  const splitReceived = (value: string) => {
+    setReceived(value); setError(''); setFieldError(undefined);
+    if (!currency) return;
+    let left: number;
+    try { left = value.trim() ? parseAmount(value, currency) : 0; } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the amount.'); return; }
+    const next: Record<string, string> = {};
+    for (const r of payable) { if (left <= 0) break; const part = Math.min(left, r.balanceMinor); next[r.charge.id] = amountInput(part, currency); left -= part; }
+    setAmounts(next);
+    if (left > 0) setError(`That is ${formatMoney(left, currency)} more than the amount due. Record only what is due; return the difference to the patient.`);
+  };
   const reviewPayment = () => {
     setError(''); setFieldError(undefined);
     try { setReview(checkPayment()); }
@@ -79,7 +96,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
       amount = Math.round(row.balanceMinor * value / 100);
     }
     await adjustCharge(adjusting, kind, amount, reason, context);
-    setAdjusting(''); setReason(''); setReduction(''); setAmounts({});
+    setAdjusting(''); setReason(''); setReduction(''); setAmounts({}); setReceived('');
   });
   return <Sheet title={review ? 'Review payment' : patient?.fullName ?? patientId} eyebrow={transfer ? 'Match bank transfer' : 'Patient billing account'} onClose={onClose} closeDisabled={busy} hasUnsavedChanges={dirty}>
     <p className="mb-3 font-mono text-xs text-ink-muted">{patientId}</p>
@@ -89,6 +106,11 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
     {transfer ? <p className="mb-3 rounded-card bg-brand-wash p-3 text-sm">Available to match: <strong>{formatMoney(transfer.amountMinor - transferAllocated(transfer.id, data.payments), transfer.currency)}</strong>. Matching needs a connection; bills must have synced.</p> : null}
     <fieldset disabled={busy} className={review ? 'hidden' : 'space-y-3'}>
       {!transfer && context.permissions.includes('payment:receive') ? <div className="space-y-2"><Button variant="outlined" onClick={() => void perform(async () => setAccounts(await billingRequest<ReceivingAccount[]>('accounts/list', { actorStaffId: context.userId })))}>Show bank details for transfer</Button>{accounts?.filter((a) => !a.departmentId || rows.some((r) => r.charge.departmentId === a.departmentId)).map((a) => <div key={a.id} className="rounded-field bg-brand-wash p-3 text-sm"><strong>{data.departments.find((d) => d.id === a.departmentId)?.name ?? 'Hospital / general'} · {a.mode}</strong><p>{a.bankName} · {a.accountName}</p><p className="font-mono text-lg">{a.accountNumber}</p></div>)}{accounts?.length === 0 ? <p className="text-sm">No receiving accounts are connected. Ask an administrator to configure Departments &amp; accounts.</p> : null}</div> : null}
+      {currency && payable.length ? <section aria-label="Amount due" className="rounded-card border-2 border-brand-tint bg-brand-wash p-4">
+        <p className="text-sm font-semibold text-ink-soft">Amount due</p><p className="font-mono text-2xl font-extrabold">{formatMoney(due, currency)}</p>
+        <div className="mt-3 flex items-end gap-2"><TextField label={transfer ? 'Amount to allocate' : 'Amount received'} name="amount-received" inputMode="decimal" value={received} onChange={(e) => splitReceived(e.target.value)} /><Button fullWidth={false} variant="ghost" onClick={() => splitReceived(amountInput(due, currency))}>Full amount</Button></div>
+        <p className="mt-2 text-xs text-ink-muted">Applied to the oldest charges first. Change any charge below before reviewing.</p>
+      </section> : null}
       {rows.length === 0 ? <p>No fees have been raised for this patient.</p> : rows.map((r) => <article key={r.charge.id} className="rounded-card border border-outline-soft p-3">
         <h3 className="font-bold">{r.charge.description}</h3>
         <p className="text-sm">Original {formatMoney(r.charge.listPriceMinor, r.charge.currency)} · Paid {formatMoney(r.settledMinor, r.charge.currency)}</p>

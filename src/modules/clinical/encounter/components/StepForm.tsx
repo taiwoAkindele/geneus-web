@@ -1,6 +1,8 @@
 import { useDeviceContext } from '@/data';
 import { zonedInput, zonedInstant } from '@/lib/workforceTime';
 import { InvestigationPicker } from './InvestigationPicker';
+import { MEDICINE_LIST_ID, PrescriptionHelpers } from './PrescriptionHelpers';
+import { DiagnosisSuggestions, DIAGNOSIS_LIST_ID, knownCode, useDiagnosisSuggestions } from './DiagnosisSuggestions';
 import { LabResultsForm } from '@/modules/clinical/resultTemplates/LabResultsForm';
 import { ResultReviewReports } from '@/modules/clinical/resultTemplates/ResultReviewReports';
 import { Button, ChoiceChip, FieldLabel, Icon, SelectField, SelectOrTextField, TextAreaField, TextField } from '@/ui';
@@ -14,6 +16,7 @@ export type StepFormController = Pick<EncounterController, 'setField' | 'toggleI
 export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { stepKey: StepKey; ctl: StepFormController; correcting?: boolean; patientId?: string }) => {
   const { enc, setField, setResult, addRx, setRx, removeRx, setDispenseReason } = ctl;
   const { facility } = useDeviceContext();
+  const knownDiagnoses = useDiagnosisSuggestions(stepKey === 'diagnosis');
   const zone = facility?.timeZone ?? 'Africa/Lagos';
   const d = enc.data;
   const rx = d.prescription.rx.length ? d.prescription.rx : d.diagnosis.rx;
@@ -22,7 +25,9 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <TextField label="Temp (°C)" help={H.temperature} name="v_temp" value={d.vitals.temp} inputMode="decimal" onChange={(e) => setField('vitals', 'temp', e.target.value)} />
-        <TextField label="BP (mmHg)" help={H.bloodPressure} name="v_bp" value={d.vitals.bp} onChange={(e) => setField('vitals', 'bp', e.target.value)} />
+        {/* Two number boxes, saved in the existing "systolic/diastolic" form. */}
+        <div className="col-span-2 grid grid-cols-2 gap-3 md:col-span-1"><TextField label="BP systolic" help={H.bloodPressure} name="v_bp_systolic" inputMode="numeric" placeholder="120" value={d.vitals.bp.split('/')[0] ?? ''} onChange={(e) => { const diastolic = d.vitals.bp.split('/')[1] ?? ''; const systolic = e.target.value.replace(/\D/g, ''); setField('vitals', 'bp', systolic || diastolic ? `${systolic}/${diastolic}` : ''); }} />
+        <TextField label="BP diastolic" name="v_bp_diastolic" inputMode="numeric" placeholder="80" hint="mmHg" value={d.vitals.bp.split('/')[1] ?? ''} onChange={(e) => { const systolic = d.vitals.bp.split('/')[0] ?? ''; const diastolic = e.target.value.replace(/\D/g, ''); setField('vitals', 'bp', systolic || diastolic ? `${systolic}/${diastolic}` : ''); }} /></div>
         <TextField label="Pulse (bpm)" help={H.pulse} name="v_pulse" value={d.vitals.pulse} inputMode="numeric" onChange={(e) => setField('vitals', 'pulse', e.target.value)} />
         <TextField label="Weight (kg)" help={H.weight} name="v_weight" value={d.vitals.weight} inputMode="decimal" onChange={(e) => setField('vitals', 'weight', e.target.value)} />
         <TextField label="SpO₂ (%)" help={H.oxygen} name="v_spo2" value={d.vitals.spo2} inputMode="numeric" onChange={(e) => setField('vitals', 'spo2', e.target.value)} />
@@ -74,7 +79,7 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
     );
   }
 
-  if (stepKey === 'diagnosis') return <>        <TextField label="Diagnosis" help={H.diagnosis} name="dx" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => setField('diagnosis', 'dx', e.target.value)} />
+  if (stepKey === 'diagnosis') return <>        <DiagnosisSuggestions known={knownDiagnoses} /><TextField label="Diagnosis" help={H.diagnosis} name="dx" list={DIAGNOSIS_LIST_ID} autoComplete="off" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => { setField('diagnosis', 'dx', e.target.value); const match = knownCode(knownDiagnoses, e.target.value); if (match && !d.diagnosis.code?.trim()) { setField('diagnosis', 'code', match.code); setField('diagnosis', 'codingSystem', match.codingSystem); } }} />
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <TextField label="Diagnosis code (optional)" help={H.diagnosisCode} value={d.diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'code', e.target.value)} />
           <SelectField label="Coding system" help={H.codingSystem} value={d.diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'codingSystem', e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined)} />
@@ -90,11 +95,12 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
         <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', [...(d.diagnosis.diagnoses ?? []), { label: '', certainty: 'unknown' }])}>Add another diagnosis</Button>
 {correcting ? <p className="mt-3 text-sm">This correction changes the diagnosis only. Treatment and disposition are recorded separately.</p> : null}</>;
   if (stepKey === 'prescription') return <><SelectField label="Medication decision" value={d.prescription.decision} options={[{ value: '', label: 'Not yet reviewed' }, { value: 'none_required', label: 'No medication required' }, { value: 'prescribed', label: 'Prescribe medication' }]} onChange={(e) => { setField('prescription', 'decision', e.target.value as typeof d.prescription.decision); if (e.target.value === 'none_required') setField('prescription', 'rx', []); }} />{d.prescription.decision === 'prescribed' ? <>        <div className="mt-4"><FieldLabel label="Prescription" help={H.prescription} /></div>
+        {!correcting ? <PrescriptionHelpers patientId={patientId} onAdd={(lines) => setField('prescription', 'rx', [...d.prescription.rx.filter((line) => line.name.trim()), ...lines])} /> : null}
         <div className="space-y-2">
           {rx.map((m, idx) => (
             <div key={idx} className="flex items-end gap-2.5 rounded-field border border-outline-soft bg-white p-3">
               <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-                <TextField label="Drug" help={H.drug} name={`rx_${idx}_drug`} value={m.name} placeholder="e.g. Artemether-Lumefantrine" onChange={(e) => setRx(idx, 'name', e.target.value)} />
+                <TextField label="Drug" help={H.drug} name={`rx_${idx}_drug`} list={MEDICINE_LIST_ID} autoComplete="off" value={m.name} placeholder="e.g. Artemether-Lumefantrine" onChange={(e) => setRx(idx, 'name', e.target.value)} />
                 <TextField label="Dose" help={H.dose} name={`rx_${idx}_dose`} value={m.dose} placeholder="e.g. 1 tablet" onChange={(e) => setRx(idx, 'dose', e.target.value)} />
                 <SelectOrTextField label="Frequency" name={`rx_${idx}_frequency`} value={m.frequency ?? ''}
                   options={PRESCRIPTION_FREQUENCIES} help={H.frequency} onChange={(value) => setRx(idx, 'frequency', value)} />

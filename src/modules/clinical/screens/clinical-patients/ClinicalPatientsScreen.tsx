@@ -5,10 +5,11 @@ import { Button, DataTable, Icon, SectionTabs, Tag, type TableColumn } from '@/u
 import { currentAge, searchPatients } from '@/modules/front-desk/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
-import { loadPatientDirectory, type PatientDirectoryRow } from '@/data/repos/patientDirectory';
+import { DIRECTORY_TYPES, loadPatientDirectory, type PatientDirectoryRow } from '@/data/repos/patientDirectory';
 import { PatientChartAccess } from '@/modules/front-desk/patients/PatientChartAccess';
 import { loadPatientClinicalSummaries, type PatientClinicalSummary } from '@/modules/front-desk/patients/clinicalSummary';
 import { patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { ScanPatientCard } from '@/modules/front-desk/patients/ScanPatientCard';
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -25,11 +26,11 @@ const Allergies = ({ summary }: { summary?: PatientClinicalSummary }) => summary
   : <span className="text-ink-soft">None recorded</span>;
 
 /** Clinical services' patient list: safety facts and care status, opening straight into the chart. */
-export const ClinicalPatientsScreen = () => <PatientChartAccess><ClinicalPatients /></PatientChartAccess>;
+export const ClinicalPatientsScreen = () => <PatientChartAccess><ClinicalPatientList /></PatientChartAccess>;
 
-const ClinicalPatients = () => {
+export const ClinicalPatientList = () => {
   const navigate = useNavigate(), [params, setParams] = useSearchParams(), context = useAuthorizationContext();
-  const data = useLiveQuery(useCallback(async () => { const rows = await loadPatientDirectory(context); return { rows, clinical: await loadPatientClinicalSummaries(context, rows) }; }, [context.userId, context.facilityId, context.deviceId]));
+  const data = useLiveQuery(useCallback(async () => { const rows = await loadPatientDirectory(context); return { rows, clinical: await loadPatientClinicalSummaries(context, rows) }; }, [context.userId, context.facilityId, context.deviceId]), [...DIRECTORY_TYPES, 'clinical_event', 'encounter_entry']);
   const query = params.get('q') ?? '', care = params.get('care') ?? 'all', page = Math.max(0, Number(params.get('page')) || 0);
   const set = (changes: Record<string, string>) => setParams((current) => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); } return next; }, { replace: true });
   useEffect(() => { document.title = 'Patients · Geneus Health'; }, []);
@@ -38,7 +39,7 @@ const ClinicalPatients = () => {
     const ids = new Set(searchPatients(rows.flatMap((row) => row.searchRecords), query, context.facilityId).map((patient) => patient.patientId));
     return rows.filter((row) => row.ids.some((id) => ids.has(id)) && (care === 'all' || (care === 'inpatient' ? Boolean(row.stay) : !row.stay && Boolean(row.lastVisit))));
   }, [rows, query, care, context.facilityId]);
-  const chart = (row: PatientDirectoryRow) => navigate(patientChartPath(row.patient.patientId, 'overview', { from: '/clinical/patients?' + params }));
+  const chart = (row: PatientDirectoryRow) => navigate(patientChartPath(row.patient.patientId, 'now', { from: '/patients/search?' + params }));
   const sortKey = params.get('sort'), sort = ['patient', 'lastVisit'].includes(sortKey ?? '') ? { key: sortKey!, descending: params.get('descending') === '1' } : { key: 'lastVisit', descending: true };
   const columns: TableColumn<PatientDirectoryRow>[] = [
     { key: 'patient', label: 'Patient', sortValue: (row) => row.patient.fullName, render: (row) => <div className="min-w-[140px] max-w-[260px]">
@@ -55,7 +56,7 @@ const ClinicalPatients = () => {
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
     <h1 className="text-[28px] font-extrabold">Patients</h1>
     <SectionTabs label="Patient care type" value={care} onChange={(value) => set({ care: value === 'all' ? '' : value, page: '' })} options={[{ value: 'all', label: 'All', count: rows.length }, { value: 'inpatient', label: 'Inpatients', count: rows.filter((r) => r.stay).length }, { value: 'outpatient', label: 'Outpatients', count: rows.filter((r) => !r.stay && r.lastVisit).length }]} />
-    <div><label htmlFor="clinical-patient-search" className="mb-2 block text-sm font-bold">Search patients</label><div className="flex min-h-[52px] items-center gap-3 rounded-field border border-outline px-4"><Icon name="search" className="h-5 w-5 shrink-0 text-ink-soft" /><input id="clinical-patient-search" type="search" value={query} onChange={(e) => set({ q: e.target.value, page: '' })} placeholder="Name, phone, ID or folder number" className="min-w-0 flex-1 border-0 bg-transparent p-0 outline-none" autoComplete="off" /></div></div>
+    <div><label htmlFor="clinical-patient-search" className="mb-2 block text-sm font-bold">Search patients</label><div className="flex min-h-[52px] items-center gap-3 rounded-field border border-outline px-4"><Icon name="search" className="h-5 w-5 shrink-0 text-ink-soft" /><input id="clinical-patient-search" type="search" value={query} onChange={(e) => set({ q: e.target.value, page: '' })} placeholder="Name, phone, ID or folder number" className="min-w-0 flex-1 border-0 bg-transparent p-0 outline-none" autoComplete="off" /></div><div className="mt-3"><ScanPatientCard onRead={(value) => set({ q: value, page: '' })} /></div></div>
     {data.loading && !data.data ? <p role="status">Reading patients…</p> : data.error ? <div role="alert"><p>Patients could not be read.</p><Button fullWidth={false} onClick={data.reload}>Try again</Button></div>
       : found.length ? <DataTable caption="Patients" uniformHeaders rows={found} rowKey={(row) => row.patient.id} page={page} onPageChange={(value) => set({ page: String(value) })} sort={sort} onSortChange={(value) => set({ sort: value.key, descending: value.descending ? '1' : '0', page: '' })} columns={columns} />
       : <p className="rounded-field border border-dashed border-outline p-6">{rows.length ? 'No patients match this search.' : 'No patients registered on this device yet.'}</p>}

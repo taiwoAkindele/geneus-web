@@ -66,6 +66,6 @@ const Dispense = () => {
         <Button disabled={saving} onClick={review}>Review &amp; sign {STEP_DEFS.dispense.short.toLowerCase()}</Button>
       </> : <p className="text-sm text-ink-soft">You have view access. Pharmacy staff record dispensing.</p>}
     </section>
-    {reviewing ? <ReviewSaveSheet title={STEP_DEFS.dispense.title} rows={summarize(enc.data, 'dispense')} actor={{ name: user.name, role: user.role }} confirmLabel="Confirm & lock" onConfirm={() => void save()} onClose={() => setReviewing(false)} saving={saving} /> : null}
+    {reviewing ? <ReviewSaveSheet title={STEP_DEFS.dispense.title} rows={summarize(enc.data, 'dispense')} actor={{ name: user.name, role: user.role }} confirmLabel="Confirm & lock" onConfirm={() => void save()} onClose={() => setReviewing(false)} saving={saving} patientId={patientId} /> : null}
   </div>;
 };

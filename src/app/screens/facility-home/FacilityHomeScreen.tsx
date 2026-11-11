@@ -1,3 +1,5 @@
-import { ModuleHome } from '@/app/dashboard/ModuleHome';
+import { Dashboard } from '@/app/dashboard/Dashboard';
+import { ModuleGrid } from '@/app/dashboard/ModuleHome';
 
-export const FacilityHomeScreen = () => <ModuleHome />;
+/** Home starts with today's work for this person, then the modules they can open. */
+export const FacilityHomeScreen = () => <><Dashboard /><ModuleGrid /></>;

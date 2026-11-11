@@ -14,6 +14,7 @@ import { useWardForm } from './useWardForm';
 import { useDeviceContext } from '@/data';
 import { activeAdmission, wardAdmission } from '@shared';
 import { zonedInstant } from '@/lib/workforceTime';
+import { SigningPatient } from '@/modules/clinical/encounter/components/SigningPatient';
 
 export const WardSessionSheet = ({ session, records, initialStep, changeOrder, onClose, onSaved }: { session: WardSession; records: WardRecords; initialStep: StepKey; changeOrder?: WardCareEvent; onClose: () => void; onSaved: () => void }) => {
   const context = useAuthorizationContext();
@@ -74,6 +75,7 @@ export const WardSessionSheet = ({ session, records, initialStep, changeOrder, o
   };
   return <Sheet title={session.purpose === 'nursing' ? 'Ward observations & notes' : 'Doctor review'} eyebrow="Continuing inpatient care" onClose={() => void close()} closeDisabled={saving} hasUnsavedChanges={edited}>
     <div className="space-y-4" onChange={() => setEdited(true)}>
+      <SigningPatient patientId={session.patientId} />
       <p className="text-sm text-ink-soft">This activity belongs to the current admission. Earlier signed care remains in the stay history.</p>
       {late ? <p className="text-sm text-amber-text">This stay has ended. Reported care is retained in Clinical reviews for a different qualified reviewer; it is not added as accepted ward care now.</p> : null}
       <SelectField label="Section to record" value={step} onChange={(e) => { setStep(e.target.value as StepKey); setReviewing(false); setError(''); }} options={allowed.map((key) => ({ value: key, label: STEP_DEFS[key].title }))} />

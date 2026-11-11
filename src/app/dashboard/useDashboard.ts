@@ -18,11 +18,11 @@ export const useDashboard = (access: ReturnType<typeof dashboardAccess>) => {
     if (!access.care) return undefined;
     const [encounters, entries, patients] = await Promise.all([listEncounters(), listEncounterEntries(), listPatients()]);
     return careSnapshot(encounters, entries, patients, today);
-  }, [access.care, today]));
+  }, [access.care, today]), ['encounter', 'encounter_entry', 'patient']);
   const billing = useLiveQuery(useCallback(async () => {
     if (!access.billing) return undefined;
     const [charges, payments, adjustments, patients] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listPatients()]);
     return billingSnapshot(charges, payments, adjustments, patients, today);
-  }, [access.billing, today]));
+  }, [access.billing, today]), ['charge', 'payment', 'billing_adjustment', 'patient', 'sync_rejection']);
   return { care, billing, today };
 };

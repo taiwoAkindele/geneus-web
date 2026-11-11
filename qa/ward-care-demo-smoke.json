@@ -18,8 +18,7 @@
   { "evaluate": "window.designAudit.go('/laboratory/request?'+new URLSearchParams({patient:'QA-PHC-000001-K2',visit:window.designAudit.rows.encounter_entries.find(e=>e.admissionId==='admission:ward'&&e.step==='lab_order').encounterId}));true" },
   { "fill": { "label": "Synthetic demonstration test", "value": "Synthetic demonstration result" } },
   { "click": "Preview report" },
-  { "click": "Publish results" },
-  { "click": "Publish", "assert": "window.designAudit.rows.encounter_entries.some(e=>e.admissionId==='admission:ward'&&e.step==='lab_results'&&JSON.parse(e.values).results.some(r=>r.result==='Synthetic demonstration result'))", "description": "A laboratory result signs against its original completed ward review" },
+  { "click": "Publish results", "assert": "window.designAudit.rows.encounter_entries.some(e=>e.admissionId==='admission:ward'&&e.step==='lab_results'&&JSON.parse(e.values).results.some(r=>r.result==='Synthetic demonstration result'))", "description": "A laboratory result signs against its original completed ward review" },
   { "path": "/patients/profile?patient=QA-PHC-000001-K2&tab=ward&admission=admission%3Award", "assert": "document.body.innerText.includes('Synthetic demonstration result')", "description": "The signed service result returns to the continuing stay" },
   { "reload": true, "readonly": true, "width": 320, "name": "demo-phone-readonly", "assert": "document.body.innerText.includes('Ward care')&&!document.body.innerText.includes('Record observations')&&!document.body.innerText.includes('Synthetic demo nursing check')&&document.documentElement.scrollWidth<=320", "description": "Restart resets sample care and the read-only demo fits a 320px phone" }
 ]

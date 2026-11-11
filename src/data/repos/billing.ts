@@ -16,7 +16,7 @@ import {
 import { assertAllowed } from '@/auth/authorization';
 import { assertAmountMinor } from '@/lib/money';
 import { mintReceiptNumber } from '@/lib/receiptNumber';
-import { allOfType, allWhere, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
+import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 import { usablePharmacyEffects } from './pharmacyAcceptance';
 
 export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
@@ -110,7 +110,7 @@ export const createCharge = async (feeId: string, draft: ChargeDraft, context: A
 export type PaymentDraft = Pick<Payment, 'patientId' | 'method' | 'currency' | 'allocations' | 'reference' | 'reason'>;
 
 const nextReceipt = async (facilityCode: string): Promise<string> =>
-  mintReceiptNumber(facilityCode, (await allOfType<Payment>('payment')).map((payment) => payment.receiptNumber));
+  mintReceiptNumber(facilityCode, await fieldValuesOf('payment', 'receiptNumber'));
 
 const checkAllocations = async (draft: PaymentDraft, context: AuthorizationContext): Promise<void> => {
   for (const allocation of draft.allocations) {
