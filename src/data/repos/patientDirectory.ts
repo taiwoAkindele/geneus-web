@@ -1,4 +1,5 @@
-import { activeAdmission, canonicalPatientId, inpatientHeads, usableInpatientEvents, type AuthorizationContext, type Encounter, type InpatientEvent, type Location, type Patient, type PatientIdentityEvent, type Unit, type WorkOwnershipEvent } from '@shared';
+import { calendarDate } from '@/lib/calendarDate';
+import { activeAdmission, canonicalPatientId, inpatientHeads, usableInpatientEvents, type Appointment, type AuthorizationContext, type Encounter, type InpatientEvent, type Location, type Patient, type PatientIdentityEvent, type Unit, type WorkOwnershipEvent } from '@shared';
 import { allOfType } from '../db';
 import { getDatabase } from '../database';
 import { listStaff } from './staff';
@@ -6,7 +7,9 @@ import { listWorkforceReceipts } from './workforceReceipts';
 import { pendingWorkforceIds } from './workforce';
 
 export type DirectoryStay = { encounterId:string; status:string; ward:string; bed:string; team:string; attending:string[]; pending:boolean; admittedOn:string };
-export type PatientDirectoryRow = { patient:Patient; ids:string[]; searchRecords:Patient[]; lastVisit?:Encounter; careVisit?:Encounter; stay?:DirectoryStay };
+/** Today's first active booking: attendance and time only, for the front desk's "in clinic today" view. */
+export type DirectoryBooking = Pick<Appointment,'attendance'|'scheduledFor'|'createdOn'>;
+export type PatientDirectoryRow = { patient:Patient; ids:string[]; searchRecords:Patient[]; lastVisit?:Encounter; careVisit?:Encounter; stay?:DirectoryStay; todayBooking?:DirectoryBooking };
 
 /** Operational patient facts only. No encounter entries, diagnoses, admission notes or clinical events. */
 export const loadPatientDirectory = async (context:AuthorizationContext):Promise<PatientDirectoryRow[]> => {
@@ -31,7 +34,12 @@ export const loadPatientDirectory = async (context:AuthorizationContext):Promise
     const key=canonicalPatientId(visit.patientId,identities),group=byPatient.get(key)??[];group.push(visit);byPatient.set(key,group);
   }
   const acceptedOwners=owners.filter(owner=>!pending.has(owner.id)&&!rejected.has(owner.id));
+  const today=calendarDate(),bookingsToday=new Map<string,DirectoryBooking>();
+  for(const booking of (await allOfType<Appointment>('appointment')).filter(row=>row.facilityId===context.facilityId&&!['cancelled','no_show'].includes(row.attendance??'')&&calendarDate(row.scheduledFor??row.createdOn)===today).sort((a,b)=>(a.scheduledFor??a.createdOn).localeCompare(b.scheduledFor??b.createdOn))){
+    const key=canonicalPatientId(booking.patientId,identities);if(!bookingsToday.has(key))bookingsToday.set(key,{attendance:booking.attendance,scheduledFor:booking.scheduledFor,createdOn:booking.createdOn});
+  }
   for(const [key,row] of groups){
+    row.todayBooking=bookingsToday.get(key);
     const history=(byPatient.get(key)??[]).sort((a,b)=>b.openedOn.localeCompare(a.openedOn));row.lastVisit=history[0];
     const active=stays.filter(stay=>row.ids.includes(stay.patientId));
     const stay=active.length===1?active[0]:undefined;

@@ -12,6 +12,8 @@ export const WorkspaceScreen = () => {
   const workspace = available.find((item) => item.id === moduleId);
   useEffect(() => { document.title = `${workspace?.label ?? 'Workspace'} · Geneus Health`; }, [workspace?.label]);
   if (!workspace) return <Navigate to="/home" replace />;
+  // Modules with a start page (Front Desk) have no Overview; old links and bookmarks land on that page.
+  if (workspace.start) return <Navigate to={workspace.start} replace />;
   return <div className="mx-auto w-full max-w-[1120px] px-5 py-7 md:px-8 md:py-10">
     <header className="mb-8 flex items-start gap-4">
       <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-card bg-brand-tint text-brand"><Icon name={workspace.icon} className="h-7 w-7" /></span>

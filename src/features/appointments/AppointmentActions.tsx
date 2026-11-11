@@ -55,8 +55,16 @@ const ResourcesSheet=({booking,zone,onClose}:{booking:BookedAppointment;zone:str
   return <Sheet title="Change booking resources" eyebrow={booking.patient.name} onClose={onClose} closeDisabled={busy} hasUnsavedChanges={JSON.stringify(proposal.allocation)!==JSON.stringify(booking.allocation)}><p className="mb-4 text-sm text-ink-muted">Keep this booking's date, attendance and fees. Your new allocation remains a proposal until the server accepts it.</p><AllocationFields start={zonedInput(booking.at,zone)} startInstant={booking.at} initial={booking.allocation} onChange={setProposal}/>{error||proposal.error?<p role="alert" className="my-3 text-sm text-danger">{error||proposal.error}</p>:null}<Button disabled={busy||Boolean(proposal.error)} loading={busy} onClick={async()=>{setBusy(true);setError('');try{await reallocateAppointment(booking.id,proposal.allocation,booking.allocation,context);query.reload();onClose();}catch(cause){setError(cause instanceof Error?cause.message:'Resources could not be saved');}finally{setBusy(false);}}}>Save resource proposal</Button></Sheet>;
 };
 
+/** One booking change opened straight from a worklist row, e.g. Rebook for a missed booking. */
+export const BookingChangeSheet = ({ booking, action, onClose }: { booking: BookedAppointment; action: AppointmentAction; onClose: () => void }) => {
+  const workforce = useWorkforce();
+  const zone = workforce.data?.offerings.find((o) => o.id === booking.allocation?.offeringId)?.timeZone;
+  if (booking.allocation && !workforce.data) return null;
+  return <ChangeSheet key={`${booking.id}:${action}`} booking={booking} action={action} zone={zone} onClose={onClose} />;
+};
+
 /** Shared by facility booking details and the patient's booking record. */
-export const AppointmentActions = ({ booking }: { booking: BookedAppointment }) => {
+export const AppointmentActions =({ booking }: { booking: BookedAppointment }) => {
   const context = useAuthorizationContext(), staff = useLiveQuery(listStaff),workforce=useWorkforce();
   const zone=workforce.data?.offerings.find((o)=>o.id===booking.allocation?.offeringId)?.timeZone;
   const [resources,setResources]=useState(false);

@@ -1,34 +1,61 @@
-import { Avatar, Button, DataTable, Tag } from '@/ui';
-import { APPOINTMENT_GROUP_LABELS, bookingAttendanceLabel } from './appointmentList';
+import { ActionMenu, Avatar, DataTable, Tag } from '@/ui';
+import type { IconName } from '@/ui';
+import { VISIT_TYPE_LABELS } from '@/features/billing/feeForm';
+import { bookingStatus } from './appointmentList';
 import type { BookedAppointment } from './types';
 
-type Props = { appointments: readonly BookedAppointment[]; onOpen: (appointment: BookedAppointment) => void; actionLabel: string };
-export const AppointmentWorklist = ({ appointments, onOpen, actionLabel }: Props) => (
+/** One entry in a row's action menu. */
+export type RowMenuItem = { label: string; onSelect: () => void; icon?: IconName };
+
+type Props = {
+  appointments: readonly BookedAppointment[];
+  /** The actions a row offers, opened from its ⋯ button (on hover with a mouse, or by click, tap or keyboard). */
+  actions: (appointment: BookedAppointment) => RowMenuItem[];
+};
+
+const Status = ({ booking }: { booking: BookedAppointment }) => {
+  const status = bookingStatus(booking);
+  return <div className="flex flex-wrap items-center gap-1.5">
+    <Tag tone={status.tone}>{status.label}</Tag>
+    {booking.paymentStatus === 'Awaiting payment' ? <Tag tone="amber">Awaiting payment</Tag> : <span className="text-xs text-ink-muted">Fees settled</span>}
+  </div>;
+};
+
+const visitLabel = (booking: BookedAppointment) => VISIT_TYPE_LABELS[booking.visitType ?? 'general'];
+const Menu = ({ booking, actions }: { booking: BookedAppointment; actions: Props['actions'] }) =>
+  <ActionMenu compact openOnHover label={`Actions for ${booking.patient.name}`} title={booking.patient.name} actions={actions(booking)} />;
+
+/**
+ * The appointment worklist. Every column has a fixed share of the width and
+ * rows are centred, so values line up under their headings; the status is one
+ * tag, and every action lives in the row's ⋯ menu.
+ */
+export const AppointmentWorklist = ({ appointments, actions }: Props) => (
   <>
-    <div className="space-y-2 lg:hidden">
-      {appointments.map((appointment) => (
-        <button key={appointment.id} type="button" onClick={() => onOpen(appointment)} className="flex w-full items-center gap-3 rounded-card border border-outline-soft bg-white p-3.5 text-left">
-          <Avatar tone="green" size="sm">{appointment.patient.initials}</Avatar>
+    <ul className="space-y-2 lg:hidden" aria-label="Appointments">
+      {appointments.map((booking) => (
+        <li key={booking.id} className="flex items-start gap-3 rounded-card border border-outline-soft bg-white p-3.5">
+          <Avatar tone="green" size="sm">{booking.patient.initials}</Avatar>
           <div className="min-w-0 flex-1">
-            <div className="font-bold text-ink">{appointment.patient.name}</div>
-            <div className="text-[13px] text-ink-muted">{appointment.reason} · {appointment.day} {appointment.when}</div>
-            <div className="mt-1 font-mono text-[11px] text-ink-muted">{appointment.patient.id}</div>
-            <div className="mt-1 text-xs font-bold text-brand">{bookingAttendanceLabel(appointment)}</div>
-            {appointment.paymentStatus === 'Awaiting payment' ? <p className="mt-1 text-xs font-bold text-amber-text">Awaiting payment · care can continue</p> : null}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="min-w-0 truncate font-bold text-ink">{booking.patient.name}</p>
+              <p className="shrink-0 font-mono text-sm font-bold tabular-nums">{booking.when}</p>
+            </div>
+            <p className="mt-0.5 text-[13px] text-ink-muted">{booking.reason} · {visitLabel(booking)} · {booking.day}</p>
+            <p className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{booking.patient.id}</p>
+            <div className="mt-2"><Status booking={booking} /></div>
           </div>
-          <Tag tone={appointment.group === 'overdue' ? 'amber' : appointment.group === 'completed' ? 'green' : 'slate'}>{APPOINTMENT_GROUP_LABELS[appointment.group]}</Tag>
-        </button>
+          <Menu booking={booking} actions={actions} />
+        </li>
       ))}
-    </div>
+    </ul>
     <div className="hidden lg:block">
-      <DataTable caption="Appointments" rows={appointments} rowKey={(row) => row.id} columns={[
-        { key: 'patient', label: 'Patient', sortValue: (row) => row.patient.name, render: (row) => <div><button type="button" className="min-h-0 py-1 text-left font-bold text-brand underline-offset-2 hover:underline" onClick={() => onOpen(row)}>{row.patient.name}</button><div className="font-mono text-[11px] text-ink-muted">{row.patient.id}</div></div> },
-        { key: 'when', label: 'Date & time', sortValue: (row) => row.at, render: (row) => <div>{row.day}<div className="text-ink-muted">{row.when}</div></div> },
-        { key: 'reason', label: 'Reason', render: (row) => row.reason },
-        { key: 'status', label: 'Booking group', render: (row) => APPOINTMENT_GROUP_LABELS[row.group] },
-        { key: 'attendance', label: 'Attendance / care', render: bookingAttendanceLabel },
-        { key: 'payment', label: 'Payment', render: (row) => row.paymentStatus ?? 'Confirmed' },
-        { key: 'action', label: 'Action', render: (row) => <Button variant="ghost" fullWidth={false} className="px-2 py-2" onClick={() => onOpen(row)}>{actionLabel}</Button> },
+      <DataTable caption="Appointments" uniformHeaders centerRows rows={appointments} rowKey={(row) => row.id} columns={[
+        { key: 'patient', label: 'Patient', className: 'w-[30%]', sortValue: (row) => row.patient.name, render: (row) => <div className="min-w-0"><p className="font-bold text-ink">{row.patient.name}</p><p className="break-all font-mono text-xs text-ink-muted">{row.patient.id}</p></div> },
+        { key: 'when', label: 'When', className: 'w-[14%]', sortValue: (row) => row.at, render: (row) => <div><p className="font-mono font-bold tabular-nums">{row.when}</p><p className="text-xs text-ink-muted">{row.day}</p></div> },
+        { key: 'visit', label: 'Visit', className: 'w-[22%]', render: (row) => <div><p>{row.reason}</p><p className="text-xs text-ink-muted">{visitLabel(row)}</p></div> },
+        { key: 'status', label: 'Status', className: 'w-[28%]', render: (row) => <Status booking={row} /> },
+        { key: 'actions', label: 'Actions', align: 'right', className: 'w-[6%]', render: (row) => <Menu booking={row} actions={actions} /> },
       ]} />
     </div>
   </>

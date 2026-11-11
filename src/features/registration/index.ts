@@ -8,6 +8,7 @@ export {
   type RegistrationValues,
 } from './registrationValues';
 export { useNextPatientNumber } from './useNextPatientNumber';
-export { useSavePatient } from './useSavePatient';
+export { useSavePatient, type RegistrationOutcome } from './useSavePatient';
+export { amountsDue, factsFromForm, newPatientFees, visitFor, type FeeLine, type RegistrationVisit } from './visitFees';
 
 export { RegistrationDraftProvider, useRegistrationDraft, useClearRegistrationDraft, useBeginRegistration } from './RegistrationDraftProvider';

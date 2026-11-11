@@ -48,3 +48,58 @@ export const projectAppointments = (
     };
   }).sort((a, b) => a.at.localeCompare(b.at));
 };
+
+/** The one inline action a worklist row offers, so routine front-desk work needs no detail sheet. */
+export type QuickAction = 'arrive' | 'rebook';
+export const quickActionFor = (booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>): QuickAction | undefined => {
+  // Once care has started, or a booking is cancelled or a no-show, changes go through the booking details.
+  if (booking.encounterId || bookingIsInactive(booking)) return undefined;
+  // The booking contract cannot reverse an arrival; a mistaken one is rescheduled or cancelled from the booking details.
+  if (booking.group === 'today') return booking.attendance === 'arrived' ? undefined : 'arrive';
+  if (booking.group === 'overdue' && booking.attendance !== 'arrived') return 'rebook';
+  return undefined;
+};
+
+/** Today's bookings as the desk works them: still expected, then arrived or already in care. */
+export const splitToday = <T extends Pick<BookedAppointment, 'attendance' | 'encounterId'>>(bookings: readonly T[]) => ({
+  expected: bookings.filter((booking) => booking.attendance !== 'arrived' && !booking.encounterId),
+  arrived: bookings.filter((booking) => booking.attendance === 'arrived' || Boolean(booking.encounterId)),
+});
+
+/** Half-hour times offered when booking ahead; any other time can still be typed. */
+export const BOOKING_SLOTS: readonly string[] = Array.from({ length: 16 }, (_, index) => `${String(8 + Math.floor(index / 2)).padStart(2, '0')}:${index % 2 ? '30' : '00'}`);
+
+const localTime = (at: string) => { const date = new Date(at); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
+
+/** Active scheduled bookings already at each local time of one day. Information only; there is no capacity limit. */
+export const slotLoad = (bookings: readonly Pick<BookedAppointment, 'scheduledFor' | 'attendance'>[], day: string): Map<string, number> => {
+  const load = new Map<string, number>();
+  for (const booking of bookings) {
+    if (!booking.scheduledFor || bookingIsInactive(booking) || calendarDate(booking.scheduledFor) !== day) continue;
+    const time = localTime(booking.scheduledFor);
+    load.set(time, (load.get(time) ?? 0) + 1);
+  }
+  return load;
+};
+
+/** What a row's action menu offers, most useful first. Permissions are checked again when each action saves. */
+export type RowAction = 'arrive' | 'rebook' | 'visit' | 'booking' | 'patient';
+export const rowActionsFor = (
+  booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>,
+  access: { canUpdate: boolean; canRecord: boolean },
+): RowAction[] => {
+  const quick = access.canUpdate ? quickActionFor(booking) : undefined;
+  return [
+    ...(quick ? [quick] : []),
+    ...(access.canRecord && booking.group !== 'completed' && !bookingIsInactive(booking) ? ['visit' as const] : []),
+    'booking', 'patient',
+  ];
+};
+
+/** The row's status as one tag: amber only when a due booking still has no arrival. */
+export const bookingStatus = (booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>): { label: string; tone: 'green' | 'amber' | 'neutral' } => {
+  const label = bookingAttendanceLabel(booking);
+  if (booking.group === 'completed' || booking.encounterId || booking.attendance === 'arrived') return { label, tone: 'green' };
+  if (booking.group === 'overdue' && !bookingIsInactive(booking)) return { label, tone: 'amber' };
+  return { label, tone: 'neutral' };
+};

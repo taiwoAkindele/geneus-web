@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Sheet } from '@/ui';
-import { toPatientDetails, useSavePatient, useClearRegistrationDraft, useRegistrationDraft } from '@/features/registration';
+import { toPatientDetails, useSavePatient, useClearRegistrationDraft, useRegistrationDraft, type RegistrationVisit } from '@/features/registration';
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/features/search';
 import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
 import { RegistrationRecoveryGate } from '@/features/registration/RegistrationRecoveryPrompt';
 
-export type DuplicateNavState = { matchIds: string[] } | null;
+/** `visit` is the booking chosen on the form; registering as a new person keeps it. */
+export type DuplicateNavState = { matchIds: string[]; visit?: RegistrationVisit } | null;
 
 const REASON_LABEL: Record<MatchReason, string> = {
   name: '✓ Name matches',
@@ -56,7 +57,7 @@ const DuplicateCheck = () => {
   const registerAsNew = async () => {
     if (saving || reason.trim().length < 3) { setError('Explain why this is a different person or why review is needed'); return; }
     setSaving(true);
-    await savePatient(values, undefined, { candidateIds: state.matchIds, outcome: uncertain ? 'review_requested' : 'registration_distinct', reason });
+    await savePatient(values, undefined, { candidateIds: state.matchIds, outcome: uncertain ? 'review_requested' : 'registration_distinct', reason }, state.visit);
     setSaving(false);
   };
 

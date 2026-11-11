@@ -5,10 +5,14 @@ import { navigationFor } from './navigation';
 
 export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'operations' | 'inventory' | 'reports' | 'administration';
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
-export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName };
-export type Workspace = { id: WorkspaceId; label: string; description: string; icon: IconName; links: WorkspaceLink[] };
+/** `also` lists other pages that belong to this link, so it stays highlighted there. */
+export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName; also?: readonly string[] };
+/** `start` opens the module on that page instead of its Overview, which the module then does not offer. */
+export type Workspace = { id: WorkspaceId; label: string; description: string; icon: IconName; links: WorkspaceLink[]; start?: string };
 
 export const workspacePath = (id: WorkspaceId) => `/workspace/${id}`;
+/** Where entering a module lands: its start page when it has one, otherwise its Overview. */
+export const moduleStart = (workspace: Pick<Workspace, 'id' | 'start'>) => workspace.start ?? workspacePath(workspace.id);
 const has = (context: WorkspaceContext, ...permissions: Permission[]) => permissions.some((permission) => context.permissions.includes(permission));
 const roleIn = (context: WorkspaceContext, ...roles: Role[]) => (context.roles ?? [context.role]).some((role) => roles.includes(role));
 
@@ -25,9 +29,10 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const inventory = roleIn(context, 'facility_admin', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'stock_item:manage', 'stock_movement:create');
   const reports = roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'register_entry:create', 'register_definition:publish');
   const modules: Workspace[] = [
-    { id: 'front-desk', label: 'Patients & Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', links: [
-      link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'),
-      ...(has(context, 'patient:create') ? [link('registration', 'Register patient', 'Create a patient record after checking for duplicates.', '/patients/new', 'plus')] : []),
+    // Front desk work starts at the patient list; its Overview only repeated the menu (GEN-6).
+    { id: 'front-desk', label: 'Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', start: '/patients/search', links: [
+      // Registration starts from the patient list's Register patient button, so its pages belong to Patients.
+      { ...link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'), also: ['/patients/new', '/patients/duplicate'] },
       ...(appointments ? [link('appointments', 'Appointments & arrivals', 'Plan bookings and record attendance.', '/appointments', 'clock')] : []),
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
@@ -92,6 +97,7 @@ export const activeWorkspaceLink = (workspace: Workspace, pathname: string, sear
   const current = new URLSearchParams(search);
   return [...workspace.links].sort((a, b) => b.to.split('?')[0].length - a.to.split('?')[0].length).find((item) => {
     const [path, query] = item.to.split('?');
+    if (item.also?.some((page) => pathname === page || pathname.startsWith(page + '/'))) return true;
     if (pathname !== path && !pathname.startsWith(path + '/')) return false;
     return [...new URLSearchParams(query)].every(([key, value]) => (current.get(key) ?? (key === 'queue' ? 'all' : key === 'tab' ? 'collections' : '')) === value);
   })?.key;

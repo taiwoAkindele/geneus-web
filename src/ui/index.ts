@@ -20,6 +20,7 @@ export { SelectField } from './SelectField';
 export { Sheet, SheetCancelButton } from './Sheet';
 export { ActionMenu } from './ActionMenu';
 export { DataTable } from './DataTable';
+export { DateRangeField } from './DateRangeField';
 export type { TableColumn } from './DataTable';
 export { Stat } from './Stat';
 export { StatusPill } from './StatusPill';
