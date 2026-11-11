@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { AppBar, useToast } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { createStaff, type StaffDetails } from '@/data/repos/staff';
 import { useAuthorizationContext } from '@/session';
 import { StaffForm } from '@/modules/operations/staff/StaffForm';
@@ -16,7 +15,7 @@ export const InviteStaffScreen = () => {
     navigate('/admin/staff');
   };
   return <div className="min-h-screen bg-surface">
-    <AppBar title="Add staff" onBack={() => navigate(-1)} right={<SyncPill />} />
+    <AppBar title="Add staff" onBack={() => navigate(-1)}/>
     <div className="mx-auto w-full max-w-xl px-5 py-4">
       {allowed ? <StaffForm canEditName canEditAccess submitLabel="Add staff member" onSave={save} /> : <p className="text-sm text-ink-muted">Adding staff needs permission to manage staff and assign access. Ask a facility admin.</p>}
     </div>

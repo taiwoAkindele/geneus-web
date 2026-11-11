@@ -3,7 +3,6 @@ import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { VisitType, validCalendarDate, yearsBetween } from '@shared';
 import { AppBar, Avatar, Button, ChoiceChip, SegmentedControl, SelectField, TextField } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { calendarDate } from '@/lib/calendarDate';
 import { formatMoney } from '@/lib/money';
 import { useLiveQuery } from '@/data';
@@ -121,7 +120,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
       <AppBar
         title={editing ? 'Edit patient' : 'New patient'}
         onBack={() => navigate(-1)}
-        right={<div className="flex items-center gap-2"><SyncPill />{provisional ? <span className="font-mono text-[11px] text-ink-muted">Provisional registration</span> : null}</div>}
+        right={<div className="flex items-center gap-2">{provisional ? <span className="font-mono text-[11px] text-ink-muted">Provisional registration</span> : null}</div>}
       />
       {/* Wide on desktop (sections use two or three columns); one column on phones. */}
       <form
