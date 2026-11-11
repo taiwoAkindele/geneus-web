@@ -77,7 +77,6 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const matches = useMemo(() => (!editing && typed && patients.data ? findLikelyMatches(typed, patients.data).slice(0, 2) : []), [editing, JSON.stringify(typed), patients.data]);
   const lines = newPatientFees(fees.data ?? [], factsFromForm(live, visitType), Boolean(visitType));
   const due = amountsDue(lines);
-  const ageUnknown = factsFromForm(live).ageYears === undefined;
 
   const openExisting = async (patientId: string) => {
     if (opening) return;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { staffPermissions, type Role } from '@shared';
-import { activeWorkspaceLink, readLastWorkspace, rememberWorkspace, workspaceForLocation, workspacePath, workspacesFor } from './workspaces';
+import { activeWorkspaceLink, moduleStart, readLastWorkspace, rememberWorkspace, workspaceForLocation, workspacePath, workspacesFor } from './workspaces';
 
 const context = (role: Role, additionalRoles: Role[] = []) => ({ role, roles: [role, ...additionalRoles], permissions: staffPermissions({ role, additionalRoles, permission: 'read_write' }) });
 
@@ -50,6 +50,23 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/admin/staff', '?workspace=administration', available)?.id).toBe('administration');
     expect(workspaceForLocation('/admin/staff', '', available, 'operations')?.id).toBe('operations');
     expect(workspaceForLocation('/home', '', available)).toBeUndefined();
+  });
+
+  it('opens Front Desk on the patient list, while other modules keep their Overview', () => {
+    const available = workspacesFor(context('facility_admin'));
+    const frontDesk = available.find((workspace) => workspace.id === 'front-desk')!;
+    expect(frontDesk.label).toBe('Front Desk');
+    expect(moduleStart(frontDesk)).toBe('/patients/search');
+    expect(frontDesk.links[0].to).toBe('/patients/search');
+    for (const workspace of available.filter((item) => item.id !== 'front-desk')) {
+      expect(workspace.start).toBeUndefined();
+      expect(moduleStart(workspace)).toBe(workspacePath(workspace.id));
+    }
+    // Every role that has Front Desk can open its start page.
+    for (const role of ['records_officer', 'cashier', 'nurse', 'doctor', 'laboratory_staff', 'pharmacy_staff'] as const) {
+      const desk = workspacesFor(context(role)).find((workspace) => workspace.id === 'front-desk');
+      if (desk) expect(desk.links.some((item) => item.to === moduleStart(desk))).toBe(true);
+    }
   });
 
   it('starts registration from the patient list rather than its own menu entry', () => {
