@@ -17,7 +17,7 @@
     "name": "01-emergency-registration"
   },
   {
-    "evaluate": "Promise.all([import('/src/data/repos/clinicalReviews.ts'),import('/src/features/workforce/CareContext.tsx')]).then(()=>true)"
+    "evaluate": "Promise.all([import('/src/data/repos/clinicalReviews.ts'),import('/src/modules/operations/workforce/CareContext.tsx')]).then(()=>true)"
   },
   {
     "offline": true,

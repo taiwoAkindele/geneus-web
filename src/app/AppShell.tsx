@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-const CareContext=lazy(()=>import('@/features/workforce/CareContext').then((m)=>({default:m.CareContext})));
+const CareContext=lazy(()=>import('@/modules/operations/workforce/CareContext').then((m)=>({default:m.CareContext})));
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useSession } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';

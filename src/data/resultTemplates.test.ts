@@ -9,7 +9,7 @@ import { recordServerContact } from './deviceCredential';
 import { fieldKindsFor } from './contractShape';
 import { loadAnswerListPage,loadPartPage,loadResultTemplateSettings,loadTemplatePage } from './repos/resultTemplates';
 import { loadCataloguePage } from './repos/investigations';
-import { partKeyFor,rangeAudience,rangeSummary } from '@/features/resultTemplates/labels';
+import { partKeyFor,rangeAudience,rangeSummary } from '@/modules/clinical/resultTemplates/labels';
 
 const base={facilityId:'TEST',schemaVersion:5,createdBy:'staff:admin',deviceId:'device:one',createdOn:'2026-11-01T08:00:00Z'};
 const admin=()=>authorizationFor({staff:{staffId:'staff:admin',role:'facility_admin',permission:'read_write'},facilityId:'TEST',deviceId:'device:one'});

@@ -14,9 +14,12 @@
     "description": "Patient navigation uses Patients"
   },
   {
+    "fill": {
+      "label": "Show",
+      "value": "inpatient"
+    },
     "assert": "document.body.innerText.includes('Amaka Okoro')&&!document.body.innerText.includes('Never Visited Patient')",
-    "description": "Inpatients tab filters to active admissions",
-    "evaluate": "[...document.querySelectorAll('button')].find(node=>node.textContent.trim().startsWith('Inpatients')).click()"
+    "description": "Show: Inpatients filters to active admissions"
   },
   {
     "click": "View details"

@@ -5,7 +5,7 @@ import { Facility, Staff, OrganizationFacilityRegistration } from '@shared';
 import { SessionProvider, useAuth, useSession } from '@/session';
 import { ToastProvider } from '@/ui';
 import { AppHeader } from '@/app/AppHeader';
-import { AddFacilityScreen } from '@/pages/facilities/AddFacilityScreen';
+import { AddFacilityScreen } from '@/modules/administration/screens/facilities/AddFacilityScreen';
 import { setDatabaseForTests } from '@/data/database';
 import { fakeDatabase } from '@/data/testing/fakeDatabase';
 import { toRow } from '@/data/rows';

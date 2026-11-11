@@ -11,7 +11,7 @@ import { rememberWardCareSupport } from './wardCareSupport';
 import { confirmAdmission, changeAdmission } from './repos/inpatient';
 import { readWardRecords, saveWardStep, saveWardEvent, type WardSession } from './repos/wardCare';
 import { allOfType } from './db';
-import { monthlyReport } from '@/features/reporting/monthlyReport';
+import { monthlyReport } from '@/modules/reports/reporting/monthlyReport';
 import { calendarDate } from '@/lib/calendarDate';
 
 const context = (readOnly = false) => authorizationFor({ staff: { staffId: 'staff:doctor', role: 'doctor', permission: readOnly ? 'read_only' : 'read_write' }, facilityId: 'TEST', deviceId: 'device:one' });

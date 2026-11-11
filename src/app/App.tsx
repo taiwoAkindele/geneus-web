@@ -3,11 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider } from '@/session';
 import { DataProvider } from '@/data';
-import { AppointmentsProvider } from '@/features/appointments';
-import { RegistersProvider } from '@/features/registers';
-import { RegistrationDraftProvider } from '@/features/registration';
+import { AppointmentsProvider } from '@/modules/front-desk/appointments';
+import { RegistersProvider } from '@/modules/reports/registers';
+import { RegistrationDraftProvider } from '@/modules/front-desk/registration';
 import { RequireCapability } from './RequireCapability';
-import { ClinicalDocumentsAccess } from '@/features/documents/ClinicalDocumentsAccess';
+import { ClinicalDocumentsAccess } from '@/modules/clinical/documents/ClinicalDocumentsAccess';
 import { AppShell } from './AppShell';
 import { AuthShell } from './AuthShell';
 import { RequireFacility } from './RequireFacility';
@@ -17,139 +17,139 @@ import { RouteIndex } from './RouteIndex';
 /**
  * App router. Each screen is lazy-imported from its own file so every route
  * ships as a separate chunk — route-level code splitting matters on the cheap
- * phones this product targets. Screens live under `@/pages/<feature>/`.
+ * phones this product targets. Screens live under `@/modules/<module>/screens/<feature>/` (app-level screens under `@/app/screens/`).
  */
 const MagicLinkScreen = lazy(() =>
-  import('@/pages/facility-onboarding/MagicLinkScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/MagicLinkScreen').then((m) => ({
     default: m.MagicLinkScreen,
   })),
 );
-const FacilityWorkspacesScreen = lazy(() => import('@/pages/facilities/FacilityWorkspacesScreen').then((m) => ({ default: m.FacilityWorkspacesScreen })));
-const OrganizationScreen = lazy(() => import('@/pages/facilities/OrganizationScreen').then((m) => ({ default: m.OrganizationScreen })));
-const AddFacilityScreen = lazy(() => import('@/pages/facilities/AddFacilityScreen').then((m) => ({ default: m.AddFacilityScreen })));
-const InvestigationCatalogueScreen = lazy(() => import('@/pages/investigations/InvestigationCatalogueScreen').then((m) => ({ default: m.InvestigationCatalogueScreen })));
-const CatalogueSettingsScreen = lazy(() => import('@/pages/investigations/CatalogueSettingsScreen').then((m) => ({ default: m.CatalogueSettingsScreen })));
-const ResultTemplateEditorScreen = lazy(() => import('@/pages/investigations/ResultTemplateEditorScreen').then((m) => ({ default: m.ResultTemplateEditorScreen })));
-const FacilityReferralsScreen = lazy(() => import('@/pages/referral/FacilityReferralsScreen').then((m) => ({ default: m.FacilityReferralsScreen })));
-const WorkspaceScreen = lazy(() => import('@/pages/workspace/WorkspaceScreen').then((m) => ({ default: m.WorkspaceScreen })));
+const FacilityWorkspacesScreen = lazy(() => import('@/modules/administration/screens/facilities/FacilityWorkspacesScreen').then((m) => ({ default: m.FacilityWorkspacesScreen })));
+const OrganizationScreen = lazy(() => import('@/modules/administration/screens/facilities/OrganizationScreen').then((m) => ({ default: m.OrganizationScreen })));
+const AddFacilityScreen = lazy(() => import('@/modules/administration/screens/facilities/AddFacilityScreen').then((m) => ({ default: m.AddFacilityScreen })));
+const InvestigationCatalogueScreen = lazy(() => import('@/modules/operations/screens/investigations/InvestigationCatalogueScreen').then((m) => ({ default: m.InvestigationCatalogueScreen })));
+const CatalogueSettingsScreen = lazy(() => import('@/modules/operations/screens/investigations/CatalogueSettingsScreen').then((m) => ({ default: m.CatalogueSettingsScreen })));
+const ResultTemplateEditorScreen = lazy(() => import('@/modules/operations/screens/investigations/ResultTemplateEditorScreen').then((m) => ({ default: m.ResultTemplateEditorScreen })));
+const FacilityReferralsScreen = lazy(() => import('@/modules/clinical/screens/referral/FacilityReferralsScreen').then((m) => ({ default: m.FacilityReferralsScreen })));
+const WorkspaceScreen = lazy(() => import('@/app/screens/workspace/WorkspaceScreen').then((m) => ({ default: m.WorkspaceScreen })));
 const MagicLinkSentScreen = lazy(() =>
-  import('@/pages/facility-onboarding/MagicLinkSentScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/MagicLinkSentScreen').then((m) => ({
     default: m.MagicLinkSentScreen,
   })),
 );
 const RegisterFacilityScreen = lazy(() =>
-  import('@/pages/facility-onboarding/RegisterFacilityScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/RegisterFacilityScreen').then((m) => ({
     default: m.RegisterFacilityScreen,
   })),
 );
 const AdminDashboardScreen = lazy(() =>
-  import('@/pages/facility-onboarding/AdminDashboardScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/AdminDashboardScreen').then((m) => ({
     default: m.AdminDashboardScreen,
   })),
 );
 const InviteStaffScreen = lazy(() =>
-  import('@/pages/facility-onboarding/InviteStaffScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/InviteStaffScreen').then((m) => ({
     default: m.InviteStaffScreen,
   })),
 );
 const JoinFacilityScreen = lazy(() =>
-  import('@/pages/facility-onboarding/JoinFacilityScreen').then((m) => ({ default: m.JoinFacilityScreen })),
+  import('@/modules/administration/screens/facility-onboarding/JoinFacilityScreen').then((m) => ({ default: m.JoinFacilityScreen })),
 );
 const AddDeviceScreen = lazy(() =>
-  import('@/pages/facility-onboarding/AddDeviceScreen').then((m) => ({ default: m.AddDeviceScreen })),
+  import('@/modules/administration/screens/facility-onboarding/AddDeviceScreen').then((m) => ({ default: m.AddDeviceScreen })),
 );
 const RolesPermissionsScreen = lazy(() =>
-  import('@/pages/facility-onboarding/RolesPermissionsScreen').then((m) => ({
+  import('@/modules/administration/screens/facility-onboarding/RolesPermissionsScreen').then((m) => ({
     default: m.RolesPermissionsScreen,
   })),
 );
 const ManageStaffScreen = lazy(() =>
-  import('@/pages/workforce/StaffDirectoryScreen').then((m) => ({
+  import('@/modules/operations/screens/workforce/StaffDirectoryScreen').then((m) => ({
     default: m.StaffDirectoryScreen,
   })),
 );
 
 // Staff onboarding & access
 const CreatePinScreen = lazy(() =>
-  import('@/pages/staff-onboarding/CreatePinScreen').then((m) => ({ default: m.CreatePinScreen })),
+  import('@/app/screens/staff-onboarding/CreatePinScreen').then((m) => ({ default: m.CreatePinScreen })),
 );
 const ShiftLoginScreen = lazy(() =>
-  import('@/pages/staff-onboarding/ShiftLoginScreen').then((m) => ({ default: m.ShiftLoginScreen })),
+  import('@/app/screens/staff-onboarding/ShiftLoginScreen').then((m) => ({ default: m.ShiftLoginScreen })),
 );
 const PinApprovalScreen = lazy(() =>
-  import('@/pages/staff-onboarding/PinApprovalScreen').then((m) => ({ default: m.PinApprovalScreen })),
+  import('@/app/screens/staff-onboarding/PinApprovalScreen').then((m) => ({ default: m.PinApprovalScreen })),
 );
 
 // Daily use
 const FacilityHomeScreen = lazy(() =>
-  import('@/pages/facility-home/FacilityHomeScreen').then((m) => ({ default: m.FacilityHomeScreen })),
+  import('@/app/screens/facility-home/FacilityHomeScreen').then((m) => ({ default: m.FacilityHomeScreen })),
 );
 const PatientSearchScreen = lazy(() =>
-  import('@/pages/patient-search/PatientSearchScreen').then((m) => ({
+  import('@/modules/front-desk/screens/patient-search/PatientSearchScreen').then((m) => ({
     default: m.PatientSearchScreen,
   })),
 );
 const NewPatientStep1Screen = lazy(() =>
-  import('@/pages/patient-registration/NewPatientStep1Screen').then((m) => ({
+  import('@/modules/front-desk/screens/patient-registration/NewPatientStep1Screen').then((m) => ({
     default: m.NewPatientStep1Screen,
   })),
 );
 const NewPatientStep2Screen = lazy(() =>
-  import('@/pages/patient-registration/NewPatientStep2Screen').then((m) => ({
+  import('@/modules/front-desk/screens/patient-registration/NewPatientStep2Screen').then((m) => ({
     default: m.NewPatientStep2Screen,
   })),
 );
 const DuplicateCheckScreen = lazy(() =>
-  import('@/pages/patient-registration/DuplicateCheckScreen').then((m) => ({
+  import('@/modules/front-desk/screens/patient-registration/DuplicateCheckScreen').then((m) => ({
     default: m.DuplicateCheckScreen,
   })),
 );
-const IdentityReviewScreen = lazy(() => import('@/pages/patient-registration/IdentityReviewScreen').then((m) => ({ default: m.IdentityReviewScreen })));
+const IdentityReviewScreen = lazy(() => import('@/modules/front-desk/screens/patient-registration/IdentityReviewScreen').then((m) => ({ default: m.IdentityReviewScreen })));
 const SendToUnitScreen = lazy(() =>
-  import('@/pages/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
+  import('@/modules/clinical/screens/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
-const UnitQueueScreen = lazy(() => import('@/pages/units/UnitQueueScreen').then((m) => ({ default: m.UnitQueueScreen })));
-const FacilityScreen = lazy(() => import('@/pages/workforce/FacilityScreen').then((m) => ({ default: m.FacilityScreen })));
-const ServiceScreen = lazy(() => import('@/pages/workforce/ServiceScreen').then((m) => ({ default: m.ServiceScreen })));
-const StaffScreen = lazy(() => import('@/pages/workforce/StaffScreen').then((m) => ({ default: m.StaffScreen })));
-const ClinicalReviewsScreen = lazy(() => import('@/pages/workforce/ClinicalReviewsScreen').then((m) => ({ default: m.ClinicalReviewsScreen })));
+const UnitQueueScreen = lazy(() => import('@/modules/clinical/screens/units/UnitQueueScreen').then((m) => ({ default: m.UnitQueueScreen })));
+const FacilityScreen = lazy(() => import('@/modules/operations/screens/workforce/FacilityScreen').then((m) => ({ default: m.FacilityScreen })));
+const ServiceScreen = lazy(() => import('@/modules/operations/screens/workforce/ServiceScreen').then((m) => ({ default: m.ServiceScreen })));
+const StaffScreen = lazy(() => import('@/modules/operations/screens/workforce/StaffScreen').then((m) => ({ default: m.StaffScreen })));
+const ClinicalReviewsScreen = lazy(() => import('@/modules/clinical/screens/workforce/ClinicalReviewsScreen').then((m) => ({ default: m.ClinicalReviewsScreen })));
 const RegistersListScreen = lazy(() =>
-  import('@/pages/registers/RegistersListScreen').then((m) => ({ default: m.RegistersListScreen })),
+  import('@/modules/reports/screens/registers/RegistersListScreen').then((m) => ({ default: m.RegistersListScreen })),
 );
 const RegisterEntriesScreen = lazy(() =>
-  import('@/pages/registers/RegisterEntriesScreen').then((m) => ({ default: m.RegisterEntriesScreen })),
+  import('@/modules/reports/screens/registers/RegisterEntriesScreen').then((m) => ({ default: m.RegisterEntriesScreen })),
 );
 const RegisterBuilderScreen = lazy(() =>
-  import('@/pages/registers/RegisterBuilderScreen').then((m) => ({ default: m.RegisterBuilderScreen })),
+  import('@/modules/reports/screens/registers/RegisterBuilderScreen').then((m) => ({ default: m.RegisterBuilderScreen })),
 );
 const SyncCenterScreen = lazy(() =>
-  import('@/pages/sync-center/SyncCenterScreen').then((m) => ({ default: m.SyncCenterScreen })),
+  import('@/modules/administration/screens/sync-center/SyncCenterScreen').then((m) => ({ default: m.SyncCenterScreen })),
 );
 const EncountersScreen = lazy(() =>
-  import('@/pages/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
+  import('@/modules/clinical/screens/encounters/EncountersScreen').then((m) => ({ default: m.EncountersScreen })),
 );
-const ServiceQueueScreen = lazy(() => import('@/pages/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
-const LabRequestScreen = lazy(() => import('@/pages/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
-const DispenseScreen = lazy(() => import('@/pages/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
-const ClinicalPatientsScreen = lazy(() => import('@/pages/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
-const InpatientScreen = lazy(() => import('@/pages/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
-const DocumentsScreen = lazy(()=>import('@/pages/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
+const ServiceQueueScreen = lazy(() => import('@/modules/clinical/screens/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
+const LabRequestScreen = lazy(() => import('@/modules/clinical/screens/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
+const DispenseScreen = lazy(() => import('@/modules/clinical/screens/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
+const ClinicalPatientsScreen = lazy(() => import('@/modules/clinical/screens/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
+const InpatientScreen = lazy(() => import('@/modules/clinical/screens/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
+const DocumentsScreen = lazy(()=>import('@/modules/clinical/screens/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
 const PatientProfileScreen = lazy(() =>
-  import('@/pages/patient/PatientProfileScreen').then((m) => ({ default: m.PatientProfileScreen })),
+  import('@/modules/front-desk/screens/patient/PatientProfileScreen').then((m) => ({ default: m.PatientProfileScreen })),
 );
 const EncounterScreen = lazy(() =>
-  import('@/pages/encounter/EncounterScreen').then((m) => ({ default: m.EncounterScreen })),
+  import('@/modules/clinical/screens/encounter/EncounterScreen').then((m) => ({ default: m.EncounterScreen })),
 );
 const FeeScheduleScreen = lazy(() =>
-  import('@/pages/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
+  import('@/modules/finance/screens/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
 );
-const BillingScreen = lazy(() => import('@/pages/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
-const BillingSettingsScreen = lazy(() => import('@/pages/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
-const DevicesScreen = lazy(() => import('@/pages/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
-const StockScreen = lazy(() => import('@/pages/stock/StockScreen').then((module) => ({ default: module.StockScreen })));
-const MonthlySummaryScreen = lazy(() => import('@/pages/monthly-summary/MonthlySummaryScreen').then((module) => ({ default: module.MonthlySummaryScreen })));
+const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
+const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
+const DevicesScreen = lazy(() => import('@/modules/administration/screens/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
+const StockScreen = lazy(() => import('@/modules/inventory/screens/stock/StockScreen').then((module) => ({ default: module.StockScreen })));
+const MonthlySummaryScreen = lazy(() => import('@/modules/reports/screens/monthly-summary/MonthlySummaryScreen').then((module) => ({ default: module.MonthlySummaryScreen })));
 const AppointmentsScreen = lazy(() =>
-  import('@/pages/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
+  import('@/modules/front-desk/screens/appointments/AppointmentsScreen').then((m) => ({ default: m.AppointmentsScreen })),
 );
 
 const ScreenFallback = () => {
