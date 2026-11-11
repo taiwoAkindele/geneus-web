@@ -1,4 +1,5 @@
 import { calendarDate } from '@/lib/calendarDate';
+import type { DocType } from '@shared';
 import { activeAdmission, canonicalPatientId, inpatientHeads, usableInpatientEvents, type Appointment, type AuthorizationContext, type Encounter, type InpatientEvent, type Location, type Patient, type PatientIdentityEvent, type Unit, type WorkOwnershipEvent } from '@shared';
 import { allOfType } from '../db';
 import { getDatabase } from '../database';
@@ -10,6 +11,9 @@ export type DirectoryStay = { encounterId:string; status:string; ward:string; be
 /** Today's first active booking: attendance and time only, for the front desk's "in clinic today" view. */
 export type DirectoryBooking = Pick<Appointment,'attendance'|'scheduledFor'|'createdOn'>;
 export type PatientDirectoryRow = { patient:Patient; ids:string[]; searchRecords:Patient[]; lastVisit?:Encounter; careVisit?:Encounter; stay?:DirectoryStay; todayBooking?:DirectoryBooking };
+
+/** Every record type loadPatientDirectory reads, for live lists that refresh only when these change. */
+export const DIRECTORY_TYPES = ['patient', 'encounter', 'inpatient_event', 'location', 'unit', 'patient_identity_event', 'staff', 'sync_rejection', 'handoff', 'work_ownership_event', 'appointment'] as const satisfies readonly DocType[];
 
 /** Operational patient facts only. No encounter entries, diagnoses, admission notes or clinical events. */
 export const loadPatientDirectory = async (context:AuthorizationContext):Promise<PatientDirectoryRow[]> => {

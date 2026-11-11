@@ -101,7 +101,7 @@ try {
   await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1024,deviceScaleFactor:1,mobile:false});
   await cdp('Page.navigate',{url:previewOrigin+'/qa/patient-flow.html'});
   await waitFor('Boolean(window.designAudit)&&document.body.innerText.includes("Amaka Okoro")');await evaluate('document.fonts.ready');
-  await click('Amaka Okoro');await waitFor('document.body.innerText.includes("Medical chart")');
+  await click('Amaka Okoro');await click('View medical history','a');await waitFor('document.body.innerText.includes("Summary")');
   assert.equal(await evaluate('Boolean(document.querySelector("aside[aria-label=\'Selected patient\']"))'),false);
   assert.equal(await evaluate('document.querySelectorAll("main").length'),1);
   checks.push('Patient search opens a full chart with one main landmark');
@@ -117,7 +117,7 @@ try {
   await clinicalSave(true);
   const clinical=await evaluate('window.designAudit.rows.clinical_events');
   assert.equal(clinical.length,2);assert.equal(clinical[1].previousId,'clinical:problem');assert.equal(JSON.parse(clinical[0].values).label,'Hypertension');
-  await click('Overview');await waitFor('document.body.innerText.includes("Hypertension follow-up")');
+  await click('Now');await waitFor('document.body.innerText.includes("Hypertension follow-up")');
   checks.push('Clinical review/sign creates a version, retains originals and refreshes the chart');
   checks.push('Dirty clinical editor cannot be silently dismissed');
   await click('Clinical record');await click('Allergies (1)');await click('Review legacy allergy');
@@ -126,7 +126,7 @@ try {
   await waitFor('document.body.innerText.includes("Reported rash")');
   checks.push('Legacy allergy review preserves its source and updates alert/count');
 
-  await click('Personal details');await click('Edit personal details');await fill('Phone','08000000047');
+  await click('Details');await click('Edit personal details');await fill('Phone','08000000047');
   await evaluate('window.designAudit.setPatient({address:"Concurrent preserved address"})');await pause(200);
   await click('Save changes');await waitFor('!document.querySelector("dialog[open]")');
   assert.equal(await evaluate('window.designAudit.rows.patients[0].phone'),'08000000047');
@@ -139,14 +139,14 @@ try {
   await click('Cancel');await click('Discard changes');await waitFor('!document.querySelector("dialog[open]")');
   checks.push('Conflicting demographic edits are refused without overwriting the saved value');
 
-  await click('Appointments');await click('Book appointment');await click('Pick date & time');
+  await click('View medical history','a');await click('History');await click('Appointments');await click('Book appointment');await click('Pick date & time');
   await fill('Date','2026-11-09');await fill('Time','10:00');await fill('Reason','Synthetic booked follow-up');
   await click('Save appointment');await waitFor('!document.querySelector("dialog[open]")');
   await waitFor('document.body.innerText.includes("Synthetic booked follow-up")');
   assert.equal(await evaluate('window.designAudit.rows.appointments.length'),2);
   checks.push('Appointment booking saves through the repository and returns to the patient list');
 
-  await click('Visits');assert.equal(await visibleTables(),1);await click('View visit');
+  await click('History');assert.equal(await visibleTables(),1);await click('View visit');
   await waitFor('document.body.innerText.includes("Saved entries · reading view")');
   assert.equal(await evaluate('Boolean(document.querySelector("textarea"))'),false);
   await click('View activity log');await waitFor('document.querySelector("dialog[open]")?.innerText.includes("Visit activity log")');await clickLabel('Close');
@@ -227,17 +227,17 @@ try {
     await cdp('Emulation.setDeviceMetricsOverride',{width,height:width===1487?1058:844,deviceScaleFactor:1,mobile:width!==1487});
     await cdp('Page.navigate',{url:previewOrigin+'/qa/patient-flow.html'});
     await waitFor('Boolean(window.designAudit)&&document.body.innerText.includes("Amaka Okoro")');
-    await go(chart);await waitFor('document.body.innerText.includes("Medical chart")');await screenshot('overview-'+width);
-    await click('Visits');assert.equal(await visibleTables(),1);await screenshot('visits-'+width);
+    await go(chart);await waitFor('document.body.innerText.includes("Summary")');await screenshot('overview-'+width);
+    await click('History');assert.equal(await visibleTables(),1);await screenshot('visits-'+width);
     const label=await evaluate('([...document.querySelectorAll("button[aria-haspopup=menu]")].map(n=>n.getAttribute("aria-label")).filter(n=>n.startsWith("Visit actions")).at(-1))');
     await clickLabel(label);await waitFor('Boolean(document.querySelector("[role=menu]"))');
     await writeFile(join(output,'patient-menu-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));await key('Escape',27);
     await click('View visit');await screenshot('saved-visit-'+width);await click('Back to visits');
     await click('Clinical record');await click('Review / update');await screenshot('clinical-editor-'+width);await clickLabel('Close');
-    await click('Appointments');await click('Book appointment');await click('Pick date & time');
+    await click('History');await click('Appointments');await click('Book appointment');await click('Pick date & time');
     await fill('Date','2026-11-09');await fill('Time','10:00');await fill('Visit type','follow_up');await fill('Reason','Follow-up review');
     await screenshot('booking-'+width);await clickLabel('Close');await click('Discard changes');
-    await click('Personal details');await click('Edit personal details');
+    await click('Details');await click('Edit personal details');
     await evaluate('document.querySelector("dialog details").open=true');await screenshot('details-'+width);await clickLabel('Close');
     await go('/encounters');await click('All visits');assert.equal(await visibleTables(),1);await screenshot('facility-visits-'+width);
     await go(chart);await click('Continue visit');await waitFor('Boolean(document.querySelector("textarea"))');await screenshot('record-visit-'+width);
@@ -245,11 +245,11 @@ try {
   }
   await cdp('Page.navigate',{url:previewOrigin+'/qa/patient-flow.html?readonly=1'});
   await waitFor('Boolean(window.designAudit)&&document.body.innerText.includes("Amaka Okoro")');
-  await go(chart);await waitFor('document.body.innerText.includes("Medical chart")');
+  await go(chart);await waitFor('document.body.innerText.includes("Summary")');
   assert.equal(await evaluate('[...document.querySelectorAll("button")].some(n=>["Start visit","Continue visit","Book appointment"].includes(n.textContent.trim()))'),false);
   await click('Clinical record');assert.equal(await evaluate('document.body.innerText.includes("View access")'),true);
-  await click('Personal details');assert.equal(await evaluate('[...document.querySelectorAll("button")].some(n=>n.textContent.trim()==="Edit personal details")'),false);
-  await click('Visits');await click('View visit');
+  await click('Details');assert.equal(await evaluate('[...document.querySelectorAll("button")].some(n=>n.textContent.trim()==="Edit personal details")'),false);
+  await click('View medical history','a');await click('History');await click('View visit');
   assert.equal(await evaluate('[...document.querySelectorAll("button")].some(n=>n.textContent.trim()==="Add amendment")'),false);
   checks.push('Read-only staff can inspect records without recording, amendment or demographic actions');
   assert.deepEqual(errors,[]);

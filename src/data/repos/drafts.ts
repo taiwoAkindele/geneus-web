@@ -2,7 +2,7 @@ import { getDatabase } from '../database';
 import { nowIso } from '../db';
 import { DRAFTS_TABLE } from '../tables';
 import type { WardSession } from './wardCare';
-import type { StepKey } from '@/features/encounter/types';
+import type { StepKey } from '@/modules/clinical/encounter/types';
 
 export const listWardDrafts = async (owner: { staffId: string; patientId: string }, admissionId: string): Promise<{ session: WardSession; step: StepKey; changeOrderId?: string }[]> => {
   const rows = await getDatabase().getAll<{ data: string }>(`SELECT data FROM ${DRAFTS_TABLE} WHERE staffId = ? AND patientId = ? AND step = ?`, [owner.staffId, owner.patientId, 'ward_form']);

@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isDatabaseOpen } from '../database';
+import type { DocType } from '@shared';
 import { onChange } from '../db';
 
 export type LiveQuery<T> = { data: T | undefined; loading: boolean; error: Error | undefined; reload: () => void };
 
-/** Callers pass a stable loader; changing its inputs switches the query immediately. */
-export const useLiveQuery = <T,>(load: () => Promise<T>): LiveQuery<T> => {
+/**
+ * Callers pass a stable loader; changing its inputs switches the query immediately.
+ * `watch` lists the record types the loader reads. Omit it to re-run on any change;
+ * a list must name every type read, or the screen can show stale data.
+ */
+export const useLiveQuery = <T,>(load: () => Promise<T>, watch?: readonly DocType[]): LiveQuery<T> => {
+  const watchKey = watch?.join('|') ?? '';
   const open = isDatabaseOpen();
   const [data, setData] = useState<T>();
   const [loading, setLoading] = useState(open);
@@ -30,9 +36,9 @@ export const useLiveQuery = <T,>(load: () => Promise<T>): LiveQuery<T> => {
     setData(undefined); setError(undefined); setLoading(open);
     if (!open) return;
     void run();
-    const stop = onChange(() => void run());
+    const stop = onChange(() => void run(), watchKey ? (watchKey.split('|') as DocType[]) : undefined);
     return () => { generation.current += 1; stop(); };
-  }, [run, open, load]);
+  }, [run, open, load, watchKey]);
   const reload = useCallback(() => { setLoading(true); void run(); }, [run]);
   return { data, loading, error, reload };
 };

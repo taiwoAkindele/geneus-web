@@ -1,11 +1,11 @@
-import { AppointmentsProvider } from '@/features/appointments';
+import { AppointmentsProvider } from '@/modules/front-desk/appointments';
 // Synthetic browser acceptance fixture. Never imported by the production application.
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Patient, Staff } from '@shared';
 import { SessionProvider, useAuth } from '@/session';
 import { ToastProvider } from '@/ui';
-import { EncounterScreen } from '@/pages/encounter/EncounterScreen';
+import { EncounterScreen } from '@/modules/clinical/screens/encounter/EncounterScreen';
 import { setDatabaseForTests } from '@/data/database';
 import { fakeDatabase } from '@/data/testing/fakeDatabase';
 import { toRow } from '@/data/rows';

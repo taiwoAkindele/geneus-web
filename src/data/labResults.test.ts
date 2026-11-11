@@ -8,9 +8,9 @@ import { setDatabaseForTests } from './database';
 import { recordServerContact } from './deviceCredential';
 import { allOfType } from './db';
 import { saveStep } from './repos/encounters';
-import { EMPTY_ENCOUNTER_DATA } from '@/features/encounter/encounterRecord';
-import { buildLabSubmission,draftsFromReport } from '@/features/resultTemplates/labEntry';
-import type { EncounterData } from '@/features/encounter/types';
+import { EMPTY_ENCOUNTER_DATA } from '@/modules/clinical/encounter/encounterRecord';
+import { buildLabSubmission,draftsFromReport } from '@/modules/clinical/resultTemplates/labEntry';
+import type { EncounterData } from '@/modules/clinical/encounter/types';
 
 const base={facilityId:'TEST',schemaVersion:5,createdBy:'staff:admin',deviceId:'device:one',createdOn:'2026-11-01T08:00:00Z'};
 const admin=()=>authorizationFor({staff:{staffId:'staff:admin',role:'facility_admin',permission:'read_write'},facilityId:'TEST',deviceId:'device:one'});

@@ -9,7 +9,7 @@ import { discardDraft, discardDrafts, readDrafts, writeDraft } from './repos/dra
 import { amendEntry, entriesForEncounter, saveStep } from './repos/encounters';
 import { assignShift, createStaff, editStaff, extendShift, findShift, listShifts, listStaff } from './repos/staff';
 import { registerPatient, updatePatient, getPatient, listPatients } from './repos/patients';
-import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from '@/features/registration/registrationValues';
+import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from '@/modules/front-desk/registration/registrationValues';
 import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from './repos/patientIdentity';
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,

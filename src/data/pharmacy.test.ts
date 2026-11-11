@@ -11,7 +11,7 @@ import { readPharmacy, saveDispensing } from './repos/pharmacy';
 import { allOfType } from './db';
 import { chargesForPatient, chargeBalances } from './repos/billing';
 import { listStockMovements } from './repos/stock';
-import { requestQueues } from '@/features/encounter/requestQueues';
+import { requestQueues } from '@/modules/clinical/encounter/requestQueues';
 import { WardCareEvent } from '@shared';
 import { usablePharmacyEntries } from './repos/pharmacyAcceptance';
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AuthorizationContext, Staff, SyncRejection } from '@shared';
 import { authorizationFor, AuthorizationError } from '@/auth/authorization';
-import { kindOf } from '@/features/reconcile';
+import { kindOf } from '@/modules/administration/reconcile';
 import { recordServerContact } from '../deviceCredential';
 import { setDatabaseForTests } from '../database';
 import { fakeDatabase, type FakeDatabase } from '../testing/fakeDatabase';

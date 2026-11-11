@@ -9,8 +9,8 @@ import { unlockSecureStorage } from '@/lib/secureStorage';
 import { recordServerContact } from '@/data/deviceCredential';
 import { TABLE_FOR } from '@/data/tables';
 import { toRow } from '@/data/rows';
-import { FacilityWorkspace, ServiceWorkspace, CoverageWorkspace } from '@/features/workforce/Workspaces';
-import { StaffWorkspace } from '@/features/workforce/StaffWorkspace';
+import { FacilityWorkspace, ServiceWorkspace, CoverageWorkspace } from '@/modules/operations/workforce/Workspaces';
+import { StaffWorkspace } from '@/modules/operations/workforce/StaffWorkspace';
 import '../src/index.css';
 
 // Uses the actual encrypted PowerSync SQLite and production repositories.

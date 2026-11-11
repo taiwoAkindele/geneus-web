@@ -1,9 +1,11 @@
 import { Patient, patientAge, patientIdentificationIssues, patientIdentitySnapshot, provisionalPatientName, type AuthorizationContext, type Charge, type FeeItem } from '@shared';
 import { mintPatientId } from '@/lib/patientId';
-import { allOfType, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
+import { allOfType, fieldValuesOf, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
 import { listFeeItems, newCharge, patientBillingFacts } from './billing';
 
 export const listPatients = () => allOfType<Patient>('patient');
+/** Patient IDs only, for issuing the next number without parsing every record. */
+export const listPatientIds = () => fieldValuesOf('patient', 'patientId');
 
 /** A patient record's `id` is its patientId (SCHEMA.md §4). */
 export const getPatient = (patientId: string) => findRecord<Patient>('patient', patientId);
@@ -22,10 +24,10 @@ export type PatientDetails = Pick<
 export type RegisteredBundle = { patient: Patient; fees: FeeItem[]; charges: Charge[] };
 
 export const registerPatient = async (details: PatientDetails, context: AuthorizationContext, extraRecords?: (patientId: string, created: RegisteredBundle) => NewRecord[]): Promise<Patient> => {
-  const existing = await listPatients();
+  const existing = await listPatientIds();
   const patientId = mintPatientId(
     context.facilityId,
-    existing.map((patient) => patient.patientId),
+    existing,
   );
   const patient = Patient.parse({
     ...envelope(context),

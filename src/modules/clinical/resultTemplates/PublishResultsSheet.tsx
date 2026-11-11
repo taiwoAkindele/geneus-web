@@ -1,0 +1,28 @@
+import type { LabReport } from '@shared';
+import { Button, Sheet, SheetCancelButton, Tag } from '@/ui';
+import { LabReportView, reportCounts } from './LabReportView';
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/**
+ * The report exactly as it will be published, with one deliberate publish
+ * action. Publishing signs and locks the results; corrections are made by
+ * amendment. The alert reaches the clinician when this device syncs.
+ */
+export const PublishResultsSheet = ({ report, patientName, heading, enteredBy, saving, correcting = false, onPublish, onClose }: {
+  report: LabReport; patientName: string; heading: string; enteredBy: string; saving: boolean; correcting?: boolean; onPublish: () => void; onClose: () => void;
+}) => {
+  const { values, flagged } = reportCounts(report), tests = report.items.map((item) => item.test).join(', ');
+  return <Sheet title={correcting ? 'Preview corrected report' : 'Preview report'} placement="side" wide onClose={onClose} closeDisabled={saving}>
+    <div className="space-y-4">
+      <p className="text-sm text-ink-soft">This is how the results will appear to the doctor and on the printed report.</p>
+      <LabReportView report={report} heading={heading} status={<Tag tone="amber">Not published</Tag>} enteredBy={enteredBy} />
+      <div className="space-y-2 rounded-field border border-outline-soft bg-surface p-4 text-sm">
+        <p><b>{tests}</b> for <b>{patientName}</b>: {plural(values, 'result')}, {flagged} flagged.</p>
+        <p>{correcting ? 'The original stays in the visit history beside the correction.' : 'After publishing, the results can’t be edited. Corrections are made by amendment and keep the original.'}</p>
+        <p className="text-ink-soft">The requesting clinician is alerted when this device syncs.</p>
+      </div>
+      <div className="flex flex-wrap gap-2"><SheetCancelButton disabled={saving}>Back to edit</SheetCancelButton><Button fullWidth={false} loading={saving} disabled={saving} onClick={onPublish}>{correcting ? 'Publish correction' : 'Publish results'}</Button></div>
+    </div>
+  </Sheet>;
+};

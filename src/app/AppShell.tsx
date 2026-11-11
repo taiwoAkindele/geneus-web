@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-const CareContext=lazy(()=>import('@/features/workforce/CareContext').then((m)=>({default:m.CareContext})));
+const CareContext=lazy(()=>import('@/modules/operations/workforce/CareContext').then((m)=>({default:m.CareContext})));
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useSession } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
+import { rememberPlace } from '@/session/lastPlace';
 import { activeWorkspaceLink, moduleStart, workspacePath } from './workspaces';
 import { useWorkspace } from './useWorkspace';
 import { AppHeader, ShiftBanner, ShiftCountdownStrip } from './AppHeader';
@@ -164,7 +165,9 @@ export const AppShell = () => {
   // The billing workspace already owns its main landmark.
   const Content = pathname === '/billing' || pathname === '/billing/settings' ? 'div' : 'main';
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }); }, [pathname]);
-  const { unreadCount, markAllRead, shift } = useSession();
+  const { unreadCount, markAllRead, shift, user, facility } = useSession();
+  const { search } = useLocation();
+  useEffect(() => { rememberPlace(user.staffId, facility.code, pathname + search); }, [user.staffId, facility.code, pathname, search]);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -183,7 +186,8 @@ export const AppShell = () => {
       <Sidebar onProfile={() => setProfileOpen(true)} />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col [--app-header-h:64px]">
         <AppHeader onProfile={() => setProfileOpen(true)} />
-        {!home ? <div className="flex min-h-[56px] flex-wrap items-center justify-between gap-2 border-b border-outline-soft bg-white px-4 py-2 md:px-6"><Link to="/home" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brand"><Icon name="modules" className="h-4 w-4" />All modules</Link><label className="flex min-w-0 items-center gap-2"><span className="sr-only">Switch module</span><select aria-label="Switch module" value={current?.id ?? ''} onChange={(event) => { const chosen = available.find((workspace) => workspace.id === event.target.value); if (chosen) navigate(moduleStart(chosen)); }} className="min-h-11 w-[164px] max-w-[48vw] rounded-field border border-outline-soft bg-surface px-3 py-2 text-base font-semibold text-brand sm:w-auto sm:max-w-[220px] sm:text-sm"><option value="" disabled>Choose module</option>{available.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label></div> : null}
+        {/* Inside a module the sidebar (desktop) and bottom bar (phone) already offer All modules; this bar then only switches module, on phones. */}
+        {!home ? <div className={`flex min-h-[56px] flex-wrap items-center justify-between gap-2 border-b border-outline-soft bg-white px-4 py-2 md:px-6 ${current ? 'lg:hidden' : ''}`}>{current ? <span className="text-sm font-bold text-ink-soft">Module</span> : <Link to="/home" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-brand"><Icon name="modules" className="h-4 w-4" />All modules</Link>}<label className="flex min-w-0 items-center gap-2"><span className="sr-only">Switch module</span><select aria-label="Switch module" value={current?.id ?? ''} onChange={(event) => { const chosen = available.find((workspace) => workspace.id === event.target.value); if (chosen) navigate(moduleStart(chosen)); }} className="min-h-11 w-[164px] max-w-[48vw] rounded-field border border-outline-soft bg-surface px-3 py-2 text-base font-semibold text-brand sm:w-auto sm:max-w-[220px] sm:text-sm"><option value="" disabled>Choose module</option>{available.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.label}</option>)}</select></label></div> : null}
         <ShiftBanner />
         <Content id="main-content" tabIndex={-1} className={`flex-1 outline-none ${current ? ending ? 'pb-44 lg:pb-0' : 'pb-24 lg:pb-0' : ''}`}>
           {current?.id === 'clinical' ? <Suspense fallback={null}><CareContext/></Suspense> : null}

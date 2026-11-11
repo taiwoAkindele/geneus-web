@@ -16,6 +16,9 @@ export const listEncounterEntries = () => allOfType<EncounterEntry>('encounter_e
 
 export const encountersForPatient = (patientId: string) => allWhere<Encounter>('encounter', 'patientId', patientId);
 
+/** Every saved entry for one patient record, read through the patientId index. */
+export const entriesForPatient = (patientId: string) => allWhere<EncounterEntry>('encounter_entry', 'patientId', patientId);
+
 export const entriesForEncounter = (encounterId: string) =>
   allWhere<EncounterEntry>('encounter_entry', 'encounterId', encounterId);
 

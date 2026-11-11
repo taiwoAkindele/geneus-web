@@ -208,6 +208,20 @@ export const findRecord = async <T extends AnyDocument>(type: DocType, id: strin
   return row ? fromRow<T>(type, row) : undefined;
 };
 
-/** Fires whenever local data changes, including changes pulled in by sync. */
-export const onChange = (listener: () => void): (() => void) =>
-  getDatabase().onChangeWithCallback({ onChange: listener }, { tables: [...ALL_TABLES] });
+/**
+ * One field's values for every record of a type, without reading or parsing
+ * whole records — for issuing the next identifier on a large table.
+ */
+export const fieldValuesOf = async (type: DocType, field: string): Promise<string[]> => {
+  if (!(field in fieldKindsFor(type))) throw new Error(`${type} has no field ${field}`);
+  const rows = await getDatabase().getAll<Record<string, unknown>>(`SELECT ${column(field)} FROM ${TABLE_FOR[type]}`);
+  return rows.flatMap((row) => (row[field] === null || row[field] === undefined ? [] : [String(row[field])]));
+};
+
+/**
+ * Fires whenever local data changes, including changes pulled in by sync.
+ * `types` narrows it to the record types a screen actually reads, so a busy
+ * sync of unrelated tables does not make every open list recompute.
+ */
+export const onChange = (listener: () => void, types?: readonly DocType[]): (() => void) =>
+  getDatabase().onChangeWithCallback({ onChange: listener }, { tables: types?.length ? types.map((type) => TABLE_FOR[type]) : [...ALL_TABLES] });
