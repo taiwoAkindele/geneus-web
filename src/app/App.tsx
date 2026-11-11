@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PulseLoader, ToastProvider } from '@/ui';
-import { SessionProvider } from '@/session';
+import { SessionProvider, useAuthorizationContext } from '@/session';
+import { rememberWorkspace } from '@/app/workspaces';
 import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/modules/front-desk/appointments';
 import { RegistersProvider } from '@/modules/reports/registers';
@@ -132,7 +133,7 @@ const ServiceQueueScreen = lazy(() => import('@/modules/clinical/screens/service
 const LabRequestScreen = lazy(() => import('@/modules/clinical/screens/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
 const DispenseScreen = lazy(() => import('@/modules/clinical/screens/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
 /** The clinical patient list became the shared list; older links keep their search. */
-const ClinicalPatientsRedirect = () => <Navigate to={'/patients/search' + useLocation().search} replace />;
+const ClinicalPatientsRedirect = () => { const context = useAuthorizationContext(); rememberWorkspace(context.facilityId, context.userId, 'clinical'); return <Navigate to={'/patients/search' + useLocation().search} replace />; };
 const InpatientScreen = lazy(() => import('@/modules/clinical/screens/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const DocumentsScreen = lazy(()=>import('@/modules/clinical/screens/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
 const PatientProfileScreen = lazy(() =>

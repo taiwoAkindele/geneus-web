@@ -11,8 +11,8 @@ export type WorkspaceLink = { key: string; label: string; description: string; t
 export type Workspace = { id: WorkspaceId; label: string; description: string; icon: IconName; links: WorkspaceLink[]; start?: string };
 
 export const workspacePath = (id: WorkspaceId) => `/workspace/${id}`;
-/** Where entering a module lands: its start page when it has one, otherwise its Overview. */
-export const moduleStart = (workspace: Pick<Workspace, 'id' | 'start'>) => workspace.start ?? workspacePath(workspace.id);
+/** Where entering a module lands: its start page, otherwise its first page. Modules have no Overview pages. */
+export const moduleStart = (workspace: Pick<Workspace, 'id' | 'start' | 'links'>) => workspace.start ?? workspace.links[0]?.to ?? '/home';
 const has = (context: WorkspaceContext, ...permissions: Permission[]) => permissions.some((permission) => context.permissions.includes(permission));
 const roleIn = (context: WorkspaceContext, ...roles: Role[]) => (context.roles ?? [context.role]).some((role) => roles.includes(role));
 
