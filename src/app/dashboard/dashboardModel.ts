@@ -1,6 +1,6 @@
 import type { AuthorizationContext, BillingAdjustment, Charge, Encounter, EncounterEntry, Patient, Payment } from '@shared';
 import { summariseEncounter } from '@/modules/clinical/encounter/encounterSummary';
-import { chargeBalances } from '@/data/repos/billing';
+import { chargeBalances, type BalanceCoverage } from '@/data/repos/billing';
 import { calendarDate } from '@/lib/calendarDate';
 import { navigationFor, hasAdminWorkspace } from '@/app/navigation';
 
@@ -31,10 +31,10 @@ export const careSnapshot = (encounters: readonly Encounter[], entries: readonly
   };
 };
 
-export const billingSnapshot = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[], patients: readonly Patient[], today: string) => {
+export const billingSnapshot = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[], patients: readonly Patient[], today: string, coverage?: BalanceCoverage) => {
   const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
   const accounts = new Map<string, { patientId: string; name: string; currency: string; outstanding: number; oldest: string }>();
-  for (const row of chargeBalances(charges, payments, adjustments)) {
+  for (const row of chargeBalances(charges, payments, adjustments, coverage)) {
     if (row.balanceMinor <= 0) continue;
     const key = row.charge.patientId + '|' + row.charge.currency;
     const account = accounts.get(key) ?? { patientId: row.charge.patientId, name: names.get(row.charge.patientId) ?? row.charge.patientId, currency: row.charge.currency, outstanding: 0, oldest: row.charge.createdOn };
@@ -46,6 +46,11 @@ export const billingSnapshot = (charges: readonly Charge[], payments: readonly P
   for (const payment of payments) {
     if (payment.method === 'waiver' || calendarDate(payment.createdOn) !== today) continue;
     collected.set(payment.currency, (collected.get(payment.currency) ?? 0) + (payment.reverses ? -payment.amountMinor : payment.amountMinor));
+  }
+  // Refunds are money handed back today: collected is what the till actually kept.
+  for (const refund of coverage?.refunds ?? []) {
+    if (calendarDate(refund.createdOn) !== today) continue;
+    collected.set(refund.currency, (collected.get(refund.currency) ?? 0) - refund.amountMinor);
   }
   return { accounts: [...accounts.values()].sort((a, b) => a.oldest.localeCompare(b.oldest)), collected: [...collected].sort(([a], [b]) => a.localeCompare(b)) };
 };

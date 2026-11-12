@@ -6,7 +6,7 @@ import { currentAge,searchPatients } from '@/modules/front-desk/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
 import { DIRECTORY_TYPES,loadPatientDirectory,type PatientDirectoryRow } from '@/data/repos/patientDirectory';
-import { chargeBalances,listAdjustments,listCharges,listPayments } from '@/data/repos/billing';
+import { balanceCoverage,chargeBalances,listAdjustments,listCharges,listPayments } from '@/data/repos/billing';
 import { balanceOwed,todayStatus } from '@/modules/front-desk/patients/directoryView';
 import { ScanPatientCard } from '@/modules/front-desk/patients/ScanPatientCard';
 import { opensChartFirst, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
@@ -26,7 +26,7 @@ const FrontDeskPatientList=()=>{
   const rows=directory.data??[];
   // Balances are financial facts: only staff who handle payments or fees see them.
   const canBill=context.permissions.some(permission=>['payment:receive','payment:waive','fee_item:manage'].includes(permission));
-  const balances=useLiveQuery(useCallback(async()=>canBill?chargeBalances(await listCharges(),await listPayments(),await listAdjustments()):[],[canBill]),['charge','payment','billing_adjustment','sync_rejection']);
+  const balances=useLiveQuery(useCallback(async()=>canBill?await (async()=>{const charges=await listCharges();return chargeBalances(charges,await listPayments(),await listAdjustments(),await balanceCoverage(charges));})():[],[canBill]),['charge','payment','billing_adjustment','sync_rejection','refund','patient_cover','cover_check','coverage_election','coverage_allocation','cover_schedule']);
   const owed=(row:PatientDirectoryRow)=>balanceOwed(row,balances.data??[]);
   // The Show select replaces the old tabs and keeps their ?care= address; anything unknown (or hidden from this role) shows all patients.
   const views=[

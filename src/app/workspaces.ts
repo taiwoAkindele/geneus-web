@@ -2,9 +2,10 @@ import type { AuthorizationContext, Permission, Role } from '@shared';
 import { clinicalDocumentAccess } from '@shared';
 import type { IconName } from '@/ui';
 import { navigationFor } from './navigation';
+import { insuranceSupported } from '@/data/insuranceSupport';
 
 export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'operations' | 'inventory' | 'reports' | 'administration';
-export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
+export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'> & Partial<Pick<AuthorizationContext, 'facilityId' | 'deviceId'>>;
 /** `also` lists other pages that belong to this link, so it stays highlighted there. */
 export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName; also?: readonly string[] };
 /** `start` opens the module on that page instead of its Overview, which the module then does not offer. */
@@ -46,12 +47,16 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
       ...(clinicalDocumentAccess(context)?[link('documents','Documents','Manage hospital files and review visit documents.','/documents','registers')]:[]),
     ] },
-    { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: keys.has('billing') ? [
+    { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: [...(keys.has('billing') ? [
       link('accounts', 'Patient accounts', 'Find bills, review charges and receive payments.', '/billing?tab=collections', 'finance'),
       link('transfers', 'Transfer reconciliation', 'Match incoming transfers to the correct account.', '/billing?tab=transfers', 'referrals'),
       link('financial-reports', 'Payments & financial reports', 'Review collections and recorded receipts.', '/billing?tab=reports', 'month'),
       ...(has(context, 'fee_item:manage') || roleIn(context, 'facility_admin') ? [link('fees', 'Fees', 'Manage the prices attached to facility services.', '/billing/fees', 'registers'), link('receiving', 'Payment setup', 'Manage departments and receiving accounts.', '/billing/settings', 'settings')] : []),
-    ] : [] },
+    ] : []),
+      // Shown only once the server has granted this device insurance, which an operator enables per hospital.
+      ...(insuranceSupported(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
+      ...(insuranceSupported(context) && has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate') ? [link('contracts', 'Payers & contracts', 'Set up payers and their contract terms.', '/insurance/contracts', 'registers')] : []),
+    ] },
     { id: 'operations', label: 'Operations', description: 'Services, teams and schedules', icon: 'calendar', links: [
       ...(has(context, 'service:manage', 'result_template:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
       ...(keys.has('facility') ? [link('facility', 'Facility setup', 'Manage services, accountable teams and locations.', '/facility', 'referrals')] : []),

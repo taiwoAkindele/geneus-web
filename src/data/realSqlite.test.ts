@@ -152,7 +152,7 @@ describe('the write path against a real SQLite', () => {
       const staff = await createStaff({ fullName: 'Always Available', role: 'cashier', permission: 'read_write', loginAccess: 'always' }, admin);
       const loaded = (await listStaff()).find((item) => item.id === staff.id)!;
       expect(loaded.loginAccess).toBe('always');
-      expect(authorizationFor({ staff: loaded, facilityId: admin.facilityId, deviceId: admin.deviceId }).permissions).toEqual(['payment:receive']);
+      expect(authorizationFor({ staff: loaded, facilityId: admin.facilityId, deviceId: admin.deviceId }).permissions).toEqual(['payment:receive', 'coverage:elect_self_pay']);
       const delegate = authorizationFor({ staff: { ...loaded, additionalPermissions: ['staff:manage'] }, facilityId: admin.facilityId, deviceId: admin.deviceId });
       await expect(editStaff(loaded, { ...loaded, loginAccess: 'shift' }, delegate)).rejects.toThrow(/role doesn't allow/);
       expect((await listStaff()).find((item) => item.id === staff.id)?.loginAccess).toBe('always');

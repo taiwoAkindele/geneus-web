@@ -1,5 +1,5 @@
 import { CLOSING_STEPS, currentAllergies, linkedPatientIds, type ClinicalEvent, type PatientIdentityEvent, type Appointment, type BillingAdjustment, type Charge, type Payment, type Encounter, type EncounterEntry, type Patient } from '@shared';
-import { isAppointmentConfirmed } from '@/data/repos/billing';
+import { isAppointmentConfirmed, type BalanceCoverage } from '@/data/repos/billing';
 import { calendarDate } from '@/lib/calendarDate';
 import type { AppointmentGroup, BookedAppointment } from './types';
 
@@ -15,6 +15,7 @@ export const projectAppointments = (
   encounters: readonly Encounter[], closingEntries: readonly EncounterEntry[], now = new Date(),
   charges: readonly Charge[] = [], payments: readonly Payment[] = [], adjustments: readonly BillingAdjustment[] = [],
   clinicalEvents: readonly ClinicalEvent[] = [], identityEvents: readonly PatientIdentityEvent[] = [],
+  coverage?: BalanceCoverage,
 ): BookedAppointment[] => {
   const today = calendarDate(now);
   const patientById = new Map(patients.map((patient) => [patient.patientId, patient]));
@@ -44,7 +45,7 @@ export const projectAppointments = (
       when: new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       at, group, encounterId: encounter?.id, status: appointment.status,
       attendance: appointment.attendance, activity: appointment.activity, scheduledFor: appointment.scheduledFor, allocation: appointment.allocation, visitType: appointment.visitType,
-      paymentStatus: isAppointmentConfirmed(appointment.id, charges, payments, adjustments, appointment.chargeIds) ? 'Confirmed' : 'Awaiting payment',
+      paymentStatus: isAppointmentConfirmed(appointment.id, charges, payments, adjustments, appointment.chargeIds, coverage) ? 'Confirmed' : 'Awaiting payment',
     };
   }).sort((a, b) => a.at.localeCompare(b.at));
 };

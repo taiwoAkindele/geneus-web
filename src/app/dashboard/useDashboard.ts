@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLiveQuery } from '@/data';
 import { listEncounters, listEncounterEntries } from '@/data/repos/encounters';
 import { listPatients } from '@/data/repos/patients';
-import { listCharges, listPayments, listAdjustments } from '@/data/repos/billing';
+import { listCharges, listPayments, listAdjustments, balanceCoverage } from '@/data/repos/billing';
 import { calendarDate } from '@/lib/calendarDate';
 import { billingSnapshot, careSnapshot, type dashboardAccess } from './dashboardModel';
 
@@ -22,7 +22,7 @@ export const useDashboard = (access: ReturnType<typeof dashboardAccess>) => {
   const billing = useLiveQuery(useCallback(async () => {
     if (!access.billing) return undefined;
     const [charges, payments, adjustments, patients] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listPatients()]);
-    return billingSnapshot(charges, payments, adjustments, patients, today);
-  }, [access.billing, today]), ['charge', 'payment', 'billing_adjustment', 'patient', 'sync_rejection']);
+    return billingSnapshot(charges, payments, adjustments, patients, today, await balanceCoverage(charges));
+  }, [access.billing, today]), ['charge', 'payment', 'billing_adjustment', 'patient', 'sync_rejection', 'refund', 'patient_cover', 'cover_check', 'coverage_election', 'coverage_allocation', 'cover_schedule']);
   return { care, billing, today };
 };

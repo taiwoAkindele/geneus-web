@@ -24,8 +24,8 @@ export const joinFacility = (code: string, deviceId: string, deviceLabel?: strin
   post<DeviceCredential>('/devices', { code: normalizeEnrollmentCode(code), deviceId, deviceLabel: deviceLabel?.trim() || undefined });
 
 /** Online only; the server rechecks the actor and facility before revoking. */
-export const revokeFacilityDevice = async (id: string, revokedBy: string, wipe: boolean): Promise<Device> => {
+export const revokeFacilityDevice = async (id: string, revokedBy: string, wipe: boolean, acceptUnsentWork = false): Promise<Device> => {
   const device = getDeviceCredential();
   if (!device) throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
-  return Device.parse(await postAsDevice(`/devices/${encodeURIComponent(id)}/revoke`, device.credential, { revokedBy, wipe }));
+  return Device.parse(await postAsDevice(`/devices/${encodeURIComponent(id)}/revoke`, device.credential, { revokedBy, wipe, ...(acceptUnsentWork ? { acceptUnsentWork: true } : {}) }));
 };

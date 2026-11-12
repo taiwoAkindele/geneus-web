@@ -10,6 +10,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly status?: number,
+    /** Structured detail some refusals carry, such as the devices that block an activation. */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -36,11 +38,12 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
 
   const payload = await response.json().catch(() => undefined);
   if (!response.ok) {
-    const detail = payload as { error?: string; message?: string } | undefined;
+    const detail = payload as { error?: string; message?: string; details?: unknown } | undefined;
     throw new ApiError(
       detail?.error ?? 'request_failed',
       detail?.message ?? `The server rejected the request (${response.status})`,
       response.status,
+      detail?.details,
     );
   }
   return payload as T;

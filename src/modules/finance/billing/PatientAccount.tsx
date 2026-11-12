@@ -4,12 +4,16 @@ import { useLiveQuery } from '@/data';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
 import { adjustCharge, createCharge, patientBillingFacts, recordPayment } from '@/data/repos/billing';
 import { useAuthorizationContext } from '@/session';
-import { Button, SelectField, Sheet, TextField } from '@/ui';
+import { Button, SelectField, Sheet, TextField, useToast } from '@/ui';
 import { amountInput, formatMoney, parseAmount } from '@/lib/money';
 import { billingRequest, matchTransfer, type ReceivingAccount } from '@/lib/api/billing';
 import { billingRows, transferAllocated } from './ledger';
 import type { BillingData } from './useBilling';
 import { PaymentInputError, preparePayment } from './paymentDraft';
+import type { CoverCheck, PatientCover } from '@shared';
+import type { ChargeBalance } from '@/data/repos/billing';
+import { ChargeCoverage, RefundSheet, SelfPaySheet } from '@/modules/insurance/AccountCoverage';
+
 
 export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved, onSelectAccount }: {
   patientId: string; transfer?: IncomingTransfer; data: BillingData; onClose: () => void;
@@ -33,13 +37,16 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   const [review, setReview] = useState<ReturnType<typeof preparePayment>>();
   const [leaving, setLeaving] = useState<() => void>();
   const [accounts, setAccounts] = useState<ReceivingAccount[]>();
+  const [selfPay, setSelfPay] = useState<{ row: ChargeBalance; cover: PatientCover; check?: CoverCheck }>();
+  const [refunding, setRefunding] = useState<ChargeBalance>();
+  const toast = useToast();
   const errorSummary = useRef<HTMLDivElement>(null);
   const reviewSection = useRef<HTMLElement>(null);
   useEffect(() => { if (error) errorSummary.current?.focus(); }, [error]);
   useEffect(() => { if (review) reviewSection.current?.focus(); }, [review]);
   const saving = useRef(false);
   const requestId = useRef(crypto.randomUUID());
-  const rows = billingRows(data.charges.filter((c) => c.patientId === patientId), data.payments, data.adjustments);
+  const rows = billingRows(data.charges.filter((c) => c.patientId === patientId), data.payments, data.adjustments, data.coverage);
   const patient = data.patients.find((p) => p.patientId === patientId);
   const dirty = Object.values(amounts).some((value) => Boolean(value.trim())) || Boolean(received.trim() || feeId || adjusting || reduction || reason);
   const requestLeave = (action: () => void) => { if (dirty) setLeaving(() => action); else action(); };
@@ -111,13 +118,15 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
         <div className="mt-3 flex items-end gap-2"><TextField label={transfer ? 'Amount to allocate' : 'Amount received'} name="amount-received" inputMode="decimal" value={received} onChange={(e) => splitReceived(e.target.value)} /><Button fullWidth={false} variant="ghost" onClick={() => splitReceived(amountInput(due, currency))}>Full amount</Button></div>
         <p className="mt-2 text-xs text-ink-muted">Applied to the oldest charges first. Change any charge below before reviewing.</p>
       </section> : null}
+      {rows.some((r) => r.undeterminedMinor > 0) ? <section aria-label="Awaiting insurance" className="rounded-card border border-amber-border bg-amber-bg p-4 text-sm"><p className="font-semibold">Awaiting an insurance decision</p>{[...new Set(rows.map((r) => r.charge.currency))].map((c) => { const total = rows.filter((r) => r.charge.currency === c).reduce((n, r) => n + r.undeterminedMinor, 0); return total ? <p key={c} className="font-mono text-lg font-bold">{formatMoney(total, c)}</p> : null; })}<p className="mt-1">Not part of the amount due. The patient is not asked to pay it until insurance is decided; care continues.</p></section> : null}
       {rows.length === 0 ? <p>No fees have been raised for this patient.</p> : rows.map((r) => <article key={r.charge.id} className="rounded-card border border-outline-soft p-3">
         <h3 className="font-bold">{r.charge.description}</h3>
         <p className="text-sm">Original {formatMoney(r.charge.listPriceMinor, r.charge.currency)} · Paid {formatMoney(r.settledMinor, r.charge.currency)}</p>
         {r.charge.exemptionReason ? <p className="text-sm text-brand">Exempt: {r.charge.exemptionReason}</p> : null}
         {r.discountMinor > 0 ? <p className="text-sm">{data.adjustments.some((a) => a.chargeId === r.charge.id && a.dispenseEntryId) ? 'Discounts / medicine returns' : 'Discount'} {formatMoney(r.discountMinor, r.charge.currency)}</p> : null}
         {r.waivedMinor > 0 ? <p className="text-sm">Waived {formatMoney(r.waivedMinor, r.charge.currency)}</p> : null}
-        <p className="mt-1 font-semibold">{r.balanceMinor < 0 ? `Patient credit / refund due ${formatMoney(-r.balanceMinor, r.charge.currency)}` : `Balance ${formatMoney(r.balanceMinor, r.charge.currency)}`}</p>
+        <p className="mt-1 font-semibold">{r.balanceMinor < 0 ? `Patient credit ${formatMoney(-r.balanceMinor, r.charge.currency)}` : `Balance ${formatMoney(r.balanceMinor, r.charge.currency)}`}</p>
+        <ChargeCoverage row={r} insurance={data.insurance} onSelfPay={(row, cover, check) => setSelfPay({ row, cover, check })} onRefund={setRefunding} />
         {data.adjustments.filter((a) => a.chargeId === r.charge.id).map((a) => <p className="text-xs text-ink-muted" key={a.id}>{a.dispenseEntryId ? 'Medicine return credit' : a.kind === 'discount' ? 'Discount' : 'Waiver'}: {a.reason} · Approved by {data.staff.find((s) => s.staffId === a.createdBy)?.fullName ?? a.createdBy} · {new Date(a.createdOn).toLocaleString('en-GB')}</p>)}
         {r.balanceMinor > 0 && context.permissions.includes('payment:receive') && (!transfer || (transfer.currency === r.charge.currency && (!transfer.departmentId || transfer.departmentId === r.charge.departmentId))) ? <div className="mt-2 flex items-end gap-2"><TextField label={transfer ? 'Allocate amount' : 'Cash received'} name={`amount-${r.charge.id}`} error={fieldError === r.charge.id ? error : undefined} inputMode="decimal" value={amounts[r.charge.id] ?? ''} onChange={(e) => { setAmounts((v) => ({ ...v, [r.charge.id]: e.target.value })); setFieldError(undefined); setError(''); }} /><Button fullWidth={false} variant="ghost" onClick={() => setAmounts((v) => ({ ...v, [r.charge.id]: amountInput(r.balanceMinor, r.charge.currency) }))}>Full</Button></div> : null}
         {r.balanceMinor > 0 && context.permissions.includes('payment:waive') ? <Button variant="ghost" onClick={() => { setAdjusting(r.charge.id); setKind('discount'); }}>Discount or waive</Button> : null}
@@ -127,6 +136,8 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
       {context.permissions.includes('charge:create') && !transfer ? <div className="space-y-2 border-t border-outline-soft pt-3"><SelectField label="Add a fee to this patient" value={feeId} options={[{ value: '', label: 'Choose a fee' }, ...data.fees.filter((f) => f.active).map((f) => ({ value: f.id, label: `${f.name} — ${formatMoney(f.amountMinor, f.currency)}` }))]} onChange={(e) => setFeeId(e.target.value)} /><Button variant="outlined" disabled={!feeId} onClick={() => void addFee()}>Add to bill</Button></div> : null}
     </fieldset>
     {error ? <div ref={errorSummary} tabIndex={-1} role="alert" className="my-3 rounded-field border border-danger bg-danger-bg p-3 text-sm text-danger"><p>{error}</p>{fieldError ? <button type="button" className="mt-1 min-h-[44px] font-bold underline" onClick={() => document.getElementById('amount-' + fieldError)?.focus()}>Go to amount</button> : null}</div> : null}
+    {selfPay ? <SelfPaySheet row={selfPay.row} cover={selfPay.cover} check={selfPay.check} onClose={() => setSelfPay(undefined)} onSaved={() => { setSelfPay(undefined); toast('Choice recorded. The patient now owes the full price for this charge.'); onSaved(); }} /> : null}
+    {refunding ? <RefundSheet row={refunding} onClose={() => setRefunding(undefined)} onDone={(refund) => { setRefunding(undefined); toast(`Refund ${refund.refundNumber} recorded`); onSaved(); }} /> : null}
     {context.permissions.includes('payment:receive') && rows.some((r) => r.balanceMinor > 0) ? review ? <div className="mt-4 flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} disabled={busy} onClick={() => { setReview(undefined); setError(''); }}>Edit payment</Button><Button fullWidth={false} className="flex-1" loading={busy} onClick={() => void savePayment()}>{transfer ? 'Confirm allocation' : 'Confirm & record cash'}</Button></div> : <Button className="mt-4" onClick={reviewPayment}>Review payment</Button> : null}
   </Sheet>;
 };

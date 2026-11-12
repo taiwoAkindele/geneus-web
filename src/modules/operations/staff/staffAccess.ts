@@ -2,7 +2,7 @@ import { rolesFor, type Permission, type Role, type Staff } from '@shared';
 
 export const ROLE_LABELS: Record<Role, string> = {
   chew: 'CHEW', nurse: 'Nurse', doctor: 'Doctor', records_officer: 'Records',
-  facility_admin: 'Facility Admin', supervisor: 'Supervisor', cashier: 'Cashier',
+  facility_admin: 'Facility Admin', supervisor: 'Supervisor', cashier: 'Cashier', insurance_officer: 'Insurance officer',
   laboratory_staff: 'Laboratory staff', pharmacy_staff: 'Pharmacy staff',
 };
 export const roleLabel = (staff: Pick<Staff, 'role' | 'additionalRoles'>): string =>
@@ -31,7 +31,10 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'referral:create': 'Create referrals', 'referral:update': 'Update referrals',
   'register_entry:create': 'Add register entries', 'stock_movement:create': 'Record stock movements',
   'charge:create': 'Raise patient charges', 'payment:receive': 'Receive payments',
-  'payment:waive': 'Discount or waive fees', 'payment:reverse': 'Reverse payments',
+  'payment:waive': 'Discount or waive fees', 'payment:reverse': 'Reverse payments', 'payment:refund': 'Refund patient credits',
+  'insurance_contract:read': 'Read payer contracts and tariffs', 'insurance_contract:manage': 'Edit payers, contracts and tariffs',
+  'insurance_contract:activate': 'Activate payer contracts', 'cover:record': 'Record patient insurance cover', 'cover:verify': 'Record insurance cover checks',
+  'coverage:elect_self_pay': 'Record a patient choosing to pay without insurance', 'coverage:confirm': 'Confirm insurance splits',
   'register_definition:publish': 'Configure registers', 'unit:manage': 'Manage units',
   'stock_item:manage': 'Manage stock items', 'fee_item:manage': 'Manage the fee schedule',
   'staff:manage': 'Add staff and edit names', 'staff:permission': 'Assign staff roles and permissions',

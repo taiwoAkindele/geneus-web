@@ -1,7 +1,7 @@
 import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport, type VisitType } from '@shared';
 import { allOfType, allWhere, findRecord, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
-import { adjustmentsForPatient, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
+import { adjustmentsForPatient, balanceCoverage, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
 import { labReportSaveIssues } from './resultTemplates';
 
@@ -86,7 +86,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
       if (appointment.attendance === 'cancelled' || appointment.attendance === 'no_show') throw new Error('Reopen this inactive booking before starting care');
       if ((await listEncounters()).some((encounter) => encounter.appointmentId === appointment.id)) throw new Error('This booking already has a visit. Continue or review that visit');
     }
-    const unpaid = save.appointmentId ? !isAppointmentConfirmed(save.appointmentId, charges, payments, adjustments, appointment?.chargeIds) : false;
+    const unpaid = save.appointmentId ? !isAppointmentConfirmed(save.appointmentId, charges, payments, adjustments, appointment?.chargeIds, await balanceCoverage(charges)) : false;
     if (unpaid && !save.collectLaterReason?.trim()) throw new Error('Give a See now — collect later reason to continue care');
     records.push({
       permission: 'encounter:record',

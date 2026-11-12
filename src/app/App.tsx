@@ -147,6 +147,8 @@ const FeeScheduleScreen = lazy(() =>
 );
 const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
+const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
+const ContractsScreen = lazy(() => import('@/modules/insurance/ContractsScreen').then((m) => ({ default: m.ContractsScreen })));
 const DevicesScreen = lazy(() => import('@/modules/administration/screens/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
 const StockScreen = lazy(() => import('@/modules/inventory/screens/stock/StockScreen').then((module) => ({ default: module.StockScreen })));
 const MonthlySummaryScreen = lazy(() => import('@/modules/reports/screens/monthly-summary/MonthlySummaryScreen').then((module) => ({ default: module.MonthlySummaryScreen })));
@@ -243,6 +245,8 @@ const App = () => {
             <Route path="/billing" element={<BillingScreen />} />
             <Route path="/billing/fees" element={<FeeScheduleScreen />} />
             <Route path="/billing/settings" element={<BillingSettingsScreen />} />
+            <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
+            <Route path="/insurance/contracts" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
             <Route path="/admin/fees" element={<Navigate to="/billing/fees" replace />} />
             <Route path="/admin/devices" element={<DevicesScreen />} />
             <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
