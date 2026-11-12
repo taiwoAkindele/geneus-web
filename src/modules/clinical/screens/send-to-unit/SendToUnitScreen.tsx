@@ -4,7 +4,6 @@ import { SelectField } from '@/ui';
 import { useWorkforce } from '@/modules/operations/workforce/useWorkforce';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AppBar, Avatar, Button, ChoiceChip, useToast } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { AuthorizationError } from '@/data';
 import { sendHandoff } from '@/data/repos/handoffs';
 import { usePatient } from '@/modules/front-desk/search';
@@ -100,7 +99,7 @@ export const SendToUnitScreen = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <AppBar title="Send patient to…" onBack={() => navigate(-1)} right={<SyncPill />} />
+      <AppBar title="Send patient to…" onBack={() => navigate(-1)}/>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:my-8 lg:min-h-0 lg:flex-none lg:overflow-hidden lg:rounded-card lg:border lg:border-outline-soft lg:bg-white lg:shadow-card">
         <div className="flex-1 px-5 py-3">
           {workforce.data?.offerings.some((o)=>o.configuration==='active')?<div className="mb-4"><SelectField label="Requested service" value={serviceId} help={{purpose:'Routes the instruction to the responsible unit. Staff confirm the service when accepting work.'}} onChange={(e)=>{const id=e.target.value;setServiceId(id);const offering=workforce.data?.offerings.find((o)=>o.id===id);const destination=active.find((u)=>[u.id,u.unitId].includes(offering?.unitId||''));setToUnitId(destination?.id);}} options={[{value:'',label:'Choose a service or select a unit below'},...workforce.data.offerings.filter((o)=>o.configuration==='active').map((o)=>({value:o.id,label:o.name}))]}/></div>:null}

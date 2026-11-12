@@ -4,7 +4,6 @@ import { ClinicalKind, patientSexLabel, INPATIENT_STATUS, clinicalDocumentAccess
 import { useInpatient } from '@/modules/clinical/inpatient/useInpatient';
 import { withAdmission } from '@/modules/clinical/inpatient/summary';
 import { ActionMenu, Button, SectionTabs } from '@/ui';
-import { SyncPill } from '@/app/SyncPill';
 import { useAuthorizationContext, useSession } from '@/session';
 import { useLiveQuery } from '@/data';
 import { patientClinicalRecord } from '@/data/repos/clinical';
@@ -107,7 +106,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
   const chartUnavailable = chart.loading ? <p role="status">Reading the medical chart…</p> : <div role="alert"><p>The clinical record could not be read.</p><Button variant="ghost" onClick={chart.reload}>Try again</Button></div>;
 
   return <div className="min-h-screen bg-white px-4 pb-8 pt-4 md:px-8">
-    <nav aria-label="Breadcrumb" className="mb-2 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-soft"><button type="button" className="min-h-[32px] font-semibold text-brand" onClick={() => navigate(params.get('from')?.startsWith('/patients/search?') ? params.get('from')! : '/patients/search')}>Patients</button><div className="sm:hidden"><SyncPill /></div></nav>
+    <nav aria-label="Breadcrumb" className="mb-2 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-soft"><button type="button" className="min-h-[32px] font-semibold text-brand" onClick={() => navigate(params.get('from')?.startsWith('/patients/search?') ? params.get('from')! : '/patients/search')}>Patients</button></nav>
     {record.identityStatus === 'provisional' ? <section className="my-3 space-y-2 rounded-field bg-amber-bg p-4 text-sm text-amber-text" aria-label="Provisional patient identity"><h2 className="font-bold">Identity not yet known</h2><p>This is a provisional record. Confirm the patient ID before care. Add identity when reliable information becomes available.</p>{canEdit ? <Button variant="outlined" fullWidth={false} onClick={() => setEditing(true)}>Identify patient</Button> : null}{context.permissions.includes('patient_identity:review') ? <Button variant="ghost" fullWidth={false} onClick={() => navigate(`/patients/identity?other=${encodeURIComponent(record.patientId)}`)}>Review an existing record</Button> : null}</section> : null}
     <header className="border-b border-outline-soft pb-2">
       <div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><h1 className="break-words text-[28px] font-extrabold tracking-tight">{record.fullName}</h1><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft"><span className="break-all font-mono">{record.patientId}</span><span>{currentAge(record) === undefined ? 'Age not recorded' : String(currentAge(record)) + ' years'} · {patientSexLabel(record.sex)}</span>{currentAdmission ? <span className="font-semibold text-brand">Inpatient · {stayPlace}</span> : null}</div></div>

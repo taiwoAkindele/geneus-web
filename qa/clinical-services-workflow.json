@@ -3,8 +3,8 @@
     "role": "doctor",
     "path": "/clinical/patients",
     "name": "clinical-patients",
-    "assert": "[...[...document.querySelectorAll('nav')].find(n=>n.getAttribute('aria-label')==='Clinical navigation').querySelectorAll('a')].map(a=>a.textContent.trim()).filter(t=>t!=='Overview').join('|')==='Patients|Wards & admissions|Laboratory|Pharmacy|Referrals|Documents'",
-    "description": "Clinical sidebar lists Patients first, without Results ready or the unit queue"
+    "assert": "(()=>{const b=[...document.querySelectorAll('aside nav[aria-label=\"Modules\"] button')].find(x=>x.textContent.trim()==='Clinical');return b&&b.getAttribute('aria-expanded')==='true'?[...document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('a')].map(a=>a.textContent.trim()).join('|'):'';})()==='Patients|Wards & admissions|Laboratory|Pharmacy|Referrals|Documents'&&![...document.querySelectorAll('aside a')].some(a=>a.textContent.trim()==='Overview')",
+    "description": "Clinical opens in the sidebar listing Patients first, without an Overview page, Results ready or the unit queue"
   },
   {
     "assert": "['Allergies','Active problems','Status','Last visit','View chart','Penicillin','Hypertension'].every(t=>document.body.innerText.includes(t))&&!document.body.innerText.includes('Review duplicate')&&![...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Add patient')&&!/\\d+ of \\d+ patients/.test(document.body.innerText)",

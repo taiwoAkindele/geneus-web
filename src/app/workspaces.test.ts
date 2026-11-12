@@ -52,7 +52,7 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/home', '', available)).toBeUndefined();
   });
 
-  it('opens Front Desk on the patient list, while other modules keep their Overview', () => {
+  it('opens Front Desk on the patient list and every other module on its first page (no Overview pages)', () => {
     const available = workspacesFor(context('facility_admin'));
     const frontDesk = available.find((workspace) => workspace.id === 'front-desk')!;
     expect(frontDesk.label).toBe('Front Desk');
@@ -60,7 +60,7 @@ describe('module workspaces', () => {
     expect(frontDesk.links[0].to).toBe('/patients/search');
     for (const workspace of available.filter((item) => item.id !== 'front-desk')) {
       expect(workspace.start).toBeUndefined();
-      expect(moduleStart(workspace)).toBe(workspacePath(workspace.id));
+      expect(moduleStart(workspace)).toBe(workspace.links[0].to);
     }
     // Every role that has Front Desk can open its start page.
     for (const role of ['records_officer', 'cashier', 'nurse', 'doctor', 'laboratory_staff', 'pharmacy_staff'] as const) {
