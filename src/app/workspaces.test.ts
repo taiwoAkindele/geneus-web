@@ -105,6 +105,22 @@ describe('module workspaces', () => {
     expect(workspacePath('clinical')).toBe('/workspace/clinical');
   });
 
+  it('shows insurance settings to an administrator while insurance is off, and insurance pages by state', () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
+    const admin = { ...context('facility_admin'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const officer = { ...context('insurance_officer'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const finance = (c: typeof admin) => workspacesFor(c).find((w) => w.id === 'finance')?.links.map((l) => l.key) ?? [];
+    expect(finance(admin)).toContain('insurance-settings');
+    expect(finance(admin)).not.toContain('contracts');
+    expect(finance(officer)).not.toContain('insurance-settings');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'setup');
+    expect(finance(officer)).toEqual(expect.arrayContaining(['contracts', 'insurance-settings']));
+    expect(finance(officer)).not.toContain('insurance');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'active');
+    expect(finance(officer)).toContain('insurance');
+  });
+
   it('keeps navigation usable when preference storage is blocked', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
     expect(readLastWorkspace('facility:one', 'staff:one')).toBeUndefined();

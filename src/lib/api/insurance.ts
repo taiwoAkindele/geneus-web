@@ -1,6 +1,6 @@
-import type { AllocationSplit, AuthorizationContext, Payer, PayerContractTerms, PayerContractVersion, Refund, UnsupportedTerm } from '@shared';
+import type { AllocationSplit, AuthorizationContext, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
-import { ApiError, workforceRequest } from './client';
+import { ApiError, binaryRequest, workforceRequest } from './client';
 import { expirePrivateWorkforce, verifiedToken } from './workforce';
 
 /**
@@ -60,4 +60,56 @@ export const SKIP_REASONS: Record<string, string> = {
   contract_unavailable: 'Contract version unavailable', reason_required: 'Give a reason', patient_liability_not_permitted: 'The contract does not allow billing the patient',
   choose_cover_first: 'Choose which cover applies first', self_pay_prohibited_by_payer: 'The contract prohibits paying without insurance', not_found: 'Charge not found',
   timezone_required: "Record the hospital's time zone first",
+  outside_billing_period: 'Raised before insurance billing started, or after it stopped: billed as recorded',
 };
+
+/* ---------------- Setup, documents and submission settings (Milestone 1) ---------------- */
+
+export const insuranceSetupStatus = (context: AuthorizationContext) =>
+  call<InsuranceSetupStatus>(context, context.permissions.includes('insurance_contract:activate') ? '/insurance/setup/status' : '/insurance/setup/status/officer', {});
+/** A hospital administrator enters or leaves setup. Billing is only ever activated by Geneus after readiness. */
+export const setInsuranceSetup = (context: AuthorizationContext, state: 'off' | 'setup') => call<{ state: InsuranceState }>(context, '/insurance/setup', { state });
+export const listInsuranceDocuments = (context: AuthorizationContext, payerId?: string) =>
+  call<{ documents: InsuranceDocument[] }>(context, '/insurance/documents/list', payerId ? { payerId } : {});
+export const verifyInsuranceDocument = (context: AuthorizationContext, id: string, verification: 'verified' | 'rejected', note?: string) =>
+  call<InsuranceDocument>(context, `/insurance/documents/${encodeURIComponent(id)}/verify`, { verification, ...(note?.trim() ? { note: note.trim() } : {}) });
+export const listSubmissionProfiles = (context: AuthorizationContext) => call<{ profiles: StoredSubmissionProfile[] }>(context, '/insurance/submission/list', {});
+export const saveSubmissionProfile = (context: AuthorizationContext, payerId: string, profile: SubmissionProfile, expectedRevision?: number) =>
+  call<{ payerId: string; profile: SubmissionProfile; revision: number }>(context, '/insurance/submission/save', { payerId, profile, ...(expectedRevision ? { expectedRevision } : {}) });
+
+export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/** Uploads a PDF or image as the request body; the server sniffs its content and checks the checksum. */
+export const uploadInsuranceDocument = async (context: AuthorizationContext, file: File, meta: InsuranceDocumentUpload): Promise<InsuranceDocument> => {
+  if (file.size > DOCUMENT_MAX_BYTES) throw new Error('Choose a PDF or image up to 10 MB');
+  const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
+  const token = verifiedToken(context); if (!token) throw new VerificationRequired();
+  const bytes = await file.arrayBuffer();
+  try {
+    const response = await binaryRequest('/insurance/documents', { method: 'POST', cache: 'no-store', body: bytes, headers: {
+      authorization: `Bearer ${device.credential}`, 'x-workforce-access': token, 'content-type': 'application/octet-stream',
+      'x-file-sha256': hex(await crypto.subtle.digest('SHA-256', bytes)), 'x-document-meta': encodeURIComponent(JSON.stringify(meta)),
+    } });
+    return await response.json() as InsuranceDocument;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'private_verification_required') { expirePrivateWorkforce(); throw new VerificationRequired(); }
+    throw cause;
+  }
+};
+
+/** Downloads a stored document to the user's device; the server audits every download. */
+export const downloadInsuranceDocument = async (context: AuthorizationContext, document_: InsuranceDocument) => {
+  const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
+  const token = verifiedToken(context); if (!token) throw new VerificationRequired();
+  const response = await binaryRequest(`/insurance/documents/${encodeURIComponent(document_.id)}/file`, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${device.credential}`, 'x-workforce-access': token } });
+  const url = URL.createObjectURL(await response.blob());
+  try { const a = document.createElement('a'); a.href = url; a.download = document_.fileName; a.click(); } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+};
+
+/* ---------------- Spreadsheet import (Milestone 2) ---------------- */
+
+export const listImportTemplates = (context: AuthorizationContext, kind: ImportKind) => call<{ templates: ImportTemplate[] }>(context, '/insurance/import-templates/list', { kind });
+export const saveImportTemplate = (context: AuthorizationContext, template: ImportTemplateSave) => call<ImportTemplate>(context, '/insurance/import-templates/save', template);
+/** Applies confirmed rows to the draft. The request key is kept by the caller so a retry after a lost reply replays instead of applying twice. */
+export const importTariff = (context: AuthorizationContext, input: TariffImport) => call<TariffImportResult>(context, '/insurance/contracts/import-tariff', input);

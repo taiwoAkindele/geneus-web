@@ -1,12 +1,13 @@
 import {
   chargeUnits, coversOn, estimateCoverage, indexCoverageRecords, scheduleOn, selfPayPermitted, serviceDateOf,
   type AuthorizationContext, type Charge, type CoverageAllocation, type CoverageElection, type CoverageEstimate, type CoverageRecords,
-  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund,
-} from '@shared';
+  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund, inBillingPeriod, type InsuranceBillingPeriod } from '@shared';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId } from '../db';
+import { getDeviceCredential } from '../deviceCredential';
+import { insuranceBillingPeriods } from '../insuranceSupport';
 
 /** The records the shared estimate reads. With insurance off they are all empty and every charge is cash. */
-export type CoverageData = CoverageRecords & { payers: Payer[]; refunds: Refund[]; timeZone?: string; entries: Map<string, EncounterEntry> };
+export type CoverageData = CoverageRecords & { payers: Payer[]; refunds: Refund[]; timeZone?: string; entries: Map<string, EncounterEntry>; billingPeriods: InsuranceBillingPeriod[] };
 
 export const listPayers = () => allOfType<Payer>('payer');
 export const listRefunds = () => allOfType<Refund>('refund');
@@ -25,12 +26,15 @@ export const loadCoverage = async (charges: readonly Charge[] = []): Promise<Cov
     const entry = await findRecord<EncounterEntry>('encounter_entry', id);
     if (entry) entries.set(id, entry);
   }
-  return { covers, checks, elections, allocations, schedules, payers, refunds, entries, timeZone: facilities[0]?.timeZone };
+  // Cover changes a bill only for charges raised while insurance billing was active; confirmed splits always stand.
+  const device = getDeviceCredential();
+  const billingPeriods = device ? insuranceBillingPeriods(device) : [];
+  return { covers, checks, elections, allocations, schedules, payers, refunds, entries, timeZone: facilities[0]?.timeZone, billingPeriods };
 };
 
 /** The same estimate the server makes, from the records this device holds. */
 export const estimateCharge = (charge: Charge, data: CoverageData): CoverageEstimate => estimateCoverage({
-  charge, records: data, serviceDate: serviceDateOf(charge.createdOn, data.timeZone),
+  charge, records: data, billingActive: inBillingPeriod(charge.createdOn, data.billingPeriods), serviceDate: serviceDateOf(charge.createdOn, data.timeZone),
   units: chargeUnits(charge, charge.dispenseEntryId ? data.entries.get(charge.dispenseEntryId) : undefined),
 });
 export const estimatesFor = (charges: readonly Charge[], data: CoverageData): Map<string, CoverageEstimate> => {

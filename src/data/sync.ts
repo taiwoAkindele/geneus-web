@@ -63,3 +63,14 @@ export const waitForFirstSync = async (db: LocalDatabase, timeoutMs = FIRST_SYNC
     clearTimeout(timer);
   }
 };
+
+/**
+ * Reconnects with a freshly negotiated token, so a change in what the server
+ * grants this device (for example insurance setup) takes effect now rather
+ * than at the next token refresh. Queued writes are kept and uploaded as usual.
+ */
+export const reconnectSync = async (): Promise<void> => {
+  const db = await openDatabase() as LocalDatabase & { disconnect?: () => Promise<void> };
+  await db.disconnect?.();
+  await startSync();
+};

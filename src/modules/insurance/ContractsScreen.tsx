@@ -18,6 +18,8 @@ import { Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
 import { CATEGORY_LABELS } from '@/modules/finance/billing/feeForm';
 import { StaffVerification } from './StaffVerification';
 import { useInsuranceSupported } from './CoverCard';
+import { PayerSetup } from './PayerSetup';
+import { TariffImport } from './TariffImport';
 import type { Facility } from '@shared';
 
 const ARRANGEMENT_LABELS: Record<Arrangement, string> = { per_service: 'Paid per service', capitation: 'Capitation', per_diem: 'Per day (not calculated yet)', package: 'Package (not calculated yet)' };
@@ -35,10 +37,10 @@ export const ContractsScreen = () => {
   const context = useAuthorizationContext();
   const supported = useInsuranceSupported();
   useEffect(() => { document.title = 'Payers & contracts · Geneus Health'; }, []);
-  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is not enabled for this hospital.</p></main>;
+  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is off for this hospital. An administrator can start setup in <Link className="font-semibold text-brand" to="/insurance/settings">Insurance settings</Link>.</p></main>;
   const canRead = context.permissions.includes('insurance_contract:read');
   return <main className="mx-auto max-w-5xl space-y-6 p-4">
-    <header><Link className="text-sm font-semibold text-brand" to="/insurance">← Insurance work</Link><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
+    <header><Link className="text-sm font-semibold text-brand" to="/insurance/settings">← Insurance settings</Link><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
       <p className="text-sm text-ink-soft">Contract prices stay on the server. Devices receive only what the patient pays, once a version is activated.</p></header>
     <StaffVerification purpose="Managing payer contracts"><ContractsBody canRead={canRead} /></StaffVerification>
   </main>;
@@ -77,11 +79,14 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
       {editingPayer ? <PayerForm existing={editingPayer === 'new' ? undefined : editingPayer} onDone={(saved) => { setEditingPayer(undefined); if (saved) toast(`${saved.name} saved. Devices receive it with the next sync.`); }} /> : null}
     </section>
     {selected ? <section aria-label="Contract versions" className="space-y-3">
-      <h2 className="text-lg font-bold">{selected.name}: contract versions</h2>
+      <h2 className="text-lg font-bold">{selected.name}</h2>
+      <PayerSetup key={`setup:${selected.id}`} payer={selected} />
+      <h3 className="font-bold">Contract versions</h3>
       {!canRead ? <p className="text-sm">You can activate or end versions, but reading contract prices needs separate permission.</p> : null}
       {mine.length === 0 ? <p className="text-sm">No contract yet.</p> : <ul className="space-y-2">{mine.map((v) => <li key={v.id} className="rounded-field border border-outline-soft bg-white p-3 text-sm"><strong>Version {v.version}</strong> · {v.status === 'draft' ? 'Draft' : 'Active'} · from {v.terms.effectiveFrom}{v.terms.effectiveTo ? ` to ${v.terms.effectiveTo}` : ''}{v.endedOn ? ` · ends ${v.endedOn} (${v.endReason})` : ''}
         {v.status === 'active' && !v.endedOn && context.permissions.includes('insurance_contract:activate') ? <EndContract version={v} today={serviceDateOf(new Date().toISOString(), timeZone)} onDone={reload} /> : null}</li>)}</ul>}
-      {canManage && canRead && versions ? <ContractEditor key={payerId} payer={selected} fees={fees} draft={mine.find((v) => v.status === 'draft')} base={mine.find((v) => v.status === 'active')} onSaved={reload} /> : null}
+      {canManage && canRead && versions ? <TariffImport key={`import:${payerId}`} payer={selected} fees={fees} draft={mine.find((v) => v.status === 'draft')} base={mine.find((v) => v.status === 'active')} onImported={reload} /> : null}
+      {canManage && canRead && versions ? <ContractEditor key={`${payerId}:${mine.find((v) => v.status === 'draft')?.revision ?? 0}`} payer={selected} fees={fees} draft={mine.find((v) => v.status === 'draft')} base={mine.find((v) => v.status === 'active')} onSaved={reload} /> : null}
       {mine.some((v) => v.status === 'draft') && context.permissions.includes('insurance_contract:activate') ? <Activation version={mine.find((v) => v.status === 'draft')!} timeZone={timeZone} onDone={reload} /> : null}
     </section> : null}
   </div>;

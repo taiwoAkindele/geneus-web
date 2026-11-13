@@ -26,6 +26,13 @@ const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 const errors = [], results = [], timeline = [];
 let socket, step = 0;
 const inspect = async (path, method = 'GET') => (await fetch(handoff.inspector + path, { method })).json();
+// Synthetic upload fixtures: a minimal PDF, and a text file named .pdf that the server must refuse.
+const samplePdf = join(profile, 'synthetic-agreement.pdf'), fakePdf = join(profile, 'not-a-pdf.pdf');
+await writeFile(samplePdf, '%PDF-1.4\n% synthetic staging agreement\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+await writeFile(fakePdf, '=HYPERLINK("http://example.org","click") this is not a PDF');
+// An HMO-style tariff sheet: a title row, a currency in the header, a near-miss name, a service the hospital lacks, and a formula-like cell.
+const tariffCsv = join(profile, 'synthetic-hmo-tariff.csv');
+await writeFile(tariffCsv, 'Synthetic Staging HMO approved tariff 2026,,,\r\nS/N,HMO Code,Service Description,Approved Tariff (₦)\r\n1,SSH-C01,General consultation,"1,500.00"\r\n2,SSH-L02,Malaria RDT (rapid test),1000\r\n3,SSH-X99,Appendicectomy,90000\r\n4,"=HYPERLINK(""http://example.org"")",=1+1,abc\r\n');
 
 try {
   let target;
@@ -37,7 +44,7 @@ try {
   socket.onmessage = ({ data }) => {
     const m = JSON.parse(data);
     if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text);
-    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') timeline.push({ console: m.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 300) });
+    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') timeline.push({ console: m.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 1500) });
     if (m.id) { const r = pending.get(m.id); pending.delete(m.id); clearTimeout(r?.timer); if (m.error) r?.reject(new Error(m.error.message)); else r?.resolve(m.result); }
   };
   const cdp = (method, params = {}) => new Promise((ok, fail) => { const id = ++sequence; const timer = setTimeout(() => { pending.delete(id); fail(new Error('Chrome timed out: ' + method)); }, 30000); pending.set(id, { resolve: ok, reject: fail, timer }); socket.send(JSON.stringify({ id, method, params })); });
@@ -160,7 +167,26 @@ try {
   const waitServer = async (patientId, predicate, label, ms = 60000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await server(patientId); if (predicate(last)) return last; await pause(1000); } throw new Error('Server never reached: ' + label + '\n' + JSON.stringify(last)); };
   const { first, second } = handoff.patients;
 
-  await check('Officer signs in with an admin PIN code and sets a PIN', async () => { await signIn('officer'); await shot('02-officer-home'); });
+  await check('Administrator starts insurance setup from Insurance settings; insurance was hidden while off', async () => {
+    await signIn('admin');
+    await go('/workspace/finance'); await pause(800);
+    const off = await text();
+    assert.ok(off.includes('Insurance settings') && !off.includes('Payers & contracts') && !off.includes('Insurance work'), 'only settings while off');
+    await go('/insurance/settings'); await waitText('Insurance settings');
+    await verifyEmail(people.admin.email);
+    await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Off'`, 30000, 'state off');
+    await click('Start insurance setup');
+    await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Setup'`, 30000, 'state setup');
+    await waitText('still needed before billing', 30000);
+    await shot('02a-setup-started');
+    const checklist = await evaluate(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].map((li) => li.innerText.replace(/\\s+/g, ' '))`);
+    // The device picks up its new grant without signing out: Payers & contracts appears.
+    await go('/workspace/finance'); await waitText('Payers & contracts', 60000);
+    assert.ok(!(await text()).includes('Insurance work'), 'billing work stays hidden in setup');
+    return { checklist };
+  });
+
+  await check('Officer signs in with an admin PIN code and sets a PIN', async () => { await signOut(); await signIn('officer'); await shot('02-officer-home'); });
 
   await check('Officer verifies by email, adds a payer and saves a contract draft (prices stay on the server)', async () => {
     await go('/insurance/contracts'); await waitText('Payers & contracts');
@@ -179,7 +205,49 @@ try {
     for (const category of ['Consultation', 'Laboratory']) { await fillIn(category, 'Cover', 'covered'); await fillIn(category, 'Co-pay', 'percent'); await fillIn(category, 'Percent', '10'); }
     await click('Save draft'); await waitText('Draft version 1 saved', 30000);
     await shot('03-contract-draft');
+    // Supporting evidence: a signed contract PDF, sniffed and stored on the server, then verified by name.
+    const attach = async (file) => {
+      const { root } = await cdp('DOM.getDocument', { depth: -1 });
+      const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'form[aria-label="Upload document"] input[type=file]' });
+      await cdp('DOM.setFileInputFiles', { nodeId, files: [file] });
+      await press(`[...document.querySelectorAll('form[aria-label="Upload document"] button')].find((b) => b.textContent.trim() === 'Upload')`);
+    };
+    await click('Upload'); await waitText('Upload a document', 10000);
+    await fill('Title', 'Synthetic provider agreement 2026'); await attach(samplePdf);
+    await waitText('Not reviewed', 30000);
+    await click('Mark verified');
+    await waitFor(`[...document.querySelectorAll('[aria-label="Documents"] p')].some((p) => p.textContent.trim() === 'Verified')`, 30000, 'document verified');
+    // A file that only claims to be a PDF is refused by its content.
+    await click('Upload'); await fill('Title', 'Not really a PDF'); await attach(fakePdf);
+    await waitText('not a PDF or image', 30000); await click('Cancel');
+    // How this payer receives claims: manual, by portal.
+    await click('Set method'); await fill('Portal address', 'https://claims.synthetic-hmo.example.org');
+    await selectByText('Claim format', 'Excel'); await fill('Days allowed to submit', '30'); await clickLabel('Referral form');
+    await click('Save'); await waitText('Manual · HMO portal', 30000);
+    await evaluate(`document.querySelector('[aria-label="Documents"]').scrollIntoView({ block: 'start' })`); await pause(300);
+    await shot('03b-documents-submission');
     return { draftSavedOnServer: true };
+  });
+
+  await check('Officer imports an HMO tariff sheet: maps columns, saves the mapping, confirms a suggestion, skips the rest, applies to the draft', async () => {
+    await click('Import tariff sheet'); await waitFor(`Boolean(document.querySelector('input[aria-label="Tariff spreadsheet"]'))`, 10000, 'import opened');
+    const { root } = await cdp('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[aria-label="Tariff spreadsheet"]' });
+    await cdp('DOM.setFileInputFiles', { nodeId, files: [tariffCsv] });
+    await waitText('Review rows', 30000);
+    const mapped = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Import tariff"] fieldset label')].map((l) => [l.textContent.split('Column')[0].replace(/[▾\\n]/g, '').trim().slice(0, 30), (l.control ?? l.querySelector('select'))?.selectedOptions[0]?.textContent]))`);
+    await shot('03c-import-mapping');
+    await fill('Save this mapping as', 'Staging HMO tariff'); await click('Save mapping'); await waitText('saved for next time', 20000);
+    await click('Review rows'); await waitFor(`Boolean(document.querySelector('[data-testid="import-summary"]'))`, 20000, 'review');
+    const before = await evaluate(`document.querySelector('[data-testid="import-summary"]').innerText`);
+    assert.match(before, /1 ready/); assert.match(before, /1 need attention/); assert.match(before, /2 skipped/, 'rows with no possible match start skipped');
+    await selectByText('Service for row 4', 'Suggested: Malaria RDT');
+    const summary = await evaluate(`document.querySelector('[data-testid="import-summary"]').innerText`);
+    assert.match(summary, /2 ready/); assert.match(summary, /0 need attention/);
+    await shot('03d-import-review');
+    await click('Apply 2 prices to the draft'); await waitText('updated.', 30000);
+    await shot('03e-import-applied');
+    return { mapped, before, summary, result: await evaluate(`document.querySelector('[aria-label="Import tariff"] [role=status]')?.innerText`) };
   });
 
   await check('Administrator activates version 1 after device readiness, acknowledging unsupported terms', async () => {
@@ -192,6 +260,16 @@ try {
     await clickLabel('I understand services'); await click('Activate version 1');
     await waitText('Version 1 is active', 30000);
     await shot('04-activated');
+    await go('/insurance/settings');
+    await waitFor(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].length > 0`, 30000, 'checklist');
+    const checklist = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Setup checklist"] li')].map((li) => [li.querySelector('strong').textContent, li.dataset.ok === 'true']))`);
+    assert.equal(checklist['An active contract'], true, JSON.stringify(checklist));
+    assert.equal(checklist['A claim submission method for every payer'], true, JSON.stringify(checklist));
+    assert.equal(checklist['A verified contract document for every payer'], true, JSON.stringify(checklist));
+    await shot('04b-readiness');
+    // Billing activation is an operator's step after readiness, as in production.
+    const billing = await inspect('/activate-billing', 'POST');
+    assert.equal(billing.state, 'active', JSON.stringify(billing));
     return { devices: await inspect('/devices') };
   });
 

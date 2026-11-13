@@ -27,7 +27,7 @@ const charge = (id = 'charge:one', listPriceMinor = 5_000) => Charge.parse({ ...
 const cover = PatientCover.parse({ ...base, type: 'patient_cover', id: 'cover:one', createdOn: at('08:30:00'), patientId: PATIENT, payerId: 'payer:a', planCode: 'GOLD', enrolleeNumber: 'SYN-1', relationship: 'principal', active: true });
 const check = (result: CoverCheck['result'] = 'verified') => CoverCheck.parse({ ...base, type: 'cover_check', id: `check:${result}`, createdOn: at('08:45:00'), patientId: PATIENT, coverId: 'cover:one', method: 'portal', result, coversFrom: '2026-11-12', coversTo: '2026-11-12' });
 const pay = (id: string, amountMinor: number, chargeId = 'charge:one') => Payment.parse({ ...base, type: 'payment', id, createdOn: at('09:10:00'), patientId: PATIENT, receiptNumber: 'QA-R-000001-K2', method: 'cash', amountMinor, currency: 'NGN', allocations: [{ chargeId, amountMinor }] });
-const data = (extra: Partial<CoverageData> = {}): CoverageData => ({ covers: [], checks: [], elections: [], allocations: [], schedules: [], payers: [], refunds: [], entries: new Map(), timeZone: TZ, ...extra });
+const data = (extra: Partial<CoverageData> = {}): CoverageData => ({ covers: [], checks: [], elections: [], allocations: [], schedules: [], payers: [], refunds: [], entries: new Map(), timeZone: TZ, billingPeriods: [{ from: '2000-01-01T00:00:00.000Z' }], ...extra });
 const coverage = (charges: Charge[], d: CoverageData): BalanceCoverage => ({ estimates: estimatesFor(charges, d), refunds: d.refunds });
 
 describe('patient balances with insurance', () => {
@@ -46,6 +46,19 @@ describe('patient balances with insurance', () => {
     expect([row.balanceMinor, row.undeterminedMinor, row.final]).toEqual([0, 5_000, false]);
     expect(isAppointmentConfirmed('appointment:one', [c], [], [], [c.id], coverage([c], d))).toBe(true);
     expect(isAppointmentConfirmed('appointment:one', [c], [], [], [c.id])).toBe(false);
+  });
+  it('during setup, verified cover is recorded but the patient is billed exactly as before', () => {
+    const c = charge();
+    const [plain] = chargeBalances([c], [pay('p1', 1_000)]);
+    const [row] = chargeBalances([c], [pay('p1', 1_000)], [], coverage([c], data({ covers: [cover], checks: [check()], schedules: [schedule()], billingPeriods: [] })));
+    expect([row.balanceMinor, row.dueMinor, row.undeterminedMinor]).toEqual([plain.balanceMinor, plain.dueMinor, 0]);
+    expect(row.estimated).toBeFalsy();
+  });
+  it('a confirmed split still decides the balance after billing is turned off', () => {
+    const c = charge();
+    const allocation = CoverageAllocation.parse({ ...base, type: 'coverage_allocation', id: 'alloc:kept', createdOn: at('10:00:00'), patientId: PATIENT, chargeId: c.id, state: 'finalised', payerId: 'payer:a', arrangement: 'per_service', patientShareMinor: 400, currency: 'NGN', basis: 'exception' });
+    const [row] = chargeBalances([c], [], [], coverage([c], data({ covers: [cover], checks: [check()], schedules: [schedule()], allocations: [allocation], billingPeriods: [] })));
+    expect(row.balanceMinor).toBe(400);
   });
   it('asks the patient only for their estimated share once cover is verified', () => {
     const c = charge();

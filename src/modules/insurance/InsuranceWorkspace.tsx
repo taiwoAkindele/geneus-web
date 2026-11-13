@@ -12,7 +12,7 @@ import { useAuthorizationContext } from '@/session';
 import { Button, TextAreaField, useToast } from '@/ui';
 import { UNDETERMINED } from './coverageLabels';
 import { StaffVerification } from './StaffVerification';
-import { useInsuranceSupported } from './CoverCard';
+import { useDeviceInsurance } from './CoverCard';
 
 type Row = ReturnType<typeof billingRows>[number];
 type Visit = { key: string; patientId: string; name: string; date: string; rows: Row[] };
@@ -25,7 +25,7 @@ type Visit = { key: string; patientId: string; name: string; date: string; rows:
  */
 export const InsuranceWorkspace = () => {
   const context = useAuthorizationContext();
-  const supported = useInsuranceSupported();
+  const insurance = useDeviceInsurance();
   const toast = useToast();
   const query = useBilling();
   const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [reasons, setReasons] = useState<Record<string, string>>({});
@@ -59,7 +59,7 @@ export const InsuranceWorkspace = () => {
     return { routine, exceptions, undetermined, selfPaidWhileCovered, credits, names };
   }, [data]);
 
-  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Insurance</h1><p className="mt-2 text-sm">Insurance is not enabled for this hospital.</p></main>;
+  if (insurance !== 'active' && insurance !== 'history') return <main className="p-4"><h1 className="text-xl font-bold">Insurance work</h1><p className="mt-2 text-sm">{insurance === 'setup' ? 'The hospital is setting up insurance. There is no insurance billing work until billing is activated.' : 'Insurance is off for this hospital.'} See <Link className="font-semibold text-brand" to="/insurance/settings">Insurance settings</Link>.</p></main>;
   if (!view) return <main className="p-4"><p role="status">Loading insurance work…</p></main>;
   const canConfirm = context.permissions.includes('coverage:confirm');
   const money = (rows: Row[], pick: (r: Row) => number) => [...new Set(rows.map((r) => r.charge.currency))].map((c) => formatMoney(rows.filter((r) => r.charge.currency === c).reduce((n, r) => n + pick(r), 0), c)).join(' + ');

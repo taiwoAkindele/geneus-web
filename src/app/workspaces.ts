@@ -2,7 +2,7 @@ import type { AuthorizationContext, Permission, Role } from '@shared';
 import { clinicalDocumentAccess } from '@shared';
 import type { IconName } from '@/ui';
 import { navigationFor } from './navigation';
-import { insuranceSupported } from '@/data/insuranceSupport';
+import { insuranceBillingWork, insuranceSupported } from '@/data/insuranceSupport';
 
 export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'operations' | 'inventory' | 'reports' | 'administration';
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'> & Partial<Pick<AuthorizationContext, 'facilityId' | 'deviceId'>>;
@@ -53,9 +53,11 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       link('financial-reports', 'Payments & financial reports', 'Review collections and recorded receipts.', '/billing?tab=reports', 'month'),
       ...(has(context, 'fee_item:manage') || roleIn(context, 'facility_admin') ? [link('fees', 'Fees', 'Manage the prices attached to facility services.', '/billing/fees', 'registers'), link('receiving', 'Payment setup', 'Manage departments and receiving accounts.', '/billing/settings', 'settings')] : []),
     ] : []),
-      // Shown only once the server has granted this device insurance, which an operator enables per hospital.
-      ...(insuranceSupported(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
-      ...(insuranceSupported(context) && has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate') ? [link('contracts', 'Payers & contracts', 'Set up payers and their contract terms.', '/insurance/contracts', 'registers')] : []),
+      // Insurance pages appear once the hospital enters setup; billing work only once billing is active.
+      // Administrators who can start setup always see its settings, so it can be turned on from here.
+      ...(insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
+      ...(insuranceSupported(context) && has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate') ? [link('contracts', 'Payers & contracts', 'Set up payers, contracts, documents and claim submission.', '/insurance/contracts', 'registers')] : []),
+      ...(has(context, 'insurance_contract:activate') || (insuranceSupported(context) && has(context, 'insurance_contract:manage')) ? [link('insurance-settings', 'Insurance settings', 'Start insurance setup and see what is still needed before billing.', '/insurance/settings', 'settings')] : []),
     ] },
     { id: 'operations', label: 'Operations', description: 'Services, teams and schedules', icon: 'calendar', links: [
       ...(has(context, 'service:manage', 'result_template:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
