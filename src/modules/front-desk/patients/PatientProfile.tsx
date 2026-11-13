@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { CheckInCoverPrompt } from '@/modules/insurance/CoverCard';
 import { ClinicalKind, patientSexLabel, INPATIENT_STATUS, clinicalDocumentAccess, canReadPatientChart, type AuthorizationContext } from '@shared';
 import { useInpatient } from '@/modules/clinical/inpatient/useInpatient';
 import { withAdmission } from '@/modules/clinical/inpatient/summary';
@@ -115,6 +116,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       <div className="mt-4"><AllergyAlert patientId={record.patientId} /></div>
     </header>
     {admissions.error ? <p role="alert" className="my-4 text-sm text-amber-text">Inpatient status could not be read. <Button variant="ghost" fullWidth={false} onClick={admissions.reload}>Retry admission status</Button></p> : null}
+    {tab !== 'details' ? <div className="mb-3"><CheckInCoverPrompt patientId={record.patientId} onRecord={() => changeTab('details')} /></div> : null}
     <SectionTabs label="Patient record sections" className="mb-5" value={tab} onChange={(value) => changeTab(value)} options={tabs.map((value) => ({ value, label: PATIENT_TABS[value] }))} />
     {needsAttention ? <div role="alert" className="mb-5 rounded-field border border-amber-border bg-amber-bg p-4 text-sm text-amber-text">Some records for this patient need sync review. Signed on this device does not mean accepted by the server. <Button variant="ghost" fullWidth={false} onClick={() => navigate('/sync')}>Open Sync &amp; device</Button></div> : null}
     {rejections.error ? <p role="alert" className="mb-4 text-sm text-amber-text">Sync review status could not be read. <button type="button" className="font-bold text-brand" onClick={rejections.reload}>Retry sync status</button></p> : null}

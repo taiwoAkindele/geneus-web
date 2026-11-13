@@ -26,6 +26,7 @@ export const clearPrivateWorkforce = (): void => {
   const device = getDeviceCredential();
   if (token && device)
     void workforceRequest('/workforce/access/end', device.credential, token, undefined, 'POST').catch(() => { });
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('geneus:staffVerification'));
 };
 export const requestWorkforceCode = (context: AuthorizationContext) => workforceRequest<{
   sentTo: string;
@@ -37,6 +38,7 @@ export const verifyWorkforceCode = async (context: AuthorizationContext, code: s
   }>('/workforce/access/verify', credential(), undefined, { staffId: context.userId, code });
   clearPrivateWorkforce();
   current = { owner: owner(context), ...response, records: [] };
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('geneus:staffVerification'));
 };
 export const readWorkforceEvidence = async (context: AuthorizationContext, type: string, staffId: string): Promise<AnyDocument[]> => {
   const bound = session(context);
@@ -74,6 +76,13 @@ export const readPrivateRejections = async (context: AuthorizationContext) => {
   };
 };
 export const resolvePrivateRejection = (context: AuthorizationContext, id: string, resolution: string) => workforceRequest<void>(`/workforce/rejections/${encodeURIComponent(id)}/resolve`, credential(), session(context).token, { resolution });
+/**
+ * The verified staff session for other online actions (insurance, refunds):
+ * one email code serves every action until it expires, never one per action.
+ */
+export const verifiedToken = (context: AuthorizationContext): string | undefined => privateAccessValid(context) ? current?.token : undefined;
+/** Called when the server says the session is no longer valid, so the next action asks for a new code. */
+export const expirePrivateWorkforce = (): void => { current = undefined; if (typeof window !== 'undefined') window.dispatchEvent(new Event('geneus:staffVerification')); };
 export const privateAccessValid = (context: AuthorizationContext): boolean => Boolean(current && current.owner === owner(context) && Date.parse(current.expiresOn) > Date.now());
 export const privateAccessExpires = (context: AuthorizationContext): string | undefined => privateAccessValid(context) ? current?.expiresOn : undefined;
 export const reviewHistoricalCare = async (context: AuthorizationContext, id: string, reason: string, record: AnyDocument): Promise<void> => {

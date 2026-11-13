@@ -8,6 +8,7 @@ import { useAuthorizationContext,useSession } from '@/session';
 import { currentAge } from '@/modules/front-desk/search';
 import { loadPatientDirectory } from '@/data/repos/patientDirectory';
 import { PersonalDetails,PersonalDetailsEditor } from './PersonalDetails';
+import { CoverCard } from '@/modules/insurance/CoverCard';
 import { PatientCard } from './PatientCard';
 import { patientChartPath } from './patientRoutes';
 import { visitDate } from '@/modules/clinical/encounter/VisitTable';
@@ -41,6 +42,7 @@ export const PatientDetails=({patientId}:{patientId?:string})=>{
       <div><dt className="font-semibold text-ink-soft">Responsible team</dt><dd>{stay?.team??'Not assigned'}</dd></div><div><dt className="font-semibold text-ink-soft">Attending / responsible staff</dt><dd>{stay?.attending.join(', ')||'Not assigned'}</dd></div>
     </dl>{stay?.pending?<p className="mt-3 text-sm text-amber-text">Admission change pending server confirmation</p>:null}</section>
     <PersonalDetails patient={patient} canEdit={canEdit} onEdit={()=>setEditing(true)} onPrint={()=>setCard(true)}/>
+    <div className="mt-4"><CoverCard patientId={patient.patientId}/></div>
     {booking&&context.permissions.includes('appointment:create')?<BookAppointmentSheet patient={{id:patient.patientId,name:patient.fullName,initials:patient.fullName.split(/\s+/).slice(0,2).map(part=>part[0]).join(''),allergy:'Review clinical information with authorised care staff'} as AppointmentPatient} onClose={()=>setBooking(false)}/>:null}
     {editing&&canEdit?<PersonalDetailsEditor patient={patient} onClose={()=>setEditing(false)} onSaved={query.reload}/>:null}
     {card?<PatientCard patient={patient} facilityName={facility.name} onClose={()=>setCard(false)}/>:null}

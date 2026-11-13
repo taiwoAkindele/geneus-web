@@ -10,6 +10,7 @@ import { getDeviceCredential, recordServerContact } from './deviceCredential';
 import { decodeValues } from './rows';
 import { TYPE_FOR } from './tables';
 import { rememberPharmacySupport } from './pharmacySupport';
+import { rememberInsuranceSupport } from './insuranceSupport';
 import { rememberWardCareSupport } from './wardCareSupport';
 import { rememberInpatientSupport } from './inpatientSupport';
 import { rememberDocumentSupport } from './documentSupport';
@@ -66,6 +67,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       rememberWardCareSupport(device, minted.wardCareVersion);
       rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
       rememberDocumentSupport(device,minted.documentWorkflowVersion);
+      rememberInsuranceSupport(device, minted.insuranceWorkflowVersion);
       recordServerContact(minted.serverTime, device.deviceId);
       await refreshWorkforceKeys();
       return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
@@ -86,7 +88,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);}
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }

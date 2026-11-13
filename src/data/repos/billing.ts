@@ -12,12 +12,22 @@ import {
   type BillingDepartment,
   type Patient,
   type VisitType,
+  type CoverageEstimate,
+  type Refund,
+  patientResponsibility,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { assertAmountMinor } from '@/lib/money';
 import { mintReceiptNumber } from '@/lib/receiptNumber';
 import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 import { usablePharmacyEffects } from './pharmacyAcceptance';
+import { estimatesFor, loadCoverage } from './insurance';
+
+/** Coverage and refunds for these charges, as this device holds them. */
+export const balanceCoverage = async (charges: readonly Charge[]): Promise<BalanceCoverage> => {
+  const data = await loadCoverage(charges);
+  return { estimates: estimatesFor(charges, data), refunds: data.refunds };
+};
 
 export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
 
@@ -42,8 +52,9 @@ export const adjustCharge = async (chargeId: string, kind: BillingAdjustment['ki
   assertAllowed(context, 'payment:waive');
   const charge = await findRecord<Charge>('charge', chargeId);
   if (!charge || charge.facilityId !== context.facilityId) throw new Error('This bill is not available');
-  const [payments, adjustments] = await Promise.all([paymentsForPatient(charge.patientId), adjustmentsForPatient(charge.patientId)]);
-  const [{ balanceMinor }] = chargeBalances([charge], payments, adjustments);
+  const [payments, adjustments, coverage] = await Promise.all([paymentsForPatient(charge.patientId), adjustmentsForPatient(charge.patientId), balanceCoverage([charge])]);
+  // The payer's part, or an undetermined one, is never reduced on the patient's account.
+  const [{ balanceMinor }] = chargeBalances([charge], payments, adjustments, coverage);
   assertAmountMinor(amountMinor);
   if (amountMinor <= 0 || amountMinor > balanceMinor) throw new Error('The reduction must fit the unpaid balance');
   return insertRecord<BillingAdjustment>(context, 'payment:waive', 'billing_adjustment', {
@@ -167,13 +178,45 @@ export const reversePayment = async (paymentId: string, reason: string, context:
   });
 };
 
-export type ChargeBalance = { charge: Charge; settledMinor: number; balanceMinor: number; discountMinor: number; waivedMinor: number; dueMinor: number };
+export type ChargeBalance = {
+  charge: Charge; settledMinor: number; balanceMinor: number; discountMinor: number; waivedMinor: number; dueMinor: number;
+  /** Money handed back from a credit. Payments stay as received. */
+  refundedMinor: number;
+  /** Insurance: the part whose payer is not yet decided. Never added to what is due. */
+  undeterminedMinor: number;
+  /** Insurance: how this charge's responsibility was decided, when it was. */
+  coverage?: CoverageEstimate;
+  /** Insurance: true while the patient's part is an estimate a confirmation may still change. */
+  estimated: boolean;
+  /** No later decision can change the patient's part: the condition for refunding a credit. */
+  final: boolean;
+};
 
-/** One pass over allocations; reversals subtract instead of removing history. */
-export const chargeBalances = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = []): ChargeBalance[] => {
+/**
+ * Insurance and refunds, when the facility uses them. Without this, every
+ * charge is a cash bill exactly as before insurance existed.
+ */
+export type BalanceCoverage = { estimates: ReadonlyMap<string, CoverageEstimate>; refunds: readonly Refund[] };
+
+/**
+ * One pass over allocations; reversals subtract instead of removing history.
+ * With coverage, the patient owes only their responsibility (the shared
+ * `patientResponsibility`, the same figure the server uses) and refunds add
+ * back to the balance. The server applies the same arithmetic in
+ * `availableOnCharge`, so a device and the server cannot disagree on it.
+ */
+export const chargeBalances = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = [], coverage?: BalanceCoverage): ChargeBalance[] => {
   const byId = new Map(charges.map((charge) => [charge.id, charge]));
   const settled = new Map<string, number>();
   const legacyWaivers = new Map<string, number>();
+  const refunded = new Map<string, number>();
+  for (const refund of coverage?.refunds ?? []) {
+    for (const allocation of refund.allocations) {
+      const charge = byId.get(allocation.chargeId);
+      if (!charge || charge.patientId !== refund.patientId || charge.currency !== refund.currency || charge.facilityId !== refund.facilityId) continue;
+      refunded.set(charge.id, (refunded.get(charge.id) ?? 0) + allocation.amountMinor);
+    }
+  }
   for (const payment of payments) {
     for (const allocation of payment.allocations) {
       const charge = byId.get(allocation.chargeId);
@@ -188,21 +231,28 @@ export const chargeBalances = (charges: readonly Charge[], payments: readonly Pa
     const reductions = adjustments.filter((a) => a.chargeId === charge.id && a.patientId === charge.patientId && a.facilityId === charge.facilityId);
     const discountMinor = reductions.filter((a) => a.kind === 'discount').reduce((n, a) => n + a.amountMinor, 0);
     const waivedMinor = (legacyWaivers.get(charge.id) ?? 0) + reductions.filter((a) => a.kind === 'waiver').reduce((n, a) => n + a.amountMinor, 0);
-    const dueMinor = charge.amountMinor - discountMinor - waivedMinor;
-    return { charge, settledMinor, discountMinor, waivedMinor, dueMinor, balanceMinor: dueMinor - settledMinor };
+    const estimate = coverage?.estimates.get(charge.id);
+    const responsibility = estimate ? patientResponsibility(charge, estimate) : { baseMinor: charge.amountMinor, undeterminedMinor: 0, estimated: false, final: true };
+    const refundedMinor = refunded.get(charge.id) ?? 0;
+    const dueMinor = responsibility.baseMinor - discountMinor - waivedMinor;
+    return {
+      charge, settledMinor, discountMinor, waivedMinor, dueMinor, refundedMinor, balanceMinor: dueMinor - settledMinor + refundedMinor,
+      undeterminedMinor: responsibility.undeterminedMinor, estimated: responsibility.estimated, final: responsibility.final,
+      ...(estimate && estimate.state !== 'self_pay' && estimate.state !== 'exempt' ? { coverage: estimate } : {}),
+    };
   });
 };
 
 /** Never add different currencies into a single patient balance. */
-export const balancesByCurrency = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = []): Map<string, number> => {
+export const balancesByCurrency = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = [], coverage?: BalanceCoverage): Map<string, number> => {
   const totals = new Map<string, number>();
-  for (const { charge, balanceMinor } of chargeBalances(charges, payments, adjustments)) {
+  for (const { charge, balanceMinor } of chargeBalances(charges, payments, adjustments, coverage)) {
     totals.set(charge.currency, (totals.get(charge.currency) ?? 0) + balanceMinor);
   }
   return totals;
 };
 
 /** With no fees configured there is nothing to pay, so care continues immediately. */
-export const isAppointmentConfirmed = (appointmentId: string, charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = [], chargeIds: readonly string[] = []): boolean =>
+export const isAppointmentConfirmed = (appointmentId: string, charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[] = [], chargeIds: readonly string[] = [], coverage?: BalanceCoverage): boolean =>
   chargeIds.every((id) => charges.some((charge) => charge.id === id)) &&
-  chargeBalances(charges.filter((charge) => charge.appointmentId === appointmentId || chargeIds.includes(charge.id)), payments, adjustments).every(({ balanceMinor }) => balanceMinor <= 0);
+  chargeBalances(charges.filter((charge) => charge.appointmentId === appointmentId || chargeIds.includes(charge.id)), payments, adjustments, coverage).every(({ balanceMinor }) => balanceMinor <= 0);

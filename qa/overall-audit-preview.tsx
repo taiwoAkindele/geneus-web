@@ -61,6 +61,9 @@ import { rememberDocumentSupport } from '@/data/documentSupport';
 import { rememberInpatientSupport } from '@/data/inpatientSupport';
 import { rememberWardCareSupport } from '@/data/wardCareSupport';
 import { rememberPharmacySupport } from '@/data/pharmacySupport';
+import { installInsuranceScenario } from './insurance-scenario';
+import { InsuranceWorkspace } from '@/modules/insurance/InsuranceWorkspace';
+import { ContractsScreen } from '@/modules/insurance/ContractsScreen';
 import '../src/index.css';
 
 const wardDemo = location.pathname === '/qa/ward-care-demo.html';
@@ -189,6 +192,7 @@ db.getOptional = async <T,>(sql: string, parameters: unknown[] = []) => {
   return originalOptional<T>(sql, parameters);
 };
 db.writeTransaction = async (callback) => callback({ execute: db.execute,getOptional:db.getOptional });
+Object.assign(window, { seedInsuranceScenario: installInsuranceScenario(db as never, () => listeners.forEach((listener) => listener()), envelope, staff.id, { first: patientId, second: secondId }) });
 setDatabaseForTests(db);
 localStorage.setItem('geneus.signedInStaffId', staff.id);
 localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
@@ -411,4 +415,6 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/patients/identity" element={<IdentityReviewScreen />} />
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
   <Route path="/stock" element={<StockScreen />} />
+  <Route path="/insurance" element={<InsuranceWorkspace />} />
+  <Route path="/insurance/contracts" element={<ContractsScreen />} />
 </Route></Routes></MemoryRouter></RegistrationDraftProvider></RegistersProvider></AppointmentsProvider></Ready></SessionProvider></ToastProvider>);

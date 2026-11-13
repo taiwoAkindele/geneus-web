@@ -1,10 +1,10 @@
 import type { BillingAdjustment, Charge, Payment } from '@shared';
-import { chargeBalances } from '@/data/repos/billing';
+import { chargeBalances, type BalanceCoverage } from '@/data/repos/billing';
 import { calendarDate } from '@/lib/calendarDate';
 import type { BillingData } from './useBilling';
 
 /** Each allocation is filtered before summing, so reports and their scope agree. */
-export const collectionAllocations = (data: BillingData, filters: { currency: string; from: string; to: string; departmentId: string; search: string }) => {
+export const collectionAllocations = (data: Pick<BillingData, 'charges' | 'payments' | 'patients'>, filters: { currency: string; from: string; to: string; departmentId: string; search: string }) => {
   const charges = new Map(data.charges.map((charge) => [charge.id, charge]));
   const names = new Map(data.patients.map((patient) => [patient.patientId, patient.fullName]));
   const term = filters.search.trim().toLowerCase();
@@ -19,11 +19,12 @@ export const collectionAllocations = (data: BillingData, filters: { currency: st
   });
 };
 
-export const billingRows = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[]) =>
-  chargeBalances(charges, payments, adjustments).map((row) => {
+export const billingRows = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[], coverage?: BalanceCoverage) =>
+  chargeBalances(charges, payments, adjustments, coverage).map((row) => {
     const receipts = payments.filter((p) => p.allocations.some((a) => a.chargeId === row.charge.id));
     const reasons = adjustments.filter((a) => a.chargeId === row.charge.id).map((a) => a.reason);
-    return { ...row, receipts, reasons, status: row.balanceMinor <= 0 ? 'Settled' : row.settledMinor > 0 ? 'Part paid' : 'Unpaid' };
+    const status = row.balanceMinor < 0 ? 'Credit' : row.balanceMinor === 0 && row.undeterminedMinor > 0 ? 'Awaiting cover' : row.balanceMinor <= 0 ? 'Settled' : row.settledMinor > 0 ? 'Part paid' : 'Unpaid';
+    return { ...row, receipts, reasons, status };
   });
 
 export const transferAllocated = (id: string, payments: readonly Payment[]) => payments
@@ -37,4 +38,6 @@ export const totalsFor = (rows: ReturnType<typeof billingRows>) => rows.reduce((
   collected: n.collected + r.receipts.filter((p) => p.method !== 'waiver').reduce((v, p) => v +
     (p.reverses ? -1 : 1) * p.allocations.filter((a) => a.chargeId === r.charge.id).reduce((s, a) => s + a.amountMinor, 0), 0),
   outstanding: n.outstanding + Math.max(0, r.balanceMinor),
-}), { original: 0, exempt: 0, discounted: 0, waived: 0, collected: 0, outstanding: 0 });
+  refunded: n.refunded + r.refundedMinor,
+  undetermined: n.undetermined + r.undeterminedMinor,
+}), { original: 0, exempt: 0, discounted: 0, waived: 0, collected: 0, outstanding: 0, refunded: 0, undetermined: 0 });

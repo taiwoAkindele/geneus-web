@@ -40,7 +40,7 @@ export const BillingWorkspace = () => {
   const department = (id?: string) => data?.departments.find((d) => d.id === id)?.name ?? 'Hospital / general';
   const departmentMatches = (id?: string) => !departmentId || (departmentId === '__general__' ? !id : id === departmentId);
   const dateMatches = (at: string) => (!from || calendarDate(at) >= from) && (!to || calendarDate(at) <= to);
-  const allRows = data ? billingRows(data.charges, data.payments, data.adjustments) : [];
+  const allRows = data ? billingRows(data.charges, data.payments, data.adjustments, data.coverage) : [];
   const rows = allRows.filter((r) => r.charge.currency === currency && departmentMatches(r.charge.departmentId) && (!category || r.charge.category === category) && dateMatches(r.charge.createdOn)
     && `${name(r.charge.patientId)} ${r.charge.patientId} ${r.charge.description}`.toLowerCase().includes(search.toLowerCase())
     && (status === 'all' || (status === 'unpaid' && r.balanceMinor > 0) || (status === 'settled' && r.balanceMinor <= 0) || (status === 'discounted' && r.discountMinor > 0)

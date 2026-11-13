@@ -7,7 +7,7 @@ import { balanceOwed, todayStatus } from './directoryView';
 const now = new Date(2026, 10, 9, 10);
 const at = (day: number, hour = 9) => new Date(2026, 10, day, hour).toISOString();
 const visit = (day: number) => ({ openedOn: at(day) }) as Encounter;
-const balance = (patientId: string, balanceMinor: number, currency = 'NGN'): ChargeBalance => ({ charge: { patientId, currency } as Charge, balanceMinor, settledMinor: 0, discountMinor: 0, waivedMinor: 0, dueMinor: balanceMinor });
+const balance = (patientId: string, balanceMinor: number, currency = 'NGN'): ChargeBalance => ({ charge: { patientId, currency } as Charge, balanceMinor, settledMinor: 0, discountMinor: 0, waivedMinor: 0, dueMinor: balanceMinor, refundedMinor: 0, undeterminedMinor: 0, estimated: false, final: true });
 
 describe('patient list: today at the desk', () => {
   it('prefers a visit opened today over the booking', () => {
