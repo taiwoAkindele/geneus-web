@@ -56,6 +56,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       // Daily insurance work appears once billing is active; setting insurance up lives under Settings.
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm') ? [link('claims', 'Claims', 'Prepare, export and record claims to payers.', '/insurance/claims', 'month')] : []),
+      ...(insuranceBillingWork(context) && has(context, 'insurance_remittance:record') ? [link('payer-payments', 'Payer payments', 'Record what payers paid and follow up what they still owe.', '/insurance/payments', 'finance')] : []),
     ] },
     { id: 'inventory', label: 'Inventory', description: 'Medicines, supplies and stock', icon: 'stock', links: inventory && keys.has('stock') ? [link('stock', 'Medicine & stock', 'Review stock balances, movements and items needing attention.', '/stock', 'stock')] : [] },
     { id: 'reports', label: 'Registers & Reports', description: 'Programme records and reports', icon: 'month', links: reports ? [

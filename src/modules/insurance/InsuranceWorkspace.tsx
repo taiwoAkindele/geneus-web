@@ -3,18 +3,51 @@ import type { AuditEvent } from '@shared';
 import { useLiveQuery } from '@/data';
 import { allWhere } from '@/data/db';
 import { Link } from 'react-router-dom';
-import { isRoutine, serviceDateOf, type UndeterminedReason } from '@shared';
+import { LiabilityChange, isRoutine, serviceDateOf, type CoverCheck, type UndeterminedReason } from '@shared';
 import { useBilling } from '@/modules/finance/billing/useBilling';
 import { billingRows } from '@/modules/finance/billing/ledger';
 import { confirmAllocations, SKIP_REASONS, VerificationRequired, type ConfirmOutcome } from '@/lib/api/insurance';
 import { formatMoney } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
-import { Button, TextAreaField, useToast } from '@/ui';
+import { Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
 import { UNDETERMINED } from './coverageLabels';
 import { StaffVerification } from './StaffVerification';
 import { useDeviceInsurance } from './CoverCard';
 
 type Row = ReturnType<typeof billingRows>[number];
+
+/**
+ * Making the patient liable for a charge that has cover (audit H3). It needs a
+ * documented ground — a reason alone is never enough — and, where the payer
+ * was expected to pay, a person allowed to approve liability changes. The
+ * server checks all of it again.
+ */
+const LiabilityForm = ({ patientId, checks, canApprove, payerExpected, busy, disabled, onSubmit }: {
+  patientId: string; checks: readonly CoverCheck[]; canApprove: boolean; payerExpected: boolean; busy: boolean; disabled: boolean; onSubmit: (liability: LiabilityChange) => void;
+}) => {
+  const [open, setOpen] = useState(false); const [ground, setGround] = useState<LiabilityChange['ground']>('patient_election');
+  const [agreement, setAgreement] = useState(''); const [clause, setClause] = useState(''); const [checkId, setCheckId] = useState('');
+  const notEligible = checks.filter((c) => c.patientId === patientId && c.result === 'not_eligible');
+  if (!open) return <Button fullWidth={false} variant="ghost" onClick={() => setOpen(true)}>The patient should pay instead…</Button>;
+  const needsApproval = payerExpected || ground === 'contract_clause';
+  const liability = ground === 'patient_election' ? { ground, patientAgreement: agreement.trim() } : ground === 'not_eligible' ? { ground, coverCheckId: checkId } : { ground, contractClause: clause.trim() };
+  const parsed = LiabilityChange.safeParse(liability);
+  return <div className="space-y-2 rounded-field border border-outline-soft p-3">
+    <SelectField label="On what ground?" value={ground} options={[
+      { value: 'patient_election', label: 'The patient chose to pay, and the contract allows it' },
+      { value: 'not_eligible', label: 'A recorded check found the cover not eligible' },
+      { value: 'contract_clause', label: 'A clause of the contract makes the patient liable' },
+    ]} onChange={(e) => setGround(e.target.value as LiabilityChange['ground'])} />
+    {ground === 'patient_election' ? <TextField label="How the patient agreed (form, reference)" value={agreement} onChange={(e) => setAgreement(e.target.value)} /> : null}
+    {ground === 'not_eligible' ? notEligible.length ? <SelectField label="The check" value={checkId} options={[{ value: '', label: 'Choose…' }, ...notEligible.map((c) => ({ value: c.id, label: `${c.coversFrom} to ${c.coversTo} · ${c.method}${c.reference ? ` · ${c.reference}` : ''}` }))]} onChange={(e) => setCheckId(e.target.value)} />
+      : <p className="text-sm text-danger">No check has found this patient's cover not eligible. Record the check first.</p> : null}
+    {ground === 'contract_clause' ? <TextField label="The contract clause" value={clause} onChange={(e) => setClause(e.target.value)} /> : null}
+    {needsApproval && !canApprove ? <p className="text-sm text-amber-text">The payer is expected to pay this. Ask someone allowed to approve liability changes (usually the administrator).</p> : null}
+    <p className="text-xs text-ink-soft">Missing hospital set-up is never a reason to charge the patient. A charge already on a claim must be revised off the claim first.</p>
+    <div className="flex gap-2"><Button fullWidth={false} variant="outlined" loading={busy} disabled={disabled || !parsed.success || (needsApproval && !canApprove)} onClick={() => parsed.success && onSubmit(parsed.data)}>Make the patient liable</Button>
+      <Button fullWidth={false} variant="ghost" onClick={() => setOpen(false)}>Cancel</Button></div>
+  </div>;
+};
 type Visit = { key: string; patientId: string; name: string; date: string; rows: Row[] };
 
 /**
@@ -102,8 +135,10 @@ export const InsuranceWorkspace = () => {
           <TextAreaField label="Reason for your decision" value={reasons[item.key] ?? ''} onChange={(e) => setReasons((v) => ({ ...v, [item.key]: e.target.value }))} />
           <div className="flex flex-wrap gap-2">
             <Button fullWidth={false} loading={busy === item.key + ':cover'} disabled={Boolean(busy) || !reasons[item.key]?.trim()} onClick={() => void run(item.key + ':cover', { chargeIds: item.rows.map((r) => r.charge.id), basis: 'exception', decision: 'apply_cover', reason: reasons[item.key] })}>Apply cover</Button>
-            <Button fullWidth={false} variant="outlined" loading={busy === item.key + ':self'} disabled={Boolean(busy) || !reasons[item.key]?.trim()} onClick={() => void run(item.key + ':self', { chargeIds: item.rows.map((r) => r.charge.id), basis: 'exception', decision: 'self_pay', reason: reasons[item.key] })}>Patient pays without insurance</Button>
           </div>
+          <LiabilityForm patientId={item.rows[0]?.charge.patientId ?? ''} checks={data?.insurance.checks ?? []} canApprove={context.permissions.includes('coverage:approve_liability_change')}
+            payerExpected={item.rows.some((r) => r.coverage!.state === 'estimated')} busy={busy === item.key + ':self'} disabled={Boolean(busy) || !reasons[item.key]?.trim()}
+            onSubmit={(liability) => void run(item.key + ':self', { chargeIds: item.rows.map((r) => r.charge.id), basis: 'exception', decision: 'self_pay', reason: reasons[item.key], liability })} />
         </StaffVerification> : null}
       </article>)}
     </section>
@@ -112,7 +147,10 @@ export const InsuranceWorkspace = () => {
       <h2 className="text-lg font-bold">Undecided cover</h2>
       {view.undetermined.size === 0 ? <p className="text-sm">Every insured charge has a decision or an estimate.</p> : [...view.undetermined].map(([reason, rows]) => <article key={reason} className="rounded-card border border-outline-soft bg-white p-3">
         <h3 className="font-semibold">{UNDETERMINED[reason].label} ({rows.length})</h3><p className="text-sm text-ink-soft">{UNDETERMINED[reason].next}</p>
-        <ul className="mt-2 space-y-1 text-sm">{rows.slice(0, 20).map((r) => <li key={r.charge.id}><Link className="text-brand underline" to={`/patients/profile?patient=${encodeURIComponent(r.charge.patientId)}&tab=details`}>{view.names.get(r.charge.patientId) ?? r.charge.patientId}</Link> · {r.charge.description} · {formatMoney(r.undeterminedMinor, r.charge.currency)}</li>)}</ul>
+        <ul className="mt-2 space-y-1 text-sm">{rows.slice(0, 20).map((r) => <li key={r.charge.id}><Link className="text-brand underline" to={`/patients/profile?patient=${encodeURIComponent(r.charge.patientId)}&tab=details`}>{view.names.get(r.charge.patientId) ?? r.charge.patientId}</Link> · {r.charge.description} · {formatMoney(r.undeterminedMinor, r.charge.currency)}
+          {reason === 'not_eligible' && canConfirm ? <StaffVerification purpose="Recording that the patient pays"><TextAreaField label="Reason for your decision" value={reasons[r.charge.id] ?? ''} onChange={(e) => setReasons((v) => ({ ...v, [r.charge.id]: e.target.value }))} />
+            <LiabilityForm patientId={r.charge.patientId} checks={data?.insurance.checks ?? []} canApprove={context.permissions.includes('coverage:approve_liability_change')} payerExpected={false}
+              busy={busy === r.charge.id} disabled={Boolean(busy) || !reasons[r.charge.id]?.trim()} onSubmit={(liability) => void run(r.charge.id, { chargeIds: [r.charge.id], basis: 'exception', decision: 'self_pay', reason: reasons[r.charge.id], liability })} /></StaffVerification> : null}</li>)}</ul>
       </article>)}
     </section>
 

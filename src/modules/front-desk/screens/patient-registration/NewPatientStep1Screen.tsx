@@ -18,6 +18,7 @@ import {
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/modules/front-desk/search';
 import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/modules/front-desk/registration/RegistrationRecoveryPrompt';
 import type { DuplicateNavState } from './DuplicateCheckScreen';
+import { RegistrationPayment, coverIssue, emptyCover, type CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 
 const todayIso = (): string => calendarDate();
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
@@ -60,6 +61,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const canBook = context.permissions.includes('appointment:create');
   const [visitChoice, setVisitChoice] = useState<VisitType | ''>(canBook ? 'general' : '');
   const [saveError, setSaveError] = useState('');
+  const [payment, setPayment] = useState<'self_pay' | 'insurance'>('self_pay'); const [cover, setCover] = useState<CoverFieldsValue>(emptyCover);
   const [opening, setOpening] = useState(false);
 
   const { control, register, handleSubmit, getValues, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({ defaultValues: values });
@@ -90,14 +92,16 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     keep(form);
     const complete: RegistrationValues = { ...values, ...form };
     const visit = visitType ? visitFor(visitType) : undefined;
+    const insured = !editing && !provisional && payment === 'insurance' ? cover : undefined;
+    if (insured && coverIssue(insured)) { setSaveError(coverIssue(insured)!); return; }
     try {
       if (provisional || editing) return await savePatient(complete, state.patientId);
       const found = findLikelyMatches(toPatientDetails(complete), await listPatients());
       if (found.length > 0) {
-        const duplicate: DuplicateNavState = { matchIds: found.map((match) => match.patient.patientId), visit };
+        const duplicate: DuplicateNavState = { matchIds: found.map((match) => match.patient.patientId), visit, ...(insured ? { cover: insured } : {}) };
         return navigate('/patients/duplicate', { state: duplicate });
       }
-      return await savePatient(complete, undefined, undefined, visit);
+      return await savePatient(complete, undefined, undefined, visit, insured);
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'The duplicate check could not be completed. Try again.'); }
   };
 
@@ -247,6 +251,8 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
               </div>
             </section>
           ) : null}
+
+          {!editing && !provisional ? <RegistrationPayment method={payment} onMethod={setPayment} cover={cover} onCover={setCover} /> : null}
 
           {!editing && !provisional && canBook ? (
             <section aria-labelledby="registration-visit" className="space-y-4 border-t border-outline-soft pt-6">

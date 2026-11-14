@@ -61,11 +61,17 @@ export const coverNeedsCheck = (patientId: string, data: Pick<CoverageData, 'cov
 };
 
 export type CoverDraft = Pick<PatientCover, 'patientId' | 'payerId' | 'planCode' | 'enrolleeNumber' | 'relationship' | 'principalName' | 'validFrom' | 'validTo' | 'active'> & { replaces?: string };
-export const recordCover = (draft: CoverDraft, context: AuthorizationContext) => insertRecord<PatientCover>(context, 'cover:record', 'patient_cover', {
+/** A new cover record. Recording cover is not checking it: a cover starts unchecked, whatever the card says. */
+export const coverRecord = (draft: CoverDraft, context: AuthorizationContext): PatientCover => ({
   ...envelope(context), id: newId('patient_cover'), type: 'patient_cover', ...draft,
-  enrolleeNumber: draft.enrolleeNumber.trim(), principalName: draft.principalName?.trim() || undefined,
+  planCode: draft.planCode.trim(), enrolleeNumber: draft.enrolleeNumber.trim(), principalName: draft.principalName?.trim() || undefined,
   validFrom: draft.validFrom || undefined, validTo: draft.validTo || undefined, replaces: draft.replaces || undefined,
-});
+} as PatientCover);
+export const recordCover = (draft: CoverDraft, context: AuthorizationContext) => insertRecord<PatientCover>(context, 'cover:record', 'patient_cover', coverRecord(draft, context));
+/** Plans a payer's active contract offers, from the synced patient-facing schedules: code and name only. */
+export const plansOf = (payerId: string, schedules: readonly CoverSchedule[]) =>
+  [...new Map(schedules.filter((s) => s.payerId === payerId && !s.endedOn).map((s) => [s.planCode, s.planName])).entries()].map(([code, name]) => ({ code, name }));
+export const listSchedules = () => allOfType<CoverSchedule>('cover_schedule');
 
 export type CheckDraft = Pick<CoverCheck, 'patientId' | 'coverId' | 'method' | 'result' | 'coversFrom' | 'coversTo' | 'reference' | 'note'>;
 export const recordCheck = (draft: CheckDraft, context: AuthorizationContext) => insertRecord<CoverCheck>(context, 'cover:verify', 'cover_check', {

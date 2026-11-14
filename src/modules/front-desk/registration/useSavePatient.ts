@@ -10,6 +10,8 @@ import { useClearRegistrationDraft } from './RegistrationDraftProvider';
 import { toPatientDetails, type RegistrationValues } from './registrationValues';
 import { amountsDue, type RegistrationVisit } from './visitFees';
 import { identityReviewRecords, type RegistrationDecision } from '@/data/repos/patientIdentity';
+import { coverRecord } from '@/data/repos/insurance';
+import type { CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 
 /** Where a newly registered and booked patient goes next, shown on their record. */
 export type RegistrationOutcome = { patientId: string; message: string };
@@ -35,7 +37,7 @@ export const useSavePatient = () => {
   const saving = useRef(false);
 
   return useCallback(
-    async (values: RegistrationValues, editingPatientId?: string, decision?: RegistrationDecision, visit?: RegistrationVisit) => {
+    async (values: RegistrationValues, editingPatientId?: string, decision?: RegistrationDecision, visit?: RegistrationVisit, cover?: CoverFieldsValue) => {
       if (saving.current) return;
       saving.current = true;
       try {
@@ -46,6 +48,8 @@ export const useSavePatient = () => {
           ? await updatePatient(editingPatientId, details, context)
           : await registerPatient(details, context, (patientId, created) => {
             const extra: NewRecord[] = [...identityReviewRecords(patientId, decision, context)];
+            // Insurance chosen at registration is saved with the patient, as cover not yet checked.
+            if (cover) extra.push({ permission: 'cover:record', type: 'patient_cover', record: coverRecord({ ...cover, patientId }, context) });
             charges.push(...created.charges);
             if (visit) {
               const booking = newPatientBookingRecords({ patientId, reason: visit.reason, visitType: visit.visitType }, context, created);

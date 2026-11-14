@@ -144,6 +144,7 @@ const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/Billi
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
 const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
+const PayerPaymentsScreen = lazy(() => import('@/modules/insurance/PayerPaymentsScreen').then((m) => ({ default: m.PayerPaymentsScreen })));
 const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCompletionScreen').then((m) => ({ default: m.ServiceCompletionScreen })));
 const SettingsLayout = lazy(() => import('@/app/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const AccountSecurity = lazy(() => import('@/app/settings/AccountSecurity').then((m) => ({ default: m.AccountSecurity })));
@@ -268,6 +269,7 @@ const App = () => {
             <Route path="/billing/settings" element={<MovedTo to="/settings/billing/payments" />} />
             <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
             <Route path="/insurance/claims" element={<RequireCapability permissions={['coverage:confirm']}><ClaimsScreen /></RequireCapability>} />
+            <Route path="/insurance/payments" element={<RequireCapability permissions={['insurance_remittance:record']}><PayerPaymentsScreen /></RequireCapability>} />
             <Route path="/clinical/service-completion" element={<RequireCapability permissions={['encounter:record']}><ServiceCompletionScreen /></RequireCapability>} />
             <Route path="/insurance/settings" element={<MovedTo to="/settings/insurance/setup" />} />
             <Route path="/insurance/contracts" element={<MovedTo to="/settings/insurance/payers" />} />

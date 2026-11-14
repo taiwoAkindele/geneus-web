@@ -1,3 +1,4 @@
+import type { ClaimSettlement, DiagnosisCatalogueImport, DiagnosisCatalogueSummary, DisputeOpen, DisputeResolve, LiabilityChange, PayerDecisionInput, RemittanceInput, RemittanceMatch, RemittanceRow, WriteOffInput } from '@shared';
 import type { AllocationSplit, AuthorizationContext, AuthorizationInput, ClaimAcknowledgementInput, ClaimAuthorization, ClaimIssue, ClaimState, ClaimSubmissionInput, ClaimView, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, binaryRequest, staffRequest } from './client';
@@ -51,7 +52,7 @@ export const activateContract = (context: AuthorizationContext, input: { contrac
 export const endContract = (context: AuthorizationContext, input: { contractVersionId: string; endsOn: string; reason: string }) =>
   call<{ contractVersionId: string; endsOn: string }>(context, '/insurance/contracts/end', { ...input, requestKey: key() });
 export const previewAllocations = (context: AuthorizationContext, chargeIds: string[]) => call<{ items: PreviewItem[] }>(context, '/insurance/allocations/preview', { chargeIds });
-export const confirmAllocations = (context: AuthorizationContext, input: { chargeIds: string[]; basis: 'visit' | 'routine_bulk' | 'exception'; decision?: 'apply_cover' | 'self_pay'; reason?: string }) =>
+export const confirmAllocations = (context: AuthorizationContext, input: { chargeIds: string[]; basis: 'visit' | 'routine_bulk' | 'exception'; decision?: 'apply_cover' | 'self_pay'; reason?: string; liability?: LiabilityChange }) =>
   call<{ outcomes: ConfirmOutcome[] }>(context, '/insurance/allocations/confirm', { ...input, requestKey: key() });
 export const recordRefund = (context: AuthorizationContext, input: { id: string; patientId: string; method: Refund['method']; currency: string; allocations: { chargeId: string; amountMinor: number }[]; reason: string; reference?: string }) =>
   call<Refund>(context, '/billing/refunds', input);
@@ -63,6 +64,11 @@ export const SKIP_REASONS: Record<string, string> = {
   choose_cover_first: 'Choose which cover applies first', self_pay_prohibited_by_payer: 'The contract prohibits paying without insurance', not_found: 'Charge not found',
   timezone_required: "Record the hospital's time zone first",
   outside_billing_period: 'Raised before insurance billing started, or after it stopped: billed as recorded',
+  ground_required: 'Choose the documented ground for making the patient liable', on_current_claim: 'It is on a current claim. Revise the claim first',
+  missing_configuration_is_not_a_ground: 'Missing hospital configuration is not a reason to charge the patient. Complete the contract set-up',
+  contract_does_not_allow_self_pay: 'The contract in force on the date of service does not allow members to pay without insurance',
+  not_eligible_check_required: 'Name a recorded check that found the cover not eligible on the date of service',
+  liability_approval_required: 'The payer is expected to pay this. Moving it to the patient needs someone allowed to approve liability changes',
 };
 
 /* ---------------- Setup, documents and submission settings (Milestone 1) ---------------- */
@@ -119,7 +125,7 @@ export const importTariff = (context: AuthorizationContext, input: TariffImport)
 /* ---------------- Claims (Milestone 3) ---------------- */
 
 export type ClaimBatch = { id: string; payerId: string; reference: string; periodFrom: string; periodTo: string; claims: number; createdOn: string };
-export type ClaimSubmission = { id: string; payerId: string; claimIds: string[]; channel: string; reference: string; submittedOn: string; submittedBy: string; evidenceDocumentId?: string; acknowledgement?: { id: string; reference?: string; acknowledgedOn: string } };
+export type ClaimSubmission = { id: string; payerId: string; claimIds: string[]; channel: string; reference: string; submittedOn: string; submittedBy: string; evidenceDocumentId?: string; exportIds: string[]; resubmission: boolean; note?: string; acknowledgement?: { id: string; reference?: string; acknowledgedOn: string } };
 export type ClaimExport = { exportId: string; draft: boolean; headers: string[]; rows: (string | number)[][]; payloadSha256: string; claims: { id: string; claimNumber: string; revision: number }[] };
 export type ReadyOutcome = { claimId: string; outcome: 'ready' } | { claimId: string; outcome: 'skipped'; reason: string; issues?: ClaimIssue[] };
 
@@ -141,11 +147,56 @@ export const listClaimSubmissions = (context: AuthorizationContext) => call<{ su
 
 export const CLAIM_ISSUE_LABELS: Record<ClaimIssue['code'], string> = {
   fulfillment_missing: 'Not shown as done', not_performed: 'Recorded as not done', authorization_missing: 'Authorization missing', authorization_pending: 'Authorization pending',
-  authorization_denied: 'Authorization denied', referral_missing: 'Referral missing', diagnosis_missing: 'No diagnosis', diagnosis_code_missing: 'No ICD-10 code',
-  diagnosis_coding_unverified: 'Coding not verifiable yet', allocation_superseded: 'Split corrected since', submission_method_missing: 'No submission method',
+  authorization_denied: 'Authorization denied', authorization_emergency_followup: 'Emergency care: approval to follow', authorization_quantity_exceeded: 'More than authorized',
+  referral_missing: 'Referral missing', diagnosis_missing: 'No diagnosis', diagnosis_code_missing: 'No diagnosis code',
+  diagnosis_code_format: 'Invalid diagnosis code', diagnosis_code_not_in_catalogue: 'Code not in your list', diagnosis_catalogue_missing: 'No licensed code list',
+  admission_date_missing: 'Admission date unknown', discharge_date_missing: 'Not yet discharged', enrollee_number_missing: 'No enrollee number',
+  service_date_invalid: 'Invalid service date', amount_invalid: 'Invalid amount', allocation_superseded: 'Split corrected since', submission_method_missing: 'No submission method',
   payer_code_missing: 'No payer service code', attachment_missing: 'Attachment missing',
 };
 
 /** The administrator asks Geneus to switch insurance billing on; Geneus approves in its operator console. */
 export const requestInsuranceActivation = (context: AuthorizationContext, note?: string) => call<InsuranceSetupStatus>(context, '/insurance/activation/request', note?.trim() ? { note: note.trim() } : {});
 export const withdrawInsuranceActivation = (context: AuthorizationContext) => call<InsuranceSetupStatus>(context, '/insurance/activation/withdraw', {});
+
+/* ---------------- Diagnosis catalogue (audit H1) ---------------- */
+
+export const importDiagnosisCatalogue = (context: AuthorizationContext, input: DiagnosisCatalogueImport) =>
+  call<{ importId: string; codeSystem: string; added: number; changed: number; removed: number; codes: number }>(context, '/insurance/diagnosis-catalogue/import', input);
+export const listDiagnosisCatalogues = (context: AuthorizationContext) => call<{ catalogues: DiagnosisCatalogueSummary[] }>(context, '/insurance/diagnosis-catalogue/list', {});
+
+/* ---------------- Payer decisions, remittances and settlement (Slice 4) ---------------- */
+
+export type RemittanceView = {
+  id: string; payerId: string; receivedOn: string; reference: string; amountMinor: number; currency: string; method: string; receivingAccount?: string;
+  allocatedMinor: number; unallocatedMinor: number; reversed?: { reason: string; by: string; on: string };
+  allocations: { claimId: string; claimNumber: string; revision: number; amountMinor: number }[]; recordedBy: string; recordedOn: string;
+};
+export type OutstandingClaim = Pick<ClaimView, 'id' | 'claimNumber' | 'revision' | 'payerId' | 'patientId' | 'patientName' | 'enrolleeNumber' | 'state' | 'serviceFrom' | 'serviceTo' | 'currency'> & { settlement: ClaimSettlement };
+export type OutstandingTotals = Record<string, { expected: number; approved: number; deducted: number; paid: number; writtenOff: number; disputed: number; outstanding: number; payerOwes: number; overdue: number }>;
+export type DisputeView = { id: string; claimId: string; claimNumber: string; revision: number; payerId: string; amountMinor: number; reason: string; payerReference?: string; openedBy: string; openedOn: string; resolution?: { outcome: string; note: string; by: string; on: string } };
+
+export const recordPayerDecision = (context: AuthorizationContext, input: Omit<PayerDecisionInput, 'requestKey' | 'lines'> & { lines?: PayerDecisionInput['lines'] }) =>
+  call<{ decisionId: string; claimId: string; decision: string; approvedMinor: number }>(context, '/insurance/claims/decisions/record', { ...input, requestKey: key() });
+/** The caller keeps the request key for the whole entry, so a retry after a lost reply never records the payment twice. */
+export const recordRemittance = (context: AuthorizationContext, input: Omit<RemittanceInput, 'allocations'> & { allocations?: RemittanceInput['allocations'] }) =>
+  call<{ remittanceId: string; allocatedMinor: number; unallocatedMinor: number }>(context, '/insurance/remittances/record', input);
+export const allocateRemittance = (context: AuthorizationContext, input: { remittanceId: string; allocations: { claimId: string; amountMinor: number }[] }) =>
+  call<{ remittanceId: string; allocatedMinor: number; unallocatedMinor: number }>(context, '/insurance/remittances/allocate', { ...input, requestKey: key() });
+export const reverseRemittance = (context: AuthorizationContext, remittanceId: string, reason: string) =>
+  call<{ remittanceId: string }>(context, '/insurance/remittances/reverse', { remittanceId, reason, requestKey: key() });
+export const listRemittances = (context: AuthorizationContext, payerId?: string) => call<{ remittances: RemittanceView[] }>(context, '/insurance/remittances/list', payerId ? { payerId } : {});
+export const matchRemittance = (context: AuthorizationContext, payerId: string, rows: RemittanceRow[]) => call<{ matches: RemittanceMatch[] }>(context, '/insurance/remittances/match', { payerId, rows });
+export const outstandingClaims = (context: AuthorizationContext, payerId?: string) => call<{ claims: OutstandingClaim[]; totals: OutstandingTotals }>(context, '/insurance/outstanding', payerId ? { payerId } : {});
+export const openDispute = (context: AuthorizationContext, input: Omit<DisputeOpen, 'requestKey'>) => call<{ disputeId: string }>(context, '/insurance/disputes/open', { ...input, requestKey: key() });
+export const resolveDispute = (context: AuthorizationContext, input: Omit<DisputeResolve, 'requestKey'>) => call<{ disputeId: string }>(context, '/insurance/disputes/resolve', { ...input, requestKey: key() });
+export const listDisputes = (context: AuthorizationContext) => call<{ disputes: DisputeView[] }>(context, '/insurance/disputes/list', {});
+export const writeOff = (context: AuthorizationContext, input: Omit<WriteOffInput, 'requestKey'>) => call<{ writeOffId: string }>(context, '/insurance/write-offs', { ...input, requestKey: key() });
+
+export const SETTLEMENT_LABELS: Record<ClaimSettlement['status'], string> = {
+  not_submitted: 'Not with the payer', awaiting_response: 'Awaiting payer', queried: 'Queried by payer', returned: 'Returned for correction', denied: 'Denied',
+  approved_unpaid: 'Approved, unpaid', partially_paid: 'Partly paid', disputed: 'Disputed', settled: 'Settled',
+};
+export const DIAGNOSIS_VERIFICATION_LABELS: Record<string, string> = {
+  catalogue_verified: 'verified in your licensed list', format_checked: 'format checked only', format_invalid: 'not a valid code', not_in_catalogue: 'not in your list', not_coded: 'written',
+};

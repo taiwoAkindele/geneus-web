@@ -35,6 +35,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'insurance_contract:read': 'Read payer contracts and tariffs', 'insurance_contract:manage': 'Edit payers, contracts and tariffs',
   'insurance_contract:activate': 'Activate payer contracts', 'cover:record': 'Record patient insurance cover', 'cover:verify': 'Record insurance cover checks',
   'coverage:elect_self_pay': 'Record a patient choosing to pay without insurance', 'coverage:confirm': 'Confirm insurance splits',
+  'coverage:approve_liability_change': 'Approve making a patient liable for what a payer was expected to pay',
+  'insurance_remittance:record': 'Record payments received from payers', 'billing:write_off': 'Write off amounts payers will not pay',
   'register_definition:publish': 'Configure registers', 'unit:manage': 'Manage units',
   'stock_item:manage': 'Manage stock items', 'fee_item:manage': 'Manage the fee schedule',
   'staff:manage': 'Add staff and edit names', 'staff:permission': 'Assign staff roles and permissions',

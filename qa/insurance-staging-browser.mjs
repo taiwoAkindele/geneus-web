@@ -330,7 +330,10 @@ try {
     await signOut(); await signIn('desk');
     for (const patient of [first, second]) {
       await go(`/patients/profile?patient=${encodeURIComponent(patient)}&tab=details`); await waitText('Insurance cover', 30000);
-      await click('Add cover'); await selectByText('Payer', 'Synthetic Staging HMO'); await fill('Plan code', 'GOLD'); await fill('Enrollee number', 'STG-' + patient.slice(-9, -3)); await click('Save cover');
+      await click('Add cover'); await selectByText('Payer', 'Synthetic Staging HMO');
+      // Known plans come from the payer's active contract; nobody retypes the plan code.
+      await selectByText('Plan', 'Staging Gold (GOLD)'); await fill('Enrollee or membership number', 'STG-' + patient.slice(-9, -3)); await click('Save cover');
+      await waitText('Not yet verified', 30000);
       await waitText('Never checked', 30000);
       await click('Record check'); await click('Save check'); await waitText('Last check: Verified', 30000);
     }
@@ -514,6 +517,58 @@ try {
     assert.equal(claims.reduce((n, c) => n + c.lines, 0), 3, 'three services, each still claimed exactly once');
     await shot('16-revised');
     return { claims };
+  });
+
+  /* ---------------- Slice 4: payer decision, payment and settlement ---------------- */
+
+  await check('Officer records the payer\'s approval; the payer\'s payment is recorded and allocated; the claim settles; the patient\'s account is untouched', async () => {
+    const before = await waitFor(`true`).then(() => inspect('/settlement'));
+    const target = before.find((c) => c.claimNumber === 'CLM-000002');
+    assert.ok(target, 'the acknowledged claim is with the payer: ' + JSON.stringify(before));
+    assert.equal(target.status, 'awaiting_response');
+    const patientBefore = (await server(target.patientId)).map((r) => [r.chargeId, r.balanceMinor]);
+    await go('/insurance/claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length >= 2`, 30000, 'claims');
+    await press(`[...document.querySelectorAll('tr[data-claim="CLM-000002"] button')].find((b) => b.textContent.trim() === 'Open')`);
+    await waitText('Payer response and payment', 20000);
+    assert.ok((await text()).includes('Awaiting payer'));
+    await click("Record the payer's decision"); await click('Save decision'); await waitText('Payer decision recorded', 20000);
+    const decisions = await inspect('/decisions');
+    assert.deepEqual(decisions.map((d) => [d.claim_number, d.decision, Number(d.approved_minor)]), [['CLM-000002', 'approved', target.expectedMinor]]);
+    await shot('17-payer-approved');
+
+    await go('/insurance/payments'); await waitText('Payer payments', 30000);
+    await waitText('What payers owe', 30000);
+    await click('Payments received'); await waitText('Record a payment from a payer', 20000);
+    await selectByText('Payer', 'Synthetic Staging HMO');
+    await fill('Payment or advice reference', 'SSH-REMIT-0001');
+    await fill('Received on', new Date().toISOString().slice(0, 10));
+    await fill('Amount received', (target.expectedMinor / 100).toFixed(2));
+    await press(`[...document.querySelectorAll('section[aria-label="Record a payer payment"] div')].find((d) => d.textContent.startsWith('CLM-000002') && d.querySelector('button'))?.querySelector('button')`);
+    await click('Record payment'); await waitText('Payment recorded', 20000);
+    const remittances = await inspect('/remittances');
+    assert.deepEqual(remittances.map((r) => [r.reference, Number(r.amount_minor), Number(r.allocated), r.reversed]), [['SSH-REMIT-0001', target.expectedMinor, target.expectedMinor, false]]);
+    const after = (await inspect('/settlement')).find((c) => c.claimNumber === 'CLM-000002');
+    assert.deepEqual([after.status, after.outstandingMinor, after.paidMinor], ['settled', 0, target.expectedMinor]);
+    assert.deepEqual((await server(target.patientId)).map((r) => [r.chargeId, r.balanceMinor]), patientBefore, 'payer money never enters the patient\'s account');
+    await shot('18-payer-paid');
+
+    // Recording the same payment again is refused: the money is counted once.
+    await fill('Payment or advice reference', 'ssh-remit-0001'); await fill('Amount received', '1.00');
+    await selectByText('Payer', 'Synthetic Staging HMO'); await fill('Payment or advice reference', 'ssh-remit-0001'); await fill('Amount received', '1.00');
+    await click('Record payment'); await waitText('already recorded', 20000);
+    assert.equal((await inspect('/remittances')).length, 1);
+
+    await click('What payers owe'); await waitFor(`Boolean(document.querySelector('[data-testid="payer-outstanding"]'))`, 20000, 'payer totals');
+    const owed = await evaluate(`document.querySelector('[data-testid="payer-outstanding"]').textContent`);
+    await shot('19-payer-balances');
+    return { decisions, remittances, settlementBefore: target, settlementAfter: after, payerOutstandingShown: owed, patientBalances: patientBefore };
+  });
+
+  await check('A cashier cannot see payer payments or record them', async () => {
+    await signOut(); await signIn('cashier');
+    await go('/insurance/payments'); await pause(800);
+    assert.ok(!(await text()).includes('Record a payment from a payer'), 'the cashier has no payer payment screen');
+    return { denied: true };
   });
 
   console.log(JSON.stringify({ results, errors, timeline: timeline.slice(-20) }, null, 2));
