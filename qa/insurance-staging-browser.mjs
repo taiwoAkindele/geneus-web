@@ -4,7 +4,7 @@
 //   node qa/insurance-staging-browser.mjs <handoff.json> <output-dir>
 import { createServer } from 'vite';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm, mkdtemp } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm, mkdtemp, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -26,6 +26,13 @@ const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 const errors = [], results = [], timeline = [];
 let socket, step = 0;
 const inspect = async (path, method = 'GET') => (await fetch(handoff.inspector + path, { method })).json();
+// Synthetic upload fixtures: a minimal PDF, and a text file named .pdf that the server must refuse.
+const samplePdf = join(profile, 'synthetic-agreement.pdf'), fakePdf = join(profile, 'not-a-pdf.pdf');
+await writeFile(samplePdf, '%PDF-1.4\n% synthetic staging agreement\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+await writeFile(fakePdf, '=HYPERLINK("http://example.org","click") this is not a PDF');
+// An HMO-style tariff sheet: a title row, a currency in the header, a near-miss name, a service the hospital lacks, and a formula-like cell.
+const tariffCsv = join(profile, 'synthetic-hmo-tariff.csv');
+await writeFile(tariffCsv, 'Synthetic Staging HMO approved tariff 2026,,,\r\nS/N,HMO Code,Service Description,Approved Tariff (₦)\r\n1,SSH-C01,General consultation,"1,500.00"\r\n2,SSH-L02,Malaria RDT (rapid test),1000\r\n3,SSH-X99,Appendicectomy,90000\r\n4,"=HYPERLINK(""http://example.org"")",=1+1,abc\r\n');
 
 try {
   let target;
@@ -37,7 +44,7 @@ try {
   socket.onmessage = ({ data }) => {
     const m = JSON.parse(data);
     if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text);
-    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') timeline.push({ console: m.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 300) });
+    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') timeline.push({ console: m.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 1500) });
     if (m.id) { const r = pending.get(m.id); pending.delete(m.id); clearTimeout(r?.timer); if (m.error) r?.reject(new Error(m.error.message)); else r?.resolve(m.result); }
   };
   const cdp = (method, params = {}) => new Promise((ok, fail) => { const id = ++sequence; const timer = setTimeout(() => { pending.delete(id); fail(new Error('Chrome timed out: ' + method)); }, 30000); pending.set(id, { resolve: ok, reject: fail, timer }); socket.send(JSON.stringify({ id, method, params })); });
@@ -90,7 +97,7 @@ try {
   await cdp('Page.navigate', { url: handoff.web + '/onboarding/join' });
 
   const people = handoff.people;
-  const pinFor = (key) => ({ admin: '246810', desk: '135791', cashier: '112358', officer: '314159', supervisor: '271828' }[key]);
+  const pinFor = (key) => ({ admin: '246810', desk: '135791', cashier: '112358', officer: '314159', supervisor: '271828', doctor: '161803' }[key]);
   const pinsSet = new Set();
   const signIn = async (key) => {
     const person = people[key];
@@ -126,13 +133,17 @@ try {
     await click('Sign out');
     await waitFor(`location.pathname === '/login'`, 30000, 'signed out');
   };
+  // Online actions need the server to know who is signed in. Signing in online already proves the PIN to it;
+  // the PIN is asked for again only if that has lapsed (for example after the session was ended on the server).
+  const gate = `document.querySelector('section[aria-label="Confirm it is you"]')`;
   const verifyEmail = async (email) => {
-    await click('Email me a verification code');
-    let code;
-    for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent(email)); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
-    assert.ok(code, 'No verification email arrived');
-    await fill('Six-digit code', code); await click('Verify');
-    await waitText('Verified until', 20000);
+    const key = Object.keys(people).find((k) => people[k].email === email) ?? 'admin';
+    await pause(500);
+    if (await evaluate(`Boolean(${gate})`)) {
+      await press(`${gate}.querySelector('input')`);
+      await fill('Your PIN', pinFor(key)); await click('Confirm');
+      await waitFor(`!${gate}`, 20000, 'identity confirmed with the server');
+    }
   };
   const synced = async () => { await waitFor(`!document.body.innerText.includes('Syncing') || true`, 1000).catch(() => {}); await pause(3000); };
 
@@ -160,9 +171,48 @@ try {
   const waitServer = async (patientId, predicate, label, ms = 60000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await server(patientId); if (predicate(last)) return last; await pause(1000); } throw new Error('Server never reached: ' + label + '\n' + JSON.stringify(last)); };
   const { first, second } = handoff.patients;
 
-  await check('Officer signs in with an admin PIN code and sets a PIN', async () => { await signIn('officer'); await shot('02-officer-home'); });
+  await check('Administrator starts insurance setup, follows the checklist to Facility settings and records the time zone', async () => {
+    await signIn('admin');
+    // Setting insurance up lives under Settings; daily insurance work stays hidden until billing is active.
+    await go('/workspace/finance'); await pause(800);
+    assert.ok(!(await text()).includes('Insurance work'), 'no insurance work while off');
+    await go('/insurance/settings'); await waitText('Insurance settings');
+    await waitFor(`location.pathname === '/settings/insurance/setup'`, 10000, 'the old address opens Settings → Insurance');
+    assert.ok((await text()).includes('Payers & contracts'), 'payers and contracts are a tab beside setup, not a page under it');
+    await verifyEmail(people.admin.email);
+    await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Off'`, 30000, 'state off');
+    await click('Start insurance setup');
+    await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Setup'`, 30000, 'state setup');
+    await waitText('must be completed before you can request activation', 30000);
+    const checklist = await evaluate(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].map((li) => li.innerText.replace(/\\s+/g, ' '))`);
+    assert.ok(checklist[0].includes('Facility time zone has not been configured.') && checklist[0].includes('Why it matters') && checklist[0].includes('Who resolves it'), checklist[0]);
+    await shot('02a-setup-started');
+    // The checklist action opens Facility settings directly.
+    await click('Configure time zone'); await waitText('Facility time zone', 30000);
+    await waitFor(`location.search.includes('view=settings')`, 10000, 'facility settings');
+    await waitFor(`Boolean([...document.querySelectorAll('label')].find((l) => l.textContent.includes('I confirm Africa/Lagos')))`, 30000, 'Lagos preselected, awaiting confirmation');
+    await clickLabel('I confirm Africa/Lagos'); await click('Save time zone');
+    await waitText('Time zone set to Africa/Lagos', 20000);
+    assert.equal((await inspect('/insurance-state')).time_zone, 'Africa/Lagos');
+    await shot('02b-time-zone');
+    await go('/workspace/finance'); await pause(800);
+    assert.ok(!(await text()).includes('Insurance work'), 'billing work stays hidden in setup');
+    return { checklist };
+  });
 
-  await check('Officer verifies by email, adds a payer and saves a contract draft (prices stay on the server)', async () => {
+  await check('Officer signs in (the PIN code registers their PIN with the server), then adds their own email on My profile', async () => {
+    await signOut(); await signIn('officer'); await shot('02-officer-home');
+    await go('/profile'); await waitText('My email address', 30000);
+    await fill('Email address', people.officer.email); await click('Email me a code');
+    let code; for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent(people.officer.email)); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
+    assert.ok(code, 'no code arrived');
+    await fill('Code from the email', code); await click('Confirm');
+    await waitText('Your email is verified.', 20000);
+    await shot('02c-my-email-verified');
+  });
+
+  await check('Officer adds a payer and saves a contract draft (prices stay on the server)', async () => {
+    await signOut(); await signIn('officer');
     await go('/insurance/contracts'); await waitText('Payers & contracts');
     await verifyEmail(people.officer.email);
     await waitText('Add payer', 30000); await click('Add payer'); await fill('Payer name', 'Synthetic Staging HMO'); await fill('Short code', 'SSH'); await click('Save payer');
@@ -179,10 +229,52 @@ try {
     for (const category of ['Consultation', 'Laboratory']) { await fillIn(category, 'Cover', 'covered'); await fillIn(category, 'Co-pay', 'percent'); await fillIn(category, 'Percent', '10'); }
     await click('Save draft'); await waitText('Draft version 1 saved', 30000);
     await shot('03-contract-draft');
+    // Supporting evidence: a signed contract PDF, sniffed and stored on the server, then verified by name.
+    const attach = async (file) => {
+      const { root } = await cdp('DOM.getDocument', { depth: -1 });
+      const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'form[aria-label="Upload document"] input[type=file]' });
+      await cdp('DOM.setFileInputFiles', { nodeId, files: [file] });
+      await press(`[...document.querySelectorAll('form[aria-label="Upload document"] button')].find((b) => b.textContent.trim() === 'Upload')`);
+    };
+    await click('Upload'); await waitText('Upload a document', 10000);
+    await fill('Title', 'Synthetic provider agreement 2026'); await attach(samplePdf);
+    await waitText('Not reviewed', 30000);
+    await click('Mark verified');
+    await waitFor(`[...document.querySelectorAll('[aria-label="Documents"] p')].some((p) => p.textContent.trim() === 'Verified')`, 30000, 'document verified');
+    // A file that only claims to be a PDF is refused by its content.
+    await click('Upload'); await fill('Title', 'Not really a PDF'); await attach(fakePdf);
+    await waitText('not a PDF or image', 30000); await click('Cancel');
+    // How this payer receives claims: manual, by portal.
+    await click('Set method'); await fill('Portal address', 'https://claims.synthetic-hmo.example.org');
+    await selectByText('Claim format', 'Excel'); await fill('Days allowed to submit', '30'); await clickLabel('Referral form');
+    await click('Save'); await waitText('Manual · HMO portal', 30000);
+    await evaluate(`document.querySelector('[aria-label="Documents"]').scrollIntoView({ block: 'start' })`); await pause(300);
+    await shot('03b-documents-submission');
     return { draftSavedOnServer: true };
   });
 
-  await check('Administrator activates version 1 after device readiness, acknowledging unsupported terms', async () => {
+  await check('Officer imports an HMO tariff sheet: maps columns, saves the mapping, confirms a suggestion, skips the rest, applies to the draft', async () => {
+    await click('Import tariff sheet'); await waitFor(`Boolean(document.querySelector('input[aria-label="Tariff spreadsheet"]'))`, 10000, 'import opened');
+    const { root } = await cdp('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[aria-label="Tariff spreadsheet"]' });
+    await cdp('DOM.setFileInputFiles', { nodeId, files: [tariffCsv] });
+    await waitText('Review rows', 30000);
+    const mapped = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Import tariff"] fieldset label')].map((l) => [l.textContent.split('Column')[0].replace(/[▾\\n]/g, '').trim().slice(0, 30), (l.control ?? l.querySelector('select'))?.selectedOptions[0]?.textContent]))`);
+    await shot('03c-import-mapping');
+    await fill('Save this mapping as', 'Staging HMO tariff'); await click('Save mapping'); await waitText('saved for next time', 20000);
+    await click('Review rows'); await waitFor(`Boolean(document.querySelector('[data-testid="import-summary"]'))`, 20000, 'review');
+    const before = await evaluate(`document.querySelector('[data-testid="import-summary"]').innerText`);
+    assert.match(before, /1 ready/); assert.match(before, /1 need attention/); assert.match(before, /2 skipped/, 'rows with no possible match start skipped');
+    await selectByText('Service for row 4', 'Suggested: Malaria RDT');
+    const summary = await evaluate(`document.querySelector('[data-testid="import-summary"]').innerText`);
+    assert.match(summary, /2 ready/); assert.match(summary, /0 need attention/);
+    await shot('03d-import-review');
+    await click('Apply 2 prices to the draft'); await waitText('updated.', 30000);
+    await shot('03e-import-applied');
+    return { mapped, before, summary, result: await evaluate(`document.querySelector('[aria-label="Import tariff"] [role=status]')?.innerText`) };
+  });
+
+  await check('Administrator activates the contract, requests billing activation; a Geneus operator approves it in the console', async () => {
     await signOut(); await signIn('admin');
     await inspect('/ready', 'POST');
     await go('/insurance/contracts'); await waitText('Payers & contracts');
@@ -192,7 +284,31 @@ try {
     await clickLabel('I understand services'); await click('Activate version 1');
     await waitText('Version 1 is active', 30000);
     await shot('04-activated');
-    return { devices: await inspect('/devices') };
+    await go('/insurance/settings');
+    await waitFor(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].length > 0`, 30000, 'checklist');
+    const checklist = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Setup checklist"] li[data-kind]')].map((li) => [li.dataset.kind, li.dataset.ok === 'true']))`);
+    for (const kind of ['time_zone_recorded', 'payers_added', 'active_contract', 'officer_with_verified_email', 'devices_ready', 'submission_method_per_payer', 'contract_document_verified']) assert.equal(checklist[kind], true, kind + ' ' + JSON.stringify(checklist));
+    await shot('04b-readiness');
+    // The hospital asks; Geneus approves in its console. No script, no inspector.
+    await fill('Note for Geneus (optional)', 'Staging hospital ready for insurance billing');
+    await click('Request billing activation'); await waitText('Waiting for Geneus', 20000);
+    await shot('04c-activation-requested');
+    await go('/operator'); await waitText('Geneus operator console', 30000);
+    await fill('Operator email', 'ops@geneus.example.org'); await click('Email me a code');
+    let code; for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent('ops@geneus.example.org')); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
+    assert.ok(code, 'no operator code arrived');
+    await fill('Six-digit code', code); await click('Sign in');
+    await waitText('activation request waiting', 20000);
+    await click('Review'); await waitText('Activation requested', 20000);
+    await fill('Decision note', 'STAGING-GOV-001: synthetic rollout approval');
+    await shot('04d-operator-review');
+    await click('Approve and activate billing'); await waitText('Approved: insurance billing is active.', 30000);
+    await shot('04e-operator-approved');
+    assert.equal((await inspect('/insurance-state')).insurance_state, 'active');
+    await click('Sign out');
+    await inspect('/attend', 'POST');
+    await go('/insurance/settings'); await waitText('Approved by Geneus', 30000);
+    return { devices: await inspect('/devices'), operatorAudit: await inspect('/audit?context=insurance_activation_approved') };
   });
 
   await check('Cashier, offline, takes NGN 3,500 cash for patient 1 before any cover is recorded; it uploads on reconnect', async () => {
@@ -249,7 +365,7 @@ try {
     await waitText('Routine visits (1)', 60000); await waitText('Needs review (1)');
     await inspect('/expire-sessions', 'POST');
     await click('Confirm 1 routine visit');
-    await waitText('Your verification ended', 20000);
+    await waitText('Confirm your PIN to continue', 20000);
     await verifyEmail(people.officer.email);
     await click('Confirm 1 routine visit'); await waitText('confirmed', 20000);
     await fill('Reason for your decision', 'Staging: paid cash before cover was verified'); await click('Apply cover');
@@ -276,6 +392,128 @@ try {
     await shot('09-refund');
     return { consult: { received: consult.money.receivedMinor, refunded: consult.money.refundedMinor, patientShare: consult.split.patient_share_minor, payerShare: consult.split.payer_share_minor, adjustment: consult.split.contract_adjustment_minor, balance: consult.balanceMinor },
       lab: { balance: lab.balanceMinor }, refunds: await inspect('/refunds') };
+  });
+
+  /* ---------------- Milestone 3: claims ---------------- */
+  const downloads = join(output, 'downloads');
+  await mkdir(downloads, { recursive: true });
+  await cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+  const newDownload = async (before, ms = 30000) => {
+    const until = Date.now() + ms;
+    while (Date.now() < until) { const now = (await readdir(downloads)).filter((n) => !n.endsWith('.crdownload') && !before.includes(n)); if (now.length) return join(downloads, now[0]); await pause(300); }
+    throw new Error('No file was downloaded');
+  };
+  const sheetRows = async (file) => { const { read, utils } = await import('xlsx'); const book = read(await readFile(file)); return utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, raw: true, defval: '' }); };
+  const claimsOnServer = () => inspect('/claims');
+  const waitClaims = async (predicate, label, ms = 30000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await claimsOnServer(); if (predicate(last)) return last; await pause(1000); } throw new Error('Claims never reached: ' + label + '\n' + JSON.stringify(last)); };
+
+  await check('Doctor records the insured lab test as done, and the record syncs to the server', async () => {
+    await closeDialog(); await go('/home'); await signOut(); await signIn('doctor');
+    await go('/clinical/service-completion'); await waitText('Service completion', 30000);
+    await waitText('Malaria RDT', 60000);
+    const before = await evaluate(`document.body.innerText`);
+    assert.ok(before.includes('Not yet recorded as done'), 'the test is not shown as done until someone who did it records it');
+    await shot('10-completion-list');
+    await press(`[...document.querySelectorAll('li[data-charge="charge:p1-lab"] button')].find((b) => b.textContent.trim() === 'Record as done')`);
+    await fill('Note (optional)', 'Rapid test performed at the bedside');
+    await press(`[...document.querySelectorAll('li[data-charge="charge:p1-lab"] button')].find((b) => b.textContent.trim() === 'Save')`);
+    await waitText('Recorded as done.', 20000);
+    const completions = await (async () => { for (let i = 0; i < 60; i++) { const c = await inspect('/completions'); if (c.length) return c; await pause(1000); } return []; })();
+    assert.equal(completions.length, 1); assert.equal(completions[0].actor_role, 'doctor'); assert.equal(completions[0].created_by, people.doctor.id);
+    await shot('11-completion-recorded');
+    return { completions };
+  });
+
+  await check('Officer generates claims: checks block them, a draft export is marked and changes nothing, then payer rules and evidence make them ready', async () => {
+    await signOut(); await signIn('officer');
+    // This payer accepts written diagnoses and requires a referral form with each claim (set earlier).
+    await go('/insurance/contracts'); await waitText('Payers & contracts');
+    await verifyEmail(people.officer.email);
+    await click('Contracts'); await waitText('Claim submission', 30000);
+    await click('Change'); await selectByText('Diagnosis on claims', 'Written diagnosis accepted'); await click('Save');
+    await waitText('Written diagnosis accepted', 20000);
+    await click('Upload'); await waitText('Upload a document', 10000);
+    await selectByText('Document type', 'Referral form'); await fill('Title', 'Synthetic referral forms, November');
+    const { root } = await cdp('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'form[aria-label="Upload document"] input[type=file]' });
+    await cdp('DOM.setFileInputFiles', { nodeId, files: [samplePdf] });
+    await press(`[...document.querySelectorAll('form[aria-label="Upload document"] button')].find((b) => b.textContent.trim() === 'Upload')`);
+    await waitText('Synthetic referral forms, November', 30000);
+
+    await go('/insurance/claims'); await waitText('Generate claims', 30000);
+    await click('Generate claims'); await waitText('services added', 30000);
+    const generated = await waitClaims((c) => c.length === 2, 'two claims, one per visit');
+    await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims listed');
+    await click('Open'); await waitText('Attachment missing', 20000);
+    await shot('12-claim-blocked');
+    // A marked draft export: allowed while checks fail, changes no claim.
+    await press(`document.querySelector('input[aria-label="Select all claims"]')`);
+    const beforeDraft = await readdir(downloads);
+    await click('Export as draft (2)');
+    const draftFile = await newDownload(beforeDraft);
+    const draftRows = await sheetRows(draftFile);
+    assert.ok(draftFile.includes('DRAFT'));
+    assert.ok(draftRows.slice(1).every((r) => r.includes('DRAFT - NOT FOR SUBMISSION')), 'every row is marked draft');
+    assert.ok((await claimsOnServer()).every((c) => c.state === 'draft'), 'a draft export changes nothing');
+    // Attach the referral form to each claim, then mark both ready.
+    for (const number of ['CLM-000001', 'CLM-000002']) {
+      const section = `section[aria-label="Claim ${number}"]`;
+      if (!(await evaluate(`Boolean(document.querySelector('${section}'))`))) await press(`[...document.querySelectorAll('tr[data-claim="${number}"] button')].find((b) => b.textContent.trim() === 'Open')`);
+      await waitFor(`Boolean(document.querySelector('${section} section[aria-label="Attachments"] input'))`, 20000, 'attachments of ' + number);
+      await press(`[...document.querySelectorAll('${section} section[aria-label="Attachments"] label')].find((l) => l.textContent.includes('referral forms'))?.querySelector('input:not(:checked)')`);
+      await waitFor(`!document.querySelector('${section}')?.innerText.includes('Attachment missing')`, 20000, 'referral attached to ' + number);
+    }
+    await waitFor(`[...document.querySelectorAll('tr[data-claim] td')].filter((td) => td.textContent.trim() === 'Pass').length === 2`, 30000, 'both claims pass');
+    await click('Mark ready (2)'); await waitText('2 claims ready', 20000);
+    await waitClaims((c) => c.every((x) => x.state === 'ready'), 'both ready');
+    await shot('13-claims-ready');
+    return { generated, draftRows: draftRows.length - 1 };
+  });
+
+  await check('Officer exports in the payer\'s own layout; submission and acknowledgement are recorded as separate facts', async () => {
+    await click('Export layouts'); await waitText('Layout name', 10000);
+    await fill('Layout name', 'Staging HMO claim sheet');
+    await fill('Header for Enrollee number', 'ENROLLEE ID'); await fill('Header for Amount claimed', 'AMOUNT (NGN)');
+    await click('Save layout'); await waitText('saved', 20000);
+    await click('Claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims');
+    if (!(await evaluate(`document.querySelector('input[aria-label="Select all claims"]').checked`))) await press(`document.querySelector('input[aria-label="Select all claims"]')`);
+    await selectByText('Layout', 'Staging HMO claim sheet');
+    const before = await readdir(downloads);
+    await click('Export (2)');
+    const file = await newDownload(before);
+    const rows = await sheetRows(file);
+    assert.ok(rows[0].includes('ENROLLEE ID') && rows[0].includes('AMOUNT (NGN)'), JSON.stringify(rows[0]));
+    assert.equal(rows.length - 1, 3, 'three services across two claims');
+    assert.ok(!JSON.stringify(rows).includes('DRAFT'));
+    await waitClaims((c) => c.every((x) => x.state === 'exported'), 'exported, not submitted');
+    await shot('14-exported');
+    await click('Batches & submissions'); await waitText('Record a submission', 10000);
+    for (const label of await evaluate(`[...document.querySelectorAll('section[aria-label="Record submission"] label')].map((l) => l.textContent.trim())`)) await clickLabel(label);
+    await fill("Payer's reference", 'SSH-PORTAL-BATCH-0042');
+    await click('Record submission'); await waitText('recorded as submitted', 20000);
+    await waitClaims((c) => c.every((x) => x.state === 'submitted'), 'submitted');
+    await waitText('SSH-PORTAL-BATCH-0042', 20000);
+    await fill('Acknowledgement reference (optional)', 'SSH-ACK-7781'); await click('Record acknowledgement');
+    await waitText('receipt only, not approval', 20000);
+    const claims = await waitClaims((c) => c.every((x) => x.state === 'acknowledged'), 'acknowledged');
+    await shot('15-acknowledged');
+    return { headers: rows[0], rows: rows.length - 1, exports: await inspect('/claim-exports'), submissions: await inspect('/claim-submissions'), claims };
+  });
+
+  await check('Officer revises an acknowledged claim: a new draft revision, the earlier revision and its submission kept', async () => {
+    await click('Claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims');
+    await click('Open'); await waitText('Reason for a corrected claim', 20000);
+    await fill('Reason for a corrected claim', 'Payer asked for the referral number on the claim');
+    await click('Revise claim'); await waitText('Revision 2 started', 20000);
+    const claims = await waitClaims((c) => c.length === 3, 'a second revision');
+    const [first] = claims.filter((c) => c.revision === 1 && c.superseded_by);
+    assert.equal(first.state, 'acknowledged', 'the earlier revision keeps its history');
+    assert.equal(claims.find((c) => c.revision === 2).state, 'draft');
+    assert.equal(first.lines, 0, 'the earlier revision\'s lines are retired, not deleted');
+    assert.ok(claims.find((c) => c.revision === 2).lines > 0, 'the revision carries the services');
+    assert.equal(claims.reduce((n, c) => n + c.lines, 0), 3, 'three services, each still claimed exactly once');
+    await shot('16-revised');
+    return { claims };
   });
 
   console.log(JSON.stringify({ results, errors, timeline: timeline.slice(-20) }, null, 2));

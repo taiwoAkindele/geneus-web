@@ -4,23 +4,25 @@ import { serviceDateOf, type CoverCheck, type PatientCover } from '@shared';
 import { useLiveQuery } from '@/data';
 import { checksForPatient, coversForPatient, currentCovers, listPayers, recordCheck, recordCover } from '@/data/repos/insurance';
 import { findRecord } from '@/data/db';
-import { insuranceSupported, INSURANCE_SUPPORT_EVENT } from '@/data/insuranceSupport';
+import { deviceInsurance, INSURANCE_SUPPORT_EVENT, type DeviceInsurance } from '@/data/insuranceSupport';
 import { useAuthorizationContext } from '@/session';
 import { Button, SelectField, Sheet, TextAreaField, TextField } from '@/ui';
 import { CHECK_METHODS, CHECK_RESULTS } from './coverageLabels';
 import type { Facility } from '@shared';
 
-export const useInsuranceSupported = () => {
+/** What this device was granted: setup (configure, no bill changes), active (billing), or nothing. */
+export const useDeviceInsurance = (): DeviceInsurance | undefined => {
   const context = useAuthorizationContext();
-  const [supported, setSupported] = useState(() => insuranceSupported(context));
+  const [state, setState] = useState(() => deviceInsurance(context));
   useEffect(() => {
-    const refresh = () => setSupported(insuranceSupported(context));
+    const refresh = () => setState(deviceInsurance(context));
     refresh();
     window.addEventListener(INSURANCE_SUPPORT_EVENT, refresh);
     return () => window.removeEventListener(INSURANCE_SUPPORT_EVENT, refresh);
   }, [context.facilityId, context.deviceId]);
-  return supported;
+  return state;
 };
+export const useInsuranceSupported = () => useDeviceInsurance() !== undefined;
 
 const COVER_TABLES = ['patient_cover', 'cover_check', 'payer', 'facility'] as const;
 
@@ -32,7 +34,8 @@ const COVER_TABLES = ['patient_cover', 'cover_check', 'payer', 'facility'] as co
  */
 export const CoverCard = ({ patientId }: { patientId: string }) => {
   const context = useAuthorizationContext();
-  const supported = useInsuranceSupported();
+  const insurance = useDeviceInsurance();
+  const supported = insurance !== undefined;
   const data = useLiveQuery(useCallback(async () => {
     const [covers, checks, payers, facility] = await Promise.all([coversForPatient(patientId), checksForPatient(patientId), listPayers(), findRecord<Facility>('facility', context.facilityId)]);
     return { covers, checks, payers, timeZone: facility?.timeZone };
@@ -48,6 +51,8 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
   const canCheck = context.permissions.includes('cover:verify');
   return <section aria-label="Insurance cover" className="space-y-3 rounded-card border border-outline-soft bg-white p-4">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Insurance cover</h2>{canRecord ? <Button variant="outlined" fullWidth={false} onClick={() => setEditing('new')}>Add cover</Button> : null}</div>
+    {insurance === 'history' ? <p className="text-sm text-ink-soft">Insurance billing is off. Charges raised while it was on keep their insurance treatment; new charges are billed as cash.</p> : null}
+    {insurance === 'setup' ? <p className="text-sm text-ink-soft">The hospital is setting up insurance. Cover can be recorded now; bills are not affected until insurance billing starts.</p> : null}
     {current.length === 0 ? <p className="text-sm text-ink-soft">No insurance recorded. The patient pays for care themselves.</p> : current.map((cover) => {
       const history = checks.filter((c) => c.coverId === cover.id).sort((a, b) => b.createdOn.localeCompare(a.createdOn));
       const latest = history[0];
@@ -131,7 +136,8 @@ const CheckSheet = ({ cover, today, onClose }: { cover: PatientCover; today?: st
 
 /** At check-in: a prompt, never a gate. Care continues whatever the cover state. */
 export const CheckInCoverPrompt = ({ patientId, onRecord, recordHref }: { patientId: string; onRecord?: () => void; recordHref?: string }) => {
-  const supported = useInsuranceSupported();
+  // During setup cover does not change bills, so the desk is not prompted yet.
+  const supported = useDeviceInsurance() === 'active';
   const context = useAuthorizationContext();
   const data = useLiveQuery(useCallback(async () => {
     const [covers, checks, facility] = await Promise.all([coversForPatient(patientId), checksForPatient(patientId), findRecord<Facility>('facility', context.facilityId)]);

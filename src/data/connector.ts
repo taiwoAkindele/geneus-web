@@ -67,7 +67,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
       rememberWardCareSupport(device, minted.wardCareVersion);
       rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
       rememberDocumentSupport(device,minted.documentWorkflowVersion);
-      rememberInsuranceSupport(device, minted.insuranceWorkflowVersion);
+      rememberInsuranceSupport(device, minted.insuranceWorkflowVersion, minted.insuranceBillingActive, minted.insuranceBillingPeriods);
       recordServerContact(minted.serverTime, device.deviceId);
       await refreshWorkforceKeys();
       return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
@@ -88,7 +88,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion);}
+        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion,handshake.insuranceBillingActive,handshake.insuranceBillingPeriods);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }

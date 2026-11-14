@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { MovedTo } from '@/app/settings/AccountSecurity';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider, useAuthorizationContext } from '@/session';
@@ -41,11 +42,6 @@ const MagicLinkSentScreen = lazy(() =>
 const RegisterFacilityScreen = lazy(() =>
   import('@/modules/administration/screens/facility-onboarding/RegisterFacilityScreen').then((m) => ({
     default: m.RegisterFacilityScreen,
-  })),
-);
-const AdminDashboardScreen = lazy(() =>
-  import('@/modules/administration/screens/facility-onboarding/AdminDashboardScreen').then((m) => ({
-    default: m.AdminDashboardScreen,
   })),
 );
 const InviteStaffScreen = lazy(() =>
@@ -110,7 +106,6 @@ const SendToUnitScreen = lazy(() =>
   import('@/modules/clinical/screens/send-to-unit/SendToUnitScreen').then((m) => ({ default: m.SendToUnitScreen })),
 );
 const UnitQueueScreen = lazy(() => import('@/modules/clinical/screens/units/UnitQueueScreen').then((m) => ({ default: m.UnitQueueScreen })));
-const FacilityScreen = lazy(() => import('@/modules/operations/screens/workforce/FacilityScreen').then((m) => ({ default: m.FacilityScreen })));
 const ServiceScreen = lazy(() => import('@/modules/operations/screens/workforce/ServiceScreen').then((m) => ({ default: m.ServiceScreen })));
 const StaffScreen = lazy(() => import('@/modules/operations/screens/workforce/StaffScreen').then((m) => ({ default: m.StaffScreen })));
 const ClinicalReviewsScreen = lazy(() => import('@/modules/clinical/screens/workforce/ClinicalReviewsScreen').then((m) => ({ default: m.ClinicalReviewsScreen })));
@@ -148,6 +143,14 @@ const FeeScheduleScreen = lazy(() =>
 const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
+const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
+const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCompletionScreen').then((m) => ({ default: m.ServiceCompletionScreen })));
+const SettingsLayout = lazy(() => import('@/app/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
+const AccountSecurity = lazy(() => import('@/app/settings/AccountSecurity').then((m) => ({ default: m.AccountSecurity })));
+const FacilityWorkspace = lazy(() => import('@/modules/operations/workforce/Workspaces').then((m) => ({ default: m.FacilityWorkspace })));
+const MyProfileScreen = lazy(() => import('@/modules/administration/screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })));
+const OperatorConsole = lazy(() => import('@/modules/operator/OperatorConsole').then((m) => ({ default: m.OperatorConsole })));
+const InsuranceSettings = lazy(() => import('@/modules/insurance/InsuranceSettings').then((m) => ({ default: m.InsuranceSettings })));
 const ContractsScreen = lazy(() => import('@/modules/insurance/ContractsScreen').then((m) => ({ default: m.ContractsScreen })));
 const DevicesScreen = lazy(() => import('@/modules/administration/screens/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
 const StockScreen = lazy(() => import('@/modules/inventory/screens/stock/StockScreen').then((module) => ({ default: module.StockScreen })));
@@ -176,6 +179,8 @@ const App = () => {
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
           <Route path="/facilities" element={<FacilityWorkspacesScreen />} />
+          {/* Geneus staff only: no facility or device enrollment, its own sign-in. */}
+          <Route path="/operator" element={<OperatorConsole />} />
           {/* Default screen is the staff shift-login. */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -227,13 +232,29 @@ const App = () => {
 
             {/* Facility admin — the same shell as daily use, reached from the
                 Admin nav entry; each screen deep-links to the next. */}
-            <Route path="/admin" element={<AdminDashboardScreen />} />
-            <Route path="/admin/staff" element={<ManageStaffScreen />} />
+            {/* Settings: every facility setting, one tab per area (src/app/settings). */}
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route path="facility" element={<FacilityWorkspace />} />
+              <Route path="staff" element={<ManageStaffScreen />} />
+              <Route path="devices" element={<DevicesScreen />} />
+              <Route path="billing/fees" element={<FeeScheduleScreen />} />
+              <Route path="billing/payments" element={<BillingSettingsScreen />} />
+              <Route path="insurance/setup" element={<RequireCapability permissions={['insurance_contract:activate', 'insurance_contract:manage']}><InsuranceSettings /></RequireCapability>} />
+              <Route path="insurance/payers" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
+              <Route path="catalogue" element={<InvestigationCatalogueScreen />} />
+              <Route path="organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
+              <Route path="account" element={<AccountSecurity />} />
+              <Route path="*" element={null} />
+            </Route>
+            {/* Earlier addresses of settings pages move there, keeping any query. */}
+            <Route path="/admin" element={<MovedTo to="/settings" />} />
+            <Route path="/profile" element={<MyProfileScreen />} />
+            <Route path="/admin/staff" element={<MovedTo to="/settings/staff" />} />
             <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
-            <Route path="/facility" element={<FacilityScreen />} />
-            <Route path="/organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
+            <Route path="/facility" element={<MovedTo to="/settings/facility" />} />
+            <Route path="/organization" element={<MovedTo to="/settings/organization" />} />
             <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
-            <Route path="/investigations/catalogue" element={<InvestigationCatalogueScreen />} />
+            <Route path="/investigations/catalogue" element={<MovedTo to="/settings/catalogue" />} />
             <Route path="/investigations/settings" element={<RequireCapability permissions={['result_template:manage']}><CatalogueSettingsScreen /></RequireCapability>} />
             <Route path="/investigations/settings/templates/new" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
             <Route path="/investigations/settings/templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
@@ -241,14 +262,17 @@ const App = () => {
             <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
-            <Route path="/admin/units" element={<Navigate to="/facility?view=structure" replace />} />
+            <Route path="/admin/units" element={<Navigate to="/settings/facility?view=structure" replace />} />
             <Route path="/billing" element={<BillingScreen />} />
-            <Route path="/billing/fees" element={<FeeScheduleScreen />} />
-            <Route path="/billing/settings" element={<BillingSettingsScreen />} />
+            <Route path="/billing/fees" element={<MovedTo to="/settings/billing/fees" />} />
+            <Route path="/billing/settings" element={<MovedTo to="/settings/billing/payments" />} />
             <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
-            <Route path="/insurance/contracts" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
-            <Route path="/admin/fees" element={<Navigate to="/billing/fees" replace />} />
-            <Route path="/admin/devices" element={<DevicesScreen />} />
+            <Route path="/insurance/claims" element={<RequireCapability permissions={['coverage:confirm']}><ClaimsScreen /></RequireCapability>} />
+            <Route path="/clinical/service-completion" element={<RequireCapability permissions={['encounter:record']}><ServiceCompletionScreen /></RequireCapability>} />
+            <Route path="/insurance/settings" element={<MovedTo to="/settings/insurance/setup" />} />
+            <Route path="/insurance/contracts" element={<MovedTo to="/settings/insurance/payers" />} />
+            <Route path="/admin/fees" element={<Navigate to="/settings/billing/fees" replace />} />
+            <Route path="/admin/devices" element={<MovedTo to="/settings/devices" />} />
             <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
           </Route>
           {/* Duplicate check is a modal-style screen — outside the shell for now */}

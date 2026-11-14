@@ -30,7 +30,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
       if (c === 0) payments.push(Payment.parse({ ...base, type: 'payment', id: `pay:${p}`, patientId, receiptNumber: 'QA-R-000001-K2', method: 'cash', amountMinor: 400, currency: 'NGN', allocations: [{ chargeId: id, amountMinor: 400 }] }));
     }
   }
-  const data: CoverageData = { covers, checks, elections: [], allocations: [], schedules: [schedule], payers: [], refunds: [], entries: new Map(), timeZone: 'Africa/Lagos' };
+  const data: CoverageData = { covers, checks, elections: [], allocations: [], schedules: [schedule], payers: [], refunds: [], entries: new Map(), timeZone: 'Africa/Lagos', billingPeriods: [{ from: '2000-01-01T00:00:00.000Z' }] };
   return { charges, payments, data };
 };
 

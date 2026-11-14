@@ -1,4 +1,5 @@
 import { hasRole, mayApprovePin } from '@shared';
+import { rememberSetupCode } from '@/lib/api/staffSession';
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Button, PinDots, PinKeypad, TextField } from '@/ui';
@@ -76,6 +77,8 @@ export const PinApprovalScreen = () => {
         return;
       }
       await markCodeUsed(match, claimingFor({ staff: person.staff, facilityId: facility?.code ?? '', deviceId }));
+      // The same code later registers the new PIN with the server, proving who chose it.
+      rememberSetupCode(person.staff.staffId, code);
       approved();
     } catch (cause) {
       setError(

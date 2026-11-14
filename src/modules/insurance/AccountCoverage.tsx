@@ -81,7 +81,7 @@ export const RefundSheet = ({ row, onClose, onDone }: { row: ChargeBalance; onCl
       if (amountMinor <= 0 || amountMinor > credit) throw new Error(`Refund up to ${formatMoney(credit, row.charge.currency)}`);
       if (!reason.trim()) throw new Error('Give the reason for the refund');
       onDone(await recordRefund(context, { id, patientId: row.charge.patientId, method, currency: row.charge.currency, allocations: [{ chargeId: row.charge.id, amountMinor }], reason: reason.trim(), reference: reference.trim() || undefined }));
-    } catch (cause) { setError(cause instanceof VerificationRequired ? 'Your verification ended. Verify again, then refund.' : cause instanceof Error ? cause.message : 'The refund was not recorded'); } finally { setBusy(false); }
+    } catch (cause) { setError(cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN, then refund.' : cause instanceof Error ? cause.message : 'The refund was not recorded'); } finally { setBusy(false); }
   };
   return <Sheet title="Refund credit" eyebrow={(row.charge as Charge).description} onClose={onClose} closeDisabled={busy}>
     <StaffVerification purpose="Refunding a credit">

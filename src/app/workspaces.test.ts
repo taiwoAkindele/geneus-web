@@ -7,8 +7,10 @@ const context = (role: Role, additionalRoles: Role[] = []) => ({ role, roles: [r
 describe('module workspaces', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('offers all seven modules to an administrator', () => {
-    expect(workspacesFor(context('facility_admin')).map((workspace) => workspace.id)).toEqual(['front-desk', 'clinical', 'finance', 'operations', 'inventory', 'reports', 'administration']);
+  it('offers the daily modules and one Settings module to an administrator', () => {
+    expect(workspacesFor(context('facility_admin')).map((workspace) => workspace.id)).toEqual(['front-desk', 'clinical', 'finance', 'inventory', 'reports', 'settings']);
+    expect(workspacesFor(context('facility_admin')).find((w) => w.id === 'settings')?.links.map((l) => l.label))
+      .toEqual(['Facility', 'Staff & access', 'Devices', 'Billing', 'Insurance', 'Clinical catalogue', 'Organization', 'Account & security']);
   });
 
   it('keeps clinical and administrative actions out of the cashier workspace', () => {
@@ -35,10 +37,11 @@ describe('module workspaces', () => {
     expect(pharmacy.links.map((item) => item.key)).not.toContain('laboratory');
   });
 
-  it('places delegated configuration in its owning module', () => {
+  it('places delegated configuration under Settings, showing only the tabs the person may use', () => {
     const available = workspacesFor({ role: 'cashier', roles: ['cashier'], permissions: ['payment:receive', 'fee_item:manage'] });
-    expect(available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key)).toContain('fees');
-    expect(available.map((workspace) => workspace.id)).not.toContain('administration');
+    expect(available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key)).not.toContain('fees');
+    expect(available.find((workspace) => workspace.id === 'settings')?.links.map((item) => item.label)).toEqual(['Billing']);
+    expect(workspacesFor(context('nurse')).map((workspace) => workspace.id)).not.toContain('settings');
   });
 
   it('preserves existing deep links and shared record context', () => {
@@ -47,8 +50,9 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/billing', '?patient=test', available)?.id).toBe('finance');
     expect(workspaceForLocation('/patients/profile', '', available, 'clinical')?.id).toBe('clinical');
     expect(workspaceForLocation('/patients/profile', '', available, 'finance')?.id).toBe('finance');
-    expect(workspaceForLocation('/admin/staff', '?workspace=administration', available)?.id).toBe('administration');
-    expect(workspaceForLocation('/admin/staff', '', available, 'operations')?.id).toBe('operations');
+    expect(workspaceForLocation('/admin/staff', '', available)?.id).toBe('settings');
+    expect(workspaceForLocation('/settings/insurance/payers', '?payer=x', available)?.id).toBe('settings');
+    expect(workspaceForLocation('/facility', '?view=settings', available)?.id).toBe('settings');
     expect(workspaceForLocation('/home', '', available)).toBeUndefined();
   });
 
@@ -91,7 +95,9 @@ describe('module workspaces', () => {
     expect(activeWorkspaceLink(clinical, '/clinical/patients', '?q=amaka')).toBe('clinical-patients');
     expect(clinical.links.map((link) => link.key)).toEqual(['clinical-patients', 'admissions', 'laboratory', 'pharmacy', 'referrals', 'documents']);
     expect(activeWorkspaceLink(finance, '/billing', '?tab=transfers')).toBe('transfers');
-    expect(activeWorkspaceLink(finance, '/billing/fees', '')).toBe('fees');
+    const settings = available.find((workspace) => workspace.id === 'settings')!;
+    expect(activeWorkspaceLink(settings, '/settings/billing/fees', '')).toBe('settings-billing');
+    expect(activeWorkspaceLink(settings, '/settings/insurance/payers', '')).toBe('settings-insurance');
   });
 
   it('stores only a module preference for the relevant staff member and facility', () => {
@@ -103,6 +109,30 @@ describe('module workspaces', () => {
     expect(readLastWorkspace('facility:two', 'staff:one')).toBeUndefined();
     expect([...values.values()]).toEqual(['clinical']);
     expect(workspacePath('clinical')).toBe('/workspace/clinical');
+  });
+
+  it('keeps insurance setup under Settings, and shows daily insurance work by state', () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
+    const admin = { ...context('facility_admin'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const officer = { ...context('insurance_officer'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const finance = (c: typeof admin) => workspacesFor(c).find((w) => w.id === 'finance')?.links.map((l) => l.key) ?? [];
+    const settings = (c: typeof admin) => workspacesFor(c).find((w) => w.id === 'settings')?.links.map((l) => l.key) ?? [];
+    expect(settings(admin)).toContain('settings-insurance');
+    expect(settings(officer)).toContain('settings-insurance');
+    expect(finance(admin)).not.toContain('contracts');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'setup');
+    expect(finance(officer)).not.toContain('insurance');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'active');
+    expect(finance(officer)).toContain('insurance');
+    expect(finance(officer)).toContain('claims');
+    const nurse = { ...context('nurse'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const clinical = (c: typeof admin) => workspacesFor(c).find((w) => w.id === 'clinical')?.links.map((l) => l.key) ?? [];
+    expect(clinical(nurse)).toContain('service-completion');
+    expect(clinical(officer)).not.toContain('service-completion');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'setup');
+    expect(finance(officer)).not.toContain('claims');
+    expect(clinical(nurse)).not.toContain('service-completion');
   });
 
   it('keeps navigation usable when preference storage is blocked', () => {

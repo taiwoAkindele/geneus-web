@@ -79,3 +79,7 @@ export const postAsDevice = <T>(path: string, credential: string, body?: unknown
   });
 
 export const isUnauthorized = (cause: unknown): boolean => cause instanceof ApiError && cause.status === 401;
+
+/** An online action by the signed-in person: the device credential plus their PIN-proven server session. */
+export const staffRequest = <T>(path: string, credential: string, session: string | undefined, body?: unknown): Promise<T> =>
+  request<T>(path, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...(session ? { 'x-staff-session': session } : {}), 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });

@@ -1,4 +1,6 @@
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
+// The server and sync are stood in for: an accepted configuration save lands in local SQLite as sync would deliver it.
+vi.mock('./configurationSave', async (importOriginal) => ({ ...(await importOriginal<typeof import('./configurationSave')>()), saveConfiguration: (await import('./configurationSave.localDouble')).saveConfigurationLocally }));
 import { Location,ServiceDefinition,ServiceOffering,Staff,Unit } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { memoryStorage } from '@/lib/testing/memoryStorage';
