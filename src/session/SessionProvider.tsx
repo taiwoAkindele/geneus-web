@@ -10,6 +10,7 @@ import { listPatients } from '@/data/repos/patients';
 import { RESULT_ALERT_STEPS, resultAlerts } from '@/modules/clinical/encounter/resultAlerts';
 import { visitRecordPath } from '@/modules/front-desk/patients/patientRoutes';
 import { checkPin, needsLongerPin } from './credentials';
+import { endStaffSession, enrolStaffPin, forgetStaffSession, openStaffSessionQuietly, takeSetupCode } from '@/lib/api/staffSession';
 import { approvePinSetup } from './pinApproval';
 import { accessFor, maySignIn, mayStaySignedIn, SESSION_IDLE_MS, shiftEnd, type Access } from './accessPolicy';
 import { shiftEndLabel, shiftRangeLabel } from './shiftLabels';
@@ -226,6 +227,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(LAST_ACTIVITY_KEY);
     lastActivity.current = undefined;
     setStaffId(null);
+    // The server session ends with the local one, so the next person never inherits it.
+    void endStaffSession();
   }, []);
 
   // A fresh online organization check links the same person to a different local
@@ -280,10 +283,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(SIGNED_IN_KEY, candidateId);
       // Refresh roster display immediately after a successful PIN sign-in.
       setNow(Date.now());
+      forgetStaffSession();
       setStaffId(candidateId);
+      // Prove the PIN to the server too, when online, so it knows who is acting: a just-used PIN code
+      // registers the new PIN first. Never blocks or fails sign-in; offline work carries on regardless.
+      const setupCode = takeSetupCode(candidateId);
+      void (setupCode && navigator.onLine ? enrolStaffPin(candidateId, deviceId, pin, { setupCode }).catch(() => openStaffSessionQuietly({ userId: candidateId, deviceId }, pin)) : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
       return undefined;
     },
-    [roster, data],
+    [roster, data, deviceId],
   );
 
   const auth = useMemo<AuthValue>(

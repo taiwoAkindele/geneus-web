@@ -19,7 +19,7 @@ export const DOCUMENT_LABELS: Record<InsuranceDocumentType, string> = {
 const CHANNEL_LABELS: Record<SubmissionChannel, string> = { portal: 'HMO portal', email: 'Email', physical: 'Physical delivery', other: 'Other' };
 const FORMAT_LABELS: Record<ClaimFormat, string> = { csv: 'CSV', xlsx: 'Excel', pdf: 'Printed / PDF' };
 const ACCEPT = 'application/pdf,image/png,image/jpeg';
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 const size = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 /**

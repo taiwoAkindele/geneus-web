@@ -10,7 +10,7 @@ import { Button, SelectField, TextField, useToast } from '@/ui';
 import { buildTariffRows, checkTariffRows, importLines, TARIFF_FIELDS, type CheckedRow, type TariffRow } from './tariffRows';
 
 const PAGE = 50;
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 const STATUS_LABELS = { ready: 'Ready', needs_match: 'Needs a match', error: 'Problem', skipped: 'Skipped' } as const;
 type Filter = 'all' | 'attention' | 'ready' | 'skipped';
 

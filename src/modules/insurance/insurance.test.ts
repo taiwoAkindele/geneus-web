@@ -103,14 +103,14 @@ describe('insurance menu', () => {
     const links = () => workspacesFor(officer).flatMap((w) => w.links.map((l) => l.to));
     expect(links()).not.toContain('/insurance');
     rememberInsuranceSupport(officer, 1);
-    expect(links()).toEqual(expect.arrayContaining(['/insurance', '/insurance/contracts']));
+    expect(links()).toEqual(expect.arrayContaining(['/insurance', '/settings/insurance']));
     rememberInsuranceSupport(officer, undefined);
     expect(links()).not.toContain('/insurance');
   });
   it('never shows contracts to a cashier', () => {
     rememberInsuranceSupport(officer, 1);
     const cashier = { ...officer, role: 'cashier', roles: ['cashier'], permissions: ['payment:receive', 'coverage:elect_self_pay'] } as unknown as AuthorizationContext;
-    expect(workspacesFor(cashier).flatMap((w) => w.links.map((l) => l.to))).not.toContain('/insurance/contracts');
+    expect(workspacesFor(cashier).flatMap((w) => w.links.map((l) => l.to))).not.toContain('/settings/insurance');
   });
 });
 

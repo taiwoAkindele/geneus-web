@@ -133,13 +133,17 @@ try {
     await click('Sign out');
     await waitFor(`location.pathname === '/login'`, 30000, 'signed out');
   };
+  // Online actions need the server to know who is signed in. Signing in online already proves the PIN to it;
+  // the PIN is asked for again only if that has lapsed (for example after the session was ended on the server).
+  const gate = `document.querySelector('section[aria-label="Confirm it is you"]')`;
   const verifyEmail = async (email) => {
-    await click('Email me a verification code');
-    let code;
-    for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent(email)); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
-    assert.ok(code, 'No verification email arrived');
-    await fill('Six-digit code', code); await click('Verify');
-    await waitText('Verified until', 20000);
+    const key = Object.keys(people).find((k) => people[k].email === email) ?? 'admin';
+    await pause(500);
+    if (await evaluate(`Boolean(${gate})`)) {
+      await press(`${gate}.querySelector('input')`);
+      await fill('Your PIN', pinFor(key)); await click('Confirm');
+      await waitFor(`!${gate}`, 20000, 'identity confirmed with the server');
+    }
   };
   const synced = async () => { await waitFor(`!document.body.innerText.includes('Syncing') || true`, 1000).catch(() => {}); await pause(3000); };
 
@@ -169,10 +173,12 @@ try {
 
   await check('Administrator starts insurance setup, follows the checklist to Facility settings and records the time zone', async () => {
     await signIn('admin');
+    // Setting insurance up lives under Settings; daily insurance work stays hidden until billing is active.
     await go('/workspace/finance'); await pause(800);
-    const off = await text();
-    assert.ok(off.includes('Insurance settings') && !off.includes('Payers & contracts') && !off.includes('Insurance work'), 'only settings while off');
+    assert.ok(!(await text()).includes('Insurance work'), 'no insurance work while off');
     await go('/insurance/settings'); await waitText('Insurance settings');
+    await waitFor(`location.pathname === '/settings/insurance/setup'`, 10000, 'the old address opens Settings → Insurance');
+    assert.ok((await text()).includes('Payers & contracts'), 'payers and contracts are a tab beside setup, not a page under it');
     await verifyEmail(people.admin.email);
     await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Off'`, 30000, 'state off');
     await click('Start insurance setup');
@@ -189,36 +195,23 @@ try {
     await waitText('Time zone set to Africa/Lagos', 20000);
     assert.equal((await inspect('/insurance-state')).time_zone, 'Africa/Lagos');
     await shot('02b-time-zone');
-    // The device picks up its new grant without signing out: Payers & contracts appears.
-    await go('/workspace/finance'); await waitText('Payers & contracts', 60000);
+    await go('/workspace/finance'); await pause(800);
     assert.ok(!(await text()).includes('Insurance work'), 'billing work stays hidden in setup');
     return { checklist };
   });
 
-  await check('Officer signs in, then registers and proves their own email on My profile', async () => {
+  await check('Officer signs in (the PIN code registers their PIN with the server), then adds their own email on My profile', async () => {
     await signOut(); await signIn('officer'); await shot('02-officer-home');
     await go('/profile'); await waitText('My email address', 30000);
     await fill('Email address', people.officer.email); await click('Email me a code');
     let code; for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent(people.officer.email)); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
     assert.ok(code, 'no code arrived');
     await fill('Code from the email', code); await click('Confirm');
-    await waitText('An administrator will confirm it is yours', 20000);
-    await shot('02c-my-email-pending');
+    await waitText('Your email is verified.', 20000);
+    await shot('02c-my-email-verified');
   });
 
-  await check('Administrator follows the checklist to confirm the officer\'s email', async () => {
-    await signOut(); await signIn('admin');
-    await go('/insurance/settings'); await waitText('Insurance settings', 30000);
-    if (await evaluate(`document.body.innerText.includes('Email me a verification code')`)) await verifyEmail(people.admin.email);
-    await waitText('waiting for an administrator to confirm', 30000);
-    await click('Confirm email addresses'); await waitText('Staff email confirmations', 30000);
-    if (await evaluate(`document.body.innerText.includes('Email me a verification code')`)) await verifyEmail(people.admin.email);
-    await waitText(people.officer.email, 30000);
-    await click('Confirm it is theirs'); await waitText('Email confirmed.', 20000);
-    await shot('02d-email-confirmed');
-  });
-
-  await check('Officer verifies by email, adds a payer and saves a contract draft (prices stay on the server)', async () => {
+  await check('Officer adds a payer and saves a contract draft (prices stay on the server)', async () => {
     await signOut(); await signIn('officer');
     await go('/insurance/contracts'); await waitText('Payers & contracts');
     await verifyEmail(people.officer.email);
@@ -372,7 +365,7 @@ try {
     await waitText('Routine visits (1)', 60000); await waitText('Needs review (1)');
     await inspect('/expire-sessions', 'POST');
     await click('Confirm 1 routine visit');
-    await waitText('Your verification ended', 20000);
+    await waitText('Confirm your PIN to continue', 20000);
     await verifyEmail(people.officer.email);
     await click('Confirm 1 routine visit'); await waitText('confirmed', 20000);
     await fill('Reason for your decision', 'Staging: paid cash before cover was verified'); await click('Apply cover');

@@ -17,7 +17,7 @@ import { Button, SelectField, TextField, useToast } from '@/ui';
 import { StaffVerification } from './StaffVerification';
 import { useDeviceInsurance } from './CoverCard';
 
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 const STATE_LABELS: Record<ClaimState, string> = { draft: 'Draft', ready: 'Ready', exported: 'Exported', submitted: 'Submitted', acknowledged: 'Acknowledged' };
 const FIELD_LABELS: Record<ClaimExportField, string> = {
   claimNumber: 'Claim number', claimRevision: 'Revision', claimStatus: 'Claim status', batchReference: 'Batch', facilityName: 'Hospital', patientName: 'Patient name', hospitalNumber: 'Hospital number',

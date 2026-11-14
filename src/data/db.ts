@@ -10,6 +10,8 @@ import {
   type Patient,
 } from '@shared';
 import { assertAllowed } from '@/auth/authorization';
+import { isConfigurationWrite } from '@shared';
+import { saveConfiguration } from './configurationSave';
 import { fieldKindsFor } from './contractShape';
 import { getDatabase, type LocalDatabase } from './database';
 import { fromRow, toRow, type Row } from './rows';
@@ -90,6 +92,8 @@ export const insertRecord = async <T extends AnyDocument>(
   const bundle=await prepareClinicalBundle([{type,permission,record:validate(record)}],context);
   const validated = validate<T>(bundle.records[0].record);
   assertFacilityContext(context, validated);
+  // Configuration is saved online and confirmed by the server; it never enters the offline queue.
+  if (isConfigurationWrite(type, 'put')) { await saveConfiguration(context, [{ op: 'put', type, record: validated }]); return validated; }
   const row = toRow(type, validated);
   if(options?.replaceSame){const existing=await findRecord(type,validated.id);if(existing){const {clinicalPayloadHash}=await import('./workforceClinical');if(await clinicalPayloadHash(existing)!==await clinicalPayloadHash(validated))throw new Error('A different clinical record already uses this identity. Review its existing history');}}
   const columns = Object.keys(row);
@@ -118,6 +122,13 @@ export const insertRecords = async (context: AuthorizationContext, records: read
   const bundle=await prepareClinicalBundle(records.map((r)=>({...r,record:validate(r.record)})),context);
   const validated=bundle.records.map(({type,record})=>({type,record:validate(record)}));
   for (const { record } of validated) assertFacilityContext(context, record);
+  const configuration = validated.filter(({ type }) => isConfigurationWrite(type, 'put'));
+  if (configuration.length) {
+    // Settings and daily records are never mixed in one save: one goes online, the other offline.
+    if (configuration.length !== validated.length) throw new Error('Settings are saved on their own, online');
+    await saveConfiguration(context, validated.map(({ type, record }) => ({ op: 'put' as const, type, record })));
+    return validated.map(({ record }) => record);
+  }
   await getDatabase().writeTransaction(async (transaction) => {
     if (checkUnderLock) await checkUnderLock(transaction);
     for (const { type, record } of validated) {
@@ -156,6 +167,10 @@ export const updateRecord = async <T extends AnyDocument>(
   const revision = (changes as Record<string, unknown>).revision;
   const cas = typeof revision === 'number' && ['unit','billing_department','location','service_definition','service_offering','practitioner_profile','result_template','result_part','answer_list'].includes(type);
   if (cas && revision !== Number((current as Record<string,unknown>).revision ?? 1) + 1) throw new Error('This configuration changed. Reopen the current record before saving');
+  if (isConfigurationWrite(type, 'patch', Object.keys(changes))) {
+    await saveConfiguration(context, [{ op: 'patch', type, id, changes: stamped as Record<string, unknown>, current }]);
+    return merged;
+  }
   const row = toRow(type, stamped);
   const columns = Object.keys(row);
   // `_metadata` is PowerSync's per-write note, not a contract field: it carries the

@@ -1,7 +1,7 @@
 import type { AuthorizationContext, OwnEmailStatus, StaffEmailRequestView } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
-import { ApiError, workforceRequest } from './client';
-import { expirePrivateWorkforce, verifiedToken } from './workforce';
+import { ApiError, staffRequest } from './client';
+import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
 import { VerificationRequired } from './insurance';
 
 /**
@@ -11,11 +11,11 @@ import { VerificationRequired } from './insurance';
  */
 const credential = () => { const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled'); return device.credential; };
 const send = async <T>(context: AuthorizationContext, path: string, body: unknown, needsVerification: boolean): Promise<T> => {
-  const token = verifiedToken(context);
+  const token = staffSessionToken(context);
   if (needsVerification && !token) throw new VerificationRequired();
-  try { return await workforceRequest<T>(path, credential(), token, body, 'POST'); }
+  try { const result = await staffRequest<T>(path, credential(), token, body); touchStaffSession(); return result; }
   catch (cause) {
-    if (cause instanceof ApiError && cause.code === 'private_verification_required') { expirePrivateWorkforce(); throw new VerificationRequired(); }
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
     throw cause;
   }
 };

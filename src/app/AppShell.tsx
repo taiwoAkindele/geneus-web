@@ -43,10 +43,10 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
       <div className="mt-4 flex flex-col gap-2">
         <button type="button" className="min-h-[44px] rounded-field border border-outline-soft px-4 py-3 text-left font-bold" onClick={() => go('/profile')}>My profile and email</button>
         <button type="button" className="min-h-[44px] rounded-field border border-outline-soft px-4 py-3 text-left font-bold" onClick={() => go('/facilities')}>Switch facility</button>
-        {available.some((workspace) => workspace.id === 'administration') ? (
+        {available.some((workspace) => workspace.id === 'settings') ? (
           <button
             type="button"
-            onClick={() => go('/admin')}
+            onClick={() => go('/settings')}
             className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-outline-soft px-4 py-3.5 text-left text-[15px] font-semibold"
           >
             <Icon name="patients" className="h-5 w-5 text-brand" />

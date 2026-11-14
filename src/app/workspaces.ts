@@ -2,9 +2,10 @@ import type { AuthorizationContext, Permission, Role } from '@shared';
 import { clinicalDocumentAccess } from '@shared';
 import type { IconName } from '@/ui';
 import { navigationFor } from './navigation';
-import { insuranceBillingWork, insuranceSupported } from '@/data/insuranceSupport';
+import { insuranceBillingWork } from '@/data/insuranceSupport';
+import { settingsTabsFor } from './settings/settingsTabs';
 
-export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'operations' | 'inventory' | 'reports' | 'administration';
+export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'inventory' | 'reports' | 'settings';
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'> & Partial<Pick<AuthorizationContext, 'facilityId' | 'deviceId'>>;
 /** `also` lists other pages that belong to this link, so it stays highlighted there. */
 export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName; also?: readonly string[] };
@@ -25,8 +26,6 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const lab = consultation || roleIn(context, 'laboratory_staff') || has(context, 'clinical:perform_test', 'clinical:record_result');
   const pharmacy = consultation || roleIn(context, 'pharmacy_staff') || has(context, 'clinical:dispense');
   const appointments = roleIn(context, 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor', 'facility_admin') || has(context, 'appointment:create', 'appointment:update');
-  const staffAccess = roleIn(context, 'facility_admin') || has(context, 'staff:manage', 'staff:permission', 'staff:deactivate');
-  const devices = roleIn(context, 'facility_admin') || has(context, 'device:enroll', 'device:revoke');
   const inventory = roleIn(context, 'facility_admin', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'stock_item:manage', 'stock_movement:create');
   const reports = roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'register_entry:create', 'register_definition:publish');
   const modules: Workspace[] = [
@@ -53,52 +52,38 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       link('accounts', 'Patient accounts', 'Find bills, review charges and receive payments.', '/billing?tab=collections', 'finance'),
       link('transfers', 'Transfer reconciliation', 'Match incoming transfers to the correct account.', '/billing?tab=transfers', 'referrals'),
       link('financial-reports', 'Payments & financial reports', 'Review collections and recorded receipts.', '/billing?tab=reports', 'month'),
-      ...(has(context, 'fee_item:manage') || roleIn(context, 'facility_admin') ? [link('fees', 'Fees', 'Manage the prices attached to facility services.', '/billing/fees', 'registers'), link('receiving', 'Payment setup', 'Manage departments and receiving accounts.', '/billing/settings', 'settings')] : []),
     ] : []),
-      // Insurance pages appear once the hospital enters setup; billing work only once billing is active.
-      // Administrators who can start setup always see its settings, so it can be turned on from here.
+      // Daily insurance work appears once billing is active; setting insurance up lives under Settings.
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm') ? [link('claims', 'Claims', 'Prepare, export and record claims to payers.', '/insurance/claims', 'month')] : []),
-      ...(insuranceSupported(context) && has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate') ? [link('contracts', 'Payers & contracts', 'Set up payers, contracts, documents and claim submission.', '/insurance/contracts', 'registers')] : []),
-      ...(has(context, 'insurance_contract:activate') || (insuranceSupported(context) && has(context, 'insurance_contract:manage')) ? [link('insurance-settings', 'Insurance settings', 'Start insurance setup and see what is still needed before billing.', '/insurance/settings', 'settings')] : []),
-    ] },
-    { id: 'operations', label: 'Operations', description: 'Services, teams and schedules', icon: 'calendar', links: [
-      ...(has(context, 'service:manage', 'result_template:manage') ? [link('investigations', 'Investigation catalogue', 'Configure available investigations and their fees.', '/investigations/catalogue', 'laboratory')] : []),
-      ...(keys.has('facility') ? [link('facility', 'Facility setup', 'Manage services, accountable teams and locations.', '/facility', 'referrals')] : []),
-      ...(keys.has('staff') ? [link('staff', 'Staff & roster', 'Manage people, assignments and planned shifts.', '/admin/staff', 'patients')] : []),
     ] },
     { id: 'inventory', label: 'Inventory', description: 'Medicines, supplies and stock', icon: 'stock', links: inventory && keys.has('stock') ? [link('stock', 'Medicine & stock', 'Review stock balances, movements and items needing attention.', '/stock', 'stock')] : [] },
     { id: 'reports', label: 'Registers & Reports', description: 'Programme records and reports', icon: 'month', links: reports ? [
       ...(keys.has('registers') ? [link('registers', 'Register books', 'Record and review entries in facility programme books.', '/registers', 'registers')] : []),
       ...(keys.has('month') ? [link('monthly', 'Monthly reports', 'Review recorded facility activity by month.', '/reports/month', 'month')] : []),
     ] : [] },
-    { id: 'administration', label: 'Administration', description: 'Access, devices and settings', icon: 'settings', links: [
-      ...(roleIn(context, 'facility_admin') ? [link('organization', 'Organization', 'Link independent facilities and request staff provisioning.', '/organization', 'referrals')] : []),
-      ...(staffAccess ? [link('access', 'User access', 'Open staff profiles to manage sign-in duties and permissions.', '/admin/staff?workspace=administration', 'lock')] : []),
-      ...(devices ? [link('devices', 'Facility devices', 'Enroll devices and review or revoke their access.', '/admin/devices', 'lock')] : []),
-      ...(staffAccess || devices ? [link('settings', 'Administration settings', 'Manage account recovery and administrative settings.', '/admin', 'settings')] : []),
-    ] },
+    // Every facility setting, one page per area: the same tabs as the Settings page.
+    { id: 'settings', label: 'Settings', description: 'Facility, staff, devices, billing and insurance setup', icon: 'settings', links: settingsTabsFor(context).map((tab) => ({
+      ...link(tab.key === 'devices' ? 'devices' : `settings-${tab.key}`, tab.label, tab.description, tab.to, tab.icon),
+      ...(tab.key === 'staff' ? { also: ['/admin/staff'] } : tab.key === 'facility' ? { also: ['/facility'] } : tab.key === 'catalogue' ? { also: ['/investigations'] } : {}),
+    })) },
   ];
   return modules.filter((workspace) => workspace.links.length > 0);
 };
 
 /** Shared patient and staff pages retain the relevant, permitted workspace. */
-export const workspaceForLocation = (pathname: string, search: string, available: readonly Workspace[], preferred?: WorkspaceId): Workspace | undefined => {
+export const workspaceForLocation = (pathname: string, _search: string, available: readonly Workspace[], preferred?: WorkspaceId): Workspace | undefined => {
   const find = (id?: string) => available.find((workspace) => workspace.id === id);
   if (pathname.startsWith('/workspace/')) return find(pathname.split('/')[2]);
   if (pathname === '/home' || pathname === '/sync') return undefined;
-  const params = new URLSearchParams(search);
   if (pathname.startsWith('/patients')) return find(preferred === 'finance' || preferred === 'clinical' ? preferred : 'front-desk');
-  if (pathname.startsWith('/admin/staff')) return find(params.get('workspace') === 'administration' || pathname === '/admin/staff/access' || preferred === 'administration' ? 'administration' : 'operations') ?? find('administration');
+  if (pathname.startsWith('/settings') || pathname.startsWith('/admin')) return find('settings');
   if (pathname.startsWith('/referrals')) return find('clinical');
-  if (pathname.startsWith('/investigations')) return find('operations');
-  if (pathname.startsWith('/organization')) return find('administration');
+  if (pathname.startsWith('/investigations') || pathname.startsWith('/organization') || pathname.startsWith('/facility')) return find('settings');
   if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/clinical/') || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/laboratory/') || pathname.startsWith('/pharmacy/') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
-  if (pathname.startsWith('/facility') || pathname === '/admin/units') return find('operations');
   if (pathname.startsWith('/stock')) return find('inventory');
   if (pathname.startsWith('/registers') || pathname.startsWith('/reports')) return find('reports');
-  if (pathname.startsWith('/admin')) return find('administration');
   if (pathname.startsWith('/appointments')) return find(preferred === 'clinical' ? 'clinical' : 'front-desk');
   return undefined;
 };

@@ -25,7 +25,7 @@ const Requests = () => {
   const context = useAuthorizationContext();
   const toast = useToast();
   const [requests, setRequests] = useState<StaffEmailRequestView[]>(); const [error, setError] = useState('');
-  const load = useCallback(() => listEmailRequests(context).then((r) => { setRequests(r.requests); setError(''); }, (cause) => setError(cause instanceof VerificationRequired ? 'Your verification ended. Verify again.' : cause instanceof Error ? cause.message : 'Could not load')), [context]);
+  const load = useCallback(() => listEmailRequests(context).then((r) => { setRequests(r.requests); setError(''); }, (cause) => setError(cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'Could not load')), [context]);
   useEffect(() => { void load(); }, [load]);
   const decide = (id: string, decision: 'approve' | 'reject') => decideEmailRequest(context, id, decision).then(() => { toast(decision === 'approve' ? 'Email confirmed.' : 'Request rejected.'); void load(); }, (cause) => setError(cause instanceof Error ? cause.message : 'Failed'));
   if (error) return <p role="alert" className="text-sm text-danger">{error}</p>;

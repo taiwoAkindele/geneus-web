@@ -13,7 +13,7 @@ const STATE_TEXT = {
   setup: 'Setup mode. Staff can add payers, contracts, documents and patient cover. No bill changes until Geneus approves billing.',
   active: 'Insurance billing is active. Verified cover changes what patients pay for services from activation onwards.',
 } as const;
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 
 /**
  * Insurance settings: whether the hospital is off, in setup or billing, what

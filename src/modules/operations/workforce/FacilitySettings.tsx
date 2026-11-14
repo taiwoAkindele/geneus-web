@@ -9,7 +9,7 @@ import { Button, SelectField, TextAreaField, useToast } from '@/ui';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 
 const ZONES: string[] = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? ['Africa/Lagos', 'Africa/Accra', 'Africa/Nairobi', 'Africa/Johannesburg', 'Europe/London', 'UTC'];
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 
 /**
  * Facility-wide settings a hospital administrator manages for itself. The

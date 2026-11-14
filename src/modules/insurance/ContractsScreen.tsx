@@ -26,7 +26,7 @@ const ARRANGEMENT_LABELS: Record<Arrangement, string> = { per_service: 'Paid per
 const BASIS_LABELS: Record<string, string> = { per_unit: 'per unit', per_charge: 'per charge (not calculated yet)', per_dispense: 'per dispense (not calculated yet)', per_visit: 'per visit (not calculated yet)', per_claim: 'per claim (not calculated yet)' };
 const KIND_LABELS: Record<PayerKind, string> = { national_scheme: 'National scheme', state_scheme: 'State scheme', hmo: 'HMO', company: 'Company', other: 'Other' };
 const blankPlan = (): ContractPlan => ({ planCode: '', name: '', rules: { categories: {}, items: {} } });
-const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your verification ended. Verify again to continue.' : cause instanceof Error ? cause.message : 'The request failed';
+const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 
 /**
  * Payers and their contracts. Contract terms stay on the server: this screen
@@ -37,10 +37,10 @@ export const ContractsScreen = () => {
   const context = useAuthorizationContext();
   const supported = useInsuranceSupported();
   useEffect(() => { document.title = 'Payers & contracts · Geneus Health'; }, []);
-  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is off for this hospital. An administrator can start setup in <Link className="font-semibold text-brand" to="/insurance/settings">Insurance settings</Link>.</p></main>;
+  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is off for this hospital. An administrator can start setup in <Link className="font-semibold text-brand" to="/settings/insurance/setup">Insurance settings</Link>.</p></main>;
   const canRead = context.permissions.includes('insurance_contract:read');
   return <main className="mx-auto max-w-5xl space-y-6 p-4">
-    <header><Link className="text-sm font-semibold text-brand" to="/insurance/settings">← Insurance settings</Link><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
+    <header><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
       <p className="text-sm text-ink-soft">Contract prices stay on the server. Devices receive only what the patient pays, once a version is activated.</p></header>
     <StaffVerification purpose="Managing payer contracts"><ContractsBody canRead={canRead} /></StaffVerification>
   </main>;

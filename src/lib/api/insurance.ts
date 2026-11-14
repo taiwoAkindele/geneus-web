@@ -1,7 +1,7 @@
 import type { AllocationSplit, AuthorizationContext, AuthorizationInput, ClaimAcknowledgementInput, ClaimAuthorization, ClaimIssue, ClaimState, ClaimSubmissionInput, ClaimView, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
-import { ApiError, binaryRequest, workforceRequest } from './client';
-import { expirePrivateWorkforce, verifiedToken } from './workforce';
+import { ApiError, binaryRequest, staffRequest } from './client';
+import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
 
 /**
  * Online insurance and refund actions. Each needs the staff member's verified
@@ -10,18 +10,20 @@ import { expirePrivateWorkforce, verifiedToken } from './workforce';
  * screen asks for a fresh code instead of failing the same way again.
  */
 export class VerificationRequired extends Error {
-  constructor() { super('Verify your staff email code to continue'); this.name = 'VerificationRequired'; }
+  constructor() { super('Confirm your PIN to continue'); this.name = 'VerificationRequired'; }
 }
 
 const call = async <T>(context: AuthorizationContext, path: string, body: unknown): Promise<T> => {
   const device = getDeviceCredential();
   if (!device) throw new Error('This device is not enrolled');
-  const token = verifiedToken(context);
+  const token = staffSessionToken(context);
   if (!token) throw new VerificationRequired();
   try {
-    return await workforceRequest<T>(path, device.credential, token, body, 'POST');
+    const result = await staffRequest<T>(path, device.credential, token, body);
+    touchStaffSession();
+    return result;
   } catch (cause) {
-    if (cause instanceof ApiError && cause.code === 'private_verification_required') { expirePrivateWorkforce(); throw new VerificationRequired(); }
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
     throw cause;
   }
 };
@@ -84,16 +86,16 @@ const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((b) => b.to
 export const uploadInsuranceDocument = async (context: AuthorizationContext, file: File, meta: InsuranceDocumentUpload): Promise<InsuranceDocument> => {
   if (file.size > DOCUMENT_MAX_BYTES) throw new Error('Choose a PDF or image up to 10 MB');
   const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
-  const token = verifiedToken(context); if (!token) throw new VerificationRequired();
+  const token = staffSessionToken(context); if (!token) throw new VerificationRequired();
   const bytes = await file.arrayBuffer();
   try {
     const response = await binaryRequest('/insurance/documents', { method: 'POST', cache: 'no-store', body: bytes, headers: {
-      authorization: `Bearer ${device.credential}`, 'x-workforce-access': token, 'content-type': 'application/octet-stream',
+      authorization: `Bearer ${device.credential}`, 'x-staff-session': token, 'content-type': 'application/octet-stream',
       'x-file-sha256': hex(await crypto.subtle.digest('SHA-256', bytes)), 'x-document-meta': encodeURIComponent(JSON.stringify(meta)),
     } });
     return await response.json() as InsuranceDocument;
   } catch (cause) {
-    if (cause instanceof ApiError && cause.code === 'private_verification_required') { expirePrivateWorkforce(); throw new VerificationRequired(); }
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
     throw cause;
   }
 };
@@ -101,8 +103,8 @@ export const uploadInsuranceDocument = async (context: AuthorizationContext, fil
 /** Downloads a stored document to the user's device; the server audits every download. */
 export const downloadInsuranceDocument = async (context: AuthorizationContext, document_: InsuranceDocument) => {
   const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
-  const token = verifiedToken(context); if (!token) throw new VerificationRequired();
-  const response = await binaryRequest(`/insurance/documents/${encodeURIComponent(document_.id)}/file`, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${device.credential}`, 'x-workforce-access': token } });
+  const token = staffSessionToken(context); if (!token) throw new VerificationRequired();
+  const response = await binaryRequest(`/insurance/documents/${encodeURIComponent(document_.id)}/file`, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${device.credential}`, 'x-staff-session': token } });
   const url = URL.createObjectURL(await response.blob());
   try { const a = document.createElement('a'); a.href = url; a.download = document_.fileName; a.click(); } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
 };

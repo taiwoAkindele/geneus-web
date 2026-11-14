@@ -16,41 +16,36 @@ export const DEVICE_REASONS: Record<DeviceBlockReason, { problem: string; fix: s
   revoked_with_unsent_changes: { problem: 'was revoked while it still held unsent work', fix: 'The administrator activating a contract confirms that this work will not arrive.' },
 };
 
-const payerStep = (payer: { id: string; name: string }, text: string, label: string) => ({ text, action: { label, to: `/insurance/contracts?payer=${encodeURIComponent(payer.id)}` } });
+const payerStep = (payer: { id: string; name: string }, text: string, label: string) => ({ text, action: { label, to: `/settings/insurance/payers?payer=${encodeURIComponent(payer.id)}` } });
 
-export const guideFor = (item: InsuranceSetupItem, viewer: Viewer): Guide => {
-  const canManageStaff = viewer.permissions.includes('staff:manage');
+export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
   switch (item.kind) {
     case 'time_zone_recorded':
       return item.ok
-        ? { title: 'Facility time zone', status: `Recorded: ${item.timeZone}`, why: 'Insurance dates every service in the hospital\'s local time.', who: 'Facility administrator', steps: [], action: { label: 'View or correct', to: '/facility?view=settings' } }
-        : { title: 'Facility time zone', status: 'Facility time zone has not been configured.', why: 'This is required to calculate insurance service dates accurately: cover checks and contract dates are judged by the local date of each service.', who: 'Facility administrator', steps: [], action: { label: 'Configure time zone', to: '/facility?view=settings' } };
+        ? { title: 'Facility time zone', status: `Recorded: ${item.timeZone}`, why: 'Insurance dates every service in the hospital\'s local time.', who: 'Facility administrator', steps: [], action: { label: 'View or correct', to: '/settings/facility?view=settings' } }
+        : { title: 'Facility time zone', status: 'Facility time zone has not been configured.', why: 'This is required to calculate insurance service dates accurately: cover checks and contract dates are judged by the local date of each service.', who: 'Facility administrator', steps: [], action: { label: 'Configure time zone', to: '/settings/facility?view=settings' } };
     case 'payers_added':
       return { title: 'Payers', status: item.ok ? `${item.count} payer${item.count === 1 ? '' : 's'} added` : 'No payers have been added yet.', why: 'Cover, contracts and claims all belong to a payer: an HMO, a state scheme or a company.', who: 'Insurance officer',
-        steps: [], action: { label: item.ok ? 'Manage payers' : 'Add a payer', to: '/insurance/contracts' } };
+        steps: [], action: { label: item.ok ? 'Manage payers' : 'Add a payer', to: '/settings/insurance/payers' } };
     case 'active_contract': {
       const missing = item.payers ?? [];
       return { title: 'Active contracts', status: item.ok ? `${item.count} active contract${item.count === 1 ? '' : 's'}${missing.length ? `; ${missing.length} payer${missing.length === 1 ? '' : 's'} still without one` : ''}` : 'No contract is active yet.',
         why: 'What a patient and a payer each owe comes from the payer\'s contract. Without one, insured charges cannot be estimated.', who: 'Insurance officer prepares it; a facility administrator activates it',
-        steps: missing.map((p) => payerStep(p, `${p.name} has no active contract.`, `Set up ${p.name}'s contract`)), ...(missing.length ? {} : { action: { label: 'Payers & contracts', to: '/insurance/contracts' } }) };
+        steps: missing.map((p) => payerStep(p, `${p.name} has no active contract.`, `Set up ${p.name}'s contract`)), ...(missing.length ? {} : { action: { label: 'Payers & contracts', to: '/settings/insurance/payers' } }) };
     }
     case 'officer_with_verified_email': {
+      // Who can confirm insurance work: administrators always can; the server knows who they are from their PIN.
       const people = item.people ?? [];
-      const steps = people.filter((p) => p.email !== 'verified').map((p) => p.email === 'pending'
-        ? { text: `${p.name} has proven an email address that is waiting for an administrator to confirm it is theirs.`, ...(canManageStaff ? { action: { label: 'Confirm email addresses', to: '/admin?section=email' } } : {}) }
-        : p.staffId === viewer.userId
-          ? { text: 'You have not added a verified email address.', action: { label: 'Add my email', to: '/profile' } }
-          : { text: `${p.name} has not added an email address. Ask them to open My profile and add it.` });
-      return { title: 'Someone who confirms insurance, with a verified email', status: item.ok ? `${item.count} ${item.count === 1 ? 'person' : 'people'} can confirm insurance work` : people.length ? 'Nobody who confirms insurance work has a verified email yet.' : 'Nobody here can confirm insurance work.',
-        why: 'Confirming insurance splits and preparing claims are protected by a code sent to the person\'s own email.', who: people.length ? 'Each administrator or insurance officer, from My profile; another administrator confirms a new address' : 'Facility administrator',
-        steps: people.length ? steps : [{ text: 'Give someone the insurance officer role.', action: { label: 'Open Staff & roster', to: '/admin/staff' } }] };
+      return { title: 'Someone who can confirm insurance work', status: item.ok ? `${people.map((p) => p.name).join(', ') || item.count + ' people'} can confirm insurance work` : 'Nobody here can confirm insurance work.',
+        why: 'Confirming insurance splits and preparing claims is done by an administrator or an insurance officer.', who: 'Facility administrator',
+        steps: item.ok ? [] : [{ text: 'Give someone the insurance officer role.', action: { label: 'Open Staff & access', to: '/settings/staff' } }] };
     }
     case 'devices_ready': {
       const devices = item.devices ?? [];
       return { title: 'Devices updated and synced', status: item.ok ? 'Every device is ready' : `${devices.length} device${devices.length === 1 ? ' is' : 's are'} not ready.`,
         why: 'Every device must show the same insurance figures as the server, so each one needs the current app and no unsent work when billing starts.', who: 'Whoever uses each device; a facility administrator can revoke a lost one',
         steps: devices.flatMap((d) => d.reasons.map((r) => ({ text: `${d.label ?? 'A device'} ${DEVICE_REASONS[r].problem}${r === 'unsent_changes' && d.pendingMutationCount ? ` (${d.pendingMutationCount} change${d.pendingMutationCount === 1 ? '' : 's'})` : ''}. ${DEVICE_REASONS[r].fix}` }))),
-        action: { label: 'Open Facility devices', to: '/admin/devices' } };
+        action: { label: 'Open Facility devices', to: '/settings/devices' } };
     }
     case 'submission_method_per_payer': {
       const missing = item.payers ?? [];
