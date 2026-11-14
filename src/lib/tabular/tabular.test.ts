@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { utils, write } from 'xlsx';
 import { parseWorkbook, TableFileError } from './parseWorkbook';
 import { inspectZip, verifyZipInflation } from './zipGuard';
-import { deflateRawSync } from 'node:zlib';
 import { parseWorkbookSafely } from './parseWorkbook';
 import { detectHeaderRow, mappedRows, missingRequired, suggestMapping, templateFits, type FieldSpec } from './mapping';
 import { matchIndex, matchRecord } from './matching';
@@ -68,8 +67,8 @@ const FIELDS: FieldSpec[] = [
 ];
 
 /** A real zip with one deflated part whose directory can claim any size. */
-const lyingZip = (content: Uint8Array, claimedSize: number) => {
-  const data = deflateRawSync(content); const name = new TextEncoder().encode('xl/worksheets/sheet1.xml');
+const lyingZip = async (content: Uint8Array, claimedSize: number) => {
+  const data = new Uint8Array(await new Response(new Blob([new Uint8Array(content)]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()); const name = new TextEncoder().encode('xl/worksheets/sheet1.xml');
   const u16 = (n: number) => [n & 0xff, (n >> 8) & 0xff]; const u32 = (n: number) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
   const local = [...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(8), ...u32(0), ...u32(0), ...u32(data.length), ...u32(claimedSize), ...u16(name.length), ...u16(0), ...name, ...data];
   const central = [...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(8), ...u32(0), ...u32(0), ...u32(data.length), ...u32(claimedSize), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(0), ...name];
@@ -83,13 +82,13 @@ describe('proving decompressed size instead of trusting it', () => {
     expect(parsed.sheets[0].rows[1]).toEqual(['Consultation', '1500']);
   });
   it('stops decompressing a part that produces more than it declared', async () => {
-    const bomb = lyingZip(new Uint8Array(20 * 1024 * 1024), 1_000);
+    const bomb = await lyingZip(new Uint8Array(20 * 1024 * 1024), 1_000);
     expect(inspectZip(bomb).ok).toBe(true);
     expect(await verifyZipInflation(bomb)).toMatchObject({ ok: false, reason: expect.stringMatching(/unsafe size/) });
     await expect(parseWorkbookSafely(bomb, 'bomb.xlsx')).rejects.toThrow(/unsafe size/);
   });
   it('stops at the total limit even when every part tells the truth', async () => {
-    const honest = lyingZip(new Uint8Array(3 * 1024 * 1024), 3 * 1024 * 1024);
+    const honest = await lyingZip(new Uint8Array(3 * 1024 * 1024), 3 * 1024 * 1024);
     expect(await verifyZipInflation(honest, { maxEntries: 10, maxUncompressedBytes: 1024 * 1024, maxRatio: 1e9 })).toMatchObject({ ok: false });
   });
 });

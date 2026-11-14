@@ -1,7 +1,7 @@
 import {
   chargeUnits, coversOn, estimateCoverage, indexCoverageRecords, scheduleOn, selfPayPermitted, serviceDateOf,
   type AuthorizationContext, type Charge, type CoverageAllocation, type CoverageElection, type CoverageEstimate, type CoverageRecords,
-  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund, inBillingPeriod, type InsuranceBillingPeriod } from '@shared';
+  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund, inBillingPeriod, type InsuranceBillingPeriod, currentCompletions, effectiveEncounterEntries, serviceFulfillment, type Encounter, type FulfillmentEvidence, type Patient, type ServiceCompletion } from '@shared';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId } from '../db';
 import { getDeviceCredential } from '../deviceCredential';
 import { insuranceBillingPeriods } from '../insuranceSupport';
@@ -99,3 +99,47 @@ export const electSelfPay = (input: { patientId: string; coverId: string; charge
     ...envelope(context), id: newId('coverage_election'), type: 'coverage_election', patientId: input.patientId, kind: 'self_pay', coverId: input.coverId,
     chargeIds: [...input.chargeIds], reason: input.reason, coverCheckId: input.coverCheckId, patientAgreed: true, note: input.note?.trim() || undefined,
   });
+
+/* ---------------- Service completion (Milestone 3) ---------------- */
+
+export type CompletionDraft = { patientId: string; chargeId: string; status: ServiceCompletion['status']; completedOn: string; note?: string; replaces?: string };
+/** Recorded by the clinician who did the work, in the role they are signed in as. Never edited: a correction replaces it. */
+export const recordCompletion = (draft: CompletionDraft, context: AuthorizationContext) => insertRecord<ServiceCompletion>(context, 'encounter:record', 'service_completion', {
+  ...envelope(context), id: newId('service_completion'), type: 'service_completion', actorRole: context.role,
+  patientId: draft.patientId, chargeId: draft.chargeId, status: draft.status, completedOn: draft.completedOn,
+  ...(draft.note?.trim() ? { note: draft.note.trim() } : {}), ...(draft.replaces ? { replaces: draft.replaces } : {}),
+});
+
+export type CompletionItem = { charge: Charge; patientName: string; fulfillment: FulfillmentEvidence; completion?: ServiceCompletion };
+
+/**
+ * Insured services confirmed for the payer in the last `days`, with how each
+ * is shown to have happened — the same rule the server applies to claims.
+ */
+export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const [allocations, completions] = await Promise.all([allOfType<CoverageAllocation>('coverage_allocation'), allOfType<ServiceCompletion>('service_completion')]);
+  const superseded = new Set(allocations.map((a) => a.supersedes).filter(Boolean));
+  const claimable = new Set(allocations.filter((a) => !superseded.has(a.id) && a.state === 'finalised' && a.arrangement === 'per_service').map((a) => a.chargeId));
+  const current = currentCompletions(completions);
+  const items: CompletionItem[] = [];
+  const entriesFor = new Map<string, EncounterEntry[]>();
+  const entries = async (encounterId?: string) => {
+    if (!encounterId) return [];
+    if (!entriesFor.has(encounterId)) entriesFor.set(encounterId, effectiveEncounterEntries(await allWhere<EncounterEntry>('encounter_entry', 'encounterId', encounterId)));
+    return entriesFor.get(encounterId)!;
+  };
+  for (const chargeId of claimable) {
+    const charge = await findRecord<Charge>('charge', chargeId);
+    if (!charge || charge.createdOn < since) continue;
+    const visit = charge.encounterId ?? (charge.appointmentId ? (await allWhere<Encounter>('encounter', 'appointmentId', charge.appointmentId))[0]?.id : undefined);
+    const fulfillment = serviceFulfillment(charge, {
+      results: await entries(charge.encounterId), visitEntries: await entries(visit),
+      dispense: charge.dispenseEntryId ? await findRecord<EncounterEntry>('encounter_entry', charge.dispenseEntryId) : undefined,
+      completion: current.get(charge.id),
+    });
+    const patient = await findRecord<Patient>('patient', charge.patientId);
+    items.push({ charge, patientName: patient?.fullName ?? charge.patientId, fulfillment, ...(current.get(charge.id) ? { completion: current.get(charge.id) } : {}) });
+  }
+  return items.sort((a, b) => b.charge.createdOn.localeCompare(a.charge.createdOn));
+};

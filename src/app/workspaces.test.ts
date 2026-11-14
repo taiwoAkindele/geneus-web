@@ -119,6 +119,14 @@ describe('module workspaces', () => {
     expect(finance(officer)).not.toContain('insurance');
     values.set('geneus.insuranceSupport:facility:one:device:one', 'active');
     expect(finance(officer)).toContain('insurance');
+    expect(finance(officer)).toContain('claims');
+    const nurse = { ...context('nurse'), facilityId: 'facility:one', deviceId: 'device:one' };
+    const clinical = (c: typeof admin) => workspacesFor(c).find((w) => w.id === 'clinical')?.links.map((l) => l.key) ?? [];
+    expect(clinical(nurse)).toContain('service-completion');
+    expect(clinical(officer)).not.toContain('service-completion');
+    values.set('geneus.insuranceSupport:facility:one:device:one', 'setup');
+    expect(finance(officer)).not.toContain('claims');
+    expect(clinical(nurse)).not.toContain('service-completion');
   });
 
   it('keeps navigation usable when preference storage is blocked', () => {

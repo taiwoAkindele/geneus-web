@@ -46,6 +46,8 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open and completed prescriptions.', '/pharmacy', 'pharmacy')] : []),
       ...(consultation ? [link('referrals', 'Referrals', 'Send handovers and receive patients in this facility.', '/referrals/track', 'referrals')] : []),
       ...(clinicalDocumentAccess(context)?[link('documents','Documents','Manage hospital files and review visit documents.','/documents','registers')]:[]),
+      // Insured services the payer is asked to pay for need a record that they were done; clinicians record it.
+      ...(insuranceBillingWork(context) && has(context, 'encounter:record') ? [link('service-completion', 'Service completion', 'Record insured services as done or not done.', '/clinical/service-completion', 'encounter')] : []),
     ] },
     { id: 'finance', label: 'Finance', description: 'Accounts, payments and fees', icon: 'finance', links: [...(keys.has('billing') ? [
       link('accounts', 'Patient accounts', 'Find bills, review charges and receive payments.', '/billing?tab=collections', 'finance'),
@@ -56,6 +58,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       // Insurance pages appear once the hospital enters setup; billing work only once billing is active.
       // Administrators who can start setup always see its settings, so it can be turned on from here.
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
+      ...(insuranceBillingWork(context) && has(context, 'coverage:confirm') ? [link('claims', 'Claims', 'Prepare, export and record claims to payers.', '/insurance/claims', 'month')] : []),
       ...(insuranceSupported(context) && has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate') ? [link('contracts', 'Payers & contracts', 'Set up payers, contracts, documents and claim submission.', '/insurance/contracts', 'registers')] : []),
       ...(has(context, 'insurance_contract:activate') || (insuranceSupported(context) && has(context, 'insurance_contract:manage')) ? [link('insurance-settings', 'Insurance settings', 'Start insurance setup and see what is still needed before billing.', '/insurance/settings', 'settings')] : []),
     ] },

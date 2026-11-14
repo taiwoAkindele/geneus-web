@@ -148,6 +148,8 @@ const FeeScheduleScreen = lazy(() =>
 const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
+const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
+const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCompletionScreen').then((m) => ({ default: m.ServiceCompletionScreen })));
 const InsuranceSettings = lazy(() => import('@/modules/insurance/InsuranceSettings').then((m) => ({ default: m.InsuranceSettings })));
 const ContractsScreen = lazy(() => import('@/modules/insurance/ContractsScreen').then((m) => ({ default: m.ContractsScreen })));
 const DevicesScreen = lazy(() => import('@/modules/administration/screens/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
@@ -247,6 +249,8 @@ const App = () => {
             <Route path="/billing/fees" element={<FeeScheduleScreen />} />
             <Route path="/billing/settings" element={<BillingSettingsScreen />} />
             <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
+            <Route path="/insurance/claims" element={<RequireCapability permissions={['coverage:confirm']}><ClaimsScreen /></RequireCapability>} />
+            <Route path="/clinical/service-completion" element={<RequireCapability permissions={['encounter:record']}><ServiceCompletionScreen /></RequireCapability>} />
             <Route path="/insurance/settings" element={<RequireCapability permissions={['insurance_contract:activate', 'insurance_contract:manage']}><InsuranceSettings /></RequireCapability>} />
             <Route path="/insurance/contracts" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
             <Route path="/admin/fees" element={<Navigate to="/billing/fees" replace />} />

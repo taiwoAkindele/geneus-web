@@ -4,7 +4,7 @@
 //   node qa/insurance-staging-browser.mjs <handoff.json> <output-dir>
 import { createServer } from 'vite';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm, mkdtemp } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm, mkdtemp, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -97,7 +97,7 @@ try {
   await cdp('Page.navigate', { url: handoff.web + '/onboarding/join' });
 
   const people = handoff.people;
-  const pinFor = (key) => ({ admin: '246810', desk: '135791', cashier: '112358', officer: '314159', supervisor: '271828' }[key]);
+  const pinFor = (key) => ({ admin: '246810', desk: '135791', cashier: '112358', officer: '314159', supervisor: '271828', doctor: '161803' }[key]);
   const pinsSet = new Set();
   const signIn = async (key) => {
     const person = people[key];
@@ -354,6 +354,128 @@ try {
     await shot('09-refund');
     return { consult: { received: consult.money.receivedMinor, refunded: consult.money.refundedMinor, patientShare: consult.split.patient_share_minor, payerShare: consult.split.payer_share_minor, adjustment: consult.split.contract_adjustment_minor, balance: consult.balanceMinor },
       lab: { balance: lab.balanceMinor }, refunds: await inspect('/refunds') };
+  });
+
+  /* ---------------- Milestone 3: claims ---------------- */
+  const downloads = join(output, 'downloads');
+  await mkdir(downloads, { recursive: true });
+  await cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+  const newDownload = async (before, ms = 30000) => {
+    const until = Date.now() + ms;
+    while (Date.now() < until) { const now = (await readdir(downloads)).filter((n) => !n.endsWith('.crdownload') && !before.includes(n)); if (now.length) return join(downloads, now[0]); await pause(300); }
+    throw new Error('No file was downloaded');
+  };
+  const sheetRows = async (file) => { const { read, utils } = await import('xlsx'); const book = read(await readFile(file)); return utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, raw: true, defval: '' }); };
+  const claimsOnServer = () => inspect('/claims');
+  const waitClaims = async (predicate, label, ms = 30000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await claimsOnServer(); if (predicate(last)) return last; await pause(1000); } throw new Error('Claims never reached: ' + label + '\n' + JSON.stringify(last)); };
+
+  await check('Doctor records the insured lab test as done, and the record syncs to the server', async () => {
+    await closeDialog(); await go('/home'); await signOut(); await signIn('doctor');
+    await go('/clinical/service-completion'); await waitText('Service completion', 30000);
+    await waitText('Malaria RDT', 60000);
+    const before = await evaluate(`document.body.innerText`);
+    assert.ok(before.includes('Not yet recorded as done'), 'the test is not shown as done until someone who did it records it');
+    await shot('10-completion-list');
+    await press(`[...document.querySelectorAll('li[data-charge="charge:p1-lab"] button')].find((b) => b.textContent.trim() === 'Record as done')`);
+    await fill('Note (optional)', 'Rapid test performed at the bedside');
+    await press(`[...document.querySelectorAll('li[data-charge="charge:p1-lab"] button')].find((b) => b.textContent.trim() === 'Save')`);
+    await waitText('Recorded as done.', 20000);
+    const completions = await (async () => { for (let i = 0; i < 60; i++) { const c = await inspect('/completions'); if (c.length) return c; await pause(1000); } return []; })();
+    assert.equal(completions.length, 1); assert.equal(completions[0].actor_role, 'doctor'); assert.equal(completions[0].created_by, people.doctor.id);
+    await shot('11-completion-recorded');
+    return { completions };
+  });
+
+  await check('Officer generates claims: checks block them, a draft export is marked and changes nothing, then payer rules and evidence make them ready', async () => {
+    await signOut(); await signIn('officer');
+    // This payer accepts written diagnoses and requires a referral form with each claim (set earlier).
+    await go('/insurance/contracts'); await waitText('Payers & contracts');
+    await verifyEmail(people.officer.email);
+    await click('Contracts'); await waitText('Claim submission', 30000);
+    await click('Change'); await selectByText('Diagnosis on claims', 'Written diagnosis accepted'); await click('Save');
+    await waitText('Written diagnosis accepted', 20000);
+    await click('Upload'); await waitText('Upload a document', 10000);
+    await selectByText('Document type', 'Referral form'); await fill('Title', 'Synthetic referral forms, November');
+    const { root } = await cdp('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'form[aria-label="Upload document"] input[type=file]' });
+    await cdp('DOM.setFileInputFiles', { nodeId, files: [samplePdf] });
+    await press(`[...document.querySelectorAll('form[aria-label="Upload document"] button')].find((b) => b.textContent.trim() === 'Upload')`);
+    await waitText('Synthetic referral forms, November', 30000);
+
+    await go('/insurance/claims'); await waitText('Generate claims', 30000);
+    await click('Generate claims'); await waitText('services added', 30000);
+    const generated = await waitClaims((c) => c.length === 2, 'two claims, one per visit');
+    await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims listed');
+    await click('Open'); await waitText('Attachment missing', 20000);
+    await shot('12-claim-blocked');
+    // A marked draft export: allowed while checks fail, changes no claim.
+    await press(`document.querySelector('input[aria-label="Select all claims"]')`);
+    const beforeDraft = await readdir(downloads);
+    await click('Export as draft (2)');
+    const draftFile = await newDownload(beforeDraft);
+    const draftRows = await sheetRows(draftFile);
+    assert.ok(draftFile.includes('DRAFT'));
+    assert.ok(draftRows.slice(1).every((r) => r.includes('DRAFT - NOT FOR SUBMISSION')), 'every row is marked draft');
+    assert.ok((await claimsOnServer()).every((c) => c.state === 'draft'), 'a draft export changes nothing');
+    // Attach the referral form to each claim, then mark both ready.
+    for (const number of ['CLM-000001', 'CLM-000002']) {
+      const section = `section[aria-label="Claim ${number}"]`;
+      if (!(await evaluate(`Boolean(document.querySelector('${section}'))`))) await press(`[...document.querySelectorAll('tr[data-claim="${number}"] button')].find((b) => b.textContent.trim() === 'Open')`);
+      await waitFor(`Boolean(document.querySelector('${section} section[aria-label="Attachments"] input'))`, 20000, 'attachments of ' + number);
+      await press(`[...document.querySelectorAll('${section} section[aria-label="Attachments"] label')].find((l) => l.textContent.includes('referral forms'))?.querySelector('input:not(:checked)')`);
+      await waitFor(`!document.querySelector('${section}')?.innerText.includes('Attachment missing')`, 20000, 'referral attached to ' + number);
+    }
+    await waitFor(`[...document.querySelectorAll('tr[data-claim] td')].filter((td) => td.textContent.trim() === 'Pass').length === 2`, 30000, 'both claims pass');
+    await click('Mark ready (2)'); await waitText('2 claims ready', 20000);
+    await waitClaims((c) => c.every((x) => x.state === 'ready'), 'both ready');
+    await shot('13-claims-ready');
+    return { generated, draftRows: draftRows.length - 1 };
+  });
+
+  await check('Officer exports in the payer\'s own layout; submission and acknowledgement are recorded as separate facts', async () => {
+    await click('Export layouts'); await waitText('Layout name', 10000);
+    await fill('Layout name', 'Staging HMO claim sheet');
+    await fill('Header for Enrollee number', 'ENROLLEE ID'); await fill('Header for Amount claimed', 'AMOUNT (NGN)');
+    await click('Save layout'); await waitText('saved', 20000);
+    await click('Claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims');
+    if (!(await evaluate(`document.querySelector('input[aria-label="Select all claims"]').checked`))) await press(`document.querySelector('input[aria-label="Select all claims"]')`);
+    await selectByText('Layout', 'Staging HMO claim sheet');
+    const before = await readdir(downloads);
+    await click('Export (2)');
+    const file = await newDownload(before);
+    const rows = await sheetRows(file);
+    assert.ok(rows[0].includes('ENROLLEE ID') && rows[0].includes('AMOUNT (NGN)'), JSON.stringify(rows[0]));
+    assert.equal(rows.length - 1, 3, 'three services across two claims');
+    assert.ok(!JSON.stringify(rows).includes('DRAFT'));
+    await waitClaims((c) => c.every((x) => x.state === 'exported'), 'exported, not submitted');
+    await shot('14-exported');
+    await click('Batches & submissions'); await waitText('Record a submission', 10000);
+    for (const label of await evaluate(`[...document.querySelectorAll('section[aria-label="Record submission"] label')].map((l) => l.textContent.trim())`)) await clickLabel(label);
+    await fill("Payer's reference", 'SSH-PORTAL-BATCH-0042');
+    await click('Record submission'); await waitText('recorded as submitted', 20000);
+    await waitClaims((c) => c.every((x) => x.state === 'submitted'), 'submitted');
+    await waitText('SSH-PORTAL-BATCH-0042', 20000);
+    await fill('Acknowledgement reference (optional)', 'SSH-ACK-7781'); await click('Record acknowledgement');
+    await waitText('receipt only, not approval', 20000);
+    const claims = await waitClaims((c) => c.every((x) => x.state === 'acknowledged'), 'acknowledged');
+    await shot('15-acknowledged');
+    return { headers: rows[0], rows: rows.length - 1, exports: await inspect('/claim-exports'), submissions: await inspect('/claim-submissions'), claims };
+  });
+
+  await check('Officer revises an acknowledged claim: a new draft revision, the earlier revision and its submission kept', async () => {
+    await click('Claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length === 2`, 20000, 'claims');
+    await click('Open'); await waitText('Reason for a corrected claim', 20000);
+    await fill('Reason for a corrected claim', 'Payer asked for the referral number on the claim');
+    await click('Revise claim'); await waitText('Revision 2 started', 20000);
+    const claims = await waitClaims((c) => c.length === 3, 'a second revision');
+    const [first] = claims.filter((c) => c.revision === 1 && c.superseded_by);
+    assert.equal(first.state, 'acknowledged', 'the earlier revision keeps its history');
+    assert.equal(claims.find((c) => c.revision === 2).state, 'draft');
+    assert.equal(first.lines, 0, 'the earlier revision\'s lines are retired, not deleted');
+    assert.ok(claims.find((c) => c.revision === 2).lines > 0, 'the revision carries the services');
+    assert.equal(claims.reduce((n, c) => n + c.lines, 0), 3, 'three services, each still claimed exactly once');
+    await shot('16-revised');
+    return { claims };
   });
 
   console.log(JSON.stringify({ results, errors, timeline: timeline.slice(-20) }, null, 2));

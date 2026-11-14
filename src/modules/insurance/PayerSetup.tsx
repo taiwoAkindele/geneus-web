@@ -14,6 +14,7 @@ import { Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
 export const DOCUMENT_LABELS: Record<InsuranceDocumentType, string> = {
   contract: 'Contract', tariff_schedule: 'Tariff schedule', benefit_schedule: 'Benefit schedule', authorization_policy: 'Authorization policy', claim_template: 'Claim template',
   referral_form: 'Referral form', remittance_advice: 'Remittance advice', enrollee_roster: 'Enrollee list', other: 'Other',
+  authorization_evidence: 'Authorization evidence', referral_letter: 'Referral letter', submission_evidence: 'Submission evidence', acknowledgement: 'Payer acknowledgement',
 };
 const CHANNEL_LABELS: Record<SubmissionChannel, string> = { portal: 'HMO portal', email: 'Email', physical: 'Physical delivery', other: 'Other' };
 const FORMAT_LABELS: Record<ClaimFormat, string> = { csv: 'CSV', xlsx: 'Excel', pdf: 'Printed / PDF' };
@@ -123,6 +124,8 @@ const Submission = ({ payer, canManage }: { payer: Payer; canManage: boolean }) 
         {p.claimFormat ? <><dt className="text-ink-soft">Format</dt><dd>{FORMAT_LABELS[p.claimFormat]}</dd></> : null}
         {p.deadlineDays ? <><dt className="text-ink-soft">Deadline</dt><dd>{p.deadlineDays} days after service</dd></> : null}
         {p.requiredAttachments.length ? <><dt className="text-ink-soft">Attach</dt><dd>{p.requiredAttachments.map((a) => DOCUMENT_LABELS[a as InsuranceDocumentType] ?? a).join(', ')}</dd></> : null}
+        <dt className="text-ink-soft">Diagnosis</dt><dd>{p.diagnosisRequirement === 'coded_icd10' ? 'ICD-10 code required' : p.diagnosisRequirement === 'free_text' ? 'Written diagnosis accepted' : 'Not required'}</dd>
+        {p.referralRequired ? <><dt className="text-ink-soft">Referral</dt><dd>Required on every claim</dd></> : null}
         {p.instructions ? <><dt className="text-ink-soft">Notes</dt><dd>{p.instructions}</dd></> : null}
       </dl>}
     <p className="text-xs text-ink-soft">Direct submission to HMO systems is not available yet.</p>
@@ -136,11 +139,13 @@ const SubmissionForm = ({ payer, stored, onDone }: { payer: Payer; stored?: Stor
   const [channel, setChannel] = useState<SubmissionChannel>(p?.channel ?? 'portal'); const [portalUrl, setPortalUrl] = useState(p?.portalUrl ?? ''); const [recipient, setRecipient] = useState(p?.recipient ?? '');
   const [claimFormat, setClaimFormat] = useState<ClaimFormat | ''>(p?.claimFormat ?? ''); const [deadlineDays, setDeadlineDays] = useState(p?.deadlineDays ? String(p.deadlineDays) : '');
   const [instructions, setInstructions] = useState(p?.instructions ?? ''); const [attachments, setAttachments] = useState<string[]>(p?.requiredAttachments ?? []);
+  const [diagnosis, setDiagnosis] = useState<SubmissionProfile['diagnosisRequirement']>(p?.diagnosisRequirement ?? 'coded_icd10'); const [referral, setReferral] = useState(p?.referralRequired ?? false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const submit = async () => {
     const parsed = SubmissionProfile.safeParse({
       method: 'manual', channel, ...(channel === 'portal' && portalUrl.trim() ? { portalUrl: portalUrl.trim() } : {}), ...(channel !== 'portal' && recipient.trim() ? { recipient: recipient.trim() } : {}),
       ...(claimFormat ? { claimFormat } : {}), ...(deadlineDays ? { deadlineDays: Number(deadlineDays) } : {}), ...(instructions.trim() ? { instructions: instructions.trim() } : {}), requiredAttachments: attachments,
+      diagnosisRequirement: diagnosis, referralRequired: referral,
     });
     if (!parsed.success) { setError(parsed.error.issues.map((i) => i.message).join('; ')); return; }
     setBusy(true); setError('');
@@ -155,6 +160,8 @@ const SubmissionForm = ({ payer, stored, onDone }: { payer: Payer; stored?: Stor
     <fieldset className="space-y-1"><legend className="text-sm font-semibold">Required attachments</legend>
       {(['referral_form', 'authorization_policy', 'claim_template', 'other'] as const).map((a) => <label key={a} className="flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" checked={attachments.includes(a)} onChange={(e) => setAttachments(e.target.checked ? [...attachments, a] : attachments.filter((x) => x !== a))} />{DOCUMENT_LABELS[a]}</label>)}
     </fieldset>
+    <SelectField label="Diagnosis on claims" value={diagnosis} options={[{ value: 'coded_icd10', label: 'ICD-10 code required' }, { value: 'free_text', label: 'Written diagnosis accepted' }, { value: 'not_required', label: 'Not required' }]} onChange={(e) => setDiagnosis(e.target.value as typeof diagnosis)} />
+    <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={referral} onChange={(e) => setReferral(e.target.checked)} />Every claim needs an approved referral</label>
     <TextAreaField label="Instructions (optional)" value={instructions} onChange={(e) => setInstructions(e.target.value)} />
     {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
     <div className="flex gap-2"><Button type="submit" fullWidth={false} loading={busy}>Save</Button><Button type="button" variant="ghost" fullWidth={false} onClick={() => onDone()}>Cancel</Button></div>

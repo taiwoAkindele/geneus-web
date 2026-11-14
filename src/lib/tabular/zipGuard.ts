@@ -69,7 +69,7 @@ export const verifyZipInflation = async (bytes: Uint8Array, limits: ZipLimits = 
     const data = bytes.subarray(dataStart, dataStart + compressedSize);
     if (method === 0) { if (compressedSize !== declaredSize) return damaged; produced += declaredSize; continue; }
     if (method !== 8) return { ok: false, reason: 'This workbook uses a compression Geneus does not open' };
-    const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    const reader = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
     let entry = 0;
     try {
       for (;;) {

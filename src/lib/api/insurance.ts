@@ -1,4 +1,4 @@
-import type { AllocationSplit, AuthorizationContext, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
+import type { AllocationSplit, AuthorizationContext, AuthorizationInput, ClaimAcknowledgementInput, ClaimAuthorization, ClaimIssue, ClaimState, ClaimSubmissionInput, ClaimView, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, binaryRequest, workforceRequest } from './client';
 import { expirePrivateWorkforce, verifiedToken } from './workforce';
@@ -113,3 +113,33 @@ export const listImportTemplates = (context: AuthorizationContext, kind: ImportK
 export const saveImportTemplate = (context: AuthorizationContext, template: ImportTemplateSave) => call<ImportTemplate>(context, '/insurance/import-templates/save', template);
 /** Applies confirmed rows to the draft. The request key is kept by the caller so a retry after a lost reply replays instead of applying twice. */
 export const importTariff = (context: AuthorizationContext, input: TariffImport) => call<TariffImportResult>(context, '/insurance/contracts/import-tariff', input);
+
+/* ---------------- Claims (Milestone 3) ---------------- */
+
+export type ClaimBatch = { id: string; payerId: string; reference: string; periodFrom: string; periodTo: string; claims: number; createdOn: string };
+export type ClaimSubmission = { id: string; payerId: string; claimIds: string[]; channel: string; reference: string; submittedOn: string; submittedBy: string; evidenceDocumentId?: string; acknowledgement?: { id: string; reference?: string; acknowledgedOn: string } };
+export type ClaimExport = { exportId: string; draft: boolean; headers: string[]; rows: (string | number)[][]; payloadSha256: string; claims: { id: string; claimNumber: string; revision: number }[] };
+export type ReadyOutcome = { claimId: string; outcome: 'ready' } | { claimId: string; outcome: 'skipped'; reason: string; issues?: ClaimIssue[] };
+
+export const saveAuthorization = (context: AuthorizationContext, input: AuthorizationInput) => call<ClaimAuthorization>(context, '/insurance/authorizations/save', input);
+export const listAuthorizations = (context: AuthorizationContext, patientId?: string) => call<{ authorizations: ClaimAuthorization[] }>(context, '/insurance/authorizations/list', patientId ? { patientId } : {});
+export const generateClaims = (context: AuthorizationContext, filter: { payerId?: string; from?: string; to?: string } = {}) => call<{ created: number; extended: number; lines: number }>(context, '/insurance/claims/generate', filter);
+export const listClaims = (context: AuthorizationContext, filter: { payerId?: string; state?: ClaimState; batchId?: string; claimIds?: string[]; includeSuperseded?: boolean } = {}) => call<{ claims: ClaimView[] }>(context, '/insurance/claims/list', filter);
+export const markClaimsReady = (context: AuthorizationContext, claimIds: string[]) => call<{ outcomes: ReadyOutcome[] }>(context, '/insurance/claims/ready', { claimIds });
+export const reviseClaim = (context: AuthorizationContext, claimId: string, reason: string) => call<{ claimId: string; revision: number; lines: number; dropped: number }>(context, `/insurance/claims/${encodeURIComponent(claimId)}/revise`, { reason, requestKey: key() });
+export const setClaimAttachment = (context: AuthorizationContext, claimId: string, documentId: string, remove = false) => call<{ ok: true }>(context, `/insurance/claims/${encodeURIComponent(claimId)}/attachments`, { documentId, remove });
+export const createClaimBatch = (context: AuthorizationContext, input: { payerId: string; periodFrom: string; periodTo: string; reference?: string }) => call<{ batchId: string; reference: string; claims: number }>(context, '/insurance/claims/batches/create', input);
+export const listClaimBatches = (context: AuthorizationContext) => call<{ batches: ClaimBatch[] }>(context, '/insurance/claims/batches/list', {});
+/** Rows to write or print. A draft export marks every row and changes no claim; a real one moves ready claims to exported. */
+export const exportClaims = (context: AuthorizationContext, input: { claimIds?: string[]; batchId?: string; draft: boolean; format: 'csv' | 'xlsx' | 'pdf'; templateId?: string }) =>
+  call<ClaimExport>(context, '/insurance/claims/export', { ...input, requestKey: key() });
+export const submitClaims = (context: AuthorizationContext, input: Omit<ClaimSubmissionInput, 'requestKey'>) => call<{ submissionId: string; claims: number }>(context, '/insurance/claims/submit', { ...input, requestKey: key() });
+export const acknowledgeClaims = (context: AuthorizationContext, input: Omit<ClaimAcknowledgementInput, 'requestKey'>) => call<{ acknowledgementId: string; claims: number }>(context, '/insurance/claims/acknowledge', { ...input, requestKey: key() });
+export const listClaimSubmissions = (context: AuthorizationContext) => call<{ submissions: ClaimSubmission[] }>(context, '/insurance/claims/submissions/list', {});
+
+export const CLAIM_ISSUE_LABELS: Record<ClaimIssue['code'], string> = {
+  fulfillment_missing: 'Not shown as done', not_performed: 'Recorded as not done', authorization_missing: 'Authorization missing', authorization_pending: 'Authorization pending',
+  authorization_denied: 'Authorization denied', referral_missing: 'Referral missing', diagnosis_missing: 'No diagnosis', diagnosis_code_missing: 'No ICD-10 code',
+  diagnosis_coding_unverified: 'Coding not verifiable yet', allocation_superseded: 'Split corrected since', submission_method_missing: 'No submission method',
+  payer_code_missing: 'No payer service code', attachment_missing: 'Attachment missing',
+};
