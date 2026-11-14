@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Arrangement, FeeCategory, FixedCopayBasis, PayerContractTerms, PayerKind, scheduleLineFor, serviceDateOf,
   type ContractPlan, type FeeItem, type Payer, type PayerContractVersion, type PlanRule, type UnsupportedTerm,
@@ -54,7 +54,9 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
     return { payers, fees: fees.filter((f) => f.active), timeZone: facilities[0]?.timeZone };
   }, []), ['payer', 'fee_item', 'facility']);
   const [versions, setVersions] = useState<PayerContractVersion[]>(); const [error, setError] = useState('');
-  const [payerId, setPayerId] = useState(''); const [editingPayer, setEditingPayer] = useState<Payer | 'new'>();
+  // A readiness link can open one payer directly (?payer=…).
+  const [params] = useSearchParams();
+  const [payerId, setPayerId] = useState(() => params.get('payer') ?? ''); const [editingPayer, setEditingPayer] = useState<Payer | 'new'>();
   const canActivate = context.permissions.includes('insurance_contract:activate');
   const reload = useCallback(async () => {
     try {

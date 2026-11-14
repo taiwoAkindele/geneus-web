@@ -167,7 +167,7 @@ try {
   const waitServer = async (patientId, predicate, label, ms = 60000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await server(patientId); if (predicate(last)) return last; await pause(1000); } throw new Error('Server never reached: ' + label + '\n' + JSON.stringify(last)); };
   const { first, second } = handoff.patients;
 
-  await check('Administrator starts insurance setup from Insurance settings; insurance was hidden while off', async () => {
+  await check('Administrator starts insurance setup, follows the checklist to Facility settings and records the time zone', async () => {
     await signIn('admin');
     await go('/workspace/finance'); await pause(800);
     const off = await text();
@@ -177,18 +177,49 @@ try {
     await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Off'`, 30000, 'state off');
     await click('Start insurance setup');
     await waitFor(`document.querySelector('[data-testid="insurance-state"]')?.textContent === 'Setup'`, 30000, 'state setup');
-    await waitText('still needed before billing', 30000);
-    await shot('02a-setup-started');
+    await waitText('must be completed before you can request activation', 30000);
     const checklist = await evaluate(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].map((li) => li.innerText.replace(/\\s+/g, ' '))`);
+    assert.ok(checklist[0].includes('Facility time zone has not been configured.') && checklist[0].includes('Why it matters') && checklist[0].includes('Who resolves it'), checklist[0]);
+    await shot('02a-setup-started');
+    // The checklist action opens Facility settings directly.
+    await click('Configure time zone'); await waitText('Facility time zone', 30000);
+    await waitFor(`location.search.includes('view=settings')`, 10000, 'facility settings');
+    await waitFor(`Boolean([...document.querySelectorAll('label')].find((l) => l.textContent.includes('I confirm Africa/Lagos')))`, 30000, 'Lagos preselected, awaiting confirmation');
+    await clickLabel('I confirm Africa/Lagos'); await click('Save time zone');
+    await waitText('Time zone set to Africa/Lagos', 20000);
+    assert.equal((await inspect('/insurance-state')).time_zone, 'Africa/Lagos');
+    await shot('02b-time-zone');
     // The device picks up its new grant without signing out: Payers & contracts appears.
     await go('/workspace/finance'); await waitText('Payers & contracts', 60000);
     assert.ok(!(await text()).includes('Insurance work'), 'billing work stays hidden in setup');
     return { checklist };
   });
 
-  await check('Officer signs in with an admin PIN code and sets a PIN', async () => { await signOut(); await signIn('officer'); await shot('02-officer-home'); });
+  await check('Officer signs in, then registers and proves their own email on My profile', async () => {
+    await signOut(); await signIn('officer'); await shot('02-officer-home');
+    await go('/profile'); await waitText('My email address', 30000);
+    await fill('Email address', people.officer.email); await click('Email me a code');
+    let code; for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent(people.officer.email)); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
+    assert.ok(code, 'no code arrived');
+    await fill('Code from the email', code); await click('Confirm');
+    await waitText('An administrator will confirm it is yours', 20000);
+    await shot('02c-my-email-pending');
+  });
+
+  await check('Administrator follows the checklist to confirm the officer\'s email', async () => {
+    await signOut(); await signIn('admin');
+    await go('/insurance/settings'); await waitText('Insurance settings', 30000);
+    if (await evaluate(`document.body.innerText.includes('Email me a verification code')`)) await verifyEmail(people.admin.email);
+    await waitText('waiting for an administrator to confirm', 30000);
+    await click('Confirm email addresses'); await waitText('Staff email confirmations', 30000);
+    if (await evaluate(`document.body.innerText.includes('Email me a verification code')`)) await verifyEmail(people.admin.email);
+    await waitText(people.officer.email, 30000);
+    await click('Confirm it is theirs'); await waitText('Email confirmed.', 20000);
+    await shot('02d-email-confirmed');
+  });
 
   await check('Officer verifies by email, adds a payer and saves a contract draft (prices stay on the server)', async () => {
+    await signOut(); await signIn('officer');
     await go('/insurance/contracts'); await waitText('Payers & contracts');
     await verifyEmail(people.officer.email);
     await waitText('Add payer', 30000); await click('Add payer'); await fill('Payer name', 'Synthetic Staging HMO'); await fill('Short code', 'SSH'); await click('Save payer');
@@ -250,7 +281,7 @@ try {
     return { mapped, before, summary, result: await evaluate(`document.querySelector('[aria-label="Import tariff"] [role=status]')?.innerText`) };
   });
 
-  await check('Administrator activates version 1 after device readiness, acknowledging unsupported terms', async () => {
+  await check('Administrator activates the contract, requests billing activation; a Geneus operator approves it in the console', async () => {
     await signOut(); await signIn('admin');
     await inspect('/ready', 'POST');
     await go('/insurance/contracts'); await waitText('Payers & contracts');
@@ -262,15 +293,29 @@ try {
     await shot('04-activated');
     await go('/insurance/settings');
     await waitFor(`[...document.querySelectorAll('[aria-label="Setup checklist"] li')].length > 0`, 30000, 'checklist');
-    const checklist = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Setup checklist"] li')].map((li) => [li.querySelector('strong').textContent, li.dataset.ok === 'true']))`);
-    assert.equal(checklist['An active contract'], true, JSON.stringify(checklist));
-    assert.equal(checklist['A claim submission method for every payer'], true, JSON.stringify(checklist));
-    assert.equal(checklist['A verified contract document for every payer'], true, JSON.stringify(checklist));
+    const checklist = await evaluate(`Object.fromEntries([...document.querySelectorAll('[aria-label="Setup checklist"] li[data-kind]')].map((li) => [li.dataset.kind, li.dataset.ok === 'true']))`);
+    for (const kind of ['time_zone_recorded', 'payers_added', 'active_contract', 'officer_with_verified_email', 'devices_ready', 'submission_method_per_payer', 'contract_document_verified']) assert.equal(checklist[kind], true, kind + ' ' + JSON.stringify(checklist));
     await shot('04b-readiness');
-    // Billing activation is an operator's step after readiness, as in production.
-    const billing = await inspect('/activate-billing', 'POST');
-    assert.equal(billing.state, 'active', JSON.stringify(billing));
-    return { devices: await inspect('/devices') };
+    // The hospital asks; Geneus approves in its console. No script, no inspector.
+    await fill('Note for Geneus (optional)', 'Staging hospital ready for insurance billing');
+    await click('Request billing activation'); await waitText('Waiting for Geneus', 20000);
+    await shot('04c-activation-requested');
+    await go('/operator'); await waitText('Geneus operator console', 30000);
+    await fill('Operator email', 'ops@geneus.example.org'); await click('Email me a code');
+    let code; for (let i = 0; i < 40 && !code; i++) { const m = await inspect('/mail?to=' + encodeURIComponent('ops@geneus.example.org')); code = m?.text?.match(/(\d{6})/)?.[1]; if (!code) await pause(250); }
+    assert.ok(code, 'no operator code arrived');
+    await fill('Six-digit code', code); await click('Sign in');
+    await waitText('activation request waiting', 20000);
+    await click('Review'); await waitText('Activation requested', 20000);
+    await fill('Decision note', 'STAGING-GOV-001: synthetic rollout approval');
+    await shot('04d-operator-review');
+    await click('Approve and activate billing'); await waitText('Approved: insurance billing is active.', 30000);
+    await shot('04e-operator-approved');
+    assert.equal((await inspect('/insurance-state')).insurance_state, 'active');
+    await click('Sign out');
+    await inspect('/attend', 'POST');
+    await go('/insurance/settings'); await waitText('Approved by Geneus', 30000);
+    return { devices: await inspect('/devices'), operatorAudit: await inspect('/audit?context=insurance_activation_approved') };
   });
 
   await check('Cashier, offline, takes NGN 3,500 cash for patient 1 before any cover is recorded; it uploads on reconnect', async () => {

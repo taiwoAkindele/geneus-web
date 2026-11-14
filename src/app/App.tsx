@@ -150,6 +150,8 @@ const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billi
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
 const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
 const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCompletionScreen').then((m) => ({ default: m.ServiceCompletionScreen })));
+const MyProfileScreen = lazy(() => import('@/modules/administration/screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })));
+const OperatorConsole = lazy(() => import('@/modules/operator/OperatorConsole').then((m) => ({ default: m.OperatorConsole })));
 const InsuranceSettings = lazy(() => import('@/modules/insurance/InsuranceSettings').then((m) => ({ default: m.InsuranceSettings })));
 const ContractsScreen = lazy(() => import('@/modules/insurance/ContractsScreen').then((m) => ({ default: m.ContractsScreen })));
 const DevicesScreen = lazy(() => import('@/modules/administration/screens/facility-onboarding/DevicesScreen').then((module) => ({ default: module.DevicesScreen })));
@@ -179,6 +181,8 @@ const App = () => {
           <Suspense fallback={<ScreenFallback />}>
         <Routes>
           <Route path="/facilities" element={<FacilityWorkspacesScreen />} />
+          {/* Geneus staff only: no facility or device enrollment, its own sign-in. */}
+          <Route path="/operator" element={<OperatorConsole />} />
           {/* Default screen is the staff shift-login. */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -231,6 +235,7 @@ const App = () => {
             {/* Facility admin — the same shell as daily use, reached from the
                 Admin nav entry; each screen deep-links to the next. */}
             <Route path="/admin" element={<AdminDashboardScreen />} />
+            <Route path="/profile" element={<MyProfileScreen />} />
             <Route path="/admin/staff" element={<ManageStaffScreen />} />
             <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
             <Route path="/facility" element={<FacilityScreen />} />

@@ -1,13 +1,13 @@
 import {
   chargeUnits, coversOn, estimateCoverage, indexCoverageRecords, scheduleOn, selfPayPermitted, serviceDateOf,
   type AuthorizationContext, type Charge, type CoverageAllocation, type CoverageElection, type CoverageEstimate, type CoverageRecords,
-  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund, inBillingPeriod, type InsuranceBillingPeriod, currentCompletions, effectiveEncounterEntries, serviceFulfillment, type Encounter, type FulfillmentEvidence, type Patient, type ServiceCompletion } from '@shared';
+  type CoverCheck, type CoverSchedule, type EncounterEntry, type Facility, type Payer, type PatientCover, type Refund, inBillingPeriod, type InsuranceBillingPeriod, currentCompletions, effectiveEncounterEntries, serviceFulfillment, type Encounter, type FulfillmentEvidence, type Patient, type ServiceCompletion, timeZoneAt } from '@shared';
 import { allOfType, allWhere, envelope, findRecord, insertRecord, newId } from '../db';
 import { getDeviceCredential } from '../deviceCredential';
 import { insuranceBillingPeriods } from '../insuranceSupport';
 
 /** The records the shared estimate reads. With insurance off they are all empty and every charge is cash. */
-export type CoverageData = CoverageRecords & { payers: Payer[]; refunds: Refund[]; timeZone?: string; entries: Map<string, EncounterEntry>; billingPeriods: InsuranceBillingPeriod[] };
+export type CoverageData = CoverageRecords & { payers: Payer[]; refunds: Refund[]; timeZone?: string; timeZoneHistory?: { timeZone: string; from: string }[]; entries: Map<string, EncounterEntry>; billingPeriods: InsuranceBillingPeriod[] };
 
 export const listPayers = () => allOfType<Payer>('payer');
 export const listRefunds = () => allOfType<Refund>('refund');
@@ -29,12 +29,12 @@ export const loadCoverage = async (charges: readonly Charge[] = []): Promise<Cov
   // Cover changes a bill only for charges raised while insurance billing was active; confirmed splits always stand.
   const device = getDeviceCredential();
   const billingPeriods = device ? insuranceBillingPeriods(device) : [];
-  return { covers, checks, elections, allocations, schedules, payers, refunds, entries, timeZone: facilities[0]?.timeZone, billingPeriods };
+  return { covers, checks, elections, allocations, schedules, payers, refunds, entries, timeZone: facilities[0]?.timeZone, ...(facilities[0]?.timeZoneHistory ? { timeZoneHistory: facilities[0].timeZoneHistory } : {}), billingPeriods };
 };
 
 /** The same estimate the server makes, from the records this device holds. */
 export const estimateCharge = (charge: Charge, data: CoverageData): CoverageEstimate => estimateCoverage({
-  charge, records: data, billingActive: inBillingPeriod(charge.createdOn, data.billingPeriods), serviceDate: serviceDateOf(charge.createdOn, data.timeZone),
+  charge, records: data, billingActive: inBillingPeriod(charge.createdOn, data.billingPeriods), serviceDate: serviceDateOf(charge.createdOn, timeZoneAt(data, charge.createdOn)),
   units: chargeUnits(charge, charge.dispenseEntryId ? data.entries.get(charge.dispenseEntryId) : undefined),
 });
 export const estimatesFor = (charges: readonly Charge[], data: CoverageData): Map<string, CoverageEstimate> => {
@@ -84,13 +84,13 @@ export const chooseCover = (patientId: string, coverId: string, chargeIds: reado
  * allows it. A not-eligible check is the other route, with its check named.
  */
 export const selfPayOffered = (charge: Charge, cover: PatientCover, data: CoverageData, check?: CoverCheck): boolean => {
-  const date = serviceDateOf(charge.createdOn, data.timeZone);
+  const date = serviceDateOf(charge.createdOn, timeZoneAt(data, charge.createdOn));
   if (!date) return false;
   const election = { reason: check ? 'not_eligible' : 'patient_choice', coverCheckId: check?.id } as CoverageElection;
   return selfPayPermitted(election, cover, date, data);
 };
 export const contractRuleOn = (charge: Charge, cover: PatientCover, data: CoverageData) => {
-  const date = serviceDateOf(charge.createdOn, data.timeZone);
+  const date = serviceDateOf(charge.createdOn, timeZoneAt(data, charge.createdOn));
   return date ? scheduleOn(cover.payerId, cover.planCode, date, data.schedules) : undefined;
 };
 

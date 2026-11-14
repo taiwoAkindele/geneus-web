@@ -7,6 +7,7 @@ import { saveIntake, eventHeads, type WorkforceData } from '@/data/repos/workfor
 import { workforceReadiness } from '@/lib/api/workforce';
 import { showInterval, zonedInput } from '@/lib/workforceTime';
 import { RecordEditor } from './RecordEditor';
+import { FacilitySettings } from './FacilitySettings';
 import type { EditorKind } from './editorFields';
 import { useWorkforce } from './useWorkforce';
 import { humanize, intakeLabel, proposalState, recordName, unitPath } from './presentation';
@@ -58,7 +59,7 @@ const Readiness = () => {
 };
 export const FacilityWorkspace = () => {
   const query = useWorkforce(), context = useAuthorizationContext(), [params, setParams] = useSearchParams(), [search, setSearch] = useState(''), [editing, setEditing] = useState<Edit>();
-  const view = ['overview', 'services', 'structure', 'locations', 'finance'].includes(params.get('view') || '') ? params.get('view')! : 'overview';
+  const view = ['overview', 'services', 'structure', 'locations', 'finance', 'settings'].includes(params.get('view') || '') ? params.get('view')! : 'overview';
   useEffect(() => { document.title = 'Facility setup · Geneus Health'; }, []);
   if (query.loading || !query.data)
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
@@ -69,9 +70,9 @@ export const FacilityWorkspace = () => {
   const collection = view === 'structure' ? data.units : view === 'locations' ? data.locations : view === 'finance' ? data.departments : data.offerings;
   const records = collection.filter((r) => recordName(r).toLowerCase().includes(search.toLowerCase()));
   const change = (next: string) => { setSearch(''); setParams({ view: next }); };
-  return <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8"><header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-extrabold">Facility setup</h1><p className="mt-1 max-w-2xl text-sm text-ink-muted">Choose the care you provide, where it happens and who does it.</p></div>{view !== 'overview' && canEdit(kind, context.permissions) ? <Button fullWidth={false} onClick={() => setEditing({ kind })}>Add {view === 'structure' ? 'team' : view === 'locations' ? 'location' : view === 'finance' ? 'financial department' : 'service'}</Button> : null}</header>
-    <SectionTabs label="Facility setup sections" value={view} onChange={change} options={[{ value: 'overview', label: 'Overview' }, { value: 'services', label: 'Services' }, { value: 'structure', label: 'Departments & units' }, { value: 'locations', label: 'Locations' }, { value: 'finance', label: 'Financial links' }]} />
-    {view === 'overview' ? <><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[
+  return <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8"><header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-extrabold">Facility setup</h1><p className="mt-1 max-w-2xl text-sm text-ink-muted">Choose the care you provide, where it happens and who does it.</p></div>{view !== 'overview' && view !== 'settings' && canEdit(kind, context.permissions) ? <Button fullWidth={false} onClick={() => setEditing({ kind })}>Add {view === 'structure' ? 'team' : view === 'locations' ? 'location' : view === 'finance' ? 'financial department' : 'service'}</Button> : null}</header>
+    <SectionTabs label="Facility setup sections" value={view} onChange={change} options={[{ value: 'overview', label: 'Overview' }, { value: 'services', label: 'Services' }, { value: 'structure', label: 'Departments & units' }, { value: 'locations', label: 'Locations' }, { value: 'finance', label: 'Financial links' }, { value: 'settings', label: 'Settings' }]} />
+    {view === 'settings' ? <FacilitySettings /> : view === 'overview' ? <><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[
       { title: 'Care services', count: data.offerings.filter((o) => o.configuration === 'active').length, description: 'Configured care activities', to: 'services' },
       { title: 'Accountable teams', count: data.units.filter((u) => u.active).length, description: `${data.units.filter((u) => u.active && !u.kind).length} legacy classifications to review`, to: 'structure' },
       { title: 'Actual places', count: data.locations.filter((l) => l.active).length, description: 'Rooms, wards, outreach and stores', to: 'locations' },

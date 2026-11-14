@@ -7,6 +7,9 @@ import { useAuthorizationContext } from '@/session';
 import { revokeFacilityDevice } from '@/lib/api/devices';
 import { ApiError } from '@/lib/api/client';
 import { Button, DataTable, Sheet, Tag } from '@/ui';
+import { deviceStatus, type DeviceStatus } from '@/lib/api/selfService';
+import { DEVICE_REASONS } from '@/modules/insurance/setupGuide';
+import type { DeviceBlockReason } from '@shared';
 
 export const DevicesScreen = () => {
   const context = useAuthorizationContext();
@@ -19,6 +22,9 @@ export const DevicesScreen = () => {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const working = useRef(false);
   useEffect(() => { document.title = 'Facility devices · Geneus Health'; }, []);
+  // The server's view of each device: its app version, unsent work and last report — what readiness checks use.
+  const [reports, setReports] = useState<Map<string, DeviceStatus>>(); const [reportError, setReportError] = useState('');
+  useEffect(() => { if (!sync.connected) return; deviceStatus(context).then((r) => { setReports(new Map(r.devices.map((d) => [d.id, d]))); setReportError(''); }, (cause) => setReportError(cause instanceof Error ? cause.message : 'Sync status unavailable')); }, [context, sync.connected, notice]);
   const denial = decide(context, 'device:revoke');
   const allowed = context.permissions.includes('device:enroll') || context.permissions.includes('device:revoke') || context.roles?.includes('facility_admin') || context.role === 'facility_admin';
   const revoke = async () => {
@@ -36,11 +42,15 @@ export const DevicesScreen = () => {
     {!allowed ? <p>Your account has not been assigned device administration.</p> : query.loading ? <p role="status">Reading device records…</p> : query.error ? <div role="alert"><p>Devices could not be read from this replica.</p><Button variant="ghost" onClick={query.reload}>Try again</Button></div> : !query.data?.length ? <p className="rounded-card border border-dashed border-outline bg-white p-5 text-sm text-ink-muted">No device records are available here yet. Check sync before drawing conclusions about enrollment.</p> : <DataTable caption="Enrolled facility devices" rows={query.data} rowKey={(row) => row.id} columns={[
       { key: 'device', label: 'Device', render: (row) => <><p className="font-bold">{row.label ?? 'Unnamed device'}{row.id === deviceId ? ' · this device' : ''}</p><p className="mt-1 break-all font-mono text-xs text-ink-muted">{row.id}</p></> },
       { key: 'status', label: 'Access', render: (row) => <Tag tone={row.status === 'active' ? 'green' : 'slate'}>{row.status === 'active' ? 'Active' : 'Revoked'}</Tag> },
+      { key: 'sync', label: 'Sync status', render: (row) => { const r = reports?.get(row.id); if (!r) return <span className="text-xs text-ink-muted">{reports ? 'No report yet' : sync.connected ? 'Checking…' : 'Connect to check'}</span>;
+        return <div data-device-status={row.id} className="space-y-1 text-sm"><p>{r.insuranceCapable ? 'Current app' : 'Older app version'} · {r.pendingChanges === undefined ? 'unsent work unknown' : r.pendingChanges ? `${r.pendingChanges} unsent change${r.pendingChanges === 1 ? '' : 's'}` : 'nothing unsent'}</p>
+          {r.lastReportedOn ? <p className="text-xs text-ink-muted">Last report {new Date(r.lastReportedOn).toLocaleString('en-GB')}</p> : null}
+          {row.status === 'active' ? r.blocking.map((b) => <p key={b} className="text-xs text-amber-text">This device {DEVICE_REASONS[b as DeviceBlockReason]?.problem}. {DEVICE_REASONS[b as DeviceBlockReason]?.fix}</p>) : null}</div>; } },
       { key: 'seen', label: 'Last server contact', render: (row) => row.lastSeenOn ? new Date(row.lastSeenOn).toLocaleString('en-GB') : 'Not yet recorded' },
       { key: 'action', label: 'Action', render: (row) => row.status === 'active' && context.permissions.includes('device:revoke') ? <Button fullWidth={false} variant="danger" onClick={() => { setSelected(row); setWipe(false); setAcknowledged(false); setUnsent(undefined); setAcceptUnsent(false); setError(''); }}>Revoke access</Button> : row.wipeRequested ? 'Local wipe requested' : '—' },
     ]} />}
     {notice ? <p role="status" className="rounded-field bg-brand-wash p-4 text-sm">{notice}</p> : null}
-    <p className="text-xs leading-relaxed text-ink-muted">Status is based on the records synced to this device. Adding or revoking access requires a connection and recent authorization.</p>
+    {reportError ? <p role="alert" className="text-sm text-amber-text">{reportError}</p> : null}<p className="text-xs leading-relaxed text-ink-muted">Status is based on the records synced to this device. Adding or revoking access requires a connection and recent authorization.</p>
     {selected ? <Sheet title={`Revoke ${selected.label ?? 'this device'}?`} onClose={() => setSelected(undefined)} closeDisabled={busy}><p className="text-sm leading-relaxed">The server will stop accepting this device's sync requests. It may contain changes that have not uploaded; arrange a review before revoking access.</p>{selected.id === deviceId ? <p className="mt-3 font-bold text-danger">You are using this device. Revoking it will block its future access.</p> : null}<label className="mt-4 flex min-h-[52px] items-center gap-3 text-sm"><input type="checkbox" checked={wipe} onChange={(event) => setWipe(event.target.checked)} />Also request removal of its local replica when it next contacts the server</label><label className="mt-3 flex min-h-[52px] items-center gap-3 text-sm"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />I have checked the impact on work saved on that device</label>{unsent ? <label className="mt-3 flex min-h-[52px] items-center gap-3 text-sm font-semibold text-danger"><input type="checkbox" checked={acceptUnsent} onChange={(event) => setAcceptUnsent(event.target.checked)} />I accept that {unsent} unsent change{unsent === 1 ? '' : 's'} on this device will never arrive</label> : null}{!sync.connected ? <p className="mt-3 text-sm text-amber-text">Connect before revoking access.</p> : denial ? <p className="mt-3 text-sm text-amber-text">Your authorization must be refreshed before this action. Check sync or ask a facility administrator.</p> : null}{error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}<div className="mt-5 flex flex-wrap gap-3"><Button fullWidth={false} variant="outlined" disabled={busy} onClick={() => setSelected(undefined)}>Keep access</Button><Button fullWidth={false} variant="danger-outline" loading={busy} disabled={!acknowledged || (Boolean(unsent) && !acceptUnsent) || !sync.connected || Boolean(denial)} onClick={() => void revoke()}>Confirm revocation</Button></div></Sheet> : null}
   </div>;
 };

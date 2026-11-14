@@ -143,3 +143,7 @@ export const CLAIM_ISSUE_LABELS: Record<ClaimIssue['code'], string> = {
   diagnosis_coding_unverified: 'Coding not verifiable yet', allocation_superseded: 'Split corrected since', submission_method_missing: 'No submission method',
   payer_code_missing: 'No payer service code', attachment_missing: 'Attachment missing',
 };
+
+/** The administrator asks Geneus to switch insurance billing on; Geneus approves in its operator console. */
+export const requestInsuranceActivation = (context: AuthorizationContext, note?: string) => call<InsuranceSetupStatus>(context, '/insurance/activation/request', note?.trim() ? { note: note.trim() } : {});
+export const withdrawInsuranceActivation = (context: AuthorizationContext) => call<InsuranceSetupStatus>(context, '/insurance/activation/withdraw', {});
