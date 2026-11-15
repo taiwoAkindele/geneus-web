@@ -1,0 +1,90 @@
+[
+  { "role": "facility_admin", "width": 1440, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  {
+    "path": "/setup?step=services",
+    "name": "setup-care-services-before",
+    "assert": "(()=>{const t=document.body.innerText;return t.includes('Care services')&&t.includes('1 care service not yet active')&&t.includes('Wound dressing')&&t.includes('Draft')&&!t.includes('Haemoglobin')&&!t.includes('Full blood count')&&!t.includes('Hepatitis C antibody')&&!t.includes('Server accepted')&&t.includes('Lab tests, medicines and other catalogue items')})()",
+    "description": "Step 4 lists only care services: lab tests are not shown or counted, and no server-acceptance status appears"
+  },
+  {
+    "assert": "(()=>{const s=document.querySelector('nav[aria-label=\"Setup steps\"] [aria-current=step]');return s.textContent.includes('Care services')&&s.textContent.includes('Started')})()",
+    "description": "Five active lab tests do not complete the step; the draft care service only marks it Started"
+  },
+  {
+    "assert": "[...document.querySelectorAll('aside a')].some(a=>a.textContent.includes('Lab catalogue'))&&[...document.querySelectorAll('aside a')].some(a=>a.textContent.includes('Pharmacy stock'))",
+    "description": "Lab catalogue and pharmacy stock are reached from When you need them"
+  },
+  {
+    "evaluate": "([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('General outpatient consultation')).click(),true)",
+    "name": "setup-care-services-add-preset",
+    "assert": "(()=>{const d=document.querySelector('dialog[open]');const sel=[...d.querySelectorAll('select')];return d.innerText.includes('Add General outpatient consultation')&&sel.length===2&&sel[0].selectedOptions[0].text==='Consultation'&&sel[1].selectedOptions[0].text.startsWith('Consulting room 1')&&!d.innerText.includes('Required actions')&&!d.innerText.includes('Equipment')})()",
+    "description": "A predefined service asks only for team and place, with a non-laboratory team and its own room chosen by default"
+  },
+  {
+    "assert": "(()=>{const d=document.querySelector('dialog[open]');const add=[...d.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add care service');return d.innerText.includes('Confirm it is you')&&add.disabled})()",
+    "description": "Without a confirmed staff session the sheet asks for the PIN and nothing can be saved"
+  },
+  { "fill": { "label": "Your PIN", "value": "123456" } },
+  {
+    "click": "Confirm",
+    "name": "setup-care-services-pin-confirmed",
+    "assert": "(()=>{const d=document.querySelector('dialog[open]');const add=[...d.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add care service');return !d.innerText.includes('Confirm it is you')&&!add.disabled})()",
+    "description": "After the PIN is confirmed by the server the service can be added"
+  },
+  {
+    "click": "Add care service",
+    "name": "setup-care-services-after",
+    "assert": "(()=>{const t=document.body.innerText;const s=document.querySelector('nav[aria-label=\"Setup steps\"] [aria-current=step]');return !document.querySelector('dialog[open]')&&t.includes('1 active care service')&&t.includes('General outpatient consultation')&&t.includes('Consultation · Consulting room 1')&&t.includes('Active')&&s.textContent.includes('Done')&&![...document.querySelectorAll('section[aria-labelledby=care-services-add] li button')].some(b=>b.textContent.startsWith('General outpatient consultation'))})()",
+    "description": "The added care service is Active, completes the step, and is no longer offered as an option to add"
+  },
+  {
+    "click": "Add a custom care service"
+  },
+  {
+    "fill": { "label": "Name", "value": "  general outpatient CONSULTATION " }
+  },
+  {
+    "click": "Add care service",
+    "name": "setup-care-services-duplicate-refused",
+    "assert": "document.querySelector('dialog[open] [role=alert]')?.textContent.includes('is already one of this hospital')===true",
+    "description": "A second offering with the same meaning is refused"
+  },
+  { "click": "Cancel" },
+  {
+    "evaluate": "([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('Inpatient care')).click(),true)",
+    "name": "setup-care-services-inpatient",
+    "assert": "[...document.querySelectorAll('dialog[open] select')][1].selectedOptions[0].text==='Female ward · Ward'&&![...document.querySelectorAll('dialog[open] select option')].some(o=>o.text.startsWith('FW-01'))",
+    "description": "Inpatient care defaults to a ward, and individual beds are not offered as service places"
+  },
+  { "click": "Cancel" },
+  {
+    "assert": "(()=>{const r=window.designAudit.rows;const tests=r.service_offerings.filter(o=>o.id.startsWith('service_offering:test'));return tests.length===5&&tests.every(o=>o.configuration==='active'&&o.resourceReadiness==='available')&&r.service_offerings.length===7&&r.service_definitions.length===7&&r.service_definitions.filter(d=>d.id.startsWith('service_definition:test')).every(d=>d.active)})()",
+    "description": "Lab test definitions and offerings are untouched; adding one care service created exactly one definition and one offering"
+  },
+  {
+    "path": "/setup?step=prices",
+    "name": "setup-prices-notes",
+    "assert": "(()=>{const t=document.body.innerText;return t.includes('5 lab tests without a price. Set them in the Lab catalogue.')&&!t.includes('service without a price')&&!t.includes('services without a price')})()",
+    "description": "Prices advice names unpriced lab tests only; care services are charged through visit fees"
+  },
+  {
+    "path": "/setup?step=teams",
+    "name": "setup-teams-status",
+    "assert": "(()=>{const t=document.body.innerText;return !t.includes('Server accepted')&&t.includes('Active')})()",
+    "description": "Teams list shows a business status instead of server acceptance"
+  },
+  {
+    "path": "/investigations/catalogue",
+    "name": "setup-lab-catalogue-intact",
+    "assert": "(()=>{const t=document.body.innerText;return ['Haemoglobin','Full blood count','Blood group and Rh','Hepatitis C antibody','Urine culture and sensitivity'].every(n=>t.includes(n))&&!t.includes('General outpatient consultation')})()",
+    "description": "The Lab catalogue still lists every test, and care services do not appear in it"
+  },
+  { "width": 390, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  {
+    "path": "/setup?step=services",
+    "name": "setup-care-services-phone",
+    "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('Add care services')&&!document.body.innerText.includes('Haemoglobin')",
+    "description": "At phone width the step fits without horizontal scrolling"
+  },
+  { "finish": true }
+]

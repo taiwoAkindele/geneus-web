@@ -149,6 +149,7 @@ const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCo
 const SettingsLayout = lazy(() => import('@/app/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const AccountSecurity = lazy(() => import('@/app/settings/AccountSecurity').then((m) => ({ default: m.AccountSecurity })));
 const FacilityWorkspace = lazy(() => import('@/modules/operations/workforce/Workspaces').then((m) => ({ default: m.FacilityWorkspace })));
+const SetupWizardScreen = lazy(() => import('@/modules/administration/setup/SetupWizardScreen').then((m) => ({ default: m.SetupWizardScreen })));
 const MyProfileScreen = lazy(() => import('@/modules/administration/screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })));
 const OperatorConsole = lazy(() => import('@/modules/operator/OperatorConsole').then((m) => ({ default: m.OperatorConsole })));
 const InsuranceSettings = lazy(() => import('@/modules/insurance/InsuranceSettings').then((m) => ({ default: m.InsuranceSettings })));
@@ -253,6 +254,7 @@ const App = () => {
             <Route path="/admin/staff" element={<MovedTo to="/settings/staff" />} />
             <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
             <Route path="/facility" element={<MovedTo to="/settings/facility" />} />
+            <Route path="/setup" element={<RequireCapability permissions={['unit:manage', 'location:manage', 'service:manage', 'fee_item:manage', 'staff:manage']}><SetupWizardScreen /></RequireCapability>} />
             <Route path="/organization" element={<MovedTo to="/settings/organization" />} />
             <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
             <Route path="/investigations/catalogue" element={<MovedTo to="/settings/catalogue" />} />

@@ -20,7 +20,8 @@ const server = await createServer({ root: process.cwd(), mode: 'development', lo
 await server.listen();
 const profile = await mkdtemp(join(tmpdir(), 'geneus-staging-'));
 const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
-  '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9337', '--user-data-dir=' + profile, 'about:blank',
+  // HEADED=1 opens a visible window so a person can watch the run.
+  ...(process.env.HEADED ? ['--window-size=1460,1100'] : ['--headless=new']), '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9337', '--user-data-dir=' + profile, 'about:blank',
 ], { windowsHide: true, stdio: 'ignore' });
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 const errors = [], results = [], timeline = [];
@@ -569,6 +570,44 @@ try {
     await go('/insurance/payments'); await pause(800);
     assert.ok(!(await text()).includes('Record a payment from a payer'), 'the cashier has no payer payment screen');
     return { denied: true };
+  });
+
+  /* ---------------- UX tour (UX_TOUR=1): screens of the new insurance flows, desktop and phone. Records nothing it does not need to. ---------------- */
+  if (process.env.UX_TOUR) await check('UX tour: registration payment, cover and authorizations, claim settlement, payer payments, code lists', async () => {
+    const phone = () => cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    const desktop = () => cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    const full = async (name) => { const { contentSize } = await cdp('Page.getLayoutMetrics'); const png = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: contentSize.width, height: Math.min(contentSize.height, 6000), scale: 1 } }); await writeFile(join(output, name + '.png'), Buffer.from(png.data, 'base64')); };
+    const seen = [];
+    // Front desk: registering an insured patient, then the cover and authorizations on the profile.
+    await signOut(); await signIn('desk');
+    await go('/patients/new'); await waitText('How will the patient pay?', 30000);
+    await selectByText('Payment', 'Insurance or HMO'); await waitText('Enrollee or membership number', 10000);
+    await selectByText('Payer (HMO or scheme)', 'Synthetic Staging HMO'); await pause(500);
+    await full('ux-01-registration-insurance'); seen.push('registration');
+    await phone(); await pause(500); await full('ux-01m-registration-insurance-phone'); await desktop();
+    await go(`/patients/profile?patient=${encodeURIComponent(second)}&tab=details`); await waitText('Insurance cover', 30000);
+    await waitText('Payer authorizations and referrals', 30000); await pause(800);
+    await full('ux-02-patient-cover-authorizations'); seen.push('patient details');
+    if ((await text()).includes('Record authorization or referral')) { await click('Record authorization or referral'); await pause(500); await full('ux-03-record-authorization'); }
+    await phone(); await pause(500); await full('ux-02m-patient-cover-phone'); await desktop();
+    // Insurance officer: claim with its payer response, payer payments, code list.
+    await signOut(); await signIn('officer');
+    await go('/insurance/claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length >= 2`, 30000, 'claims');
+    await full('ux-04-claims-list'); seen.push('claims');
+    await press(`[...document.querySelectorAll('tr[data-claim="CLM-000002"] button')].find((b) => b.textContent.trim() === 'Open')`); await waitText('Payer response and payment', 20000);
+    await full('ux-05-claim-settled-detail');
+    const revised = await evaluate(`Boolean(document.querySelector('tr[data-claim="CLM-000001"]'))`);
+    if (revised) { await press(`[...document.querySelectorAll('tr[data-claim="CLM-000001"] button')].find((b) => b.textContent.trim() === 'Open')`); await pause(1200); await full('ux-06-claim-revision-draft'); }
+    await click('Batches & submissions'); await waitText('Record a submission', 20000); await full('ux-07-batches-submissions');
+    await go('/insurance/payments'); await waitText('What payers owe', 30000); await pause(800); await full('ux-08-payer-balances'); seen.push('payer payments');
+    await click('Import a payment advice'); await selectByText('Payer', 'Synthetic Staging HMO'); await pause(400); await full('ux-09-import-advice');
+    await phone(); await pause(500); await full('ux-08m-payer-payments-phone'); await desktop();
+    await go('/insurance'); await waitText('Insurance work', 30000); await pause(800); await full('ux-10-insurance-work'); seen.push('insurance work');
+    await go('/insurance/settings'); await waitText('Diagnosis code lists', 30000); await pause(800); await full('ux-11-settings-code-list'); seen.push('settings');
+    await go('/insurance/contracts'); await waitText('Payers & contracts', 30000); await click('Contracts'); await waitText('Claim submission', 30000); await click('Change'); await pause(500); await full('ux-12-payer-submission-rules');
+    // Navigation as each role sees it.
+    await go('/home'); await pause(1000); await full('ux-13-officer-home');
+    return { screens: seen };
   });
 
   console.log(JSON.stringify({ results, errors, timeline: timeline.slice(-20) }, null, 2));

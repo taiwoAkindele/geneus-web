@@ -12,6 +12,7 @@ import { formatMoney } from '@/lib/money';
 import { dashboardAccess } from './dashboardModel';
 import { useDashboard } from './useDashboard';
 import { WorkforceHome } from '@/modules/operations/workforce/WorkforceHome';
+import { SetupProgressCard } from '@/modules/administration/setup/SetupProgressCard';
 import { NotificationList } from '@/app/NotificationList';
 
 const Section = ({ title, description, to, linkLabel = 'View all', count, loading, error, reload, children }: {
@@ -109,6 +110,7 @@ export const Dashboard = () => {
 
   return <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5 px-4 py-5 md:gap-6 md:px-7 md:py-7">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[13px] font-semibold text-ink-muted">{new Date(today + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><h1 className="mt-1 text-[30px] font-extrabold tracking-[-0.03em]">Home</h1><p className="mt-1 text-sm text-ink-soft">Welcome, {user.name}. <span className="block sm:inline">Your work at {facility.name}.</span></p></div><div className="flex flex-wrap gap-2">{quickActions.map((action, index) => <Button key={action.to} fullWidth={false} variant={action.primary ? 'primary' : 'outlined'} className={`min-h-[44px] px-3 py-3 text-sm ${index > 1 ? 'hidden sm:inline-flex' : ''}`} onClick={() => navigate(action.to)}><Icon name={action.icon} className="h-4 w-4" />{action.label}</Button>)}</div></header>
+    <SetupProgressCard />
     <WorkforceHome/>
     {notifications.some((notification) => notification.kind !== 'conflict') ? <section aria-labelledby="home-attention" className="overflow-hidden rounded-card border border-outline-soft bg-white"><h2 id="home-attention" className="border-b border-outline-soft px-4 py-3 text-[17px] font-extrabold md:px-5">Needs your attention</h2><NotificationList notifications={notifications.filter((notification) => notification.kind !== 'conflict').slice(0, 4)} loading={notificationsLoading} error={notificationsError} onDone={() => undefined} /></section> : null}
     {user.roles.length > 1 ? <p className="text-xs font-semibold text-ink-muted">{user.role} · all your duties in one place</p> : null}

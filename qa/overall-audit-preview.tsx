@@ -16,6 +16,7 @@ import { fakeDatabase } from '@/data/testing/fakeDatabase';
 import { toRow } from '@/data/rows';
 import { DevicesScreen } from '@/modules/administration/screens/facility-onboarding/DevicesScreen';
 import { StockScreen } from '@/modules/inventory/screens/stock/StockScreen';
+import { SetupWizardScreen } from '@/modules/administration/setup/SetupWizardScreen';
 import { MonthlySummaryScreen } from '@/modules/reports/screens/monthly-summary/MonthlySummaryScreen';
 import { FacilityHomeScreen } from '@/app/screens/facility-home/FacilityHomeScreen';
 import { WorkspaceScreen } from '@/app/screens/workspace/WorkspaceScreen';
@@ -383,6 +384,39 @@ Object.assign(window,{setPatientHistoryAccess:(allowed:boolean)=>{
   db.rows.patients.push(toRow('patient',Patient.parse({...envelope,id:'QA-PHC-000003-K4',patientId:'QA-PHC-000003-K4',type:'patient',fullName:'Never Visited Patient',address:'Synthetic address',phone:'08099990000',legacyPaperRef:'OLD-314',sex:'male',ageYears:25})));
   listeners.forEach(listener=>listener());
 }});
+const SETUP_TABLES: Record<string, string> = { service_definition: 'service_definitions', service_offering: 'service_offerings', unit: 'units', location: 'locations' };
+/** The hospital in the setup-wizard report: lab tests adopted (each an offering), one draft care service, no others. */
+Object.assign(window, { seedSetupScenario: async () => {
+  await saveDeviceCredential({ deviceId: envelope.deviceId, facilityId: envelope.facilityId, credential: 'qa-credential', syncEndpoint: 'https://sync.example.org' });
+  const place = (id: string, name: string, kind: string, extra = {}) => toRow('location', Location.parse({ ...envelope, schemaVersion: 5, id, type: 'location', name, kind, ...extra }));
+  db.rows.locations = [place('location:lab', 'Laboratory', 'room', { unitId: 'unit:2' }), place('location:c1', 'Consulting room 1', 'room', { unitId: 'unit:1' }), place('location:fw', 'Female ward', 'ward'), place('location:fw1', 'FW-01', 'bed', { parentId: 'location:fw' })];
+  // A synthetic server: PIN 123456 opens a staff session; a configuration save is applied as sync would deliver it.
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    if (url.endsWith('/staff/session')) return JSON.parse(String(init?.body)).pin === '123456'
+      ? reply(200, { token: 'qa-session', staffId: actorId, expiresOn: new Date(Date.now() + 3600_000).toISOString(), idleMinutes: 30 })
+      : reply(401, { error: 'wrong_pin', message: 'That PIN is not right' });
+    if (url.endsWith('/config/save')) {
+      const { mutations } = JSON.parse(String(init?.body)) as { mutations: { op: string; table: string; id: string; data: Record<string, unknown> }[] };
+      for (const m of mutations) if (m.op === 'put') db.rows[SETUP_TABLES[m.table]].push(toRow(m.table as never, m.data));
+      listeners.forEach((listener) => listener());
+      return reply(200, { applied: mutations.length, duplicates: 0, rejected: [] });
+    }
+    return originalFetch(input, init);
+  };
+  db.rows.service_definitions = []; db.rows.service_offerings = [];
+  const tests = ['Haemoglobin', 'Full blood count', 'Blood group and Rh', 'Hepatitis C antibody', 'Urine culture and sensitivity'];
+  tests.forEach((name, index) => {
+    const id = `service_definition:test${index}`;
+    db.rows.service_definitions.push(toRow('service_definition', ServiceDefinition.parse({ ...envelope, schemaVersion: 5, id, type: 'service_definition', name, category: 'laboratory', concept: { system: 'local', code: id, label: name }, orderable: true, active: true, revision: 1, investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] } })));
+    db.rows.service_offerings.push(toRow('service_offering', ServiceOffering.parse({ ...envelope, schemaVersion: 5, id: `service_offering:test${index}`, type: 'service_offering', serviceDefinitionId: id, unitId: 'unit:2', name, locationIds: ['location:lab'], delivery: 'physical', requiredActions: ['perform_test', 'record_result'], intakePolicy: 'both', timeZone: 'Africa/Lagos', configuration: 'active', resourceReadiness: 'available', revision: 1 })));
+  });
+  db.rows.service_definitions.push(toRow('service_definition', ServiceDefinition.parse({ ...envelope, schemaVersion: 5, id: 'service_definition:dressing', type: 'service_definition', name: 'Wound dressing', category: 'procedure', concept: { system: 'urn:geneus:local-service', code: 'dressing', label: 'Wound dressing' }, active: true, revision: 1 })));
+  db.rows.service_offerings.push(toRow('service_offering', ServiceOffering.parse({ ...envelope, schemaVersion: 5, id: 'service_offering:dressing', type: 'service_offering', serviceDefinitionId: 'service_definition:dressing', unitId: 'unit:3', name: 'Wound dressing', locationIds: ['location:c1'], delivery: 'physical', requiredActions: [], intakePolicy: 'walk_in', timeZone: 'Africa/Lagos', configuration: 'draft', resourceReadiness: 'unassessed', revision: 1 })));
+  listeners.forEach((listener) => listener());
+  return true;
+} });
 const RouteObserver = () => {
   const navigate = useNavigate(); const route = useLocation();
   useEffect(() => { Object.assign(window, { designAudit: { go: (path: string, state?: unknown) => navigate(path, { state }), path: route.pathname, search: route.search, patientId, rows: db.rows, seedHistory: (count: number) => { for (let i = 0; i < count; i++) { const opened = new Date(Date.now() - (i + 20) * 86400000).toISOString(); const historical = Encounter.parse({ ...envelope, id: 'encounter:history-' + i, type: 'encounter', patientId, openedOn: opened, createdOn: opened, setting: 'facility' }); db.rows.encounters.push(toRow('encounter', historical)); db.rows.encounter_entries.push(toRow('encounter_entry', EncounterEntry.parse({ ...envelope, id: 'entry:history-close-' + i, type: 'encounter_entry', patientId, encounterId: historical.id, createdOn: opened, step: 'follow_up', values: {}, actorRole: 'doctor' }))); } listeners.forEach((listener) => listener()); }, setPatient: (fields: Record<string, unknown>) => { Object.assign(db.rows.patients[0], fields); listeners.forEach((listener) => listener()); } } }); }, [navigate, route]);
@@ -415,6 +449,7 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/patients/identity" element={<IdentityReviewScreen />} />
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
   <Route path="/stock" element={<StockScreen />} />
+  <Route path="/setup" element={<SetupWizardScreen />} />
   <Route path="/insurance" element={<InsuranceWorkspace />} />
   <Route path="/insurance/contracts" element={<ContractsScreen />} />
 </Route></Routes></MemoryRouter></RegistrationDraftProvider></RegistersProvider></AppointmentsProvider></Ready></SessionProvider></ToastProvider>);
