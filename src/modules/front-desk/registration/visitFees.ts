@@ -4,9 +4,9 @@ import { formatMoney } from '@/lib/money';
 import { parseAge, type RegistrationValues } from './registrationValues';
 
 /** A visit booked in the same save as the registration ("Register & send on"). */
-export type RegistrationVisit = { visitType: VisitType; reason: string };
+export type RegistrationVisit = { visitType: VisitType; reason: string; /** The care service chosen, when the hospital has them. */ offeringId?: string };
 
-export const visitFor = (visitType: VisitType): RegistrationVisit => ({ visitType, reason: visitType === 'general' ? 'Consultation' : VISIT_TYPE_LABELS[visitType] });
+export const visitFor = (visitType: VisitType, offeringId?: string): RegistrationVisit => ({ visitType, reason: visitType === 'general' ? 'Consultation' : VISIT_TYPE_LABELS[visitType], ...(offeringId ? { offeringId } : {}) });
 
 /** One fee the new patient would be charged, at its price or at zero with the exemption that applies. */
 export type FeeLine = { feeId: string; name: string; listPriceMinor: number; amountMinor: number; currency: string; exemptReason?: string };

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Button, ChoiceChip, SegmentedControl, SelectField, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
+import { Button, ChoiceChip, SegmentedControl, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { BOOKING_SLOTS, bookingIsInactive, slotLoad } from './appointmentList';
-import { VisitType } from '@shared';
-import { VISIT_TYPE_LABELS } from '@/modules/finance/billing/feeForm';
+import { VISIT_TYPE_NAMES } from '@shared';
+import { CareServiceVisitFields } from '@/modules/front-desk/careServices/CareServiceVisitFields';
+import type { CareVisitChoice } from '@/data/repos/careServices';
 import { useAppointments } from './AppointmentsProvider';
 import type { AppointmentPatient } from './types';
 import { AllocationFields, type AllocationProposal } from '@/modules/operations/workforce/AllocationFields';
@@ -25,7 +26,8 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [reason, setReason] = useState('Consultation');
-  const [visitType, setVisitType] = useState<VisitType>('general');
+  const [care, setCare] = useState<CareVisitChoice>({ visitType: 'general' });
+  const visitType = care.visitType;
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState('');
   const [resource,setResource]=useState<AllocationProposal>({});
@@ -33,7 +35,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   const canBook = mode === 'now' || Boolean(date && time);
   const load = slotLoad(appointments, date);
   // An active booking of the same kind usually means this should be a reschedule, not a second booking.
-  const existing = forPatient(patient.id).find((booking) => (booking.group === 'today' || booking.group === 'upcoming') && !bookingIsInactive(booking) && !booking.encounterId && (booking.visitType ?? 'general') === visitType);
+  const existing = forPatient(patient.id).find((booking) => (booking.group === 'today' || booking.group === 'upcoming') && !bookingIsInactive(booking) && !booking.encounterId && (care.offeringId ? booking.offeringId === care.offeringId : (booking.visitType ?? 'general') === visitType));
 
   const submit = async () => {
     if (!canBook || booking) return;
@@ -41,7 +43,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
     try {
       if(mode==='scheduled'&&resource.error)throw new Error(resource.error);
       const scheduledFor = mode === 'scheduled' ? resource.scheduledFor||new Date(`${date}T${time}`).toISOString() : undefined;
-      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType, allocation:mode==='scheduled'?resource.allocation:undefined });
+      await book({ patientId: patient.id, reason: reason || 'Consultation', scheduledFor, visitType, offeringId: care.offeringId, allocation:mode==='scheduled'?resource.allocation:undefined });
       toast(
         scheduledFor
           ? `Appointment saved on this device for ${fmtDay(date)}`
@@ -55,7 +57,7 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
   };
 
   return (
-    <Sheet onClose={onClose} eyebrow="Book an appointment" title={patient.name} placement="side" closeDisabled={booking} hasUnsavedChanges={mode !== 'now' || Boolean(date || time) || reason !== 'Consultation' || visitType !== 'general'}>
+    <Sheet onClose={onClose} eyebrow="Book an appointment" title={patient.name} placement="side" closeDisabled={booking} hasUnsavedChanges={mode !== 'now' || Boolean(date || time) || reason !== 'Consultation'}>
       <p className="mb-4 break-all font-mono text-sm text-ink-soft">{patient.id}</p>
       <SegmentedControl
         ariaLabel="When"
@@ -93,12 +95,12 @@ export const BookAppointmentSheet = ({ patient, onClose }: { patient: Appointmen
       )}
 
       <div className="mt-4">
-        <SelectField label="Visit type" value={visitType} options={VisitType.options.map((value) => ({ value, label: VISIT_TYPE_LABELS[value] }))} onChange={(e) => setVisitType(e.target.value as VisitType)} />
+        <CareServiceVisitFields arrival={mode === 'scheduled' ? 'scheduled' : 'walk_in'} value={care} onChange={setCare} />
         <TextField label="Reason" name="appt_reason" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
 
-      {existing ? <p role="status" className="mt-4 rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">{patient.name} already has a {VISIT_TYPE_LABELS[visitType].toLowerCase()} booking on {existing.day} at {existing.when}. Saving adds another one; reschedule that booking instead if it is the same visit.</p> : null}
-      {mode==='scheduled'?<div className="mt-4"><AllocationFields start={date&&time?`${date}T${time}`:''} onChange={setResource}/></div>:null}
+      {existing ? <p role="status" className="mt-4 rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">{patient.name} already has a {VISIT_TYPE_NAMES[visitType].toLowerCase()} booking on {existing.day} at {existing.when}. Saving adds another one; reschedule that booking instead if it is the same visit.</p> : null}
+      {mode==='scheduled'?<div className="mt-4"><AllocationFields key={care.offeringId ?? ''} offeringId={care.offeringId} start={date&&time?`${date}T${time}`:''} onChange={setResource}/></div>:null}
       <div className="mt-5">
         {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         <Button variant="primary" disabled={!canBook || booking} loading={booking} onClick={submit}>

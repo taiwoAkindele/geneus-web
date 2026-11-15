@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { VisitType, validCalendarDate, yearsBetween } from '@shared';
+import { validCalendarDate, yearsBetween } from '@shared';
 import { AppBar, Avatar, Button, ChoiceChip, SegmentedControl, SelectField, TextField } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { formatMoney } from '@/lib/money';
@@ -10,7 +10,8 @@ import { listFeeItems } from '@/data/repos/billing';
 import { listPatients, type PatientDetails } from '@/data/repos/patients';
 import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
-import { VISIT_TYPE_LABELS } from '@/modules/finance/billing/feeForm';
+import { CareServiceVisitFields } from '@/modules/front-desk/careServices/CareServiceVisitFields';
+import type { CareVisitChoice } from '@/data/repos/careServices';
 import {
   EMPTY_REGISTRATION, amountsDue, factsFromForm, newPatientFees, parseAge, toPatientDetails, useNextPatientNumber, useRegistrationDraft, useSavePatient, visitFor,
   type RegistrationNavState, type RegistrationValues,
@@ -59,7 +60,8 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const patients = usePatients();
   const fees = useLiveQuery(listFeeItems);
   const canBook = context.permissions.includes('appointment:create');
-  const [visitChoice, setVisitChoice] = useState<VisitType | ''>(canBook ? 'general' : '');
+  const [withVisit, setWithVisit] = useState(canBook);
+  const [care, setCare] = useState<CareVisitChoice>({ visitType: 'general' });
   const [saveError, setSaveError] = useState('');
   const [payment, setPayment] = useState<'self_pay' | 'insurance'>('self_pay'); const [cover, setCover] = useState<CoverFieldsValue>(emptyCover);
   const [opening, setOpening] = useState(false);
@@ -67,7 +69,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const { control, register, handleSubmit, getValues, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({ defaultValues: values });
   const live = watch();
   const provisional = live.identityStatus === 'provisional';
-  const visitType = !editing && !provisional && canBook && visitChoice ? visitChoice : undefined;
+  const visitType = !editing && !provisional && canBook && withVisit ? care.visitType : undefined;
 
   useEffect(() => {
     const subscription = watch((partial) => keep(partial));
@@ -91,7 +93,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     setSaveError('');
     keep(form);
     const complete: RegistrationValues = { ...values, ...form };
-    const visit = visitType ? visitFor(visitType) : undefined;
+    const visit = visitType ? visitFor(visitType, care.offeringId) : undefined;
     const insured = !editing && !provisional && payment === 'insurance' ? cover : undefined;
     if (insured && coverIssue(insured)) { setSaveError(coverIssue(insured)!); return; }
     try {
@@ -258,12 +260,15 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
             <section aria-labelledby="registration-visit" className="space-y-4 border-t border-outline-soft pt-6">
               <h2 id="registration-visit" className={sectionTitle}>Visit today</h2>
               <div className="grid items-start gap-4 md:grid-cols-2">
-                <SelectField
-                  label="Visit type"
-                  value={visitChoice}
-                  onChange={(event) => setVisitChoice(event.target.value as VisitType | '')}
-                  options={[...VisitType.options.map((value) => ({ value, label: VISIT_TYPE_LABELS[value] })), { value: '', label: 'No visit today — register only' }]}
-                />
+                <div className="space-y-3">
+                  <SelectField
+                    label="Visit today"
+                    value={withVisit ? 'yes' : ''}
+                    onChange={(event) => setWithVisit(event.target.value === 'yes')}
+                    options={[{ value: 'yes', label: 'Yes — the patient is here for care' }, { value: '', label: 'No visit today — register only' }]}
+                  />
+                  {withVisit ? <CareServiceVisitFields arrival="walk_in" value={care} onChange={setCare} /> : null}
+                </div>
                 <div aria-live="polite">
                   {fees.loading ? <p role="status" className="text-sm text-ink-muted">Reading fees…</p>
                     : fees.error ? <p role="alert" className="text-sm text-amber-text">Fees could not be read. They are still applied when you save.</p>

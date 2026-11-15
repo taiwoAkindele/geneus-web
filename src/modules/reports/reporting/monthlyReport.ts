@@ -1,7 +1,7 @@
-import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, visitRegisterRows, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type Appointment, type RegisterDefinition, type RegisterEntry, type StockItem, type StockMovement } from '@shared';
+import { closesEncounter, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, linkedPatientIds, visitRegisterRows, type Encounter, type EncounterEntry, type Patient, type PatientIdentityEvent, type Appointment, type RegisterDefinition, type RegisterEntry, type ServiceOffering, type StockItem, type StockMovement } from '@shared';
 import { calendarDate } from '@/lib/calendarDate';
 
-export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[]; appointments?: Appointment[] };
+export type MonthlyData = { encounters: Encounter[]; entries: EncounterEntry[]; patients: Patient[]; identities: PatientIdentityEvent[]; definitions: RegisterDefinition[]; registerEntries: RegisterEntry[]; items: StockItem[]; movements: StockMovement[]; appointments?: Appointment[]; offerings?: ServiceOffering[] };
 export const validMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 const inMonth = (iso: string, month: string) => calendarDate(iso).slice(0, 7) === month;
 
@@ -21,6 +21,11 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
     const row = diagnoses.get(key) ?? { label, visits: new Set<string>() };
     row.visits.add(entry.encounterId); diagnoses.set(key, row);
   }
+  // Visits by the care service they were for; visits recorded before care services are counted apart.
+  const byService = new Map<string, number>();
+  for (const visit of visits) byService.set(visit.offeringId ?? '', (byService.get(visit.offeringId ?? '') ?? 0) + 1);
+  const careServices = byService.size === 1 && byService.has('') ? [] : [...byService].map(([id, count]) => ({ id, name: id ? data.offerings?.find((o) => o.id === id)?.name ?? 'Care service not on this device' : 'No care service recorded', visits: count }))
+    .sort((a, b) => Number(!a.id) - Number(!b.id) || b.visits - a.visits || a.name.localeCompare(b.name));
   const names = new Map(data.definitions.map((definition) => [definition.registerId, definition.name]));
   const registerCounts = new Map<string, number>();
   for (const entry of data.registerEntries) if (!entry.encounterId && entry.entryDate.slice(0, 7) === month) registerCounts.set(entry.registerId, (registerCounts.get(entry.registerId) ?? 0) + 1);
@@ -54,6 +59,6 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
     patientRecordsCreated: data.patients.filter((patient) => inMonth(patient.createdOn, month)).length,
     diagnoses: [...diagnoses.values()].map((row) => ({ label: row.label, visits: row.visits.size })).sort((a, b) => b.visits - a.visits || a.label.localeCompare(b.label)),
     registers: [...registerCounts].map(([id, count]) => ({ id, name: names.get(id) ?? id, count })).sort((a, b) => a.name.localeCompare(b.name)),
-    commodities, trends,
+    careServices, commodities, trends,
   };
 };

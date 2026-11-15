@@ -1,8 +1,11 @@
 import { PatientChartAccess } from '@/modules/front-desk/patients/PatientChartAccess';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { conflictingCorrections, effectiveEncounterEntries, outstandingResults, VISIT_TYPE_NAMES, VisitType, type EncounterEntry } from '@shared';
-import { ActionMenu, Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
+import { conflictingCorrections, effectiveEncounterEntries, outstandingResults, VISIT_TYPE_NAMES, type EncounterEntry } from '@shared';
+import { useLiveQuery } from '@/data';
+import { CARE_SERVICE_WATCH, careServiceName, loadCareServices, type CareVisitChoice } from '@/data/repos/careServices';
+import { CareServiceVisitFields } from '@/modules/front-desk/careServices/CareServiceVisitFields';
+import { ActionMenu, Button, TextAreaField, TextField, useToast } from '@/ui';
 import { VisitProgrammeDetails } from '@/modules/reports/registers';
 import { AuthorizationError } from '@/data';
 import { useAuthorizationContext, useSession } from '@/session';
@@ -68,7 +71,13 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
   const heading = useRef<HTMLHeadingElement>(null);
   const awaitingPayment = !enc.id && appointments.appointments.find((a) => a.id === appointmentId)?.paymentStatus === 'Awaiting payment';
   // A visit keeps the type it started with; a new one takes its appointment's type until staff choose another.
-  const bookedType = appointments.appointments.find((a) => a.id === (ctl.encounter?.appointmentId ?? appointmentId))?.visitType;
+  const booked = appointments.appointments.find((a) => a.id === (ctl.encounter?.appointmentId ?? appointmentId));
+  const bookedType = booked?.visitType;
+  // The care service: the visit's own once it exists; before that the choice, defaulting to the booking's.
+  const careRecords = useLiveQuery(loadCareServices, CARE_SERVICE_WATCH).data;
+  const careChoice: CareVisitChoice = ctl.chosenCare ?? { offeringId: booked?.offeringId, visitType: bookedType ?? 'general' };
+  const bookedService = careRecords?.offerings.find((o) => o.id === booked?.offeringId);
+  const careName = careServiceName(careRecords, enc.id ? ctl.encounter?.offeringId : careChoice.offeringId);
   const visitType = ctl.encounter?.visitType ?? (enc.id ? bookedType : ctl.chosenVisitType ?? bookedType) ?? 'general';
   useEffect(() => {
     document.title = 'Record visit · Geneus Health';
@@ -175,8 +184,8 @@ const EncounterRecord = ({ patientId, encounterId, appointmentId, returnTo, init
   return <div className="min-h-screen bg-white px-4 pb-8 pt-4 md:px-8">
     <button type="button" className="mb-4 min-h-[44px] font-bold text-brand" onClick={() => navigate(returnTo)}>{returnTo.startsWith('/laboratory') ? 'Back to Laboratory' : returnTo.startsWith('/pharmacy') ? 'Back to Pharmacy' : returnTo.startsWith('/patients/') ? 'Back to patient record' : 'Back to visits'}</button>
     <header className="border-b border-outline-soft pb-4"><div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-2xl font-extrabold">{record.fullName}</h1><p className="mt-1 break-all font-mono text-sm text-ink-soft">{record.patientId}</p></div><div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={() => navigate(patientChartPath(patientId, 'history', { show: 'chart' }))}>Full medical chart</Button>{enc.id ? <Button variant="outlined" fullWidth={false} className="min-h-[44px] px-3 py-3 text-sm" onClick={viewSaved}>View signed entries</Button> : null}</div></div><div className="mt-3"><AllergyAlert patientId={patientId} /></div></header>
-    <div className="my-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold">Current visit</h2><p className="mt-1 text-sm text-ink-soft">{enc.id ? `Opened ${enc.openedDate} · ${VISIT_TYPE_NAMES[visitType]} visit` : 'The visit starts when its first clinical entry is signed.'}</p></div>{enc.id && canRecord && !enc.closed ? <ActionMenu label="Additional entries" actions={[{ label: 'Record another observation', onSelect: () => setEntryEditor({ step: 'vitals' }) }, { label: 'Add progress note', onSelect: () => setEntryEditor({ step: 'complaint' }) }, ...(enc.data.disposition.kind === 'observation' ? [{ label: 'Record next disposition', onSelect: () => setEntryEditor({ step: 'disposition' }) }] : [])]} /> : null}</div>
-    {!enc.id && canRecord ? <div className="mb-4 max-w-sm"><SelectField label="Visit for" value={visitType} options={VisitType.options.map((type) => ({ value: type, label: VISIT_TYPE_NAMES[type] }))} onChange={(event) => ctl.setVisitType(event.target.value as VisitType)} /></div> : null}
+    <div className="my-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold">Current visit</h2><p className="mt-1 text-sm text-ink-soft">{enc.id ? `Opened ${enc.openedDate} · ${careName ? `${careName} · ` : ''}${VISIT_TYPE_NAMES[visitType]} visit` : 'The visit starts when its first clinical entry is signed.'}</p></div>{enc.id && canRecord && !enc.closed ? <ActionMenu label="Additional entries" actions={[{ label: 'Record another observation', onSelect: () => setEntryEditor({ step: 'vitals' }) }, { label: 'Add progress note', onSelect: () => setEntryEditor({ step: 'complaint' }) }, ...(enc.data.disposition.kind === 'observation' ? [{ label: 'Record next disposition', onSelect: () => setEntryEditor({ step: 'disposition' }) }] : [])]} /> : null}</div>
+    {!enc.id && canRecord ? <div className="mb-4 max-w-sm"><CareServiceVisitFields label="Visit for" value={careChoice} onChange={ctl.setCare} keep={bookedService} /></div> : null}
     {enc.id ? <VisitProgrammeDetails patientId={patientId} encounterId={enc.id} visitType={visitType} /> : null}
     {awaitingPayment && canRecord ? <section className="mb-5 space-y-2 rounded-field border border-amber-border bg-amber-bg p-4"><h3 className="font-bold">See now — collect later</h3><p className="text-sm">Care can continue before payment. Record a reason; the bill remains outstanding.</p><TextField label="Reason for seeing the patient before payment" help={ENCOUNTER_FIELD_HELP.collectLater} value={collectLaterReason} onChange={(event) => setCollectLaterReason(event.target.value)} /></section> : null}
     {conflictingCorrections(ctl.rawEntries).length ? <p role="alert" className="mb-4 rounded-field bg-amber-bg p-4 text-sm text-amber-text">Competing corrections need reconciliation. Review signed entries and Sync &amp; device.</p> : null}

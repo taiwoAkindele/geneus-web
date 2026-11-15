@@ -2,6 +2,8 @@ import { ActionMenu, Avatar, DataTable, Tag } from '@/ui';
 import type { IconName } from '@/ui';
 import { VISIT_TYPE_LABELS } from '@/modules/finance/billing/feeForm';
 import { bookingStatus } from './appointmentList';
+import { useLiveQuery } from '@/data';
+import { CARE_SERVICE_WATCH, careServiceName, loadCareServices, type CareServiceRecords } from '@/data/repos/careServices';
 import type { BookedAppointment } from './types';
 
 /** One entry in a row's action menu. */
@@ -21,7 +23,8 @@ const Status = ({ booking }: { booking: BookedAppointment }) => {
   </div>;
 };
 
-const visitLabel = (booking: BookedAppointment) => VISIT_TYPE_LABELS[booking.visitType ?? 'general'];
+/** The care service booked, or the visit type for bookings made before care services. */
+const visitLabel = (booking: BookedAppointment, care?: CareServiceRecords) => careServiceName(care, booking.offeringId) ?? VISIT_TYPE_LABELS[booking.visitType ?? 'general'];
 const Menu = ({ booking, actions }: { booking: BookedAppointment; actions: Props['actions'] }) =>
   <ActionMenu compact openOnHover label={`Actions for ${booking.patient.name}`} title={booking.patient.name} actions={actions(booking)} />;
 
@@ -30,8 +33,9 @@ const Menu = ({ booking, actions }: { booking: BookedAppointment; actions: Props
  * rows are centred, so values line up under their headings; the status is one
  * tag, and every action lives in the row's ⋯ menu.
  */
-export const AppointmentWorklist = ({ appointments, actions }: Props) => (
-  <>
+export const AppointmentWorklist = ({ appointments, actions }: Props) => {
+  const care = useLiveQuery(loadCareServices, CARE_SERVICE_WATCH).data;
+  return <>
     <ul className="space-y-2 lg:hidden" aria-label="Appointments">
       {appointments.map((booking) => (
         <li key={booking.id} className="flex items-start gap-3 rounded-card border border-outline-soft bg-white p-3.5">
@@ -41,7 +45,7 @@ export const AppointmentWorklist = ({ appointments, actions }: Props) => (
               <p className="min-w-0 truncate font-bold text-ink">{booking.patient.name}</p>
               <p className="shrink-0 font-mono text-sm font-bold tabular-nums">{booking.when}</p>
             </div>
-            <p className="mt-0.5 text-[13px] text-ink-muted">{booking.reason} · {visitLabel(booking)} · {booking.day}</p>
+            <p className="mt-0.5 text-[13px] text-ink-muted">{booking.reason} · {visitLabel(booking, care)} · {booking.day}</p>
             <p className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{booking.patient.id}</p>
             <div className="mt-2"><Status booking={booking} /></div>
           </div>
@@ -53,10 +57,10 @@ export const AppointmentWorklist = ({ appointments, actions }: Props) => (
       <DataTable caption="Appointments" uniformHeaders centerRows rows={appointments} rowKey={(row) => row.id} columns={[
         { key: 'patient', label: 'Patient', className: 'w-[30%]', sortValue: (row) => row.patient.name, render: (row) => <div className="min-w-0"><p className="font-bold text-ink">{row.patient.name}</p><p className="break-all font-mono text-xs text-ink-muted">{row.patient.id}</p></div> },
         { key: 'when', label: 'When', className: 'w-[14%]', sortValue: (row) => row.at, render: (row) => <div><p className="font-mono font-bold tabular-nums">{row.when}</p><p className="text-xs text-ink-muted">{row.day}</p></div> },
-        { key: 'visit', label: 'Visit', className: 'w-[22%]', render: (row) => <div><p>{row.reason}</p><p className="text-xs text-ink-muted">{visitLabel(row)}</p></div> },
+        { key: 'visit', label: 'Visit', className: 'w-[22%]', render: (row) => <div><p>{row.reason}</p><p className="text-xs text-ink-muted">{visitLabel(row, care)}</p></div> },
         { key: 'status', label: 'Status', className: 'w-[28%]', render: (row) => <Status booking={row} /> },
         { key: 'actions', label: 'Actions', align: 'right', className: 'w-[6%]', render: (row) => <Menu booking={row} actions={actions} /> },
       ]} />
     </div>
-  </>
-);
+  </>;
+};

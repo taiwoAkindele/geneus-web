@@ -1,4 +1,4 @@
-import { closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport, type VisitType } from '@shared';
+import { type ServiceOffering, closesEncounter, effectiveEncounterEntries, careEntryIssues, currentAllergies, currentClinicalEvents, type ClinicalEvent, POST_CONSULTATION_STEPS, type Referral, type Patient, type FeeItem, type InvestigationItem, ENCOUNTER_STEP_VALUES, REPEATABLE_STEPS, type AuthorizationContext, type Encounter, type EncounterEntry, type EncounterStep, type LabReport, type VisitType } from '@shared';
 import { allOfType, allWhere, findRecord, envelope, insertRecord, insertRecords, newId, nowIso, type NewRecord } from '../db';
 import { bookingRecords, listAppointments, type AppointmentDraft } from './appointments';
 import { adjustmentsForPatient, balanceCoverage, chargesForPatient, isAppointmentConfirmed, paymentsForPatient, newCharge, patientBillingFacts } from './billing';
@@ -38,6 +38,11 @@ export type StepSave = {
   appointmentId?: string;
   /** What a new visit is for; its appointment's type when not chosen. Ignored once the visit exists. */
   visitType?: VisitType;
+  /**
+   * The care service a new visit is for, chosen with its visit type (absent for
+   * emergency care without one). When neither is chosen, the booking's service.
+   */
+  offeringId?: string;
   patientId: string;
   step: RecordedStep;
   values: Record<string, unknown>;
@@ -91,7 +96,7 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
-      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', workflowVersion: save.workflowVersion, patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined, visitType: save.visitType ?? appointment?.visitType },
+      record: { ...envelope(context, savedOn), id: encounterId, type: 'encounter', workflowVersion: save.workflowVersion, patientId: save.patientId, appointmentId: save.appointmentId, openedOn: savedOn, collectLaterReason: unpaid ? save.collectLaterReason?.trim() : undefined, visitType: save.visitType ?? appointment?.visitType, offeringId: save.visitType ? save.offeringId : appointment?.offeringId },
     });
   }
 
@@ -118,7 +123,12 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     if (reportIssues.length) throw new Error(reportIssues.join('. '));
   }
   if (save.followUp) {
-    const followUp = await bookingRecords({ ...save.followUp, patientId: save.patientId, visitType: 'follow_up' }, context, savedOn);
+    // A follow-up is booked with the visit's care service when that service records follow-ups.
+    const visit = save.encounterId ? await findRecord<Encounter>('encounter', save.encounterId) : undefined;
+    const visitService = visit?.offeringId ?? (save.visitType ? save.offeringId : (await listAppointments()).find((a) => a.id === save.appointmentId)?.offeringId);
+    const service = visitService ? await findRecord<ServiceOffering>('service_offering', visitService) : undefined;
+    const followUpService = service?.configuration === 'active' && service.visitTypes.includes('follow_up') ? service.id : undefined;
+    const followUp = await bookingRecords({ ...save.followUp, patientId: save.patientId, visitType: 'follow_up', offeringId: followUpService }, context, savedOn);
     records.push(...followUp);
     const appointment = followUp[0].record as { id: string };
     values = { ...values, appointmentId: appointment.id };

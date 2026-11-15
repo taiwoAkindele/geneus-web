@@ -4,6 +4,7 @@ import { assertAllowed } from '@/auth/authorization';
 import { allOfType, allWhere, ContractError, envelope, findRecord, insertRecords, newId, updateRecord, type NewRecord } from '../db';
 import { chargesForPatient, listFeeItems, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
+import { checkCareServiceChoice } from './careServices';
 
 export const listAppointments = () => allOfType<Appointment>('appointment');
 export const reservationForAppointment = async(id:string) => ({ booking:await findRecord<Appointment>('appointment',id), reservations:await allWhere<import('@shared').AppointmentReservation>('appointment_reservation','appointmentId',id) });
@@ -14,6 +15,8 @@ export type AppointmentDraft = {
   /** Absent books the patient for now; present schedules them ahead. */
   scheduledFor?: string;
   visitType?: VisitType;
+  /** The care service booked; absent when the hospital has none set up, or for emergency care without one. */
+  offeringId?: string;
   allocation?: AppointmentAllocation;
 };
 
@@ -26,6 +29,7 @@ export const newAppointment = (draft: AppointmentDraft, context: AuthorizationCo
   reason: draft.reason,
   scheduledFor: draft.scheduledFor,
   visitType: draft.visitType,
+  offeringId: draft.offeringId,
   allocation: draft.allocation,
   status: draft.scheduledFor ? ('scheduled' as const) : ('pending' as const),
 });
@@ -52,6 +56,7 @@ const bookingRecordsFrom = (appointment: ReturnType<typeof newAppointment>, draf
 export const bookingRecords = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<NewRecord[]> => {
   assertAllowed(context, 'appointment:create');
   const { appointment, parsed } = checkedAppointment(draft, context, createdOn);
+  if (draft.offeringId) await checkCareServiceChoice({ offeringId: draft.offeringId, visitType: draft.visitType ?? 'general' }, context);
   await validateAllocation(parsed);
   const [patient, fees, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), listAppointments()]);
   if (!patient) throw new Error('The patient is not available on this device');

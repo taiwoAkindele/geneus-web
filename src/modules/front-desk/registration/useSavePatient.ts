@@ -52,7 +52,7 @@ export const useSavePatient = () => {
             if (cover) extra.push({ permission: 'cover:record', type: 'patient_cover', record: coverRecord({ ...cover, patientId }, context) });
             charges.push(...created.charges);
             if (visit) {
-              const booking = newPatientBookingRecords({ patientId, reason: visit.reason, visitType: visit.visitType }, context, created);
+              const booking = newPatientBookingRecords({ patientId, reason: visit.reason, visitType: visit.visitType, offeringId: visit.offeringId }, context, created);
               charges.push(...booking.filter((record) => record.type === 'charge').map((record) => record.record as Charge));
               extra.push(...booking);
             }

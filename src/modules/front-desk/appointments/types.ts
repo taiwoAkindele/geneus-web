@@ -30,6 +30,8 @@ export type BookedAppointment = {
   paymentStatus?: 'Awaiting payment' | 'Confirmed';
   /** What the visit is for; a visit started from this booking takes it. */
   visitType?: VisitType;
+  /** The care service booked (absent on older bookings). */
+  offeringId?: string;
 };
 
 export type NewAppointment = {
@@ -39,4 +41,5 @@ export type NewAppointment = {
   /** Absent books the patient for now; present schedules them ahead. */
   scheduledFor?: string;
   visitType?: VisitType;
+  offeringId?: string;
 };

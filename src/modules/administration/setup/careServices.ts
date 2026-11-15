@@ -1,6 +1,5 @@
-import { unitIsRoutable, type AuthorizationContext, type Location, type ServiceDefinition, type ServiceOffering, type Unit } from '@shared';
+import { careServiceOfferings, unitIsRoutable, type VisitType, type AuthorizationContext, type Location, type ServiceDefinition, type ServiceOffering, type Unit } from '@shared';
 import { saveWorkforce, type WorkforceData } from '@/data/repos/workforce';
-import { careServiceOfferings } from './setupProgress';
 
 /**
  * Care services are the broad kinds of care a hospital provides (outpatient
@@ -12,18 +11,19 @@ import { careServiceOfferings } from './setupProgress';
  * pricing), but they belong to the Lab catalogue, never to this list.
  */
 export type CareCategory = ServiceDefinition['category'];
-export type CarePreset = { key: string; name: string; category: CareCategory; intakePolicy: ServiceOffering['intakePolicy']; description: string; place?: Location['kind'] };
+/** visitTypes: the visits it records (first is the usual one); none for care that is not a visit. */
+export type CarePreset = { key: string; name: string; category: CareCategory; intakePolicy: ServiceOffering['intakePolicy']; visitTypes: VisitType[]; description: string; place?: Location['kind'] };
 
 /** Only care Geneus already runs a workflow for: visit types and admission. */
 export const CARE_SERVICE_PRESETS: readonly CarePreset[] = [
-  { key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', description: 'Walk-in and booked visits with a doctor or CHEW.' },
-  { key: 'specialist-consultation', name: 'Specialist consultation', category: 'consultation', intakePolicy: 'scheduled', description: 'Booked clinics with a specialist.' },
-  { key: 'emergency', name: 'Emergency care', category: 'consultation', intakePolicy: 'walk_in', description: 'Unbooked urgent care.' },
-  { key: 'antenatal', name: 'Antenatal care', category: 'preventive', intakePolicy: 'both', description: 'Pregnancy check-ups and the antenatal register.' },
-  { key: 'delivery', name: 'Labour and delivery', category: 'nursing', intakePolicy: 'walk_in', description: 'Births attended at the hospital.' },
-  { key: 'immunisation', name: 'Immunisation', category: 'preventive', intakePolicy: 'both', description: 'Routine and campaign vaccinations.' },
-  { key: 'family-planning', name: 'Family planning', category: 'preventive', intakePolicy: 'both', description: 'Counselling and contraception.' },
-  { key: 'inpatient', name: 'Inpatient care', category: 'nursing', intakePolicy: 'walk_in', description: 'Admission to a ward bed.', place: 'ward' },
+  { key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', visitTypes: ['general', 'follow_up'], description: 'Walk-in and booked visits with a doctor or CHEW.' },
+  { key: 'specialist-consultation', name: 'Specialist consultation', category: 'consultation', intakePolicy: 'scheduled', visitTypes: ['general', 'follow_up'], description: 'Booked clinics with a specialist.' },
+  { key: 'emergency', name: 'Emergency care', category: 'consultation', intakePolicy: 'walk_in', visitTypes: ['emergency'], description: 'Unbooked urgent care.' },
+  { key: 'antenatal', name: 'Antenatal care', category: 'preventive', intakePolicy: 'both', visitTypes: ['antenatal'], description: 'Pregnancy check-ups and the antenatal register.' },
+  { key: 'delivery', name: 'Labour and delivery', category: 'nursing', intakePolicy: 'walk_in', visitTypes: ['delivery', 'postnatal'], description: 'Births attended at the hospital, and postnatal checks.' },
+  { key: 'immunisation', name: 'Immunisation', category: 'preventive', intakePolicy: 'both', visitTypes: ['immunisation', 'child_welfare'], description: 'Routine and campaign vaccinations, and child welfare.' },
+  { key: 'family-planning', name: 'Family planning', category: 'preventive', intakePolicy: 'both', visitTypes: ['family_planning'], description: 'Counselling and contraception.' },
+  { key: 'inpatient', name: 'Inpatient care', category: 'nursing', intakePolicy: 'walk_in', visitTypes: [], description: 'Admission to a ward bed, through Admissions.', place: 'ward' },
 ];
 export const CARE_CONCEPT_SYSTEM = 'urn:geneus:care-service';
 
@@ -64,7 +64,7 @@ export const defaultPlacement = (preset: Pick<CarePreset, 'place'> | undefined, 
   return { unitId: team?.id ?? '', locationId: place?.id ?? '' };
 };
 
-export type CareServiceInput = { key?: string; name: string; category: CareCategory; intakePolicy: ServiceOffering['intakePolicy']; unitId: string; locationId: string };
+export type CareServiceInput = { key?: string; name: string; category: CareCategory; intakePolicy: ServiceOffering['intakePolicy']; visitTypes: VisitType[]; unitId: string; locationId: string };
 
 /**
  * Adds one care service as an active offering. An existing care service with the
@@ -83,7 +83,7 @@ export const addCareService = async (input: CareServiceInput, data: WorkforceDat
       concept: input.key ? { system: CARE_CONCEPT_SYSTEM, code: input.key, label: name } : { system: 'urn:geneus:local-service', code: crypto.randomUUID(), label: name } }, context) as ServiceDefinition;
   return await saveWorkforce('service_offering', {
     serviceDefinitionId: definition.id, unitId: input.unitId, name, locationIds: [input.locationId], delivery: 'physical',
-    requiredActions: [], intakePolicy: input.intakePolicy, timeZone: data.facility?.timeZone ?? 'Africa/Lagos',
+    requiredActions: [], intakePolicy: input.intakePolicy, visitTypes: input.visitTypes, timeZone: data.facility?.timeZone ?? 'Africa/Lagos',
     configuration: 'active', resourceReadiness: 'unassessed',
   }, context) as ServiceOffering;
 };
