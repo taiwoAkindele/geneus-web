@@ -1,6 +1,6 @@
 import { useEffect, useId, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button, Icon, Tag, type IconName } from '@/ui';
+import { Link } from 'react-router-dom';
+import { Button, Icon, Tag } from '@/ui';
 import { useAuth, useAuthorizationContext, useSession } from '@/session';
 import { useAppointments } from '@/modules/front-desk/appointments';
 import { readDeviceUnit, useIncomingHandoffs, useUnits } from '@/modules/operations/units';
@@ -73,7 +73,6 @@ const FacilityWork = () => {
 };
 
 export const Dashboard = () => {
-  const navigate = useNavigate();
   const { user, facility, notifications, notificationsLoading, notificationsError } = useSession();
   const context = useAuthorizationContext();
   const access = dashboardAccess(context);
@@ -85,12 +84,6 @@ export const Dashboard = () => {
   const earlier = appointments.appointments.filter((appointment) => appointment.group === 'overdue').length;
   const review = notifications.filter((notification) => notification.kind === 'conflict').length;
   useEffect(() => { document.title = 'Home · Geneus Health'; }, []);
-  const quickActions: { label: string; to: string; icon: IconName; primary?: boolean }[] = [
-    ...(context.permissions.includes('patient:create') ? [{ label: 'Register patient', to: '/patients/new', icon: 'plus' as const, primary: context.role === 'records_officer' }] : []),
-    { label: 'Patients', to: '/patients/search', icon: 'search', primary: careFirst },
-    ...(access.billing ? [{ label: 'Open billing', to: '/billing', icon: 'registers' as const, primary: billingFirst }] : []),
-  ];
-  quickActions.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
   const metrics = [
     ...(access.care ? [{ label: 'Visits started today', value: statValue(care.loading, care.error, care.data?.today), detail: 'By local start date', to: `/encounters?queue=all&visitFrom=${today}&visitTo=${today}` }, { label: 'Visits in progress', value: statValue(care.loading, care.error, care.data?.open.length), detail: 'All dates · unfinished care', to: '/encounters?queue=all&visitStatus=Open' }] : []),
     ...(access.appointments ? [{ label: 'Bookings today', value: statValue(appointments.loading, appointments.error, todayAppointments.length), detail: 'Not an arrival count', to: '/appointments?group=today' }] : []),
@@ -109,7 +102,7 @@ export const Dashboard = () => {
   </Section> : null;
 
   return <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5 px-4 py-5 md:gap-6 md:px-7 md:py-7">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[13px] font-semibold text-ink-muted">{new Date(today + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><h1 className="mt-1 text-[30px] font-extrabold tracking-[-0.03em]">Home</h1><p className="mt-1 text-sm text-ink-soft">Welcome, {user.name}. <span className="block sm:inline">Your work at {facility.name}.</span></p></div><div className="flex flex-wrap gap-2">{quickActions.map((action, index) => <Button key={action.to} fullWidth={false} variant={action.primary ? 'primary' : 'outlined'} className={`min-h-[44px] px-3 py-3 text-sm ${index > 1 ? 'hidden sm:inline-flex' : ''}`} onClick={() => navigate(action.to)}><Icon name={action.icon} className="h-4 w-4" />{action.label}</Button>)}</div></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[13px] font-semibold text-ink-muted">{new Date(today + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><h1 className="mt-1 text-[30px] font-extrabold tracking-[-0.03em]">Home</h1><p className="mt-1 text-sm text-ink-soft">Welcome, {user.name}. <span className="block sm:inline">Your work at {facility.name}.</span></p></div></header>
     <SetupProgressCard />
     <WorkforceHome/>
     {notifications.some((notification) => notification.kind !== 'conflict') ? <section aria-labelledby="home-attention" className="overflow-hidden rounded-card border border-outline-soft bg-white"><h2 id="home-attention" className="border-b border-outline-soft px-4 py-3 text-[17px] font-extrabold md:px-5">Needs your attention</h2><NotificationList notifications={notifications.filter((notification) => notification.kind !== 'conflict').slice(0, 4)} loading={notificationsLoading} error={notificationsError} onDone={() => undefined} /></section> : null}
