@@ -6,7 +6,8 @@ import { Avatar, Button, PinDots, PinKeypad, TextField } from '@/ui';
 import { useDeviceContext } from '@/data';
 import { AuthorizationError, claimingFor } from '@/auth/authorization';
 import { findMatchingCode, markCodeUsed } from '@/data/repos/pinSetupCodes';
-import { emailPinSetupCode } from '@/lib/api/staff';
+import { checkInvitationCode, emailPinSetupCode } from '@/lib/api/staff';
+import { ApiError } from '@/lib/api/client';
 import { approvePinSetup, checkPin, hasPin, pinLength, useAuth, type RosterEntry } from '@/session';
 
 type ApprovalState = { staffId?: string; fullName?: string; role?: string; reset?: boolean };
@@ -71,9 +72,22 @@ export const PinApprovalScreen = () => {
     try {
       const match = await findMatchingCode(person.staff.staffId, code);
       if (!match) {
-        setError(
-          'That code isn’t valid. Codes last 24 hours and only the newest one works. If your admin has just made it, connect this phone so it can sync, then try again.',
-        );
+        // Not a code read aloud that this phone holds: it may be an emailed invitation,
+        // which only the server can check and accept — so it needs a connection.
+        if (!navigator.onLine) {
+          setError('That code isn’t on this phone. If it came in an email, connect to the internet and try again. Codes last 24 hours and only the newest one works.');
+          return;
+        }
+        try {
+          await checkInvitationCode(person.staff.staffId, code);
+        } catch (cause) {
+          setError(cause instanceof ApiError && cause.code === 'offline'
+            ? 'Can’t reach Geneus right now. Check the connection and try again.'
+            : 'That code isn’t valid. Codes last 24 hours and only the newest one works. If your admin has just made it, connect this phone so it can sync, then try again.');
+          return;
+        }
+        rememberSetupCode(person.staff.staffId, code, true);
+        approved();
         return;
       }
       await markCodeUsed(match, claimingFor({ staff: person.staff, facilityId: facility?.code ?? '', deviceId }));

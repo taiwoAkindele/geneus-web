@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button, TextField, useToast } from '@/ui';
 import { confirmRecoveryEmail, requestRecoveryEmailCode } from '@/lib/api/staff';
-import { useSession } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
+import { StaffVerification } from '@/modules/insurance/StaffVerification';
 
 const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 
@@ -14,6 +15,7 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 export const RecoveryEmailCard = () => {
   const toast = useToast();
   const { user } = useSession();
+  const context = useAuthorizationContext();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState<{ sentTo: string; currentSentTo?: string }>();
   const [code, setCode] = useState('');
@@ -36,7 +38,7 @@ export const RecoveryEmailCard = () => {
 
   const sendCodes = () =>
     run(async () => {
-      const result = await requestRecoveryEmailCode(user.staffId, email.trim());
+      const result = await requestRecoveryEmailCode(context, email.trim());
       setSent(result);
       setCode('');
       setCurrentCode('');
@@ -44,7 +46,7 @@ export const RecoveryEmailCard = () => {
 
   const save = () =>
     run(async () => {
-      await confirmRecoveryEmail(user.staffId, email.trim(), code, sent?.currentSentTo ? currentCode : undefined);
+      await confirmRecoveryEmail(context, email.trim(), code, sent?.currentSentTo ? currentCode : undefined);
       toast('Recovery email saved');
       setEmail('');
       setSent(undefined);
@@ -60,6 +62,7 @@ export const RecoveryEmailCard = () => {
           If you forget your PIN, a PIN code can be emailed here. Add one, or change it. Needs an internet connection.
         </p>
       </div>
+      <StaffVerification requireServerSession purpose="Changing your recovery email"><div className="space-y-3">
       <TextField
         label="Email"
         name="recovery_email"
@@ -103,6 +106,7 @@ export const RecoveryEmailCard = () => {
           Send code
         </Button>
       )}
+      </div></StaffVerification>
     </div>
   );
 };

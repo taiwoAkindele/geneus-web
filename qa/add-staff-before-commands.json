@@ -1,0 +1,7 @@
+[
+  { "role": "facility_admin", "width": 1920, "path": "/admin/staff/invite", "name": "01-add-staff-before-desktop", "assert": "Boolean(document.querySelector('input[name=staff_name]'))", "description": "Capture the existing Add Staff form before redesign" },
+  { "evaluate": "({form:document.querySelector('form').getBoundingClientRect().toJSON(),emailY:document.querySelector('[name=staff_invite_email]').getBoundingClientRect().top,submitY:document.querySelector('form button[type=submit]').getBoundingClientRect().top,summary:document.querySelector('[aria-label=\"Effective access\"]').innerText})" },
+  { "width": 1440, "path": "/admin/staff/invite", "name": "02-add-staff-before-laptop" },
+  { "width": 390, "path": "/admin/staff/invite", "name": "03-add-staff-before-phone" },
+  { "finish": true }
+]

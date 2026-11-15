@@ -36,11 +36,16 @@ const REFUSALS: Record<string, string> = {
  * checks who that is from their PIN. Signing in online does this already; this
  * panel appears only when it has not happened yet (signed in offline, or idle
  * for 30 minutes) and asks for the PIN again. No emailed code is needed.
+ *
+ * `requireServerSession`: for binding a contact or handing out PIN authority,
+ * where the server accepts only a PIN-proven session — never just the person
+ * the device says is signed in — the panel shows until that session exists.
  */
-export const StaffVerification = ({ children, purpose }: { children?: ReactNode; purpose: string }) => {
+export const StaffVerification = ({ children, purpose, requireServerSession = false }: { children?: ReactNode; purpose: string; requireServerSession?: boolean }) => {
   const context = useAuthorizationContext();
   const sync = useSyncStatus();
-  const { verified } = useStaffVerification();
+  const { verified: deviceVerified, hasServerSession } = useStaffVerification();
+  const verified = deviceVerified && (!requireServerSession || hasServerSession);
   const [pin, setPin] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [enrol, setEnrol] = useState<'choose' | 'setup' | 'email'>(); const [proof, setProof] = useState(''); const [sentTo, setSentTo] = useState('');
   if (verified) return <>{children}</>;

@@ -1,30 +1,93 @@
-import type { EmailSent, PinSetupCodeIssued } from '@shared';
+import type { AuthorizationContext, EmailSent, PinSetupCodeIssued } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
-import { ApiError, postAsDevice } from './client';
+import { ApiError, postAsDevice, staffRequest } from './client';
+import { VerificationRequired } from './insurance';
+import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
 
 /** Every call here is made as the enrolled device; the server decides the facility from its credential. */
-const asDevice = <T>(path: string, body?: unknown): Promise<T> => {
+const deviceCredential = (): string => {
   const device = getDeviceCredential();
-  if (!device) return Promise.reject(new ApiError('not_enrolled', 'This device is not enrolled with a facility'));
-  return postAsDevice<T>(path, device.credential, body);
+  if (!device) throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
+  return device.credential;
+};
+const asDevice = <T>(path: string, body?: unknown): Promise<T> => {
+  try { return postAsDevice<T>(path, deviceCredential(), body); } catch (cause) { return Promise.reject(cause); }
+};
+
+/**
+ * A call the server accepts only from the person as it has proven them: their
+ * PIN-proven session, never just the id this device says is signed in. When
+ * the session has ended, `VerificationRequired` asks the screen for the PIN.
+ */
+const asProvenPerson = async <T>(context: AuthorizationContext, path: string, body: unknown): Promise<T> => {
+  try {
+    const result = await staffRequest<T>(path, deviceCredential(), staffSessionToken(context), body);
+    touchStaffSession();
+    return result;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
+    throw cause;
+  }
 };
 
 const staffPath = (staffId: string, rest: string) => `/staff/${encodeURIComponent(staffId)}/${rest}`;
 
 /**
  * Asks geneus-server for a one-time code that lets `staffId` set their PIN on
- * a facility device. Online only: the server checks `issuedBy` holds
- * `staff:manage` and is the only one that ever sees the plain code.
+ * a facility device. Online only: the server checks the signed-in person's
+ * own session holds `staff:manage` and is the only one that ever sees the plain code.
  */
-export const issuePinSetupCode = (staffId: string, issuedBy: string): Promise<PinSetupCodeIssued> =>
-  asDevice<PinSetupCodeIssued>(staffPath(staffId, 'pin-codes'), { issuedBy });
+export const issuePinSetupCode = (context: AuthorizationContext, staffId: string): Promise<PinSetupCodeIssued> =>
+  asProvenPerson<PinSetupCodeIssued>(context, staffPath(staffId, 'pin-codes'), { issuedBy: context.userId });
 
 /** A facility admin who forgot their PIN: the server emails them a PIN setup code (SCHEMA.md §10). */
 export const emailPinSetupCode = (staffId: string): Promise<EmailSent> => asDevice<EmailSent>(staffPath(staffId, 'pin-codes/email'));
 
 /** Step one of a facility admin setting their own recovery email: codes go to the new address (and the current one). */
-export const requestRecoveryEmailCode = (staffId: string, email: string): Promise<EmailSent> =>
-  asDevice<EmailSent>(staffPath(staffId, 'email/code'), { email, requestedBy: staffId });
+export const requestRecoveryEmailCode = (context: AuthorizationContext, email: string): Promise<EmailSent> =>
+  asProvenPerson<EmailSent>(context, staffPath(context.userId, 'email/code'), { email, requestedBy: context.userId });
 
-export const confirmRecoveryEmail = (staffId: string, email: string, code: string, currentCode?: string): Promise<void> =>
-  asDevice<void>(staffPath(staffId, 'email'), { email, code, currentCode, requestedBy: staffId });
+export const confirmRecoveryEmail = (context: AuthorizationContext, email: string, code: string, currentCode?: string): Promise<void> =>
+  asProvenPerson<void>(context, staffPath(context.userId, 'email'), { email, code, currentCode, requestedBy: context.userId });
+
+/* ---------------- Invitations (server-only state; these shapes are the server's answers) ---------------- */
+
+export type InvitationStatus = 'pending' | 'expired' | 'locked' | 'accepted' | 'revoked';
+/** `provider_accepted`: the email provider took it — not proof it arrived. `not_configured`: a development server only logged it. */
+export type InvitationDelivery = 'sending' | 'provider_accepted' | 'provider_rejected' | 'not_configured';
+export type InvitationView = {
+  id: string; channel: 'email'; destination: string; status: InvitationStatus; delivery: InvitationDelivery;
+  createdOn: string; expiresOn: string; acceptedOn?: string; revokedOn?: string; revokedReason?: 'resent' | 'revoked' | 'pin_code_issued';
+};
+export type ContactActivation = {
+  email?: { address: string; verified: true };
+  invitation?: InvitationView;
+  activation: { serverPinDevices: number; lastPinRegisteredOn?: string };
+  nextSendAllowedOn?: string;
+};
+export type StaffOnboardingSummary = { staffId: string; activated: boolean; invitation?: { status: InvitationStatus; delivery: InvitationDelivery; expiresOn: string } };
+
+/**
+ * Emails `staffId` a PIN setup code. Without `email`, it goes to their verified
+ * address, which administrators see only masked. The answer never contains
+ * the code: only its recipient sees it.
+ */
+export const sendStaffInvitation = (context: AuthorizationContext, staffId: string, email?: string): Promise<{ invitation: InvitationView }> =>
+  asProvenPerson(context, staffPath(staffId, 'invitations'), { channel: 'email', ...(email ? { email } : {}) });
+export const revokeStaffInvitation = (context: AuthorizationContext, staffId: string): Promise<{ revoked: true }> =>
+  asProvenPerson(context, staffPath(staffId, 'invitations/revoke'), {});
+export const staffContactActivation = (context: AuthorizationContext, staffId: string): Promise<ContactActivation> =>
+  asProvenPerson(context, staffPath(staffId, 'contact-activation'), {});
+export const staffOnboardingSummaries = (context: AuthorizationContext): Promise<{ staff: StaffOnboardingSummary[] }> =>
+  asProvenPerson(context, '/staff/invitations/list', {});
+
+/**
+ * Whether `code` is this person's invitation code, before they choose a PIN.
+ * The person has no PIN yet, so only the device signs the call. Spends nothing.
+ */
+export const checkInvitationCode = (staffId: string, code: string): Promise<void> =>
+  asDevice<void>(staffPath(staffId, 'invitations/check'), { code });
+
+/** Whether an invitation needs the administrator to do something: send again, or check the address. */
+export const invitationNeedsAttention = (invitation: { status: InvitationStatus; delivery: InvitationDelivery }): boolean =>
+  invitation.status === 'expired' || invitation.status === 'locked' || (invitation.status === 'pending' && invitation.delivery === 'provider_rejected');

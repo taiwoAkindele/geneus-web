@@ -55,10 +55,19 @@ export const endStaffSession = async () => {
 };
 export const forgetStaffSession = () => { hold(undefined); changed(); };
 
-/** A PIN setup code just used on this device, kept briefly so the new PIN can be registered with the server. */
-const pendingCodes = new Map<string, { code: string; until: number }>();
-export const rememberSetupCode = (staffId: string, code: string) => pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000 });
+/**
+ * A PIN setup code just used on this device, kept briefly so the new PIN can be
+ * registered with the server. `online`: an emailed invitation code, which the
+ * server must accept before the PIN is saved here at all.
+ */
+const pendingCodes = new Map<string, { code: string; until: number; online: boolean }>();
+export const rememberSetupCode = (staffId: string, code: string, online = false) => pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000, online });
 export const takeSetupCode = (staffId: string) => { const entry = pendingCodes.get(staffId); pendingCodes.delete(staffId); return entry && entry.until > Date.now() ? entry.code : undefined; };
+/** The invitation code waiting to be accepted online for this person, without using it up. */
+export const pendingInvitationCode = (staffId: string): string | undefined => {
+  const entry = pendingCodes.get(staffId);
+  return entry?.online && entry.until > Date.now() ? entry.code : undefined;
+};
 
 /** Signs the person in with the server too, when online. Never blocks or fails the local sign-in. */
 export const openStaffSessionQuietly = async (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>, pin: string): Promise<'open' | 'not_enrolled' | 'offline' | 'refused'> => {

@@ -4,6 +4,7 @@ import { Button, Sheet, SheetCancelButton, SegmentedControl, TextField, useToast
 import { calendarDate } from '@/lib/calendarDate';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
 import { issuePinSetupCode } from '@/lib/api/staff';
+import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { useAuthorizationContext } from '@/session';
 import { fullDayEnd, shiftWindow } from './shiftWindow';
 
@@ -68,7 +69,8 @@ export const SignInWindowSheet = ({ staff, shift, day: startDay, onClose }: { st
  * facility's phones — so the admin need not be there. Issued by the server on
  * request (online only); shown once and never stored on this phone.
  */
-export const PinCodeSheet = ({ staff, issuedBy, onClose }: { staff: Staff; issuedBy: string; onClose: () => void }) => {
+export const PinCodeSheet = ({ staff, onClose }: { staff: Staff; onClose: () => void }) => {
+  const context = useAuthorizationContext();
   const [issued, setIssued] = useState<PinSetupCodeIssued>();
   const [error, setError] = useState<string>();
   const [creating, setCreating] = useState(false);
@@ -76,7 +78,7 @@ export const PinCodeSheet = ({ staff, issuedBy, onClose }: { staff: Staff; issue
   const create = async () => {
     if (creating) return;
     setCreating(true); setError(undefined);
-    try { setIssued(await issuePinSetupCode(staff.staffId, issuedBy)); }
+    try { setIssued(await issuePinSetupCode(context, staff.staffId)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create a code'); }
     finally { setCreating(false); }
   };
@@ -91,10 +93,14 @@ export const PinCodeSheet = ({ staff, issuedBy, onClose }: { staff: Staff; issue
       <p className="text-[13px] leading-relaxed text-ink-muted">Creates a one-time code that lets {first} set or reset their PIN on this facility&rsquo;s phones, without you being there. Any earlier code stops working. Needs an internet connection.</p>
       {error ? <p className="mt-3 text-[13px] font-semibold text-danger">{error}</p> : null}
     </>}
-    <div className="mt-5 flex flex-wrap gap-2.5">
-      {issued ? null : <Button variant="primary" fullWidth={false} className="flex-1" loading={creating} onClick={create}>Create code</Button>}
-      <Button variant="outlined" fullWidth={Boolean(issued)} className={issued ? '' : 'px-6'} onClick={onClose}>{issued ? 'Done' : 'Cancel'}</Button>
-    </div>
+    {issued ? <Button variant="outlined" className="mt-5" onClick={onClose}>Done</Button> : <div className="mt-5 space-y-3">
+      <StaffVerification requireServerSession purpose="Issuing a PIN code">
+        <div className="flex flex-wrap gap-2.5">
+          <Button variant="primary" fullWidth={false} className="flex-1" loading={creating} onClick={create}>Create code</Button>
+          <Button variant="outlined" fullWidth={false} className="px-6" onClick={onClose}>Cancel</Button>
+        </div>
+      </StaffVerification>
+    </div>}
   </Sheet>;
 };
 

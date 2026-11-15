@@ -1,5 +1,13 @@
 # Clinical browser acceptance
 
+Add Staff redesign: run `node qa/overall-audit-browser.mjs qa/add-staff-layout-commands.json`
+and `node qa/overall-audit-browser.mjs qa/add-staff-behavior-commands.json` with separate
+`OVERALL_AUDIT_OUTPUT` folders. The first checks 1920/1440/1024/768/390/320px layouts;
+the second covers shared permission counts, role attribution, read-only access,
+extra grants, staff creation, invitation PIN sessions and delivery failure recovery.
+`qa/add-staff-review-commands.json` captures populated desktop/mobile examples.
+The before/after review is in `../docs/design-review/add-staff-2026-11-15/README.md`.
+
 Facility settings: run `node qa/overall-audit-browser.mjs qa/facility-settings-commands.json`
 with `OVERALL_AUDIT_OUTPUT=qa/artifacts/facility-settings/after`. The synthetic checks
 cover the compact details summary, on-demand editing, shared setup/settings care

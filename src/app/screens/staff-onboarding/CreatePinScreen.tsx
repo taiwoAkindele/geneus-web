@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PinDots, PinKeypad } from '@/ui';
 import { isPinSetupApproved, PIN_LENGTH, setPin as storePin, takePinSetupApproval } from '@/session';
+import { useDeviceContext } from '@/data';
+import { ApiError } from '@/lib/api/client';
+import { enrolStaffPin, pendingInvitationCode, takeSetupCode } from '@/lib/api/staffSession';
 
 /** `upgrade`: they signed in with an old 4-digit PIN and are replacing it. */
 type AcceptState = { staffId?: string; fullName?: string; role?: string; upgrade?: boolean };
@@ -21,11 +24,14 @@ export const CreatePinScreen = () => {
   const [firstPin, setFirstPin] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [refusal, setRefusal] = useState<string>();
+  const { deviceId } = useDeviceContext();
 
   if (!staffId || !isPinSetupApproved(staffId)) return <Navigate to="/login" replace />;
 
   const onDigit = async (digit: string) => {
-    if (pin.length >= PIN_LENGTH) return;
+    if (pin.length >= PIN_LENGTH || activating) return;
     const next = pin + digit;
     if (next.length < PIN_LENGTH) {
       setPin(next);
@@ -42,6 +48,27 @@ export const CreatePinScreen = () => {
       setError(true);
       setPin('');
       return;
+    }
+    // An emailed invitation is accepted by the server first: only once it has checked the code,
+    // the person and the facility is the PIN saved here. A code read aloud works offline as before.
+    const invitationCode = pendingInvitationCode(staffId);
+    if (invitationCode) {
+      setActivating(true);
+      setRefusal(undefined);
+      try {
+        await enrolStaffPin(staffId, deviceId, next, { setupCode: invitationCode });
+        takeSetupCode(staffId);
+      } catch (cause) {
+        setRefusal(cause instanceof ApiError && cause.code === 'offline'
+          ? 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.'
+          : 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.');
+        setPin('');
+        setFirstPin('');
+        setPhase('choose');
+        return;
+      } finally {
+        setActivating(false);
+      }
     }
     if (takePinSetupApproval(staffId)) await storePin(staffId, next);
     navigate('/login', { replace: true });
@@ -71,8 +98,12 @@ export const CreatePinScreen = () => {
         </p>
 
         <PinDots length={PIN_LENGTH} filled={pin.length} className="mb-2 mt-9" />
-        <div className="text-[13px] text-ink-muted">
-          {error ? (
+        <div className="text-[13px] text-ink-muted" role={refusal ? 'alert' : undefined}>
+          {activating ? (
+            'Checking your invitation with Geneus…'
+          ) : refusal ? (
+            <span className="font-semibold text-danger">{refusal}</span>
+          ) : error ? (
             <span className="font-semibold text-danger">PINs didn&rsquo;t match — try again</span>
           ) : phase === 'choose' ? (
             'Choose your PIN'

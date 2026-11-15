@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SectionTabs } from '@/ui';
 import { useAuthorizationContext } from '@/session';
 
-export type StaffView = 'directory' | 'roster' | 'coverage' | 'facilities' | 'emails';
+export type StaffView = 'directory' | 'roster' | 'coverage' | 'facilities';
 
 /**
  * The Staff module's sections, one address each (/admin/staff?view=…). A
@@ -17,7 +17,7 @@ export const StaffSectionTabs = ({ value }: { value: StaffView }) => {
     { value: 'directory', label: 'Staff' },
     { value: 'roster', label: 'Sign-in windows' },
     { value: 'coverage', label: 'Coverage' },
-    ...(manage ? [{ value: 'facilities' as const, label: 'Facility assignments' }, { value: 'emails' as const, label: 'Email confirmations' }] : []),
+    ...(manage ? [{ value: 'facilities' as const, label: 'Facility assignments' }] : []),
   ];
   return <SectionTabs label="Staff sections" value={value} onChange={(view) => navigate(view === 'directory' ? '/admin/staff' : `/admin/staff?view=${view}`)} options={options} />;
 };
