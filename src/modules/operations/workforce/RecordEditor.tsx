@@ -3,18 +3,19 @@ import { useForm } from 'react-hook-form';
 import { currentFacilityRevisions, withReviewerAuthority, type AnyDocument } from '@shared';
 import { Button, SelectField, Sheet, TextAreaField, TextField, useToast } from '@/ui';
 import { useAuthorizationContext } from '@/session';
-import { ownProof, saveWorkforce, saveWeeklyOccurrence, type WorkforceData } from '@/data/repos/workforce';
+import { ownProof, saveBatchPlace, saveWorkforce, saveWeeklyOccurrence, type WorkforceData } from '@/data/repos/workforce';
 import { readWorkforceDraft, writeWorkforceDraft, clearWorkforceDraft } from '@/data/repos/workforceDrafts';
 import { zonedInput, zonedInstant } from '@/lib/workforceTime';
 import { editorFields, type EditorKind, type Values } from './editorFields';
 import { humanize, recordName } from './presentation';
+import { nextPlaceNumber, placeBatchProblem, planPlaces, type PlannedPlace } from './placeBatch';
 const text = (values: Values, key: string) => String(values[key] ?? '').trim();
 const list = (values: Values, key: string) => Array.isArray(values[key]) ? values[key] as string[] : [];
 const defaults = (kind: EditorKind, data: WorkforceData, record?: AnyDocument, preset?: Record<string, unknown>): Values => {
   const raw = { ...record, ...preset } as Record<string, unknown>;
   record = raw as AnyDocument;
   const zone = String(raw.timeZone || data.offerings.find((o) => o.id === raw.offeringId)?.timeZone || data.facility?.timeZone || 'Africa/Lagos');
-  const values: Values = { active: true, kind: kind === 'unit' ? 'unit' : kind === 'credential' ? 'licence' : 'room', routingEnabled: true, serviceDefinitionId: 'new', category: 'consultation', delivery: 'physical', configuration: 'draft', intakePolicy: 'both', resourceReadiness: 'unassessed', duty: 'member', status: kind === 'service_session' ? 'draft' : 'proposed', verification: 'unverified', decision: 'approve', repeatCount: '1', scopeKind: 'offerings', timeZone: zone };
+  const values: Values = { active: true, kind: kind === 'unit' ? 'unit' : kind === 'credential' ? 'licence' : 'room', routingEnabled: true, serviceDefinitionId: 'new', category: 'consultation', delivery: 'physical', configuration: 'draft', intakePolicy: 'both', resourceReadiness: 'unassessed', duty: 'member', status: kind === 'service_session' ? 'draft' : 'proposed', verification: 'unverified', decision: 'approve', repeatCount: '1', placeCount: '1', scopeKind: 'offerings', timeZone: zone };
   for (const [key, value] of Object.entries(raw))
     if (typeof value === 'boolean' || typeof value === 'string')
       values[key] = value;
@@ -69,7 +70,20 @@ export const RecordEditor = ({ kind, data, previous, preset, privateRecords = []
   const errorBox = useRef<HTMLDivElement>(null), definition = useRef<string>();
   const slot = `${kind}:${previous?.id || String(preset?.id || preset?.staffId || preset?.offeringId || 'new')}`;
   const { register, watch, reset, setValue, getValues, handleSubmit, formState: { errors, isDirty } } = useForm<Values>({ defaultValues: defaults(kind, data, previous, preset) });
-  const values = watch(), fields = editorFields(kind, data, values, privateRecords).map((f)=>{
+  /** The places a new-place batch would create, or undefined for a single place or any other record. Throws when the batch cannot be planned. */
+  const batchPlan = (form: Values): PlannedPlace[] | undefined => {
+    if (kind !== 'location' || previous) return undefined;
+    const count = Number(text(form, 'placeCount') || '1');
+    if (count === 1) return undefined;
+    const parentId = text(form, 'parentId') || undefined, prefix = text(form, 'name'), batchId = text(form, '_batchId');
+    // Places this batch already saved are its own, not existing names to skip.
+    const locations = batchId ? data.locations.filter((l) => !l.id.startsWith(`location:${batchId}:`)) : data.locations;
+    const start = text(form, 'placeStart') ? Number(text(form, 'placeStart')) : nextPlaceNumber(prefix, parentId, locations);
+    const problem = placeBatchProblem(count, start);
+    if (problem) throw new Error(problem);
+    return planPlaces({ prefix, count, start, parentId, locations });
+  };
+  const values = watch(), fields = editorFields(kind, data, values, privateRecords, !previous).map((f)=>{
     if(kind==='credential'&&f.key==='verification'&&(!draftContext.permissions.includes('clinical_capability:review')||values.staffId===context.userId))return{...f,options:f.options?.filter((o)=>o.value==='unverified')};
     if(['capability_decision','reviewer_delegation'].includes(kind)&&f.key==='staffId')return{...f,options:f.options?.filter((o)=>o.value!==context.userId)};
     return f;
@@ -111,7 +125,20 @@ export const RecordEditor = ({ kind, data, previous, preset, privateRecords = []
   const save = handleSubmit(async (form) => {
     if (busy)
       return;
-    const consequential = ['capability_decision', 'reviewer_delegation'].includes(kind)||(kind==='credential'&&form.verification!=='unverified') || (kind === 'service_session' && form.status !== 'draft') || (kind === 'staff_assignment' && form.status !== 'proposed') || Boolean(previous && (form.active === false || form.configuration === 'retired' || text(form, 'parentId') !== String((previous as Record<string, unknown>).parentId ?? '')));
+    let plan: PlannedPlace[] | undefined;
+    try {
+      plan = batchPlan(form);
+    }
+    catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'These places could not be planned');
+      return;
+    }
+    if (plan?.every((place) => place.exists)) {
+      setError('Every one of these names is already used in this place. Change the name or the start number');
+      return;
+    }
+    // A batch is always previewed: the review lists every name before anything is written.
+    const consequential = Boolean(plan) || ['capability_decision', 'reviewer_delegation'].includes(kind)||(kind==='credential'&&form.verification!=='unverified') || (kind === 'service_session' && form.status !== 'draft') || (kind === 'staff_assignment' && form.status !== 'proposed') || Boolean(previous && (form.active === false || form.configuration === 'retired' || text(form, 'parentId') !== String((previous as Record<string, unknown>).parentId ?? '')));
     if (consequential && !review) {
       setReview(true);
       setError('');
@@ -125,8 +152,27 @@ export const RecordEditor = ({ kind, data, previous, preset, privateRecords = []
         const value = form[field.key];
         payload[field.key] = field.kind === 'multi' ? list(form, field.key) : field.kind === 'boolean' ? Boolean(value) : field.kind === 'number' ? (text(form, field.key) ? Number(value) : undefined) : text(form, field.key) || undefined;
       }
-      for (const key of ['repeatCount', 'category', 'professionCode', 'professionLabel', 'specialties'])
+      for (const key of ['repeatCount', 'placeCount', 'placeStart', 'category', 'professionCode', 'professionLabel', 'specialties'])
         delete payload[key];
+      if (plan) {
+        const batchId = text(form, '_batchId') || crypto.randomUUID();
+        setValue('_batchId', batchId);
+        await writeWorkforceDraft(draftContext, slot, getValues());
+        let added = 0;
+        for (const place of plan) {
+          if (!place.exists) {
+            await saveBatchPlace({ ...payload, name: place.name }, context, batchId, place.index);
+            added++;
+          }
+          setValue('_completedOccurrences', String(place.index + 1));
+          await writeWorkforceDraft(draftContext, slot, getValues());
+        }
+        await clearWorkforceDraft(draftContext, slot);
+        toast(`${added} place${added === 1 ? '' : 's'} saved on this device. Server acceptance will appear after sync`);
+        onSaved?.();
+        onClose();
+        return;
+      }
       const zone = text(form, 'timeZone') || data.offerings.find((o) => o.id === form.offeringId)?.timeZone || data.facility?.timeZone || 'Africa/Lagos';
       for (const key of ['startsAt', 'endsAt'])
         if (text(form, key))
@@ -216,13 +262,15 @@ export const RecordEditor = ({ kind, data, previous, preset, privateRecords = []
     }
   }, () => { setError('Complete the highlighted fields before continuing'); });
   const selectedAssignments = currentFacilityRevisions(data.assignments).filter((a) => list(values, 'participants').includes(a.id));
+  const previewPlan = (() => { try { return review ? batchPlan(values) : undefined; } catch { return undefined; } })();
+  const seriesNoun = kind === 'location' ? 'places' : 'occurrences';
   return <Sheet title={`${previous ? 'Update' : 'Add'} ${humanize(kind).toLowerCase()}`} eyebrow={previous ? recordName(previous) : 'Facility setup'} placement="side" onClose={onClose} closeDisabled={busy} hasUnsavedChanges={isDirty}>
     <p className="mb-4 text-sm text-ink-muted">{['credential', 'capability_decision', 'reviewer_delegation'].includes(kind) ? 'Private professional evidence. Qualification, approval and account access are separate.' : 'Save real services, places and duties. Changes remain proposals until the server accepts them.'}</p>
     {previous?.type === 'reviewer_delegation' && previous.scopes.length > 1 ? <p className="mb-4 text-sm text-ink-muted">This delegation has separate scope boundaries. They are retained exactly; update its term or revoke it. Create separate bounded delegations to change activities.</p> : null}
-    {values._completedOccurrences ? <p role="status" className="mb-4 rounded-field bg-amber-bg p-3 text-sm">{String(values._completedOccurrences)} occurrences already saved. Confirming again resumes the same series; existing occurrences are not duplicated.</p> : null}
+    {values._completedOccurrences ? <p role="status" className="mb-4 rounded-field bg-amber-bg p-3 text-sm">{String(values._completedOccurrences)} {seriesNoun} already saved. Confirming again resumes the same {kind === 'location' ? 'batch' : 'series'}; existing {seriesNoun} are not duplicated.</p> : null}
     {!ready ? <p role="status">Restoring your draft…</p> : <form onSubmit={save} noValidate className="space-y-4">
       {error ? <div ref={errorBox} tabIndex={-1} role="alert" className="rounded-field border border-danger bg-danger-bg p-3 text-sm text-danger">{error}</div> : null}
-      {review ? <div className="space-y-3"><h3 className="text-lg font-bold">Review before confirming</h3><dl className="space-y-3">{fields.map((f) => <div key={f.key}><dt className="text-xs font-bold text-ink-muted">{f.label}</dt><dd className="break-words text-sm">{f.kind === 'boolean' ? (values[f.key] ? 'Yes' : 'No') : f.kind === 'multi' ? list(values, f.key).map((id) => f.options?.find((o) => o.value === id)?.label || 'Unavailable selection').join(', ') || 'Not selected' : f.options?.find((o) => o.value === values[f.key])?.label || String(values[f.key] || 'Not set')}</dd></div>)}</dl><p className="rounded-field bg-amber-bg p-3 text-sm">This changes planned work or authority. Existing clinical records and responsibility remain until the required transitions are accepted.</p></div> : <fieldset disabled={busy || Boolean(values._completedOccurrences)} className="space-y-4">{fields.map((f) => {
+      {review ? <div className="space-y-3"><h3 className="text-lg font-bold">Review before confirming</h3><dl className="space-y-3">{fields.map((f) => <div key={f.key}><dt className="text-xs font-bold text-ink-muted">{f.label}</dt><dd className="break-words text-sm">{f.kind === 'boolean' ? (values[f.key] ? 'Yes' : 'No') : f.kind === 'multi' ? list(values, f.key).map((id) => f.options?.find((o) => o.value === id)?.label || 'Unavailable selection').join(', ') || 'Not selected' : f.options?.find((o) => o.value === values[f.key])?.label || String(values[f.key] || 'Not set')}</dd></div>)}</dl>{previewPlan ? <section aria-labelledby="place-preview" className="rounded-field border border-outline-soft p-3"><h4 id="place-preview" className="text-sm font-bold">{previewPlan.filter((p) => !p.exists).length} places to add</h4><ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm md:grid-cols-3">{previewPlan.map((p) => <li key={p.index} className={p.exists ? 'text-ink-muted' : ''}>{p.name}{p.exists ? ' · already exists, skipped' : ''}</li>)}</ul></section> : null}<p className="rounded-field bg-amber-bg p-3 text-sm">{previewPlan ? 'Each place is saved on this device and appears for others after sync. Names already used inside the same place are skipped.' : 'This changes planned work or authority. Existing clinical records and responsibility remain until the required transitions are accepted.'}</p></div> : <fieldset disabled={busy || Boolean(values._completedOccurrences)} className="space-y-4">{fields.map((f) => {
         const message = errors[f.key] ? 'Complete this field' : undefined;
         const locked = (kind === 'practitioner_profile' && Boolean(previous) && f.key === 'staffId') || (previous?.type === 'reviewer_delegation' && previous.scopes.length > 1 && ['scopeKind', 'actions', 'offeringIds'].includes(f.key));
         if(kind==='practitioner_profile'&&previous?.type==='practitioner_profile'&&f.key==='staffId')return <div key={f.key}><span className="block text-sm font-bold">{f.label}</span><p className="my-2 text-sm">{data.staff.find((s)=>s.staffId===previous.staffId)?.fullName||'Original staff identity'}</p><input type="hidden" {...register(f.key)}/><p className="text-xs text-ink-muted">This profile stays with its original person.</p></div>;
@@ -241,7 +289,7 @@ export const RecordEditor = ({ kind, data, previous, preset, privateRecords = []
         {fields.some((f) => f.kind === 'datetime-local') ? <SelectField label="Repeated daylight-saving clock time" help={{ purpose: 'Normally reject ambiguous times. If a time occurs twice, explicitly choose its earlier or later occurrence.' }} {...register('clockOccurrence')} options={[{ value: '', label: 'Ask me if ambiguous' }, { value: 'earlier', label: 'Earlier occurrence' }, { value: 'later', label: 'Later occurrence' }]} /> : null}
       </fieldset>}
       <div className="sticky bottom-0 space-y-2 border-t border-outline-soft bg-white py-3"><Button type="submit" loading={busy} disabled={busy}>{review ? 'Confirm and save' : 'Save / review changes'}</Button>{review ? <Button variant="outlined" disabled={busy} onClick={() => setReview(false)}>Back to details</Button> : null}<Button variant="ghost" disabled={busy} onClick={onClose}>Close editor</Button></div>
-      {values._completedOccurrences?<details className="rounded-field border border-outline-soft p-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">Stop remaining occurrences</summary><p className="my-3 text-sm text-ink-muted">Keep the {String(values._completedOccurrences)} sessions already saved and close only the unfinished series draft. Existing sessions remain available for review.</p><Button variant="outlined" disabled={busy} onClick={async()=>{setBusy(true);try{await clearWorkforceDraft(draftContext,slot);toast('Saved sessions kept. Remaining series draft closed');onClose();}catch(cause){setError(cause instanceof Error?cause.message:'The draft could not be closed');}finally{setBusy(false);}}}>Confirm stop remaining</Button></details>:null}
+      {values._completedOccurrences?<details className="rounded-field border border-outline-soft p-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">Stop remaining {seriesNoun}</summary><p className="my-3 text-sm text-ink-muted">Keep the {String(values._completedOccurrences)} {kind === 'location' ? 'places' : 'sessions'} already saved and close only the unfinished draft. Saved {kind === 'location' ? 'places' : 'sessions'} remain available for review.</p><Button variant="outlined" disabled={busy} onClick={async()=>{setBusy(true);try{await clearWorkforceDraft(draftContext,slot);toast('Saved sessions kept. Remaining series draft closed');onClose();}catch(cause){setError(cause instanceof Error?cause.message:'The draft could not be closed');}finally{setBusy(false);}}}>Confirm stop remaining</Button></details>:null}
       <p className="text-xs text-ink-muted">Draft recovery is encrypted and belongs to your staff identity on this device.</p>
     </form>}
   </Sheet>;

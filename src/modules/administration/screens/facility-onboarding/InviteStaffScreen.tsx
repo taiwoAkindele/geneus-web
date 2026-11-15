@@ -25,6 +25,9 @@ export const InviteStaffScreen = () => {
   useEffect(() => { document.title = 'Add staff · Geneus Health'; }, []);
   const allowed = context.permissions.includes('staff:manage') && context.permissions.includes('staff:permission');
   const inviting = email.trim() !== '';
+  // Letting the link set up a device is adding a device: offered only to someone who may.
+  const mayAddDevices = context.permissions.includes('device:enroll');
+  const [allowNewDevice, setAllowNewDevice] = useState(false);
   const save = async (details: StaffDetails) => {
     if (inviting && !isEmail(email)) throw new Error('Enter a valid email address, or leave it empty to give them a PIN code in person');
     // Checked before anything is saved, so the person is never added with an invitation that cannot go.
@@ -37,7 +40,7 @@ export const InviteStaffScreen = () => {
       return;
     }
     try {
-      const { invitation } = await sendStaffInvitation(context, created.staffId, email.trim());
+      const { invitation } = await sendStaffInvitation(context, created.staffId, email.trim(), mayAddDevices && allowNewDevice);
       toast(invitation.delivery === 'provider_accepted'
         ? `${details.fullName} added — invitation emailed to ${invitation.destination}`
         : `${details.fullName} added, but the invitation email was not sent. See their profile.`);
@@ -59,11 +62,15 @@ export const InviteStaffScreen = () => {
         {inviting && !hasServerSession ? <div className="mb-5 max-w-2xl"><StaffVerification requireServerSession purpose="Sending an invitation" /></div> : null}
         <StaffForm layout="split" canEditName canEditAccess submitLabel={inviting ? 'Add and send invitation' : 'Add staff member'} onSave={save} summaryContent={
           <div className="space-y-1 text-xs text-ink-muted"><p className="text-sm font-semibold text-ink">PIN setup</p>
-            {inviting ? <><p className="break-all">Email invitation to {email.trim()}</p><p>{hasServerSession ? 'They receive a one-time code to set their PIN.' : 'Confirm your PIN before the invitation can be sent.'}</p></> : <p>Give them a one-time PIN code in person from their profile after adding them.</p>}
+            {inviting ? <><p className="break-all">Email invitation to {email.trim()}</p><p>{hasServerSession ? 'They receive an Accept invitation link to set their PIN.' : 'Confirm your PIN before the invitation can be sent.'}</p>{mayAddDevices && allowNewDevice ? <p>The link may also set up one new device for them.</p> : null}</> : <p>Give them a one-time PIN code in person from their profile after adding them.</p>}
           </div>
         }>
           <TextField label="Email address (optional)" name="staff_invite_email" type="email" inputMode="email" autoComplete="off" value={email} onChange={(event) => setEmail(event.target.value)}
             hint="Leave blank to give their PIN setup code in person." />
+          {inviting && mayAddDevices ? <label className="flex min-h-11 items-start gap-3 rounded-field border border-outline-soft p-3 text-sm">
+            <input type="checkbox" checked={allowNewDevice} onChange={(event) => setAllowNewDevice(event.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
+            <span><span className="block font-bold">Allow this person to set up one new device</span><span className="block text-xs text-ink-muted">For staff who will use a phone the facility has not added yet. The link can set up one device, once, until the invitation expires. Leave unticked if they will use a device the facility already has.</span></span>
+          </label> : null}
         </StaffForm>
       </> : <p className="text-sm text-ink-muted">Adding staff needs permission to manage staff and assign access. Ask a facility admin.</p>}
     </div>

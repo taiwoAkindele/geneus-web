@@ -639,3 +639,27 @@ predecessors under lock, and retains rejected records for Sync & review. Billing
 shows paid returns as patient credit; it does not invent refund payments.
 See [implementation](../docs/PHARMACY-STOCK-BILLING-2026-11-08.md) and
 [QA](qa/pharmacy-stock-qa.md).
+
+### Workflow and usability improvements (15 November 2026)
+
+- **Places in batches.** "Add place" takes a count. Above one, the name becomes the
+  part before the number ("Bed" gives Bed 1…N). Numbering continues after the highest
+  number already used inside the same parent. The review lists every name; names an
+  active sibling already uses are skipped. Each place in a batch has a fixed id
+  (`location:<batch>:<n>`), so an interrupted batch resumes without duplicates. At most
+  100 per batch. Wards show their bed count. The inpatient Beds tab shows available,
+  occupied and unavailable beds per ward. Nothing is deleted. No contract or server change.
+- **Complaints & Diagnoses.** The visit steps are now "Complaints" (chief complaint, other
+  complaints one per line, history of presenting complaint, then the clinician's notes)
+  and "Diagnoses". The stored `complaints[]` is unchanged: the first entry is the chief
+  complaint. Certainty is labelled Provisional / working (`suspected`) and Confirmed /
+  final (`confirmed`); stored values and claims are unchanged. Differential diagnoses are
+  not modelled yet; they need a breaking contract change. The patient's long-term problem
+  list is untouched.
+- **Visit so far.** A read-only summary of the earlier sections relevant to the current
+  one: beside the form on wide screens, folded above it on tablets, never on phones. It
+  marks each section as signed, draft (not signed), passed over or not recorded, and a
+  blank field inside a signed section as not recorded.
+- **Invitation links.** `/onboarding/invitation` opens the link from an invitation email
+  and takes the shortest path this device allows. See docs/ARCHITECTURE.md §3
+  (Invitation links).

@@ -7,7 +7,7 @@ import { useAuthorizationContext } from '@/session';
 import { RecordEditor } from '@/modules/operations/workforce/RecordEditor';
 import { RecordList, WorkspaceLoading } from '@/modules/operations/workforce/Workspaces';
 import { useWorkforce } from '@/modules/operations/workforce/useWorkforce';
-import { humanize, unitPath } from '@/modules/operations/workforce/presentation';
+import { humanize, placeDetail, unitPath } from '@/modules/operations/workforce/presentation';
 import type { EditorKind } from '@/modules/operations/workforce/editorFields';
 import { CareServicesStep } from './CareServicesStep';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
@@ -54,7 +54,7 @@ const StepEditor = ({ step }: { step: SetupStepId }) => {
     {allowed ? <StaffVerification purpose="Changing hospital setup" /> : null}
     {allowed ? <Button fullWidth={false} onClick={() => setEditing({})}><Icon name="plus" className="h-4 w-4" />{editor.add}</Button> : <p className="text-sm text-ink-muted">Your role can view these but not change them.</p>}
     <RecordList businessStatus records={records} data={data} onEdit={allowed ? (previous) => setEditing({ previous }) : undefined}
-      detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Team'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? humanize(r.kind) : ''} />
+      detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Team'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? placeDetail(r, data.locations) : ''} />
     {editing ? <RecordEditor key={editing.previous?.id ?? 'new'} kind={editor.kind} previous={editing.previous} data={data} onClose={() => setEditing(undefined)} onSaved={query.reload} /> : null}
   </div>;
 };

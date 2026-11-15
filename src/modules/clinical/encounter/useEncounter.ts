@@ -9,7 +9,7 @@ import { amendEntry, encountersForPatient, entriesForEncounter, saveStep } from 
 import { listStaff } from '@/data/repos/staff';
 import { useAuthorizationContext } from '@/session';
 import { EMPTY_ENCOUNTER_DATA, projectEncounter } from './encounterRecord';
-import { isClosingStep, STEP_DEFS, stepsFor } from './steps';
+import { CERTAINTY_LABEL, isClosingStep, STEP_DEFS, stepsFor } from './steps';
 import { stepProblems, toStepValues } from './stepValues';
 import type { EncounterData, LabItemDraft, RxLine, StepKey } from './types';
 
@@ -28,7 +28,8 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
       ];
     case 'complaint':
       return [
-        { label: 'Complaints', value: data.complaint.text.trim() || '—' },
+        { label: 'Chief complaint', value: data.complaint.text.trim() || '—' },
+        ...(data.complaint.others?.trim() ? [{ label: 'Other complaints', value: data.complaint.others.trim() }] : []),
         { label: 'Clinical note', value: data.complaint.note || '—' },
         ...(['historyOfPresentIllness', 'examination', 'assessment', 'plan'] as const).flatMap((key) => data.complaint[key] ? [{ label: { historyOfPresentIllness: 'History of presenting illness', examination: 'Examination', assessment: 'Assessment', plan: 'Clinical plan / advice' }[key], value: data.complaint[key]! }] : []),
       ];
@@ -49,8 +50,8 @@ export const summarize = (data: EncounterData, key: StepKey): { label: string; v
       else plan.push('Send home');
       return [
         { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
-        ...(data.diagnosis.code || data.diagnosis.certainty ? [{ label: 'Diagnosis details', value: [data.diagnosis.codingSystem, data.diagnosis.code, data.diagnosis.certainty].filter(Boolean).join(' · ') }] : []),
-        ...(data.diagnosis.diagnoses ?? []).map((diagnosis, index) => ({ label: `Additional diagnosis ${index + 1}`, value: [diagnosis.label, diagnosis.codingSystem, diagnosis.code, diagnosis.certainty].filter(Boolean).join(' · ') })),
+        ...(data.diagnosis.code || data.diagnosis.certainty ? [{ label: 'Diagnosis details', value: [data.diagnosis.codingSystem, data.diagnosis.code, data.diagnosis.certainty && CERTAINTY_LABEL[data.diagnosis.certainty]].filter(Boolean).join(' · ') }] : []),
+        ...(data.diagnosis.diagnoses ?? []).map((diagnosis, index) => ({ label: `Additional diagnosis ${index + 1}`, value: [diagnosis.label, diagnosis.codingSystem, diagnosis.code, diagnosis.certainty && CERTAINTY_LABEL[diagnosis.certainty]].filter(Boolean).join(' · ') })),
         ...(data.diagnosis.pendingResultsReason ? [{ label: 'Continued without all results', value: data.diagnosis.pendingResultsReason }] : []),
         // A visit recorded in the retired order carried its treatment plan on the diagnosis.
         ...(!data.diagnosis.rx.length && !data.diagnosis.injection && !data.diagnosis.admit ? [] : [

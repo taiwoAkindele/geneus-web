@@ -11,7 +11,7 @@ import { FacilityDetailsStep } from '@/modules/administration/setup/FacilityDeta
 import { CareServicesStep } from '@/modules/administration/setup/CareServicesStep';
 import type { EditorKind } from './editorFields';
 import { useWorkforce } from './useWorkforce';
-import { humanize, intakeLabel, proposalState, recordName, unitPath } from './presentation';
+import { humanize, intakeLabel, placeDetail, proposalState, recordName, unitPath } from './presentation';
 export const WorkspaceLoading = ({ error, reload }: {
   error?: Error;
   reload: () => void;
@@ -89,7 +89,7 @@ export const FacilityWorkspace = () => {
       {canEdit(kind, context.permissions) ? <Button fullWidth={false} onClick={() => setEditing({ kind })}>Add {view === 'structure' ? 'team' : view === 'locations' ? 'place' : 'financial department'}</Button> : null}
     </div>
     <TextField label={`Find ${view === 'structure' ? 'a team' : view === 'locations' ? 'a place' : 'a financial department'}`} type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
-    {records.length ? <RecordList businessStatus records={records} data={data} onEdit={canEdit(kind, context.permissions) ? (previous) => setEditing({ kind, previous }) : undefined} detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Classification needed'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? humanize(r.kind) : r.type === 'billing_department' ? r.organizationUnitId ? unitPath(r.organizationUnitId, data.units) : 'Not yet linked' : ''} /> : <Empty>{search ? 'No matches. Try another name.' : view === 'structure' ? 'No teams yet. Add the team responsible for care.' : view === 'locations' ? 'No places yet. Add a room, ward, bed or store.' : 'No financial departments yet.'}</Empty>}
+    {records.length ? <RecordList businessStatus records={records} data={data} onEdit={canEdit(kind, context.permissions) ? (previous) => setEditing({ kind, previous }) : undefined} detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Classification needed'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? placeDetail(r, data.locations) : r.type === 'billing_department' ? r.organizationUnitId ? unitPath(r.organizationUnitId, data.units) : 'Not yet linked' : ''} /> : <Empty>{search ? 'No matches. Try another name.' : view === 'structure' ? 'No teams yet. Add the team responsible for care.' : view === 'locations' ? 'No places yet. Add a room, ward, bed or store.' : 'No financial departments yet.'}</Empty>}
   </section>;
   return <section aria-labelledby="facility-heading" className="min-w-0 space-y-5">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="facility-heading" className="text-xl font-extrabold">Facility</h2><p className="mt-1 text-sm text-ink-muted">Manage your facility details, the care you provide and where it happens.</p></div><Link to="/setup" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Open setup guide</Link></header>

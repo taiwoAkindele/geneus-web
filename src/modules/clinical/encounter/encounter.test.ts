@@ -108,12 +108,22 @@ describe('section values', () => {
     expect(stepProblems('dispense', { ...data, dispense: { done: {}, reasons: { 0: 'Out of stock' } } })).toEqual([]);
   });
 
-  it('saves complaints as typed, in the patient’s words, and reads older lists back joined', () => {
+  it('saves complaints as typed, in the patient’s words, chief complaint first', () => {
     const typed = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: '  pain when passing urine for 2 days ', note: '' } };
 
     expect(toStepValues('complaint', typed)).toEqual({ complaints: ['pain when passing urine for 2 days'], note: undefined });
     expect(stepProblems('complaint', EMPTY_ENCOUNTER_DATA)).toEqual(['Record a complaint or a clinical note']);
-    expect(fromStepValues('complaint', { complaints: ['Fever', 'Headache'] }, EMPTY_ENCOUNTER_DATA).complaint.text).toBe('Fever, Headache');
+    const withOthers = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: 'Fever for 3 days', others: 'Headache\n\n  Cough for a week ', note: '' } };
+    expect(toStepValues('complaint', withOthers)).toEqual({ complaints: ['Fever for 3 days', 'Headache', 'Cough for a week'], note: undefined });
+  });
+
+  it('reads the first saved complaint as the chief complaint and keeps the rest', () => {
+    const read = fromStepValues('complaint', { complaints: ['Fever', 'Headache', 'Cough'] }, EMPTY_ENCOUNTER_DATA).complaint;
+    expect(read.text).toBe('Fever');
+    expect(read.others).toBe('Headache\nCough');
+    expect(toStepValues('complaint', { ...EMPTY_ENCOUNTER_DATA, complaint: read })).toEqual({ complaints: ['Fever', 'Headache', 'Cough'], note: undefined });
+    // A visit saved with one free-text complaint reads back unchanged.
+    expect(fromStepValues('complaint', { complaints: ['Fever, headache'] }, EMPTY_ENCOUNTER_DATA).complaint).toEqual({ text: 'Fever, headache', note: '' });
   });
 
   it('reads a saved section back exactly as it was entered', () => {

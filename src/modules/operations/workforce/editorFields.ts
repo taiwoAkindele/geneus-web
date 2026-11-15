@@ -1,6 +1,7 @@
 import { ClinicalAction, LocationKind, ServiceCategory, VISIT_TYPE_NAMES, VisitType, currentFacilityRevisions, type AnyDocument } from '@shared';
 import type { WorkforceData } from '@/data/repos/workforce';
 import { humanize, unitPath } from './presentation';
+import { nextPlaceNumber } from './placeBatch';
 export type EditorKind = 'unit' | 'location' | 'service_definition' | 'service_offering' | 'practitioner_profile' | 'staff_assignment' | 'service_session' | 'credential' | 'capability_decision' | 'reviewer_delegation' | 'billing_department';
 export type Values = Record<string, string | string[] | boolean | undefined>;
 export type Option = {
@@ -20,7 +21,19 @@ const timeZones = (Intl as typeof Intl & {
   supportedValuesOf?: (key: string) => string[];
 }).supportedValuesOf?.('timeZone') || ['Africa/Lagos', 'Africa/Accra', 'Africa/Nairobi', 'Europe/London', 'America/New_York', 'Asia/Kolkata'];
 const field = (key: string, label: string, help: string, kind?: Field['kind'], options?: Option[], required = true): Field => ({ key, label, help, kind, options, required });
-export const editorFields = (kind: EditorKind, data: WorkforceData, values: Values, privateRecords: AnyDocument[]): Field[] => {
+/** A new place can be added several at a time ("Bed 1" … "Bed N"); the name becomes the part before the number. */
+const placeBatchFields = (data: WorkforceData, values: Values, name: Field): Field[] => {
+  const count = field('placeCount', 'How many', 'Add several places of this type at once, such as every bed in a ward. Leave 1 for a single place.', 'number');
+  if (!(Number(values.placeCount) > 1)) return [name, count];
+  const prefix = String(values.name ?? '').trim() || 'Bed';
+  const auto = nextPlaceNumber(prefix, String(values.parentId ?? '') || undefined, data.locations);
+  return [
+    { ...name, label: 'Name before the number', help: `For example "Bed" creates Bed ${auto}, Bed ${auto + 1}, …` },
+    count,
+    field('placeStart', 'Start numbering at', `Leave blank to start at ${auto}, after the highest number already used in the same place.`, 'number', undefined, false),
+  ];
+};
+export const editorFields = (kind: EditorKind, data: WorkforceData, values: Values, privateRecords: AnyDocument[], isNew = false): Field[] => {
   const staff = data.staff.filter((s) => s.active).map((s) => ({ value: s.staffId, label: `${s.fullName} · ${humanize(s.role)} · ${s.id.slice(-5)}` }));
   const units = data.units.map((u) => ({ value: u.id, label: unitPath(u.id, data.units) + (u.active ? '' : ' (retired)') }));
   const places = data.locations.filter((l) => l.active).map((l) => ({ value: l.id, label: `${l.name} · ${humanize(l.kind)}` }));
@@ -35,7 +48,7 @@ export const editorFields = (kind: EditorKind, data: WorkforceData, values: Valu
   const reason = field('reason', 'Reason', 'Explain this decision so another person can safely review it.', 'textarea', undefined, ['capability_decision', 'reviewer_delegation'].includes(kind));
   switch (kind) {
     case 'unit': return [name, field('kind', 'Organization type', 'A department groups accountable units; a unit receives work.', 'select', choices(['department', 'unit'])), field('parentId', 'Parent team', 'Optional department or unit above this team.', 'select', units, false), field('routingEnabled', 'Receive patient instructions', 'Only operational units can receive new patient instructions.', 'boolean'), active];
-    case 'location': return [name, field('kind', 'Place type', 'A real place, not a department. An individual bed does not record occupancy.', 'select', choices(LocationKind.options)), field('parentId', 'Located within', 'Choose its actual parent place, if applicable.', 'select', places, false), { ...unit, required: false }, field('capacity', 'Resource capacity', 'Number that can use this place at once. An individual bed has capacity one.', 'number', undefined, false), field('description', 'Description', 'Useful access or operating restrictions.', 'textarea', undefined, false), active];
+    case 'location': return [...(isNew ? placeBatchFields(data, values, name) : [name]), field('kind', 'Place type', 'A real place, not a department. An individual bed does not record occupancy.', 'select', choices(LocationKind.options)), field('parentId', 'Located within', 'Choose its actual parent place, if applicable.', 'select', places, false), { ...unit, required: false }, field('capacity', 'Resource capacity', 'Number that can use this place at once. An individual bed has capacity one.', 'number', undefined, false), field('description', 'Description', 'Useful access or operating restrictions.', 'textarea', undefined, false), active];
     case 'service_definition': return [name, field('category', 'Service category', 'Groups this care activity; it does not create a fee, medicine or laboratory catalogue.', 'select', choices(ServiceCategory.options)), field('orderable', 'Can be requested', 'Whether other care teams can request this service.', 'boolean'), active];
     case 'service_offering': return [name, field('serviceDefinitionId', 'Care activity', 'Reuse an existing service definition across teams or create a local one.', 'select', [{ value: 'new', label: 'Create a new local care activity' }, ...data.definitions.filter((d) => d.active).map((d) => ({ value: d.id, label: d.name }))]), ...(values.serviceDefinitionId === 'new' ? [field('category', 'Care activity category', 'Creates an explicitly local service concept; no official terminology is inferred.', 'select', choices(ServiceCategory.options))] : []), unit, locations, field('delivery', 'Delivery', 'How the patient receives care. Physical services need actual places.', 'select', choices(['physical', 'mobile', 'virtual'])), actions, field('intakePolicy', 'Patients accepted', 'Walk-in, scheduled appointments or both.', 'select', choices(['walk_in', 'scheduled', 'both'])), field('visitTypes', 'Visits recorded as', 'Booking and registration offer this service for these kinds of visit. Leave clear for care that is not booked, such as admission.', 'multi', VisitType.options.map((value) => ({ value, label: VISIT_TYPE_NAMES[value] })), false), zone, field('configuration', 'Configuration', 'Active is a proposal until the server accepts it; intake is opened separately.', 'select', choices(['draft', 'proposed', 'active', 'retired'])), field('resourceReadiness', 'Equipment and supplies', 'Unassessed means readiness has not been checked. This does not derive stock.', 'select', choices(['unassessed', 'available', 'unavailable']))];
     case 'practitioner_profile': return [field('staffId', 'Staff member', 'Use the existing identity; do not make another account for another duty.', 'select', staff), field('professionCode', 'Profession', 'Training description only. Independent approval determines allowed clinical activities.', 'select', choices([...new Set(['chew', 'nurse', 'doctor', 'medical_laboratory_scientist', 'pharmacist', 'other', ...(values.professionCode ? [String(values.professionCode)] : [])])])), ...(values.professionCode === 'other' ? [field('professionLabel', 'Profession name', 'The actual profession or qualification label used by this person.')] : []), field('specialties', 'Specialties', 'Optional specialty descriptions, one per line. Existing terminology is preserved.', 'textarea', undefined, false), {...active,label:'Profile current',help:'Retiring a profile description keeps history. Manage account access and clinical approval separately.'}];
