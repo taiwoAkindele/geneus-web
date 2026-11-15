@@ -1,6 +1,7 @@
 import { registerWorkspaceFlusher } from '@/data/facilityWorkspaces';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { closesEncounter, type Encounter, type EncounterEntry, type LabReport, type VisitType } from '@shared';
+import { closesEncounter, type Encounter, type EncounterEntry, type LabReport } from '@shared';
+import type { CareVisitChoice } from '@/data/repos/careServices';
 import { useLiveQuery, useDeviceContext } from '@/data';
 import { zonedInstant } from '@/lib/workforceTime';
 import { discardDraft, discardDrafts, readDrafts, writeDraft, type DraftOwner } from '@/data/repos/drafts';
@@ -138,7 +139,9 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
   const [draft, setDraft] = useState<EncounterData>(EMPTY_ENCOUNTER_DATA);
   const [skippedNow, setSkippedNow] = useState<StepKey[]>([]);
   // What a new visit is for; saved with its first signed section. Undefined keeps the appointment's type.
-  const [chosenVisitType, setVisitType] = useState<VisitType>();
+  // What a new visit is for: the care service and kind of visit; the booking's until staff choose.
+  const [chosenCare, setCare] = useState<CareVisitChoice>();
+  const chosenVisitType = chosenCare?.visitType;
   // Unsaved work (PRD §9.8.4) is kept per person: whoever is typing, for this patient and encounter.
   const owner = useMemo<DraftOwner>(
     () => ({ staffId: context.userId, patientId, encounterKey: currentId ?? appointmentId ?? 'new' }),
@@ -337,7 +340,8 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
         {
           encounterId,
           appointmentId,
-          visitType: chosenVisitType,
+          visitType: chosenCare?.visitType,
+          offeringId: chosenCare?.offeringId,
           patientId,
           step: key,
           values: labSubmission ? labSubmission.values : key === 'diagnosis' ? { ...toStepValues(key, enc.data), prescription: [] } : toStepValues(key, enc.data),
@@ -370,7 +374,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
       setCurrentId(entry.encounterId);
       return entry;
     },
-    [context, facility?.timeZone, enc.data, enc.entries, draft, owner, patientId, appointmentId, skippedNow, chosenVisitType],
+    [context, facility?.timeZone, enc.data, enc.entries, draft, owner, patientId, appointmentId, skippedNow, chosenCare],
   );
 
   /** Saves the section, locked to the signed-in staff member. */
@@ -434,7 +438,7 @@ export const useEncounter = (patientId: string, encounterId?: string, appointmen
     [setField, toggleIn, setResult, setLabReport, addRx, setRx, removeRx, toggleDispense, setDispenseReason, skip, problems, lockStep, lockSteps, signable, amendStep],
   );
 
-  return { enc, rawEntries: live.data?.entries ?? [], encounter: live.data?.encounter, chosenVisitType, setVisitType, draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, flushDraft: () => pendingDraft.current?.(), ...actions };
+  return { enc, rawEntries: live.data?.entries ?? [], encounter: live.data?.encounter, chosenVisitType, chosenCare, setCare, draftRestoredAt, loading: live.loading, error: live.error, reload: live.reload, flushDraft: () => pendingDraft.current?.(), ...actions };
 };
 
 export type EncounterController = ReturnType<typeof useEncounter>;

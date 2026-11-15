@@ -5,11 +5,26 @@ import { ApiError, staffRequest } from './client';
 /**
  * The signed-in person's server session: opened from their PIN when they sign
  * in online, so the server itself knows who is acting on this shared device.
- * Held in memory only — a reload, sign-out or the next person's sign-in ends
- * it — and never written to storage.
+ * Kept for the life of this browser tab (sessionStorage), so an ordinary page
+ * reload does not ask for the PIN again; closing the tab forgets it. It is only
+ * ever used for the person and device it was opened for, the server still ends
+ * it after its idle time and maximum lifetime, and sign-out, the app's idle
+ * lock and the next person's sign-in end it here at once.
  */
 type Held = StaffSession & { deviceId: string; lastUsed: number };
-let held: Held | undefined;
+const TAB_KEY = 'geneus.staffSession';
+const restore = (): Held | undefined => {
+  try {
+    const raw: unknown = JSON.parse(sessionStorage.getItem(TAB_KEY) ?? 'null');
+    const h = raw as Held | null;
+    return h && typeof h.token === 'string' && typeof h.staffId === 'string' && typeof h.deviceId === 'string' && typeof h.expiresOn === 'string' && typeof h.idleMinutes === 'number' && typeof h.lastUsed === 'number' ? h : undefined;
+  } catch { return undefined; }
+};
+const persist = (value: Held | undefined) => {
+  try { if (value) sessionStorage.setItem(TAB_KEY, JSON.stringify(value)); else sessionStorage.removeItem(TAB_KEY); } catch { /* storage unavailable: the session lasts this page */ }
+};
+let held: Held | undefined = typeof sessionStorage === 'undefined' ? undefined : restore();
+const hold = (value: Held | undefined) => { held = value; persist(value); };
 export const STAFF_SESSION_EVENT = 'geneus:staffSession';
 const changed = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event(STAFF_SESSION_EVENT)); };
 const credential = () => { const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled'); return device.credential; };
@@ -17,12 +32,12 @@ const credential = () => { const device = getDeviceCredential(); if (!device) th
 export const staffSessionToken = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>): string | undefined => {
   if (!held || held.staffId !== context.userId || held.deviceId !== context.deviceId) return undefined;
   const now = Date.now();
-  if (Date.parse(held.expiresOn) <= now || now - held.lastUsed > held.idleMinutes * 60_000) { held = undefined; changed(); return undefined; }
+  if (Date.parse(held.expiresOn) <= now || now - held.lastUsed > held.idleMinutes * 60_000) { hold(undefined); changed(); return undefined; }
   return held.token;
 };
 export const staffSessionExpires = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>) => (staffSessionToken(context) ? held!.expiresOn : undefined);
-export const touchStaffSession = () => { if (held) held.lastUsed = Date.now(); };
-const keep = (session: StaffSession, deviceId: string) => { held = { ...session, deviceId, lastUsed: Date.now() }; changed(); return session; };
+export const touchStaffSession = () => { if (held) hold({ ...held, lastUsed: Date.now() }); };
+const keep = (session: StaffSession, deviceId: string) => { hold({ ...session, deviceId, lastUsed: Date.now() }); changed(); return session; };
 
 /** Proves the PIN to the server. Refusals: wrong_pin, locked, pin_not_enrolled, unknown_staff. */
 export const openStaffSession = async (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>, pin: string) =>
@@ -35,10 +50,10 @@ export const enrolStaffPin = async (staffId: string, deviceId: string, pin: stri
 /** Ends the session on the server and here. Safe to call when there is none. */
 export const endStaffSession = async () => {
   const ending = held;
-  held = undefined; changed();
+  hold(undefined); changed();
   if (ending) await staffRequest('/staff/session/end', credential(), ending.token).catch(() => undefined);
 };
-export const forgetStaffSession = () => { held = undefined; changed(); };
+export const forgetStaffSession = () => { hold(undefined); changed(); };
 
 /** A PIN setup code just used on this device, kept briefly so the new PIN can be registered with the server. */
 const pendingCodes = new Map<string, { code: string; until: number }>();

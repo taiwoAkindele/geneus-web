@@ -26,15 +26,15 @@ describe('care services in hospital setup', () => {
   });
 
   it('adds an active offering under a new care definition, with no workforce rules imposed', async () => {
-    await addCareService({ key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', unitId: 'u-opd', locationId: 'l-c1' }, base(), context);
+    await addCareService({ key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: 'l-c1' }, base(), context);
     expect(saved.map((s) => s.type)).toEqual(['service_definition', 'service_offering']);
     expect(saved[0].fields).toMatchObject({ category: 'consultation', orderable: false, concept: { system: CARE_CONCEPT_SYSTEM, code: 'general-outpatient' } });
-    expect(saved[1].fields).toMatchObject({ serviceDefinitionId: 'service_definition:new', configuration: 'active', requiredActions: [], resourceReadiness: 'unassessed', locationIds: ['l-c1'], timeZone: 'Africa/Lagos' });
+    expect(saved[1].fields).toMatchObject({ serviceDefinitionId: 'service_definition:new', configuration: 'active', visitTypes: ['general'], requiredActions: [], resourceReadiness: 'unassessed', locationIds: ['l-c1'], timeZone: 'Africa/Lagos' });
   });
 
   it('reuses an existing definition with the same meaning instead of creating another', async () => {
     const own = { id: 'd-anc', name: 'antenatal care', category: 'preventive', active: true, concept: { system: 'urn:geneus:local-service', code: 'x', label: 'antenatal care' } };
-    await addCareService({ key: 'antenatal', name: 'Antenatal care', category: 'preventive', intakePolicy: 'both', unitId: 'u-opd', locationId: 'l-c1' }, base({ definitions: [lab, own] }), context);
+    await addCareService({ key: 'antenatal', name: 'Antenatal care', category: 'preventive', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: 'l-c1' }, base({ definitions: [lab, own] }), context);
     expect(saved.map((s) => s.type)).toEqual(['service_offering']);
     expect(saved[0].fields.serviceDefinitionId).toBe('d-anc');
   });
@@ -43,20 +43,20 @@ describe('care services in hospital setup', () => {
     const data = base({ definitions: [lab, { id: 'd-opd', name: 'OPD', category: 'consultation', active: true, concept: { system: CARE_CONCEPT_SYSTEM, code: 'general-outpatient', label: 'OPD' } }],
       offerings: [{ id: 'o-opd', name: 'OPD', serviceDefinitionId: 'd-opd', configuration: 'active' }] });
     expect(existingCareService({ key: 'general-outpatient', name: 'General outpatient consultation' }, data)?.id).toBe('o-opd');
-    await expect(addCareService({ key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', unitId: 'u-opd', locationId: 'l-c1' }, data, context)).rejects.toThrow('already one of');
-    await expect(addCareService({ name: ' opd ', category: 'consultation', intakePolicy: 'both', unitId: 'u-opd', locationId: 'l-c1' }, data, context)).rejects.toThrow('already one of');
+    await expect(addCareService({ key: 'general-outpatient', name: 'General outpatient consultation', category: 'consultation', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: 'l-c1' }, data, context)).rejects.toThrow('already one of');
+    await expect(addCareService({ name: ' opd ', category: 'consultation', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: 'l-c1' }, data, context)).rejects.toThrow('already one of');
     expect(saved).toEqual([]);
   });
 
   it('never treats a lab test as an existing care service, and never reuses a lab definition', async () => {
     expect(existingCareService({ name: 'Haemoglobin' }, base())).toBeUndefined();
-    await addCareService({ name: 'Haemoglobin', category: 'other', intakePolicy: 'both', unitId: 'u-opd', locationId: 'l-c1' }, base(), context);
+    await addCareService({ name: 'Haemoglobin', category: 'other', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: 'l-c1' }, base(), context);
     expect(saved[0].type).toBe('service_definition');
   });
 
   it('asks for the team and place before saving anything', async () => {
-    await expect(addCareService({ name: 'Eye clinic', category: 'consultation', intakePolicy: 'both', unitId: '', locationId: 'l-c1' }, base(), context)).rejects.toThrow('team');
-    await expect(addCareService({ name: 'Eye clinic', category: 'consultation', intakePolicy: 'both', unitId: 'u-opd', locationId: '' }, base(), context)).rejects.toThrow('where');
+    await expect(addCareService({ name: 'Eye clinic', category: 'consultation', intakePolicy: 'both', visitTypes: ['general'], unitId: '', locationId: 'l-c1' }, base(), context)).rejects.toThrow('team');
+    await expect(addCareService({ name: 'Eye clinic', category: 'consultation', intakePolicy: 'both', visitTypes: ['general'], unitId: 'u-opd', locationId: '' }, base(), context)).rejects.toThrow('where');
     expect(saved).toEqual([]);
   });
 

@@ -1,3 +1,4 @@
+import { careServiceOfferings, isLabTestOffering } from '@shared';
 import type { Facility, FeeItem, Location, RosterShift, ServiceDefinition, ServiceOffering, Staff, StockItem, Unit } from '@shared';
 import { allOfType } from '@/data/db';
 import { getFacility } from '@/data/repos/facility';
@@ -16,12 +17,8 @@ export type SetupFacts = {
   fees: readonly FeeItem[]; stock: readonly StockItem[]; staff: readonly Staff[]; shifts: readonly RosterShift[];
 };
 
-/** A lab catalogue test: its definition carries investigation details. */
-export const isLabTestOffering = (offering: Pick<ServiceOffering, 'serviceDefinitionId'>, definitions: readonly Pick<ServiceDefinition, 'id' | 'investigation'>[] = []) =>
-  Boolean(definitions.find((d) => d.id === offering.serviceDefinitionId)?.investigation);
-/** Offerings that are care services, not lab tests. Retired ones are history, not the hospital's current care. */
-export const careServiceOfferings = <O extends Pick<ServiceOffering, 'serviceDefinitionId' | 'configuration'>>(offerings: readonly O[], definitions: readonly Pick<ServiceDefinition, 'id' | 'investigation'>[] = []) =>
-  offerings.filter((o) => o.configuration !== 'retired' && !isLabTestOffering(o, definitions));
+/** One definition of care service versus lab test, shared with booking and the server. */
+export { careServiceOfferings, isLabTestOffering };
 export const SETUP_STEP_IDS = ['facility', 'teams', 'places', 'services', 'prices', 'staff'] as const;
 export type SetupStepId = typeof SETUP_STEP_IDS[number];
 export type SetupStepStatus = 'done' | 'started' | 'todo' | 'not_needed';

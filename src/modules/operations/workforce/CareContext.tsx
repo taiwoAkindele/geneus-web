@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { careContextOptions } from './careContextOptions';
 import { Link } from 'react-router-dom';
 import { workforceEnforcementActive } from '@shared';
 import { SelectField, Button } from '@/ui';
@@ -16,7 +17,7 @@ export const CareContext = () => {
   const enforcing = workforceEnforcementActive(query.data.facility?.workforcePolicy, Date.now()), proof = query.data.snapshots.find((s) => s.staffId === context.userId);
   if (!enforcing && !proof?.reviewScopes.length)
     return null;
-  return <aside className="border-b border-outline-soft bg-white px-4 py-3 md:px-8" aria-label="Current care context"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3">{enforcing ? <div className="min-w-48 flex-1"><SelectField label="Care service" value={selected} onChange={(e) => { const value = e.target.value; setSelected(value); void selectCareService(context, value).catch(() => setError('Could not save your service choice. Choose it again before signing')); }} options={[{ value: '', label: 'Choose the service you are working in' }, ...query.data.offerings.filter((o) => o.configuration === 'active').map((o) => ({ value: o.id, label: o.name }))]} help={{ purpose: 'This records which service your clinical entries belong to. A device default or duty selection does not grant professional authority.' }} /></div> : null}<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Clinical reviews & co-signatures</Link><Button fullWidth={false} variant="ghost" disabled={refreshing} loading={refreshing} onClick={async () => {
+  return <aside className="border-b border-outline-soft bg-white px-4 py-3 md:px-8" aria-label="Current care context"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3">{enforcing ? <div className="min-w-48 flex-1"><SelectField label="Care service" value={selected} onChange={(e) => { const value = e.target.value; setSelected(value); void selectCareService(context, value).catch(() => setError('Could not save your service choice. Choose it again before signing')); }} options={[{ value: '', label: 'Choose the service you are working in' }, ...careContextOptions(query.data.offerings, query.data.definitions)]} help={{ purpose: 'This records which service your clinical entries belong to. A device default or duty selection does not grant professional authority.' }} /></div> : null}<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Clinical reviews & co-signatures</Link><Button fullWidth={false} variant="ghost" disabled={refreshing} loading={refreshing} onClick={async () => {
     setRefreshing(true); setError(''); try {
       await refreshWorkforceKeys();
       query.reload();

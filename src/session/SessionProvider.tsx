@@ -193,6 +193,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem(LAST_ACTIVITY_KEY);
         lastActivity.current = undefined;
         setStaffId(null);
+        // The idle lock ends the server session too, not only the local sign-in.
+        void endStaffSession();
         setNow(at);
         return;
       }

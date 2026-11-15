@@ -3,14 +3,15 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { AnyDocument } from '@shared';
 import { Button, Icon } from '@/ui';
 import { useLiveQuery } from '@/data';
-import { useAuthorizationContext, useSession } from '@/session';
-import { FacilitySettings } from '@/modules/operations/workforce/FacilitySettings';
+import { useAuthorizationContext } from '@/session';
 import { RecordEditor } from '@/modules/operations/workforce/RecordEditor';
 import { RecordList, WorkspaceLoading } from '@/modules/operations/workforce/Workspaces';
 import { useWorkforce } from '@/modules/operations/workforce/useWorkforce';
 import { humanize, unitPath } from '@/modules/operations/workforce/presentation';
 import type { EditorKind } from '@/modules/operations/workforce/editorFields';
 import { CareServicesStep } from './CareServicesStep';
+import { StaffVerification } from '@/modules/insurance/StaffVerification';
+import { FacilityDetailsStep } from './FacilityDetailsStep';
 import { loadSetupFacts, readNotNeeded, SETUP_STEP_IDS, SETUP_WATCH, setupProgress, setupSteps, writeNotNeeded, type SetupStep, type SetupStepId } from './setupProgress';
 
 const panel = 'rounded-card border border-outline-soft bg-white p-4 md:p-5';
@@ -50,6 +51,7 @@ const StepEditor = ({ step }: { step: SetupStepId }) => {
   const records = step === 'teams' ? data.units : data.locations;
   const allowed = context.permissions.includes(editor.permission as never);
   return <div className="space-y-3">
+    {allowed ? <StaffVerification purpose="Changing hospital setup" /> : null}
     {allowed ? <Button fullWidth={false} onClick={() => setEditing({})}><Icon name="plus" className="h-4 w-4" />{editor.add}</Button> : <p className="text-sm text-ink-muted">Your role can view these but not change them.</p>}
     <RecordList businessStatus records={records} data={data} onEdit={allowed ? (previous) => setEditing({ previous }) : undefined}
       detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Team'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? humanize(r.kind) : ''} />
@@ -61,8 +63,7 @@ const Links = ({ items }: { items: { label: string; to: string; primary?: boolea
   <Link key={item.to} to={item.to} className={`inline-flex min-h-[44px] items-center gap-1 rounded-field px-4 text-sm font-bold ${item.primary ? 'bg-brand text-white' : 'border-[1.5px] border-outline bg-white text-brand'}`}>{item.label}<Icon name="chevron" className="h-4 w-4" /></Link>)}</div>;
 
 const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
-  const { facility } = useSession();
-  if (step === 'facility') return <div className="space-y-4"><dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-ink-muted">Facility</dt><dd className="font-bold">{facility.name}</dd></div><div><dt className="text-ink-muted">Facility code</dt><dd className="font-mono font-bold">{facility.code}</dd></div></dl><FacilitySettings /></div>;
+  if (step === 'facility') return <FacilityDetailsStep />;
   if (step === 'prices') return <Links items={[{ label: 'Open price list', to: '/settings/billing/fees', primary: true }, { label: 'Link stock prices', to: '/stock' }]} />;
   if (step === 'staff') return <Links items={[{ label: 'Open staff & access', to: '/settings/staff', primary: true }, { label: 'Invite staff', to: '/admin/staff/invite' }]} />;
   if (step === 'services') return <CareServicesStep />;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { AnyDocument, ServiceOffering } from '@shared';
+import { VISIT_TYPE_NAMES, VisitType, type AnyDocument, type ServiceOffering } from '@shared';
 import { Button, Icon, SelectField, Sheet, SheetCancelButton, Tag, TextField, useToast } from '@/ui';
 import { useAuthorizationContext } from '@/session';
 import type { WorkforceData } from '@/data/repos/workforce';
@@ -20,12 +20,26 @@ const INTAKE: { value: ServiceOffering['intakePolicy']; label: string }[] = [
 ];
 const intakeLabel = (value: string) => INTAKE.find((i) => i.value === value)?.label ?? humanize(value);
 
+/**
+ * Which visits a custom service records: what booking and registration offer
+ * for it. None means patients are not booked for it (it is reached another way).
+ */
+const VisitKindsField = ({ value, onChange }: { value: VisitType[]; onChange: (value: VisitType[]) => void }) =>
+  <fieldset>
+    <legend className="text-sm font-bold">Visits recorded as</legend>
+    <p className="text-xs text-ink-muted">Booking and registration offer this service for these kinds of visit. Leave all clear if patients are not booked for it.</p>
+    <div className="mt-2 grid gap-1 sm:grid-cols-2">{VisitType.options.map((type) => <label key={type} className="flex min-h-11 items-center gap-2 text-sm">
+      <input type="checkbox" checked={value.includes(type)} onChange={(e) => onChange(e.target.checked ? [...value, type] : value.filter((t) => t !== type))} />{VISIT_TYPE_NAMES[type]}
+    </label>)}</div>
+  </fieldset>;
+
 /** Choose the team and place, with the name and category asked only for a custom service. */
 const AddCareServiceSheet = ({ preset, data, onClose, onSaved }: { preset?: CarePreset; data: WorkforceData; onClose: () => void; onSaved: () => void }) => {
   const context = useAuthorizationContext(), toast = useToast();
   const start = defaultPlacement(preset, data);
   const [name, setName] = useState(preset?.name ?? ''), [category, setCategory] = useState<CareCategory>(preset?.category ?? 'consultation');
   const [intakePolicy, setIntake] = useState<ServiceOffering['intakePolicy']>(preset?.intakePolicy ?? 'both');
+  const [visitTypes, setVisitTypes] = useState<VisitType[]>(preset?.visitTypes ?? ['general']);
   const [unitId, setUnit] = useState(start.unitId), [locationId, setLocation] = useState(start.locationId);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   // Configuration is saved on the server in the person's name; the wizard sits outside Settings, so confirm here.
@@ -35,7 +49,7 @@ const AddCareServiceSheet = ({ preset, data, onClose, onSaved }: { preset?: Care
     if (busy) return;
     setBusy(true); setError('');
     try {
-      await addCareService({ key: preset?.key, name, category, intakePolicy, unitId, locationId }, data, context);
+      await addCareService({ key: preset?.key, name, category, intakePolicy, visitTypes, unitId, locationId }, data, context);
       toast(`${name.trim()} added`);
       onSaved(); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The care service could not be added'); } finally { setBusy(false); }
@@ -46,6 +60,7 @@ const AddCareServiceSheet = ({ preset, data, onClose, onSaved }: { preset?: Care
         <TextField label="Name" name="care_service_name" value={name} onChange={(e) => setName(e.target.value)} placeholder="For example, Eye clinic" />
         <SelectField label="Kind of care" name="care_service_category" value={category} onChange={(e) => setCategory(e.target.value as CareCategory)} options={CUSTOM_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))} />
         <SelectField label="Patients accepted" name="care_service_intake" value={intakePolicy} onChange={(e) => setIntake(e.target.value as ServiceOffering['intakePolicy'])} options={INTAKE} />
+        <VisitKindsField value={visitTypes} onChange={setVisitTypes} />
       </>}
       {teams.length ? <SelectField label="Responsible team" name="care_service_team" value={unitId} onChange={(e) => setUnit(e.target.value)} options={teams.map((t) => ({ value: t.id, label: t.name }))} />
         : <p className="rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">Add a team first. <Link className="font-bold underline" to="/setup?step=teams">Go to Teams & units</Link></p>}
@@ -69,7 +84,8 @@ export const CareServicesStep = () => {
   const query = useWorkforce();
   const [adding, setAdding] = useState<{ preset?: CarePreset }>();
   const [editing, setEditing] = useState<AnyDocument>();
-  if (query.loading || query.error || !query.data) return <WorkspaceLoading error={query.error} reload={query.reload} />;
+  // Keep the list on screen while it refreshes after a save; the placeholder is only for the first load.
+  if (!query.data) return <WorkspaceLoading error={query.error} reload={query.reload} />;
   const data = query.data;
   const allowed = context.permissions.includes('service:manage');
   const services = careServiceOfferings(data.offerings, data.definitions).sort((a, b) => a.name.localeCompare(b.name));
@@ -87,7 +103,7 @@ export const CareServicesStep = () => {
         <ul className="mt-1 divide-y divide-outline-soft rounded-field border border-outline-soft">{group.items.map((o) => {
           const status = careServiceStatus(o, data);
           return <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
-            <div className="min-w-0"><p className="font-bold">{o.name}</p><p className="text-xs text-ink-muted">{[team(o), place(o), intakeLabel(o.intakePolicy)].filter(Boolean).join(' · ')}</p></div>
+            <div className="min-w-0"><p className="font-bold">{o.name}</p><p className="text-xs text-ink-muted">{[team(o), place(o), intakeLabel(o.intakePolicy), o.visitTypes.length ? o.visitTypes.map((t) => VISIT_TYPE_NAMES[t]).join(', ') : 'Not booked as a visit'].filter(Boolean).join(' · ')}</p></div>
             <div className="flex items-center gap-2"><Tag tone={status.tone}>{status.label}</Tag>
               {allowed ? <Button fullWidth={false} variant="outlined" disabled={data.pending.has(o.id)} onClick={() => setEditing(o)}>Edit</Button> : null}</div>
           </li>;

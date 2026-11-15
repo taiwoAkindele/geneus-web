@@ -34,8 +34,8 @@ export const eventHeads = <T extends {
 export const ownProof = async (context: AuthorizationContext, data: Pick<WorkforceData, 'snapshots'>) => acceptedAuthority(data.snapshots.filter((s) => s.staffId === context.userId && s.facilityId === context.facilityId).sort((a, b) => b.revision - a.revision)[0]);
 /** Care signing does not scan appointment, handoff or audit history. */
 export const loadCareContext = async () => {
-  const [offerings, staff, snapshots, facility] = await Promise.all([allOfType<ServiceOffering>('service_offering'), allOfType<Staff>('staff'), allOfType<AuthoritySnapshot>('authority_snapshot'), getFacility()]);
-  return { offerings, staff, snapshots, facility };
+  const [offerings, definitions, staff, snapshots, facility] = await Promise.all([allOfType<ServiceOffering>('service_offering'), allOfType<ServiceDefinition>('service_definition'), allOfType<Staff>('staff'), allOfType<AuthoritySnapshot>('authority_snapshot'), getFacility()]);
+  return { offerings, definitions, staff, snapshots, facility };
 };
 export const clinicalAssignments = async(staffId:string):Promise<StaffAssignment[]>=>{
   const records=await allWhere<StaffAssignment>('staff_assignment','staffId',staffId),unaccepted=new Set<string>();

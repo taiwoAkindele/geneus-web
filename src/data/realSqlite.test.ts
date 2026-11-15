@@ -664,4 +664,70 @@ describe('the write path against a real SQLite', () => {
       expect(await readDrafts(nurse)).toEqual([]);
     });
   });
+  describe('care services on bookings and visits', () => {
+    const admin = () => contextFor('facility_admin');
+    /** The hospital's own care services, as setup leaves them, and one lab test (an offering too). */
+    const seedServices = async () => {
+      const a = admin(), env = { ...envelope(a), schemaVersion: 4 };
+      await insertRecord(a, 'unit:manage', 'unit', { ...env, id: 'unit:opd', unitId: 'unit:opd', type: 'unit', name: 'Outpatients', active: true, kind: 'unit', revision: 1 } as never);
+      await insertRecord(a, 'location:manage', 'location', { ...env, id: 'location:c1', type: 'location', name: 'Consulting room 1', kind: 'room', active: true, revision: 1 } as never);
+      const service = async (key: string, name: string, visitTypes: string[], investigation = false, configuration = 'active') => {
+        await insertRecord(a, 'service:manage', 'service_definition', { ...env, id: `def:${key}`, type: 'service_definition', name, category: investigation ? 'laboratory' : 'consultation', concept: { system: 'local', code: key, label: name }, orderable: investigation, active: true, revision: 1, ...(investigation ? { investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] } } : {}) } as never);
+        await insertRecord(a, 'service:manage', 'service_offering', { ...env, id: `offering:${key}`, type: 'service_offering', serviceDefinitionId: `def:${key}`, unitId: 'unit:opd', name, locationIds: ['location:c1'], delivery: 'physical', requiredActions: [], intakePolicy: 'both', timeZone: 'Africa/Lagos', configuration, resourceReadiness: 'unassessed', revision: 1, visitTypes } as never);
+      };
+      await service('opd', 'General outpatient consultation', ['general', 'follow_up']);
+      await service('anc', 'Antenatal care', ['antenatal']);
+      await service('ward', 'Inpatient care', []);
+      await service('hb', 'Haemoglobin', ['general'], true);
+      await service('old', 'Old clinic', ['general'], false, 'retired');
+    };
+    const visits = () => db.getAll<{ id: string; offeringId: string | null; visitType: string }>(`SELECT id, "offeringId", "visitType" FROM ${TABLE_FOR.encounter}`);
+
+    it('books the chosen care service with its visit kind, and refuses a lab test, non-visit care or a retired service', async () => {
+      await seedServices();
+      const context = contextFor('records_officer');
+      const patient = await registerPatient({ fullName: 'Ada Care', address: 'Ring Road', sex: 'female', ageYears: 30 }, context);
+      const booked = await book({ patientId: patient.patientId, reason: 'Review', visitType: 'follow_up', offeringId: 'offering:opd' }, context);
+      expect(booked).toMatchObject({ offeringId: 'offering:opd', visitType: 'follow_up' });
+      await expect(book({ patientId: patient.patientId, reason: 'x', visitType: 'general', offeringId: 'offering:hb' }, context)).rejects.toThrow(/care service of this hospital/);
+      await expect(book({ patientId: patient.patientId, reason: 'x', visitType: 'general', offeringId: 'offering:ward' }, context)).rejects.toThrow(/does not take booked/);
+      await expect(book({ patientId: patient.patientId, reason: 'x', visitType: 'antenatal', offeringId: 'offering:opd' }, context)).rejects.toThrow(/does not record this kind/);
+      await expect(book({ patientId: patient.patientId, reason: 'x', visitType: 'general', offeringId: 'offering:old' }, context)).rejects.toThrow(/not an active/);
+      expect((await book({ patientId: patient.patientId, reason: 'Legacy', visitType: 'general' }, context)).offeringId).toBeUndefined();
+    });
+
+    it('registers a walk-in for a care service, and fee exemptions still follow the visit type', async () => {
+      await seedServices();
+      const context = contextFor('records_officer');
+      const consultation = await createFeeItem({ name: 'Consultation', category: 'consultation', amountMinor: 200000, currency: 'NGN', chargeWhen: 'every_visit', exemptions: [{ reason: 'Antenatal policy', visitTypes: ['antenatal'] }] }, admin());
+      const patient = await registerPatient({ fullName: 'Kemi Care', address: 'Ring Road', sex: 'female', ageYears: 29 }, context,
+        (patientId, created) => newPatientBookingRecords({ patientId, reason: 'Antenatal', visitType: 'antenatal', offeringId: 'offering:anc' }, context, created));
+      const [appointment] = await listAppointments();
+      expect(appointment).toMatchObject({ offeringId: 'offering:anc', visitType: 'antenatal' });
+      expect((await chargesForPatient(patient.id)).find((c) => c.feeItemId === consultation.id)).toMatchObject({ amountMinor: 0, exemptionReason: 'Antenatal policy' });
+    });
+
+    it('carries the booked care service onto the visit at check-in, without raising anything new', async () => {
+      await seedServices();
+      const records = contextFor('records_officer'), doctor = contextFor('doctor');
+      const patient = await registerPatient({ fullName: 'Bola Care', address: 'Ring Road', sex: 'male', ageYears: 40 }, records);
+      const booking = await book({ patientId: patient.patientId, reason: 'Consultation', visitType: 'general', offeringId: 'offering:opd' }, records);
+      await changeAppointment(booking.id, { action: 'arrived' }, records);
+      const chargesBefore = (await chargesForPatient(patient.id)).length;
+      const entry = await saveStep({ patientId: patient.patientId, appointmentId: booking.id, step: 'vitals', values: { pulseBpm: 80 }, collectLaterReason: 'Synthetic: fees later' }, doctor);
+      expect((await visits()).find((v) => v.id === entry.encounterId)).toMatchObject({ offeringId: 'offering:opd', visitType: 'general' });
+      expect((await chargesForPatient(patient.id)).length).toBe(chargesBefore);
+    });
+
+    it('records a care service chosen at the visit itself, and emergency care without one', async () => {
+      await seedServices();
+      const doctor = contextFor('doctor');
+      const patient = await registerPatient({ fullName: 'Chidi Care', address: 'Ring Road', sex: 'male', ageYears: 50 }, contextFor('records_officer'));
+      const chosen = await saveStep({ patientId: patient.patientId, visitType: 'follow_up', offeringId: 'offering:opd', step: 'vitals', values: { pulseBpm: 70 } }, doctor);
+      const emergency = await saveStep({ patientId: patient.patientId, visitType: 'emergency', step: 'vitals', values: { pulseBpm: 120 } }, doctor);
+      const all = await visits();
+      expect(all.find((v) => v.id === chosen.encounterId)).toMatchObject({ offeringId: 'offering:opd', visitType: 'follow_up' });
+      expect(all.find((v) => v.id === emergency.encounterId)).toMatchObject({ offeringId: null, visitType: 'emergency' });
+    });
+  });
 });

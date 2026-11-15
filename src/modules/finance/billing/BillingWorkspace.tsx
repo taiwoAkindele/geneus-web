@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FeeCategory, type FeeItem, type IncomingTransfer, type Payment } from '@shared';
 import { Button, SectionTabs, SelectField, Sheet, TextField, useToast } from '@/ui';
 import { useAuthorizationContext, useSession } from '@/session';
+import { useLiveQuery } from '@/data';
+import { getFacility } from '@/data/repos/facility';
 import { formatMoney } from '@/lib/money';
 import { calendarDate } from '@/lib/calendarDate';
 import { billingRequest } from '@/lib/api/billing';
@@ -19,6 +21,8 @@ import { createFeeItem, updateFeeItem, type FeeDraft } from '@/data/repos/billin
 
 export const BillingWorkspace = () => {
   const navigate = useNavigate(); const context = useAuthorizationContext(); const { user } = useSession();
+  // New prices start in the facility's currency; each fee keeps its own.
+  const facilityCurrency = useLiveQuery(getFacility, ['facility']).data?.currency;
   const toast = useToast();
   const [feeEditing, setFeeEditing] = useState<FeeItem | 'new'>();
   const query = useBilling(); const [params, setParams] = useSearchParams();
@@ -91,7 +95,7 @@ export const BillingWorkspace = () => {
         </> : <BillingReports data={data} currency={currency} from={from} to={to} departmentId={departmentId} search={search} />}</>}
       </>}
     </main>
-    {feeEditing && context.permissions.includes('fee_item:manage') ? <FeeEditorSheet key={feeEditing === 'new' ? 'new' : feeEditing.id} fee={feeEditing === 'new' ? undefined : feeEditing} defaultCurrency={data?.fees[0]?.currency ?? currency} onSave={saveFee} onClose={() => setFeeEditing(undefined)} /> : null}
+    {feeEditing && context.permissions.includes('fee_item:manage') ? <FeeEditorSheet key={feeEditing === 'new' ? 'new' : feeEditing.id} fee={feeEditing === 'new' ? undefined : feeEditing} defaultCurrency={facilityCurrency ?? data?.fees[0]?.currency ?? currency} onSave={saveFee} onClose={() => setFeeEditing(undefined)} /> : null}
     {choosePatient && data ? <Sheet title="Choose patient" eyebrow={transfer ? `Match ${formatMoney(transfer.amountMinor, transfer.currency)} · ${department(transfer.departmentId)}` : 'Patient billing account'} onClose={() => { setChoosePatient(false); setTransfer(undefined); }}><TextField label="Patient name or ID" value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} /><div className="mt-3 max-h-80 overflow-auto">{data.patients.filter((p) => `${p.fullName} ${p.patientId}`.toLowerCase().includes(patientSearch.toLowerCase())).slice(0, 30).map((p) => <button key={p.patientId} type="button" className="block min-h-[48px] w-full border-b border-outline-soft py-2 text-left" onClick={() => openPatient(p.patientId)}><strong>{p.fullName}</strong><span className="ml-2 font-mono text-xs">{p.patientId}</span></button>)}</div></Sheet> : null}
     {patientId && data && !receipt && !choosePatient ? <PatientAccount key={`${patientId}|${transfer?.id ?? 'cash'}`} patientId={patientId} transfer={transfer} data={data} onSelectAccount={setPatientId} onClose={() => { setPatientId(''); setTransfer(undefined); }} onSaved={query.reload} onReceipt={(p) => { setReceipt(p); setPatientId(''); setTransfer(undefined); query.reload(); }} /> : null}
     {receipt && data ? <Receipt payment={receipt} data={data} onClose={() => setReceipt(undefined)} /> : null}
