@@ -149,6 +149,7 @@ const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCo
 const SettingsLayout = lazy(() => import('@/app/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const ModuleSettingsLayout = lazy(() => import('@/app/ModuleSettingsMenu').then((m) => ({ default: m.ModuleSettingsLayout })));
 const AccountSecurity = lazy(() => import('@/app/settings/AccountSecurity').then((m) => ({ default: m.AccountSecurity })));
+const StaffScheduling = lazy(() => import('@/app/settings/StaffScheduling').then((m) => ({ default: m.StaffScheduling })));
 const FacilityWorkspace = lazy(() => import('@/modules/operations/workforce/Workspaces').then((m) => ({ default: m.FacilityWorkspace })));
 const SetupWizardScreen = lazy(() => import('@/modules/administration/setup/SetupWizardScreen').then((m) => ({ default: m.SetupWizardScreen })));
 const MyProfileScreen = lazy(() => import('@/modules/administration/screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })));
@@ -238,6 +239,7 @@ const App = () => {
             {/* Settings: facility-wide settings, one tab per area (src/app/settings). */}
             <Route path="/settings" element={<SettingsLayout />}>
               <Route path="facility" element={<FacilityWorkspace />} />
+              <Route path="scheduling" element={<StaffScheduling />} />
               <Route path="devices" element={<DevicesScreen />} />
               <Route path="organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
               <Route path="account" element={<AccountSecurity />} />

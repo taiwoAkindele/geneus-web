@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useAuthorizationContext } from '@/session';
 import { currentOrganization, organizationRequest } from '@/lib/api/organizations';
 import { Button, TextField } from '@/ui';
+import { IncomingStaffRequests } from './StaffFacilityAssignments';
 
-/** Linked facilities. Giving staff access at another facility lives in Staff → Facility assignments. */
+/** Linked facilities, and staff access requests from them. Requests to other facilities start from a staff profile. */
 export const OrganizationScreen = () => {
   const context = useAuthorizationContext();
   const [data, setData] = useState<Awaited<ReturnType<typeof currentOrganization>>>();
@@ -17,6 +18,7 @@ export const OrganizationScreen = () => {
     {error ? <div role="alert" className="text-danger-strong">{error}<Button variant="outlined" onClick={() => void load()}>Retry</Button></div> : null}{message ? <p role="status" className="text-brand">{message}</p> : null}
     {!data && !error ? <p role="status">Loading organization…</p> : null}
     {data?.organization ? <><section className="space-y-3"><h2 className="text-lg font-bold">{data.organization.name}</h2><ul>{data.organization.facilities.map((f) => <li key={f.id}>{f.name} · {f.id}</li>)}</ul><Button disabled={busy} onClick={() => void run(async () => { const issued = await organizationRequest<{ code: string; expiresOn: string }>('/organization/invitations', context.userId); setInvitation(`${issued.code} · expires ${new Date(issued.expiresOn).toLocaleString()}`); }, 'Invitation issued')}>Invite another facility</Button>{invitation ? <p className="break-all rounded-field bg-surface-muted p-3">{invitation}</p> : null}</section>
-      <p className="border-t border-outline-soft pt-4 text-sm">To give a staff member access at another facility, or accept staff sent here, use <Link className="font-semibold text-brand underline" to="/admin/staff?view=facilities">Staff → Facility assignments</Link>.</p></> : data ? <div className="space-y-6"><section className="space-y-3"><TextField label="New organization name" value={name} onChange={(e) => setName(e.target.value)} /><Button disabled={busy || !name.trim()} onClick={() => void run(() => organizationRequest('/organizations', context.userId, { name }), 'Organization created')}>Create organization</Button></section><section className="space-y-3"><TextField label="Organization invitation code" value={code} onChange={(e) => setCode(e.target.value)} /><Button disabled={busy || !code.trim()} onClick={() => void run(() => organizationRequest('/organization/join', context.userId, { code }), 'Facility linked without sharing operational records')}>Join organization</Button></section></div> : null}
+      <IncomingStaffRequests />
+      <p className="text-sm text-ink-muted">To ask another facility to give one of your staff access, open that person in <Link className="font-semibold text-brand underline" to="/admin/staff">Staff</Link>.</p></> : data ? <div className="space-y-6"><section className="space-y-3"><TextField label="New organization name" value={name} onChange={(e) => setName(e.target.value)} /><Button disabled={busy || !name.trim()} onClick={() => void run(() => organizationRequest('/organizations', context.userId, { name }), 'Organization created')}>Create organization</Button></section><section className="space-y-3"><TextField label="Organization invitation code" value={code} onChange={(e) => setCode(e.target.value)} /><Button disabled={busy || !code.trim()} onClick={() => void run(() => organizationRequest('/organization/join', context.userId, { code }), 'Facility linked without sharing operational records')}>Join organization</Button></section></div> : null}
   </main>;
 };

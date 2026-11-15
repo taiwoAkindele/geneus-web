@@ -68,7 +68,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
     // People, their facility access, roster and coverage: one page with its own sections.
     { id: 'staff', label: 'Staff', description: 'People, access, roster and coverage', icon: 'patients', links: keys.has('staff') ? [link('staff', 'Staff', 'People, facility access, roster and coverage.', '/admin/staff', 'patients')] : [] },
     // Facility-wide settings, one page per area: the same tabs as the Settings page.
-    { id: 'settings', label: 'Settings', description: 'Facility, devices, organization and account', icon: 'settings', links: settingsTabsFor(context).map((tab) => ({
+    { id: 'settings', label: 'Settings', description: 'Facility, scheduling, devices, organization and account', icon: 'settings', links: settingsTabsFor(context).filter((tab) => tab.navigation !== false).map((tab) => ({
       ...link(tab.key === 'devices' ? 'devices' : `settings-${tab.key}`, tab.label, tab.description, tab.to, tab.icon),
       ...(tab.key === 'facility' ? { also: ['/facility'] } : {}),
     })) },

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { staffPermissions, type Role } from '@shared';
 import { activeWorkspaceLink, moduleStart, readLastWorkspace, rememberWorkspace, workspaceForLocation, workspacePath, workspacesFor } from './workspaces';
 import { activeSettingsPage, moduleSettingsFor } from './moduleSettings';
+import { schedulingPlanner, settingsTabsFor } from './settings/settingsTabs';
 
 const context = (role: Role, additionalRoles: Role[] = []) => ({ role, roles: [role, ...additionalRoles], permissions: staffPermissions({ role, additionalRoles, permission: 'read_write' }) });
 
@@ -12,7 +13,20 @@ describe('module workspaces', () => {
     expect(workspacesFor(context('facility_admin')).map((workspace) => workspace.id)).toEqual(['front-desk', 'clinical', 'finance', 'inventory', 'reports', 'staff', 'settings']);
     expect(workspacesFor(context('facility_admin')).find((w) => w.id === 'staff')?.links.map((l) => l.to)).toEqual(['/admin/staff']);
     expect(workspacesFor(context('facility_admin')).find((w) => w.id === 'settings')?.links.map((l) => l.label))
-      .toEqual(['Facility', 'Devices', 'Organization', 'Account & security']);
+      .toEqual(['Facility', 'Staff scheduling & coverage', 'Devices', 'Organization', 'Account & security']);
+  });
+
+  it('keeps facility-wide workforce planning in Settings, reachable by clinicians running intake without a Settings menu', () => {
+    // Clinicians open walk-in intake from Coverage: the page is theirs to reach, but no Settings entry appears in their sidebar.
+    const nurse = context('nurse');
+    expect(settingsTabsFor(nurse).find((tab) => tab.key === 'scheduling')).toMatchObject({ to: '/settings/scheduling', navigation: false });
+    expect(workspacesFor(nurse).map((workspace) => workspace.id)).not.toContain('settings');
+    expect(schedulingPlanner(nurse)).toBe(false);
+    expect(schedulingPlanner(context('facility_admin'))).toBe(true);
+    // A cashier neither plans nor runs sessions.
+    expect(settingsTabsFor(context('cashier')).map((tab) => tab.key)).not.toContain('scheduling');
+    // The Staff module is the directory only; old Staff tab addresses belong to Staff and redirect from there.
+    expect(workspaceForLocation('/settings/scheduling', '?view=coverage', workspacesFor(context('facility_admin')))?.id).toBe('settings');
   });
 
   it('keeps module setup in each module’s Settings menu, not in global Settings or the module pages', () => {
