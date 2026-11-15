@@ -7,8 +7,8 @@ import { VerificationRequired } from '@/lib/api/insurance';
 import { useAuthorizationContext } from '@/session';
 import { Button, SelectField, TextAreaField, useToast } from '@/ui';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
+import { timeZoneOptions } from '@/lib/timeZoneOptions';
 
-const ZONES: string[] = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? ['Africa/Lagos', 'Africa/Accra', 'Africa/Nairobi', 'Africa/Johannesburg', 'Europe/London', 'UTC'];
 const describeError = (cause: unknown) => cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'The request failed';
 
 /**
@@ -40,7 +40,7 @@ const TimeZoneForm = ({ current }: { current?: string }) => {
   const load = useCallback(() => timeZoneHistory(context).then((r) => setChanges(r.changes), () => undefined), [context]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (current) setZone(current); }, [current]);
-  const options = useMemo(() => [...new Set(['Africa/Lagos', ...ZONES])].map((z) => ({ value: z, label: z })), []);
+  const options = useMemo(() => timeZoneOptions(current), [current]);
   const correcting = Boolean(current) && zone !== current;
   const save = async () => {
     setBusy(true); setError('');

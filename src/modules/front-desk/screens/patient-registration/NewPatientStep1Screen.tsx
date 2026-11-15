@@ -155,23 +155,20 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)]">
-              <div>
-                <div className="mb-1.5 flex min-h-5 items-center text-[13px] font-semibold text-ink-soft">Sex</div>
-                <Controller
-                  control={control}
-                  name="sex"
-                  rules={{ validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex' }}
-                  render={({ field }) => (
-                    <SegmentedControl
-                      ariaLabel="Sex"
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={[...(provisional ? [{ value: '' as const, label: 'Unknown' }] : []), { value: 'F', label: 'F' }, { value: 'M', label: 'M' }]}
-                    />
-                  )}
-                />
-                {errors.sex ? <p role="alert" className="mt-1.5 text-[13px] text-danger">{errors.sex.message}</p> : null}
-              </div>
+              <Controller
+                control={control}
+                name="sex"
+                rules={{ validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex' }}
+                render={({ field }) => (
+                  <SelectField
+                    {...field}
+                    label="Sex"
+                    required={!provisional}
+                    error={errors.sex?.message}
+                    options={[{ value: '', label: provisional ? 'Unknown' : 'Choose sex' }, { value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }]}
+                  />
+                )}
+              />
               <TextField
                 label="Age"
                 type="number"

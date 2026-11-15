@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 import { Button } from './Button';
 
@@ -64,7 +65,8 @@ export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false
     };
   }, []);
 
-  return (
+  // Keep page spacing and transformed containers from moving the viewport overlay.
+  return createPortal(
     <dialog ref={dialog} tabIndex={-1} aria-labelledby={title ? titleId : undefined}
       aria-label={title ? undefined : eyebrow ?? 'Details'} aria-modal="true"
       onCancel={(event) => { event.preventDefault(); event.stopPropagation(); close(); }}
@@ -105,6 +107,6 @@ export const Sheet = ({ onClose, title, eyebrow, children, closeDisabled = false
         </div> : null}
         <CloseContext.Provider value={close}>{children}</CloseContext.Provider>
       </div>
-    </dialog>
+    </dialog>, document.body,
   );
 };

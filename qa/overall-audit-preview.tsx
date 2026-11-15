@@ -400,6 +400,21 @@ Object.assign(window, { seedSetupScenario: async () => {
     if (url.endsWith('/staff/session')) return JSON.parse(String(init?.body)).pin === '123456'
       ? reply(200, { token: 'qa-session', staffId: actorId, expiresOn: new Date(Date.now() + 3600_000).toISOString(), idleMinutes: 30 })
       : reply(401, { error: 'wrong_pin', message: 'That PIN is not right' });
+    if (url.endsWith('/facility/details')) {
+      const details = JSON.parse(String(init?.body));
+      Object.assign(db.rows.facilities[0], details, { updatedOn: new Date().toISOString() });
+      listeners.forEach((listener) => listener());
+      return reply(200, { changed: Object.keys(details) });
+    }
+    if (url.endsWith('/facility/time-zone/history')) return reply(200, { changes: [] });
+    if (url.endsWith('/facility/time-zone')) {
+      const body = JSON.parse(String(init?.body));
+      const before = db.rows.facilities[0].timeZone;
+      if (body.confirm !== true || (before && before !== body.timeZone && (body.reason?.trim().length ?? 0) < 5)) return reply(400, { error: 'invalid_request', message: 'Confirm the correction and give a reason' });
+      db.rows.facilities[0].timeZone = body.timeZone;
+      listeners.forEach((listener) => listener());
+      return reply(200, { timeZone: body.timeZone, changed: before !== body.timeZone });
+    }
     // The app names the person signed in; the synthetic server refuses a save without one, as the real one does.
     if (url.endsWith('/config/save') && !new Headers(init?.headers).get('x-actor-staff-id')) return reply(403, { error: 'staff_required', message: 'Sign in to save settings' });
     if (url.endsWith('/config/save')) {
