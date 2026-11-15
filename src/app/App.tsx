@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { MovedTo } from '@/app/settings/AccountSecurity';
+import { MovedFromOldSettings, MovedTemplate, MovedTo } from '@/app/settings/AccountSecurity';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider, useAuthorizationContext } from '@/session';
@@ -144,10 +144,14 @@ const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/Billi
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
 const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
+const PayerPaymentsScreen = lazy(() => import('@/modules/insurance/PayerPaymentsScreen').then((m) => ({ default: m.PayerPaymentsScreen })));
 const ServiceCompletionScreen = lazy(() => import('@/modules/insurance/ServiceCompletionScreen').then((m) => ({ default: m.ServiceCompletionScreen })));
 const SettingsLayout = lazy(() => import('@/app/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
+const ModuleSettingsLayout = lazy(() => import('@/app/ModuleSettingsMenu').then((m) => ({ default: m.ModuleSettingsLayout })));
 const AccountSecurity = lazy(() => import('@/app/settings/AccountSecurity').then((m) => ({ default: m.AccountSecurity })));
+const StaffScheduling = lazy(() => import('@/app/settings/StaffScheduling').then((m) => ({ default: m.StaffScheduling })));
 const FacilityWorkspace = lazy(() => import('@/modules/operations/workforce/Workspaces').then((m) => ({ default: m.FacilityWorkspace })));
+const SetupWizardScreen = lazy(() => import('@/modules/administration/setup/SetupWizardScreen').then((m) => ({ default: m.SetupWizardScreen })));
 const MyProfileScreen = lazy(() => import('@/modules/administration/screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })));
 const OperatorConsole = lazy(() => import('@/modules/operator/OperatorConsole').then((m) => ({ default: m.OperatorConsole })));
 const InsuranceSettings = lazy(() => import('@/modules/insurance/InsuranceSettings').then((m) => ({ default: m.InsuranceSettings })));
@@ -232,46 +236,63 @@ const App = () => {
 
             {/* Facility admin — the same shell as daily use, reached from the
                 Admin nav entry; each screen deep-links to the next. */}
-            {/* Settings: every facility setting, one tab per area (src/app/settings). */}
+            {/* Settings: facility-wide settings, one tab per area (src/app/settings). */}
             <Route path="/settings" element={<SettingsLayout />}>
               <Route path="facility" element={<FacilityWorkspace />} />
-              <Route path="staff" element={<ManageStaffScreen />} />
+              <Route path="scheduling" element={<StaffScheduling />} />
               <Route path="devices" element={<DevicesScreen />} />
-              <Route path="billing/fees" element={<FeeScheduleScreen />} />
-              <Route path="billing/payments" element={<BillingSettingsScreen />} />
-              <Route path="insurance/setup" element={<RequireCapability permissions={['insurance_contract:activate', 'insurance_contract:manage']}><InsuranceSettings /></RequireCapability>} />
-              <Route path="insurance/payers" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
-              <Route path="catalogue" element={<InvestigationCatalogueScreen />} />
               <Route path="organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
               <Route path="account" element={<AccountSecurity />} />
               <Route path="*" element={null} />
             </Route>
-            {/* Earlier addresses of settings pages move there, keeping any query. */}
-            <Route path="/admin" element={<MovedTo to="/settings" />} />
-            <Route path="/profile" element={<MyProfileScreen />} />
-            <Route path="/admin/staff" element={<MovedTo to="/settings/staff" />} />
+            {/* Module settings: each module's own configuration, opened from its header Settings menu (src/app/moduleSettings.ts). */}
+            <Route path="/laboratory/settings" element={<ModuleSettingsLayout module="laboratory" />}>
+              <Route path="tests" element={<InvestigationCatalogueScreen />} />
+              <Route path="templates" element={<RequireCapability permissions={['result_template:manage']}><CatalogueSettingsScreen /></RequireCapability>} />
+              <Route path="templates/new" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
+              <Route path="templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
+              <Route path="*" element={null} />
+            </Route>
+            <Route path="/billing/settings" element={<ModuleSettingsLayout module="billing" />}>
+              <Route path="fees" element={<FeeScheduleScreen />} />
+              <Route path="payments" element={<BillingSettingsScreen />} />
+              <Route path="*" element={null} />
+            </Route>
+            <Route path="/insurance/settings" element={<ModuleSettingsLayout module="insurance" />}>
+              <Route path="setup" element={<RequireCapability permissions={['insurance_contract:activate', 'insurance_contract:manage']}><InsuranceSettings /></RequireCapability>} />
+              <Route path="payers" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
+              <Route path="*" element={null} />
+            </Route>
+            {/* Staff: its own module (people, facility access, roster, coverage). */}
+            <Route path="/admin/staff" element={<ManageStaffScreen />} />
             <Route path="/admin/staff/:staffId" element={<StaffScreen />} />
-            <Route path="/facility" element={<MovedTo to="/settings/facility" />} />
-            <Route path="/organization" element={<MovedTo to="/settings/organization" />} />
-            <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
-            <Route path="/investigations/catalogue" element={<MovedTo to="/settings/catalogue" />} />
-            <Route path="/investigations/settings" element={<RequireCapability permissions={['result_template:manage']}><CatalogueSettingsScreen /></RequireCapability>} />
-            <Route path="/investigations/settings/templates/new" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
-            <Route path="/investigations/settings/templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
-            <Route path="/clinical-reviews" element={<ClinicalReviewsScreen />} />
-            <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/staff/invite" element={<InviteStaffScreen />} />
             <Route path="/admin/staff/access" element={<RolesPermissionsScreen />} />
+            {/* Earlier addresses of settings pages move to their current place, keeping any query. */}
+            <Route path="/admin" element={<MovedTo to="/settings" />} />
+            <Route path="/settings/staff" element={<MovedTo to="/admin/staff" />} />
+            <Route path="/settings/billing/*" element={<MovedFromOldSettings />} />
+            <Route path="/settings/insurance/*" element={<MovedFromOldSettings />} />
+            <Route path="/settings/catalogue" element={<MovedTo to="/laboratory/settings/tests" />} />
+            <Route path="/profile" element={<MyProfileScreen />} />
+            <Route path="/facility" element={<MovedTo to="/settings/facility" />} />
+            <Route path="/setup" element={<RequireCapability permissions={['unit:manage', 'location:manage', 'service:manage', 'fee_item:manage', 'staff:manage']}><SetupWizardScreen /></RequireCapability>} />
+            <Route path="/organization" element={<MovedTo to="/settings/organization" />} />
+            <Route path="/facilities/new" element={<RequireCapability permissions={['staff:manage']}><AddFacilityScreen /></RequireCapability>} />
+            <Route path="/investigations/catalogue" element={<MovedTo to="/laboratory/settings/tests" />} />
+            <Route path="/investigations/settings" element={<MovedTo to="/laboratory/settings/templates" />} />
+            <Route path="/investigations/settings/templates/:templateId" element={<MovedTemplate />} />
+            <Route path="/clinical-reviews" element={<ClinicalReviewsScreen />} />
+            <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/units" element={<Navigate to="/settings/facility?view=structure" replace />} />
             <Route path="/billing" element={<BillingScreen />} />
-            <Route path="/billing/fees" element={<MovedTo to="/settings/billing/fees" />} />
-            <Route path="/billing/settings" element={<MovedTo to="/settings/billing/payments" />} />
+            <Route path="/billing/fees" element={<MovedTo to="/billing/settings/fees" />} />
             <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
             <Route path="/insurance/claims" element={<RequireCapability permissions={['coverage:confirm']}><ClaimsScreen /></RequireCapability>} />
+            <Route path="/insurance/payments" element={<RequireCapability permissions={['insurance_remittance:record']}><PayerPaymentsScreen /></RequireCapability>} />
             <Route path="/clinical/service-completion" element={<RequireCapability permissions={['encounter:record']}><ServiceCompletionScreen /></RequireCapability>} />
-            <Route path="/insurance/settings" element={<MovedTo to="/settings/insurance/setup" />} />
-            <Route path="/insurance/contracts" element={<MovedTo to="/settings/insurance/payers" />} />
-            <Route path="/admin/fees" element={<Navigate to="/settings/billing/fees" replace />} />
+            <Route path="/insurance/contracts" element={<MovedTo to="/insurance/settings/payers" />} />
+            <Route path="/admin/fees" element={<Navigate to="/billing/settings/fees" replace />} />
             <Route path="/admin/devices" element={<MovedTo to="/settings/devices" />} />
             <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
           </Route>

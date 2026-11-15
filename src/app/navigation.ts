@@ -38,7 +38,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
     { key: 'stock', label: 'Medicine & stock', to: '/stock', match: '/stock', icon: 'stock', group: 'Facility' },
     { key: 'month', label: 'Monthly reports', to: '/reports/month', match: '/reports', icon: 'month', group: 'Facility' },
   );
-  if (roles.includes('facility_admin') || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign', 'credential:read', 'practitioner:manage', 'staff_assignment:manage', 'service_session:manage'].includes(permission))) items.push({ key: 'staff', label: 'Staff & roster', to: '/admin/staff', match: '/admin/staff', icon: 'patients', group: 'Facility' });
+  if (roles.includes('facility_admin') || context.permissions.some((permission) => ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign', 'credential:read', 'practitioner:manage', 'staff_assignment:manage', 'service_session:manage'].includes(permission))) items.push({ key: 'staff', label: 'Staff', to: '/admin/staff', match: '/admin/staff', icon: 'patients', group: 'Facility' });
   if (context.permissions.some((p)=>['unit:manage','location:manage','service:manage','staff_assignment:manage','staff:manage'].includes(p))) items.push({key:'facility',label:'Facility setup',to:'/facility',match:'/facility',icon:'referrals',group:'Facility'});
   if (hasAdminWorkspace(context)) items.push({ key: 'admin', label: 'Settings', to: '/settings', match: '/settings', icon: 'lock', group: 'Facility' });
   return items;

@@ -6,10 +6,12 @@ import {
 import { useLiveQuery } from '@/data';
 import { listPayers } from '@/data/repos/insurance';
 import {
-  CLAIM_ISSUE_LABELS, acknowledgeClaims, createClaimBatch, exportClaims, generateClaims, listAuthorizations, listClaimBatches, listClaimSubmissions, listClaims,
-  listImportTemplates, listInsuranceDocuments, markClaimsReady, reviseClaim, saveAuthorization, saveImportTemplate, setClaimAttachment, submitClaims, VerificationRequired,
+  CLAIM_ISSUE_LABELS, DIAGNOSIS_VERIFICATION_LABELS, SETTLEMENT_LABELS, acknowledgeClaims, createClaimBatch, downloadInsuranceDocument, exportClaims, generateClaims, listAuthorizations, listClaimBatches, listClaimSubmissions, listClaims,
+  listImportTemplates, listInsuranceDocuments, listSubmissionProfiles, markClaimsReady, reviseClaim, saveAuthorization, saveImportTemplate, setClaimAttachment, submitClaims, VerificationRequired,
   type ClaimBatch, type ClaimExport, type ClaimSubmission,
 } from '@/lib/api/insurance';
+import type { StoredSubmissionProfile } from '@shared';
+import { SettlementPanel } from './SettlementPanel';
 import { downloadTable } from '@/lib/tabular/exportTable';
 import { formatMoney } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
@@ -21,12 +23,14 @@ const describeError = (cause: unknown) => cause instanceof VerificationRequired 
 const STATE_LABELS: Record<ClaimState, string> = { draft: 'Draft', ready: 'Ready', exported: 'Exported', submitted: 'Submitted', acknowledged: 'Acknowledged' };
 const FIELD_LABELS: Record<ClaimExportField, string> = {
   claimNumber: 'Claim number', claimRevision: 'Revision', claimStatus: 'Claim status', batchReference: 'Batch', facilityName: 'Hospital', patientName: 'Patient name', hospitalNumber: 'Hospital number',
-  enrolleeNumber: 'Enrollee number', planCode: 'Plan', serviceDate: 'Date of service', admissionDate: 'Admission date', dischargeDate: 'Discharge date', diagnosis: 'Diagnosis', diagnosisCode: 'Diagnosis code',
+  enrolleeNumber: 'Enrollee number', planCode: 'Plan', serviceDate: 'Date of service', admissionDate: 'Admission date', dischargeDate: 'Discharge date', diagnosis: 'Diagnosis', diagnosisCode: 'Diagnosis code', diagnosisCodeStatus: 'Diagnosis code check',
   authorizationCode: 'Authorization code', referralNumber: 'Referral number', payerServiceCode: "Payer's service code", serviceName: 'Service', category: 'Category', quantity: 'Quantity',
   unitPrice: 'Unit price', amountClaimed: 'Amount claimed', patientShare: 'Patient share', listPrice: 'Hospital price', fulfilledOn: 'Date performed',
 };
 const EVIDENCE: Record<string, string> = { administrative: 'Administrative', result: 'Result recorded', dispense: 'Supplied', visit: 'Seen by a clinician', completion: 'Recorded as done', not_done: 'Not done', missing: 'No record it was done' };
 const today = () => new Date().toISOString().slice(0, 10);
+/** Final exports made on this screen, so a submission can name the exact files that were sent. */
+const recentExports: { exportId: string; format: string; claimIds: string[]; at: string }[] = [];
 const escapeHtml = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 /**
@@ -93,13 +97,14 @@ const ClaimsBody = () => {
       {!claims ? <p role="status">Loading…</p> : claims.length === 0 ? <p className="text-sm">No claims yet. Generate them from confirmed insurance splits.</p> :
         <div className="overflow-x-auto"><table className="min-w-full text-left text-sm">
           <thead><tr className="border-b border-outline-soft"><th className="p-2"><input type="checkbox" aria-label="Select all claims" checked={selected.size === claims.length} onChange={(e) => setSelected(new Set(e.target.checked ? claims.map((c) => c.id) : []))} /></th>
-            <th className="p-2">Claim</th><th className="p-2">Patient</th><th className="p-2">Payer</th><th className="p-2">Services</th><th className="p-2">Claimed</th><th className="p-2">State</th><th className="p-2">Checks</th><th /></tr></thead>
+            <th className="p-2">Claim</th><th className="p-2">Patient</th><th className="p-2">Payer</th><th className="p-2">Services</th><th className="p-2">Claimed</th><th className="p-2">State</th><th className="p-2">Checks</th><th className="p-2">Payer response</th><th /></tr></thead>
           <tbody>{claims.map((c) => { const blocking = c.issues.filter((i) => i.blocking).length; return <tr key={c.id} data-claim={c.claimNumber} data-state={c.state} className="border-b border-outline-soft align-top">
             <td className="p-2"><input type="checkbox" aria-label={`Select ${c.claimNumber}`} checked={selected.has(c.id)} onChange={(e) => setSelected((s) => { const n = new Set(s); if (e.target.checked) n.add(c.id); else n.delete(c.id); return n; })} /></td>
             <td className="p-2 font-semibold">{c.claimNumber}{c.revision > 1 ? ` r${c.revision}` : ''}</td><td className="p-2">{c.patientName}<span className="block text-xs text-ink-soft">{c.enrolleeNumber}</span></td>
             <td className="p-2">{payerName(c.payerId)}</td><td className="p-2">{c.serviceFrom}{c.serviceTo !== c.serviceFrom ? ` – ${c.serviceTo}` : ''} · {c.lines.length}</td>
             <td className="p-2">{formatMoney(c.payerShareMinor, c.currency)}</td><td className="p-2">{STATE_LABELS[c.state]}</td>
             <td className={`p-2 ${blocking ? 'text-danger' : 'text-success'}`}>{blocking ? `${blocking} blocking` : 'Pass'}</td>
+            <td className="p-2">{c.settlement ? <>{SETTLEMENT_LABELS[c.settlement.status]}{c.settlement.outstandingMinor && c.settlement.status !== 'not_submitted' ? <span className="block text-xs text-ink-soft">{formatMoney(c.settlement.outstandingMinor, c.currency)} outstanding{c.settlement.overdue ? ' · overdue' : ''}</span> : null}</> : '—'}</td>
             <td className="p-2"><Button variant="ghost" fullWidth={false} onClick={() => setOpen(open === c.id ? '' : c.id)}>{open === c.id ? 'Close' : 'Open'}</Button></td>
           </tr>; })}</tbody></table></div>}
       {claims?.find((c) => c.id === open) ? <ClaimDetail claim={claims.find((c) => c.id === open)!} payerName={payerName} onChanged={load} onError={setError} /> : null}
@@ -125,6 +130,7 @@ const ExportControls = ({ claims, batchId, templates, payerName, onDone, onError
     try {
       const result = await exportClaims(context, { ...(batchId ? { batchId } : { claimIds: claims.map((c) => c.id) }), draft, format, ...(layout ? { templateId: layout } : {}) });
       const name = `${payerName(payerId ?? 'claims').replace(/[^\w-]+/g, '-')}-claims-${today()}${result.draft ? '-DRAFT' : ''}`;
+      if (!result.draft) recentExports.unshift({ exportId: result.exportId, format, claimIds: result.claims.map((c) => c.id), at: new Date().toISOString() });
       if (format === 'pdf') printClaims(printWindow, result, payerName(payerId ?? ''));
       else await downloadTable(`${name}.xlsx`, result.draft ? 'DRAFT claims' : 'Claims', [result.headers, ...result.rows], format);
       toast(result.draft ? 'Draft exported: marked on every row, no claim changed.' : `${result.claims.length} claim${result.claims.length === 1 ? '' : 's'} exported. Record the submission when you send them.`);
@@ -157,6 +163,35 @@ const printClaims = (target: Window | null, result: ClaimExport, payer: string) 
   target.document.close();
 };
 
+/**
+ * A claim's supporting-document package: each attached document (each
+ * download audited by the server) and a manifest naming the claim, revision
+ * and every file, so the package can be uploaded, emailed or printed whole.
+ */
+const downloadPackage = async (context: ReturnType<typeof useAuthorizationContext>, claim: ClaimView, documents: InsuranceDocument[]) => {
+  const attached = documents.filter((d) => claim.attachments.some((a) => a.documentId === d.id));
+  for (const d of attached) await downloadInsuranceDocument(context, d);
+  await downloadTable(`${claim.claimNumber}-r${claim.revision}-documents.csv`, 'Documents', [
+    ['Claim', 'Revision', 'Patient', 'Enrollee number', 'Document', 'Type', 'File', 'SHA-256'],
+    ...attached.map((d) => [claim.claimNumber, claim.revision, claim.patientName, claim.enrolleeNumber, d.title, d.documentType.replace(/_/g, ' '), d.fileName, d.sha256]),
+  ], 'csv');
+};
+
+/** A cover sheet for claims delivered by hand: what is in the envelope, and a line for the receiving officer's signature. */
+const printCoverSheet = (claims: ClaimView[], payer: string, recipient?: string) => {
+  const target = window.open('', '_blank');
+  if (!target) throw new Error('Allow pop-ups for Geneus to print');
+  const total = new Map<string, number>(); for (const c of claims) total.set(c.currency, (total.get(c.currency) ?? 0) + c.payerShareMinor);
+  target.document.open();
+  target.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Claims delivery</title><style>body{font:13px system-ui,sans-serif;margin:32px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #999;padding:4px 6px;text-align:left} .sign{margin-top:48px;display:flex;gap:48px} .sign div{flex:1;border-top:1px solid #000;padding-top:4px} @media print{button{display:none}}</style></head><body>
+    <h1>Claims delivery — ${escapeHtml(payer)}</h1>${recipient ? `<p>To: ${escapeHtml(recipient)}</p>` : ''}<p>Delivered on: ____________________</p>
+    <table><thead><tr><th>Claim</th><th>Revision</th><th>Patient</th><th>Enrollee</th><th>Services</th><th>Amount claimed</th></tr></thead><tbody>${claims.map((c) => `<tr><td>${escapeHtml(c.claimNumber)}</td><td>${c.revision}</td><td>${escapeHtml(c.patientName)}</td><td>${escapeHtml(c.enrolleeNumber)}</td><td>${escapeHtml(c.serviceFrom)}${c.serviceTo !== c.serviceFrom ? ` – ${escapeHtml(c.serviceTo)}` : ''}</td><td>${escapeHtml(formatMoney(c.payerShareMinor, c.currency))}</td></tr>`).join('')}</tbody></table>
+    <p>Total: ${[...total].map(([cur, n]) => escapeHtml(formatMoney(n, cur))).join(' + ')}</p>
+    <div class="sign"><div>Delivered by (name, signature)</div><div>Received by (name, signature, stamp)</div></div>
+    <p><button onclick="window.print()">Print</button></p></body></html>`);
+  target.document.close();
+};
+
 const ClaimDetail = ({ claim, payerName, onChanged, onError }: { claim: ClaimView; payerName: (id: string) => string; onChanged: () => void; onError: (m: string) => void }) => {
   const context = useAuthorizationContext();
   const toast = useToast();
@@ -182,7 +217,9 @@ const ClaimDetail = ({ claim, payerName, onChanged, onError }: { claim: ClaimVie
         <td className="p-2">{l.serviceDate}</td><td className="p-2">{l.units}</td><td className="p-2">{formatMoney(l.payerShareMinor, claim.currency)}</td>
         <td className={`p-2 ${l.fulfillment.kind === 'missing' || l.fulfillment.kind === 'not_done' ? 'text-danger' : ''}`}>{EVIDENCE[l.fulfillment.kind]}{'on' in l.fulfillment ? <span className="block text-xs text-ink-soft">{new Date(l.fulfillment.on).toLocaleString('en-GB')}</span> : null}</td>
         <td className="p-2">{l.authorization?.reference ?? '—'}</td><td className="p-2 text-xs">{l.contractVersionId.split(':').pop()}</td></tr>)}</tbody></table></div>
-    <p className="text-sm"><strong>Diagnosis:</strong> {claim.diagnoses.length ? claim.diagnoses.map((d) => `${d.label}${d.code ? ` (${d.codingSystem ?? ''} ${d.code})` : ''}`).join('; ') : 'none recorded by a clinician'}</p>
+    <p className="text-sm"><strong>Diagnosis:</strong> {claim.diagnoses.length ? claim.diagnoses.map((d) => `${d.label}${d.code ? ` (${d.codingSystem ?? ''} ${d.code}: ${DIAGNOSIS_VERIFICATION_LABELS[d.verification] ?? d.verification})` : ''}`).join('; ') : 'none recorded by a clinician'}</p>
+    {claim.episode.kind === 'admission' ? <p className="text-sm"><strong>Admitted:</strong> {claim.admittedOn ?? 'no ward arrival recorded'} · <strong>Discharged:</strong> {claim.dischargedOn ?? 'not yet'}</p> : null}
+    <p className="text-xs text-ink-soft">Passing these checks means the claim meets the rules recorded for this payer. It does not guarantee the payer will accept it.</p>
     <div className="grid gap-4 lg:grid-cols-2">
       <section aria-label="Authorizations" className="space-y-2">
         <div className="flex items-center justify-between"><h3 className="font-bold">Authorizations and referrals</h3><Button variant="ghost" fullWidth={false} onClick={() => setAddingAuth(!addingAuth)}>{addingAuth ? 'Cancel' : 'Record'}</Button></div>
@@ -195,8 +232,10 @@ const ClaimDetail = ({ claim, payerName, onChanged, onError }: { claim: ClaimVie
           const on = claim.attachments.some((a) => a.documentId === d.id);
           return <label key={d.id} className="flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" checked={on} disabled={claim.state !== 'draft'} onChange={(e) => void attach(d.id, !e.target.checked)} />{d.title} <span className="text-xs text-ink-soft">({d.documentType.replace(/_/g, ' ')})</span></label>;
         })}
+        {claim.attachments.length ? <Button variant="outlined" fullWidth={false} onClick={() => void downloadPackage(context, claim, documents).then(() => toast('Supporting documents downloaded, with a list of what belongs to this claim.'), (cause) => onError(describeError(cause)))}>Download supporting documents</Button> : null}
       </section>
     </div>
+    <SettlementPanel claim={claim} onChanged={onChanged} onError={onError} />
     {claim.state !== 'draft' ? <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); reviseClaim(context, claim.id, reason).then((r) => { toast(`Revision ${r.revision} started; the earlier claim and its history are kept.`); setReason(''); onChanged(); }, (cause) => onError(describeError(cause))); }}>
       <div className="min-w-[260px] flex-1"><TextField label="Reason for a corrected claim" value={reason} onChange={(e) => setReason(e.target.value)} /></div><Button type="submit" variant="outlined" fullWidth={false} disabled={reason.trim().length < 3}>Revise claim</Button>
     </form> : null}
@@ -206,7 +245,8 @@ const ClaimDetail = ({ claim, payerName, onChanged, onError }: { claim: ClaimVie
 
 const AuthorizationForm = ({ claim, existing, documents, onSaved, onError }: { claim: ClaimView; existing: ClaimAuthorization[]; documents: InsuranceDocument[]; onSaved: () => void; onError: (m: string) => void }) => {
   const context = useAuthorizationContext();
-  const [kind, setKind] = useState<'pre_authorization' | 'referral'>('pre_authorization'); const [status, setStatus] = useState<'requested' | 'approved' | 'denied'>('approved');
+  const [kind, setKind] = useState<'pre_authorization' | 'referral'>('pre_authorization'); const [status, setStatus] = useState<'requested' | 'approved' | 'denied' | 'emergency_exception'>('approved');
+  const [note, setNote] = useState(''); const [requestedOn, setRequestedOn] = useState(''); const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reference, setReference] = useState(''); const [validFrom, setValidFrom] = useState(claim.serviceFrom); const [validTo, setValidTo] = useState(claim.serviceTo);
   const [feeItemIds, setFeeItemIds] = useState<string[]>([]); const [via, setVia] = useState<'portal' | 'phone' | 'email' | 'letter' | 'other'>('phone');
   const [replaces, setReplaces] = useState(''); const [evidence, setEvidence] = useState(''); const [busy, setBusy] = useState(false);
@@ -215,17 +255,23 @@ const AuthorizationForm = ({ claim, existing, documents, onSaved, onError }: { c
     try {
       await saveAuthorization(context, { patientId: claim.patientId, payerId: claim.payerId, kind, status, ...(reference.trim() ? { reference: reference.trim() } : {}), validFrom, validTo, feeItemIds,
         categories: [] as FeeCategory[], ...(kind === 'pre_authorization' && !feeItemIds.length && claim.episode.kind === 'encounter' ? { encounterId: claim.episode.key } : {}),
+        approvedQuantities: Object.fromEntries(Object.entries(quantities).filter(([id, q]) => feeItemIds.includes(id) && Number(q) > 0).map(([id, q]) => [id, Number(q)])),
+        ...(requestedOn ? { requestedOn } : {}), ...(note.trim() ? { note: note.trim() } : {}),
         obtainedVia: via, ...(replaces ? { replaces } : {}), ...(evidence ? { evidenceDocumentId: evidence } : {}) });
       onSaved();
     } catch (cause) { onError(describeError(cause)); } finally { setBusy(false); }
   };
   return <form aria-label="Record authorization" className="space-y-2 rounded-field border border-outline-soft p-3" onSubmit={(e) => { e.preventDefault(); void save(); }}>
     <SelectField label="Kind" value={kind} options={[{ value: 'pre_authorization', label: 'Prior authorization' }, { value: 'referral', label: 'Referral' }]} onChange={(e) => setKind(e.target.value as typeof kind)} />
-    <SelectField label="Status" value={status} options={[{ value: 'requested', label: 'Requested' }, { value: 'approved', label: 'Approved' }, { value: 'denied', label: 'Denied' }]} onChange={(e) => setStatus(e.target.value as typeof status)} />
+    <SelectField label="Status" value={status} options={[{ value: 'requested', label: 'Requested' }, { value: 'approved', label: 'Approved' }, { value: 'denied', label: 'Denied' }, ...(kind === 'pre_authorization' ? [{ value: 'emergency_exception', label: 'Emergency: care given before approval' }] : [])]} onChange={(e) => setStatus(e.target.value as typeof status)} />
+    {status === 'emergency_exception' ? <p className="text-xs text-amber-text">Care continues. The claim stays blocked until you record the payer's own decision as an update to this record.</p> : null}
     <TextField label={kind === 'referral' ? 'Referral number' : "Payer's authorization code"} value={reference} onChange={(e) => setReference(e.target.value)} />
     <div className="grid grid-cols-2 gap-2"><TextField label="Valid from" type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} /><TextField label="Valid to" type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} /></div>
     {kind === 'pre_authorization' ? <fieldset className="space-y-1"><legend className="text-sm font-semibold">Services covered (none: the whole visit)</legend>{[...new Map(claim.lines.map((l) => [l.feeItemId, l.description])).entries()].map(([id, name]) =>
-      <label key={id} className="flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" checked={feeItemIds.includes(id)} onChange={(e) => setFeeItemIds(e.target.checked ? [...feeItemIds, id] : feeItemIds.filter((x) => x !== id))} />{name}</label>)}</fieldset> : null}
+      <div key={id} className="flex flex-wrap items-end gap-2"><label className="flex min-h-[40px] flex-1 items-center gap-2 text-sm"><input type="checkbox" checked={feeItemIds.includes(id)} onChange={(e) => setFeeItemIds(e.target.checked ? [...feeItemIds, id] : feeItemIds.filter((x) => x !== id))} />{name}</label>
+        {feeItemIds.includes(id) && status === 'approved' ? <div className="w-36"><TextField label="Quantity approved" inputMode="numeric" value={quantities[id] ?? ''} onChange={(e) => setQuantities((q) => ({ ...q, [id]: e.target.value.replace(/\D/g, '') }))} /></div> : null}</div>)}</fieldset> : null}
+    <TextField label="Requested from the payer on (optional)" type="date" value={requestedOn} onChange={(e) => setRequestedOn(e.target.value)} />
+    <TextField label={status === 'emergency_exception' ? 'Why care could not wait' : 'Note (optional)'} value={note} onChange={(e) => setNote(e.target.value)} />
     <SelectField label="Obtained by" value={via} options={['phone', 'portal', 'email', 'letter', 'other'].map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))} onChange={(e) => setVia(e.target.value as typeof via)} />
     {existing.length ? <SelectField label="Replaces (an update to an earlier record)" value={replaces} options={[{ value: '', label: 'Nothing — a new record' }, ...existing.map((a) => ({ value: a.id, label: `${a.kind === 'referral' ? 'Referral' : 'Authorization'} · ${a.status}${a.reference ? ` · ${a.reference}` : ''}` }))]} onChange={(e) => setReplaces(e.target.value)} /> : null}
     <SelectField label="Evidence document (optional)" value={evidence} options={[{ value: '', label: 'None' }, ...documents.map((d) => ({ value: d.id, label: d.title }))]} onChange={(e) => setEvidence(e.target.value)} />
@@ -268,7 +314,18 @@ const SubmissionForm = ({ exported, payerName, onSaved, onError }: { exported: C
   const context = useAuthorizationContext();
   const toast = useToast();
   const [ids, setIds] = useState<string[]>([]); const [channel, setChannel] = useState<'portal' | 'email' | 'physical' | 'other'>('portal'); const [reference, setReference] = useState(''); const [submittedOn, setSubmittedOn] = useState(today());
+  const [note, setNote] = useState(''); const [exportIds, setExportIds] = useState<string[]>([]); const [profiles, setProfiles] = useState<StoredSubmissionProfile[]>([]);
+  useEffect(() => { listSubmissionProfiles(context).then((r) => setProfiles(r.profiles), () => undefined); }, [context]);
   const chosen = useMemo(() => exported.filter((c) => ids.includes(c.id)), [exported, ids]);
+  const files = recentExports.filter((x) => x.claimIds.some((id) => ids.includes(id)));
+  const profile = profiles.find((p) => p.payerId === chosen[0]?.payerId)?.profile;
+  useEffect(() => { if (profile) setChannel(profile.channel); }, [profile]);
+  useEffect(() => { setExportIds(recentExports.filter((x) => x.claimIds.some((id) => ids.includes(id))).map((x) => x.exportId)); }, [ids]);
+  const emailDraft = () => {
+    const subject = `Claims · ${chosen.map((c) => `${c.claimNumber}${c.revision > 1 ? ` r${c.revision}` : ''}`).join(', ')}`;
+    const body = ['Please find attached the following claims:', '', ...chosen.map((c) => `${c.claimNumber}${c.revision > 1 ? ` (corrected, revision ${c.revision})` : ''} · enrollee ${c.enrolleeNumber} · ${c.serviceFrom} · ${formatMoney(c.payerShareMinor, c.currency)}`), '', 'Attach the exported claim file and supporting documents before sending.'].join('\n');
+    return `mailto:${encodeURIComponent(profile?.recipient ?? '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
   return <section aria-label="Record submission" className="space-y-2 rounded-card border border-outline-soft bg-white p-4">
     <h2 className="text-lg font-bold">Record a submission</h2>
     <p className="text-sm text-ink-soft">After sending exported claims through the payer's channel, record it here with the payer's reference. This does not mean the payer approved them.</p>
@@ -279,8 +336,18 @@ const SubmissionForm = ({ exported, payerName, onSaved, onError }: { exported: C
         <TextField label="Payer's reference" value={reference} onChange={(e) => setReference(e.target.value)} />
         <TextField label="Sent on" type="date" value={submittedOn} onChange={(e) => setSubmittedOn(e.target.value)} />
       </div>
-      <Button fullWidth={false} disabled={!chosen.length || !reference.trim() || new Set(chosen.map((c) => c.payerId)).size > 1} onClick={() => submitClaims(context, { claimIds: chosen.map((c) => c.id), channel, reference: reference.trim(), submittedOn })
-        .then((r) => { toast(`${r.claims} claim${r.claims === 1 ? '' : 's'} recorded as submitted.`); setIds([]); setReference(''); onSaved(); }, (cause) => onError(describeError(cause)))}>Record submission</Button>
+      {chosen.length && profile ? <div className="flex flex-wrap items-center gap-3 rounded-field bg-surface-muted p-2 text-sm">
+        <span>This payer receives claims by <strong>{profile.channel}</strong>{profile.instructions ? `: ${profile.instructions}` : ''}.</span>
+        {profile.channel === 'portal' && profile.portalUrl ? <a className="font-semibold text-brand underline" href={profile.portalUrl} target="_blank" rel="noopener noreferrer">Open the payer's portal</a> : null}
+        {profile.channel === 'email' ? <a className="font-semibold text-brand underline" href={emailDraft()}>Prepare the email to {profile.recipient}</a> : null}
+        {profile.channel === 'physical' ? <Button variant="ghost" fullWidth={false} onClick={() => printCoverSheet(chosen, payerName(chosen[0].payerId), profile.recipient)}>Print delivery cover sheet</Button> : null}
+      </div> : null}
+      {files.length ? <fieldset className="space-y-1"><legend className="text-sm font-semibold">Files sent</legend>{files.map((f) => <label key={f.exportId} className="flex min-h-[40px] items-center gap-2 text-sm">
+        <input type="checkbox" checked={exportIds.includes(f.exportId)} onChange={(e) => setExportIds(e.target.checked ? [...exportIds, f.exportId] : exportIds.filter((x) => x !== f.exportId))} />{f.format.toUpperCase()} export of {new Date(f.at).toLocaleTimeString('en-GB')} ({f.claimIds.length} claim{f.claimIds.length === 1 ? '' : 's'})</label>)}</fieldset> : null}
+      <TextField label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <p className="text-xs text-ink-soft">Sending an email from your mail app is dispatch, not receipt: record the payer's acknowledgement separately when it arrives.</p>
+      <Button fullWidth={false} disabled={!chosen.length || !reference.trim() || new Set(chosen.map((c) => c.payerId)).size > 1} onClick={() => submitClaims(context, { claimIds: chosen.map((c) => c.id), channel, reference: reference.trim(), submittedOn, exportIds, ...(note.trim() ? { note: note.trim() } : {}) })
+        .then((r) => { toast(`${r.claims} claim${r.claims === 1 ? '' : 's'} recorded as submitted.`); setIds([]); setReference(''); setNote(''); onSaved(); }, (cause) => onError(describeError(cause)))}>Record submission</Button>
     </>}
   </section>;
 };
@@ -289,7 +356,7 @@ const AcknowledgeRow = ({ submission, payerName, onSaved, onError }: { submissio
   const context = useAuthorizationContext();
   const [reference, setReference] = useState(''); const [on, setOn] = useState(today());
   return <div data-submission={submission.reference} className="space-y-2 rounded-field border border-outline-soft bg-white p-3 text-sm">
-    <p><strong>{submission.reference}</strong> · {payerName(submission.payerId)} · {submission.channel} · sent {submission.submittedOn} · {submission.claimIds.length} claim{submission.claimIds.length === 1 ? '' : 's'}</p>
+    <p><strong>{submission.reference}</strong> · {payerName(submission.payerId)} · {submission.channel} · sent {submission.submittedOn} · {submission.claimIds.length} claim{submission.claimIds.length === 1 ? '' : 's'}{submission.resubmission ? ' · corrected resubmission' : ''}{submission.exportIds.length ? ` · ${submission.exportIds.length} file${submission.exportIds.length === 1 ? '' : 's'} recorded` : ''}</p>
     {submission.acknowledgement ? <p className="text-success">Acknowledged {submission.acknowledgement.acknowledgedOn}{submission.acknowledgement.reference ? ` · ${submission.acknowledgement.reference}` : ''} (receipt only, not approval)</p>
       : <div className="flex flex-wrap items-end gap-2"><div className="w-56"><TextField label="Acknowledgement reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} /></div>
         <div className="w-40"><TextField label="Acknowledged on" type="date" value={on} onChange={(e) => setOn(e.target.value)} /></div>

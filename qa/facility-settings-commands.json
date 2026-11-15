@@ -1,0 +1,44 @@
+[
+  { "role": "facility_admin", "width": 1440, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  {
+    "path": "/settings/facility",
+    "name": "facility-details-desktop",
+    "assert": "(()=>{const s=document.querySelector('section[aria-labelledby=facility-heading]');return document.querySelectorAll('h1').length===1&&s.querySelector('nav [aria-current=page]').textContent==='Details'&&s.innerText.includes('Synthetic clinical facility')&&s.querySelector('dl').innerText.includes('Nigeria')&&!s.querySelector('input[name=facility_name]')&&Boolean(s.querySelector('button[aria-haspopup=dialog]'))&&!s.innerText.includes('Clinical approval rollout')&&!s.innerText.includes('Financial team links')&&[...s.querySelectorAll('details')].every(d=>!d.open)})()",
+    "description": "Facility opens on a compact summary with an Edit button"
+  },
+  { "click": "Edit facility details", "assert": "document.querySelector('dialog[open] input[name=facility_name]').value==='Synthetic clinical facility'&&document.body.innerText.includes('Save changes')&&document.querySelector('dialog[open] select[name=facility_time_zone]').value==='Africa/Lagos'", "description": "The Edit button opens a form panel with facility details and time zone" },
+  { "click": "Cancel" },
+  {
+    "path": "/settings/facility?view=services",
+    "name": "facility-care-services-desktop",
+    "assert": "(()=>{const t=document.querySelector('section[aria-labelledby=facility-heading]').innerText;window.facilityCareNames=[...document.querySelectorAll('section[aria-labelledby=care-services-list] li p.font-bold')].map(n=>n.textContent);return t.includes('Your care services (1)')&&t.includes('Wound dressing')&&t.includes('Draft')&&!t.includes('Haemoglobin')&&!t.includes('Full blood count')&&!t.includes('Server accepted')&&!document.querySelector('#care-services-add-section')&&document.querySelector('a[href=\"/laboratory/settings/tests\"]')!==null})()",
+    "description": "Settings lists only care services, with lab tests excluded from the list and count and add choices initially hidden"
+  },
+  {
+    "path": "/setup?step=services",
+    "assert": "JSON.stringify(window.facilityCareNames)===JSON.stringify([...document.querySelectorAll('section[aria-labelledby=care-services-list] li p.font-bold')].map(n=>n.textContent))&&Boolean(document.querySelector('#care-services-add-section'))",
+    "description": "Setup and Settings show exactly the same services; setup keeps its guided add choices"
+  },
+  { "path": "/settings/facility?view=services", "fill": { "label": "Find a care service", "value": "Haemoglobin" }, "assert": "document.body.innerText.includes('No care services match your search.')&&!document.querySelector('section[aria-labelledby=care-services-list] li')", "description": "Searching care services cannot reveal lab investigations" },
+  { "fill": { "label": "Find a care service", "value": "" }, "click": "Add care services", "assert": "document.querySelector('button[aria-controls=care-services-add-section]').getAttribute('aria-expanded')==='true'&&Boolean(document.querySelector('#care-services-add-section'))", "description": "Add choices open only when requested" },
+  { "evaluate": "([...document.querySelectorAll('#care-services-add-section button')].find(b=>b.textContent.startsWith('General outpatient consultation')).click(),true)", "assert": "document.querySelector('dialog[open]').innerText.includes('Responsible team')&&document.querySelectorAll('dialog[open] select').length===2", "description": "Adding in Settings uses the same simple team-and-place form as setup" },
+  { "click": "Add care service", "assert": "!document.querySelector('dialog[open]')&&document.body.innerText.includes('Your care services (2)')&&document.body.innerText.includes('General outpatient consultation')", "description": "A care service added from Settings appears immediately in its list" },
+  { "path": "/setup?step=services", "assert": "document.body.innerText.includes('1 active care service')&&document.querySelector('section[aria-labelledby=care-services-list]').innerText.includes('General outpatient consultation')&&!document.querySelector('section[aria-labelledby=care-services-list]').innerText.includes('Full blood count')", "description": "The addition also appears in setup and updates its progress without counting tests" },
+  { "path": "/settings/facility?view=services", "evaluate": "([...document.querySelectorAll('section[aria-labelledby=care-services-list] li')].find(li=>li.innerText.includes('General outpatient consultation')).querySelector('button').click(),true)", "assert": "document.querySelector('dialog[open] input[name=name]')?.value==='General outpatient consultation'", "description": "Existing care services remain editable from Settings" },
+  { "evaluate": "(document.querySelector('dialog[open] button[aria-label=Close]').click(),true)" },
+  { "path": "/settings/facility?view=structure", "assert": "document.body.innerText.includes('Teams & units')&&document.body.innerText.includes('Active')&&!document.body.innerText.includes('Server accepted')", "description": "Teams show business status and remain available through existing links" },
+  { "path": "/settings/facility?view=locations", "assert": "document.body.innerText.includes('Female ward')&&document.body.innerText.includes('FW-01')&&document.body.innerText.includes('Add place')", "description": "Places include rooms, wards and beds with their existing add action" },
+  { "path": "/settings/facility?view=finance", "assert": "document.querySelector('nav[aria-label=\"Facility sections\"] [aria-current=page]').textContent==='Advanced'&&document.body.innerText.includes('Financial team links')&&!document.querySelector('details').open", "description": "Legacy financial links open Advanced and clinical rollout checks stay collapsed" },
+  { "path": "/settings/facility?view=settings", "assert": "document.body.innerText.includes('Facility details')&&document.body.innerText.includes('Africa/Lagos')", "description": "Legacy Settings links still reach facility preferences" },
+  { "path": "/laboratory/settings/tests", "assert": "['Haemoglobin','Full blood count','Blood group and Rh','Hepatitis C antibody','Urine culture and sensitivity'].every(n=>document.body.innerText.includes(n))&&!document.body.innerText.includes('General outpatient consultation')&&window.designAudit.rows.service_offerings.filter(o=>o.id.startsWith('service_offering:test')).length===5", "description": "All five investigations remain intact in the Lab catalogue" },
+  { "width": 390, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  { "path": "/settings/facility?view=services", "name": "facility-care-services-phone", "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('Your care services (1)')", "description": "Care services fit at 390px" },
+  { "path": "/settings/facility", "name": "facility-details-phone", "assert": "document.documentElement.scrollWidth<=innerWidth&&Boolean(document.querySelector('section[aria-labelledby=facility-details-heading] dl'))&&!document.querySelector('input[name=facility_name]')", "description": "Facility details fit at 390px" },
+  { "width": 320, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  { "path": "/settings/facility?view=services", "name": "facility-care-services-320", "assert": "document.documentElement.scrollWidth<=innerWidth&&document.body.innerText.includes('Your care services (1)')", "description": "Care services fit at 320px" },
+  { "path": "/settings/facility", "name": "facility-details-320", "assert": "document.documentElement.scrollWidth<=innerWidth", "description": "Facility details fit at 320px" },
+  { "role": "facility_admin", "readonly": true, "reload": true, "width": 1440, "path": "/home", "evaluate": "window.seedSetupScenario()" },
+  { "path": "/settings/facility", "assert": "document.body.innerText.includes('Synthetic clinical facility')&&!document.querySelector('input[name=facility_name]')&&!document.body.innerText.includes('Save facility details')", "description": "Read-only staff can read facility details without edit controls" },
+  { "path": "/settings/facility?view=services", "assert": "document.body.innerText.includes('Wound dressing')&&!document.querySelector('section[aria-labelledby=care-services-list] button')&&!document.body.innerText.includes('Add care services')", "description": "Read-only staff can view care services without add or edit actions" },
+  { "finish": true }
+]

@@ -7,6 +7,7 @@ import { chargeBalances, isAppointmentConfirmed, type BalanceCoverage } from '@/
 import { coverNeedsCheck, estimatesFor, selfPayOffered, type CoverageData } from '@/data/repos/insurance';
 import { rememberInsuranceSupport } from '@/data/insuranceSupport';
 import { workspacesFor } from '@/app/workspaces';
+import { moduleSettingsFor } from '@/app/moduleSettings';
 
 // Synthetic payer, plan and prices only.
 const base = { facilityId: 'QA', deviceId: 'device:one', schemaVersion: 5, createdBy: 'staff:one' };
@@ -103,14 +104,16 @@ describe('insurance menu', () => {
     const links = () => workspacesFor(officer).flatMap((w) => w.links.map((l) => l.to));
     expect(links()).not.toContain('/insurance');
     rememberInsuranceSupport(officer, 1);
-    expect(links()).toEqual(expect.arrayContaining(['/insurance', '/settings/insurance']));
+    expect(links()).toContain('/insurance');
     rememberInsuranceSupport(officer, undefined);
     expect(links()).not.toContain('/insurance');
   });
   it('never shows contracts to a cashier', () => {
     rememberInsuranceSupport(officer, 1);
     const cashier = { ...officer, role: 'cashier', roles: ['cashier'], permissions: ['payment:receive', 'coverage:elect_self_pay'] } as unknown as AuthorizationContext;
-    expect(workspacesFor(cashier).flatMap((w) => w.links.map((l) => l.to))).not.toContain('/settings/insurance');
+    expect(workspacesFor(cashier).flatMap((w) => w.links.map((l) => l.to))).not.toContain('/insurance');
+    expect(moduleSettingsFor('insurance', cashier).pages).toEqual([]);
+    expect(moduleSettingsFor('insurance', officer).pages.map((p) => p.key)).toEqual(['setup', 'payers']);
   });
 });
 

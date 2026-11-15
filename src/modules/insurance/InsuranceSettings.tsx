@@ -7,6 +7,7 @@ import { useAuthorizationContext } from '@/session';
 import { Button, TextAreaField, useToast } from '@/ui';
 import { StaffVerification } from './StaffVerification';
 import { guideFor, NEEDED_FOR } from './setupGuide';
+import { DiagnosisCatalogue } from './DiagnosisCatalogue';
 
 const STATE_TEXT = {
   off: 'Insurance is off. Bills are cash only and insurance pages are hidden from staff.',
@@ -95,5 +96,6 @@ const SettingsBody = () => {
       <h2 className="text-lg font-bold">Readiness</h2>
       <SetupChecklist status={status} />
     </section> : null}
+    {status.state !== 'off' && context.permissions.includes('insurance_contract:read') ? <DiagnosisCatalogue /> : null}
   </div>;
 };

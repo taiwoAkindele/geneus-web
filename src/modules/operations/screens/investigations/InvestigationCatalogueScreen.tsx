@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
 import { addOwnTests, adoptStandardTests, loadCataloguePage, loadStandardTests, setInvestigationPrice, type AddedTests, type CatalogueRow, type OwnTest } from '@/data/repos/investigations';
@@ -132,11 +132,11 @@ const EditSheet = ({ row, onClose }: { row: CatalogueRow; onClose: () => void })
 };
 
 export const InvestigationCatalogueScreen = () => {
-  const context = useAuthorizationContext(), [params, setParams] = useSearchParams(), navigate = useNavigate();
+  const context = useAuthorizationContext(), [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '', page = Math.max(0, Number(params.get('page')) || 0), descending = params.get('descending') === '1';
   const data = useLiveQuery(useCallback(() => loadCataloguePage(context, { query, page, descending }), [context.facilityId, query, page, descending]));
   const [panel, setPanel] = useState<Panel>();
-  const canManage = context.permissions.includes('service:manage'), canTemplate = context.permissions.includes('result_template:manage');
+  const canManage = context.permissions.includes('service:manage');
   useEffect(() => { document.title = 'Investigation catalogue · Geneus Health'; }, []);
   const set = (changes: Record<string, string>) => setParams((current) => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); } return next; }, { replace: true });
   const close = () => { setPanel(undefined); data.reload(); };
@@ -151,13 +151,9 @@ export const InvestigationCatalogueScreen = () => {
     ...(canManage ? [{ key: 'actions', label: 'Action', render: (row: CatalogueRow) => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => setPanel({ edit: row })}>Edit</Button> }] : []),
   ];
   const addActions = [{ label: 'Add a single test', onSelect: () => setPanel('single') }, { label: 'Upload a list of tests', onSelect: () => setPanel('upload') }, { label: 'Choose from standard tests', onSelect: () => setPanel('standard') }];
-  const settingsActions = [
-    { label: 'Result templates', onSelect: () => navigate('/investigations/settings') },
-    { label: 'Result parts library', onSelect: () => navigate('/investigations/settings?tab=parts') },
-    { label: 'Answer lists', onSelect: () => navigate('/investigations/settings?tab=answers') },
-  ];
+  // Result templates, parts and answer lists are the next Laboratory settings page.
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
-    <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Investigation catalogue</h1><div className="flex flex-wrap gap-2">{canTemplate ? <ActionMenu label="Settings" title="Catalogue settings" actions={settingsActions} /> : null}{canManage && !empty ? <ActionMenu label="Add tests" title="Add tests" actions={addActions} /> : null}</div></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Investigation catalogue</h1><div className="flex flex-wrap gap-2">{canManage && !empty ? <ActionMenu label="Add tests" title="Add tests" actions={addActions} /> : null}</div></header>
     {empty ? <section aria-label="No tests yet" className="flex flex-col items-center gap-3 rounded-card border border-dashed border-outline px-6 py-10 text-center">
       <h2 className="text-xl font-extrabold">This facility has no lab tests yet</h2>
       <p className="max-w-xl text-ink-soft">Start with standard tests used in most facilities, with specimens and other names already filled in. You can set prices, or add your own tests afterwards.</p>

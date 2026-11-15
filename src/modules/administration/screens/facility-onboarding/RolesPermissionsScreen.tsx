@@ -20,10 +20,10 @@ export const RolesPermissionsScreen = () => {
     if (!entry) return;
     await editStaff(entry.staff, details, context);
     toast(`${details.fullName} updated`);
-    navigate('/admin/staff');
+    navigate('/admin/staff/' + encodeURIComponent(entry.staff.staffId));
   };
   return <div className="min-h-screen bg-surface">
-    <AppBar title="Edit staff" onBack={() => navigate('/admin/staff')} />
+    <AppBar title="Edit details & access" onBack={() => navigate(staffId ? '/admin/staff/' + encodeURIComponent(staffId) : '/admin/staff')} />
     <div className="mx-auto w-full max-w-xl px-5 py-4">
       <h1 className="mb-4 text-2xl font-extrabold">Staff details &amp; access</h1>
       {loading ? <div role="status" aria-label="Loading staff member" className="h-32 animate-pulse rounded-card bg-surface-muted" />

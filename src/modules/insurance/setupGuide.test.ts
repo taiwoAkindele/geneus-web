@@ -13,13 +13,13 @@ describe('readiness guidance', () => {
   });
   it('names each payer that still needs a contract, with a link straight to it', () => {
     const g = guideFor({ kind: 'active_contract', ok: false, requiredFor: 'billing', count: 0, payers: [{ id: 'payer:a', name: 'Synthetic HMO' }] }, viewer());
-    expect(g.steps).toEqual([{ text: 'Synthetic HMO has no active contract.', action: { label: "Set up Synthetic HMO's contract", to: '/settings/insurance/payers?payer=payer%3Aa' } }]);
+    expect(g.steps).toEqual([{ text: 'Synthetic HMO has no active contract.', action: { label: "Set up Synthetic HMO's contract", to: '/insurance/settings/payers?payer=payer%3Aa' } }]);
   });
   it('names who can confirm insurance work, and says how to add someone when nobody can', () => {
     const ok = guideFor({ kind: 'officer_with_verified_email', ok: true, requiredFor: 'billing', count: 2, people: [{ staffId: 'staff:a', name: 'Ada Admin', email: 'none' }, { staffId: 'staff:o', name: 'Ifeoma', email: 'none' }] }, viewer());
     expect(ok.status).toBe('Ada Admin, Ifeoma can confirm insurance work');
     const none = guideFor({ kind: 'officer_with_verified_email', ok: false, requiredFor: 'billing', count: 0, people: [] }, viewer());
-    expect(none.steps[0].action?.to).toBe('/settings/staff');
+    expect(none.steps[0].action?.to).toBe('/admin/staff');
   });
   it('explains each device that blocks billing and what to do about it', () => {
     const g = guideFor({ kind: 'devices_ready', ok: false, requiredFor: 'billing', devices: [{ deviceId: 'device:1', label: 'Front desk tablet', reasons: ['no_insurance_support', 'unsent_changes'], pendingMutationCount: 3 }] }, viewer());

@@ -20,7 +20,8 @@ const server = await createServer({ root: process.cwd(), mode: 'development', lo
 await server.listen();
 const profile = await mkdtemp(join(tmpdir(), 'geneus-staging-'));
 const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
-  '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9337', '--user-data-dir=' + profile, 'about:blank',
+  // HEADED=1 opens a visible window so a person can watch the run.
+  ...(process.env.HEADED ? ['--window-size=1460,1100'] : ['--headless=new']), '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9337', '--user-data-dir=' + profile, 'about:blank',
 ], { windowsHide: true, stdio: 'ignore' });
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 const errors = [], results = [], timeline = [];
@@ -330,7 +331,10 @@ try {
     await signOut(); await signIn('desk');
     for (const patient of [first, second]) {
       await go(`/patients/profile?patient=${encodeURIComponent(patient)}&tab=details`); await waitText('Insurance cover', 30000);
-      await click('Add cover'); await selectByText('Payer', 'Synthetic Staging HMO'); await fill('Plan code', 'GOLD'); await fill('Enrollee number', 'STG-' + patient.slice(-9, -3)); await click('Save cover');
+      await click('Add cover'); await selectByText('Payer', 'Synthetic Staging HMO');
+      // Known plans come from the payer's active contract; nobody retypes the plan code.
+      await selectByText('Plan', 'Staging Gold (GOLD)'); await fill('Enrollee or membership number', 'STG-' + patient.slice(-9, -3)); await click('Save cover');
+      await waitText('Not yet verified', 30000);
       await waitText('Never checked', 30000);
       await click('Record check'); await click('Save check'); await waitText('Last check: Verified', 30000);
     }
@@ -514,6 +518,96 @@ try {
     assert.equal(claims.reduce((n, c) => n + c.lines, 0), 3, 'three services, each still claimed exactly once');
     await shot('16-revised');
     return { claims };
+  });
+
+  /* ---------------- Slice 4: payer decision, payment and settlement ---------------- */
+
+  await check('Officer records the payer\'s approval; the payer\'s payment is recorded and allocated; the claim settles; the patient\'s account is untouched', async () => {
+    const before = await waitFor(`true`).then(() => inspect('/settlement'));
+    const target = before.find((c) => c.claimNumber === 'CLM-000002');
+    assert.ok(target, 'the acknowledged claim is with the payer: ' + JSON.stringify(before));
+    assert.equal(target.status, 'awaiting_response');
+    const patientBefore = (await server(target.patientId)).map((r) => [r.chargeId, r.balanceMinor]);
+    await go('/insurance/claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length >= 2`, 30000, 'claims');
+    await press(`[...document.querySelectorAll('tr[data-claim="CLM-000002"] button')].find((b) => b.textContent.trim() === 'Open')`);
+    await waitText('Payer response and payment', 20000);
+    assert.ok((await text()).includes('Awaiting payer'));
+    await click("Record the payer's decision"); await click('Save decision'); await waitText('Payer decision recorded', 20000);
+    const decisions = await inspect('/decisions');
+    assert.deepEqual(decisions.map((d) => [d.claim_number, d.decision, Number(d.approved_minor)]), [['CLM-000002', 'approved', target.expectedMinor]]);
+    await shot('17-payer-approved');
+
+    await go('/insurance/payments'); await waitText('Payer payments', 30000);
+    await waitText('What payers owe', 30000);
+    await click('Payments received'); await waitText('Record a payment from a payer', 20000);
+    await selectByText('Payer', 'Synthetic Staging HMO');
+    await fill('Payment or advice reference', 'SSH-REMIT-0001');
+    await fill('Received on', new Date().toISOString().slice(0, 10));
+    await fill('Amount received', (target.expectedMinor / 100).toFixed(2));
+    await press(`[...document.querySelectorAll('section[aria-label="Record a payer payment"] div')].find((d) => d.textContent.startsWith('CLM-000002') && d.querySelector('button'))?.querySelector('button')`);
+    await click('Record payment'); await waitText('Payment recorded', 20000);
+    const remittances = await inspect('/remittances');
+    assert.deepEqual(remittances.map((r) => [r.reference, Number(r.amount_minor), Number(r.allocated), r.reversed]), [['SSH-REMIT-0001', target.expectedMinor, target.expectedMinor, false]]);
+    const after = (await inspect('/settlement')).find((c) => c.claimNumber === 'CLM-000002');
+    assert.deepEqual([after.status, after.outstandingMinor, after.paidMinor], ['settled', 0, target.expectedMinor]);
+    assert.deepEqual((await server(target.patientId)).map((r) => [r.chargeId, r.balanceMinor]), patientBefore, 'payer money never enters the patient\'s account');
+    await shot('18-payer-paid');
+
+    // Recording the same payment again is refused: the money is counted once.
+    await fill('Payment or advice reference', 'ssh-remit-0001'); await fill('Amount received', '1.00');
+    await selectByText('Payer', 'Synthetic Staging HMO'); await fill('Payment or advice reference', 'ssh-remit-0001'); await fill('Amount received', '1.00');
+    await click('Record payment'); await waitText('already recorded', 20000);
+    assert.equal((await inspect('/remittances')).length, 1);
+
+    await click('What payers owe'); await waitFor(`Boolean(document.querySelector('[data-testid="payer-outstanding"]'))`, 20000, 'payer totals');
+    const owed = await evaluate(`document.querySelector('[data-testid="payer-outstanding"]').textContent`);
+    await shot('19-payer-balances');
+    return { decisions, remittances, settlementBefore: target, settlementAfter: after, payerOutstandingShown: owed, patientBalances: patientBefore };
+  });
+
+  await check('A cashier cannot see payer payments or record them', async () => {
+    await signOut(); await signIn('cashier');
+    await go('/insurance/payments'); await pause(800);
+    assert.ok(!(await text()).includes('Record a payment from a payer'), 'the cashier has no payer payment screen');
+    return { denied: true };
+  });
+
+  /* ---------------- UX tour (UX_TOUR=1): screens of the new insurance flows, desktop and phone. Records nothing it does not need to. ---------------- */
+  if (process.env.UX_TOUR) await check('UX tour: registration payment, cover and authorizations, claim settlement, payer payments, code lists', async () => {
+    const phone = () => cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    const desktop = () => cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    const full = async (name) => { const { contentSize } = await cdp('Page.getLayoutMetrics'); const png = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: contentSize.width, height: Math.min(contentSize.height, 6000), scale: 1 } }); await writeFile(join(output, name + '.png'), Buffer.from(png.data, 'base64')); };
+    const seen = [];
+    // Front desk: registering an insured patient, then the cover and authorizations on the profile.
+    await signOut(); await signIn('desk');
+    await go('/patients/new'); await waitText('How will the patient pay?', 30000);
+    await selectByText('Payment', 'Insurance or HMO'); await waitText('Enrollee or membership number', 10000);
+    await selectByText('Payer (HMO or scheme)', 'Synthetic Staging HMO'); await pause(500);
+    await full('ux-01-registration-insurance'); seen.push('registration');
+    await phone(); await pause(500); await full('ux-01m-registration-insurance-phone'); await desktop();
+    await go(`/patients/profile?patient=${encodeURIComponent(second)}&tab=details`); await waitText('Insurance cover', 30000);
+    await waitText('Payer authorizations and referrals', 30000); await pause(800);
+    await full('ux-02-patient-cover-authorizations'); seen.push('patient details');
+    if ((await text()).includes('Record authorization or referral')) { await click('Record authorization or referral'); await pause(500); await full('ux-03-record-authorization'); }
+    await phone(); await pause(500); await full('ux-02m-patient-cover-phone'); await desktop();
+    // Insurance officer: claim with its payer response, payer payments, code list.
+    await signOut(); await signIn('officer');
+    await go('/insurance/claims'); await waitFor(`document.querySelectorAll('tr[data-claim]').length >= 2`, 30000, 'claims');
+    await full('ux-04-claims-list'); seen.push('claims');
+    await press(`[...document.querySelectorAll('tr[data-claim="CLM-000002"] button')].find((b) => b.textContent.trim() === 'Open')`); await waitText('Payer response and payment', 20000);
+    await full('ux-05-claim-settled-detail');
+    const revised = await evaluate(`Boolean(document.querySelector('tr[data-claim="CLM-000001"]'))`);
+    if (revised) { await press(`[...document.querySelectorAll('tr[data-claim="CLM-000001"] button')].find((b) => b.textContent.trim() === 'Open')`); await pause(1200); await full('ux-06-claim-revision-draft'); }
+    await click('Batches & submissions'); await waitText('Record a submission', 20000); await full('ux-07-batches-submissions');
+    await go('/insurance/payments'); await waitText('What payers owe', 30000); await pause(800); await full('ux-08-payer-balances'); seen.push('payer payments');
+    await click('Import a payment advice'); await selectByText('Payer', 'Synthetic Staging HMO'); await pause(400); await full('ux-09-import-advice');
+    await phone(); await pause(500); await full('ux-08m-payer-payments-phone'); await desktop();
+    await go('/insurance'); await waitText('Insurance work', 30000); await pause(800); await full('ux-10-insurance-work'); seen.push('insurance work');
+    await go('/insurance/settings'); await waitText('Diagnosis code lists', 30000); await pause(800); await full('ux-11-settings-code-list'); seen.push('settings');
+    await go('/insurance/contracts'); await waitText('Payers & contracts', 30000); await click('Contracts'); await waitText('Claim submission', 30000); await click('Change'); await pause(500); await full('ux-12-payer-submission-rules');
+    // Navigation as each role sees it.
+    await go('/home'); await pause(1000); await full('ux-13-officer-home');
+    return { screens: seen };
   });
 
   console.log(JSON.stringify({ results, errors, timeline: timeline.slice(-20) }, null, 2));

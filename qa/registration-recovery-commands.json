@@ -1,7 +1,7 @@
 [
   { "role": "doctor", "width": 1440, "path": "/patients/new", "assert": "Boolean(document.querySelector('input[name=fullName]'))", "description": "New registration opens the existing form" },
   { "fill": { "label": "Full name", "value": "Synthetic Recovery Patient" } },
-  { "click": "F" },
+  { "fill": { "label": "Sex", "value": "F" } },
   { "fill": { "label": "Age", "value": "32" } },
   { "fill": { "label": "Address", "value": "Synthetic recovery address" }, "name": "01-private-draft", "assert": "localStorage.getItem('geneus.registrationDrafts').startsWith('enc1:') && !localStorage.getItem('geneus.registrationDrafts').includes('Synthetic Recovery')", "description": "Form typing is persisted encrypted on the device" },
   { "reload": true, "path": "/patients/new", "name": "02-resume-choice", "assert": "document.body.innerText.includes('Resume your unfinished form?') && !document.querySelector('input[name=fullName]')", "description": "Reload offers explicit Resume or Discard before opening private form contents" },

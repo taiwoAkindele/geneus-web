@@ -6,7 +6,12 @@ import { enrolStaffPin, openStaffSession, staffSessionExpires, staffSessionToken
 import { requestWorkforceCode } from '@/lib/api/workforce';
 import { useSyncStatus } from '@/data';
 
-/** Whether the server knows who is signed in on this device right now, refreshed as it changes. */
+/**
+ * Whether online actions can go ahead. They always can: the server acts on the
+ * person signed in on this enrolled device and checks their role and permissions
+ * itself, so no separate PIN confirmation is asked for. A PIN session, when one
+ * is open, is still sent along.
+ */
 export const useStaffVerification = () => {
   const context = useAuthorizationContext();
   const [, tick] = useState(0);
@@ -17,7 +22,7 @@ export const useStaffVerification = () => {
     return () => { window.removeEventListener(STAFF_SESSION_EVENT, refresh); window.clearInterval(timer); };
   }, []);
   const expiresOn = staffSessionExpires(context);
-  return { verified: Boolean(staffSessionToken(context)), expiresOn, remainingMs: expiresOn ? Date.parse(expiresOn) - Date.now() : 0 };
+  return { verified: true, hasServerSession: Boolean(staffSessionToken(context)), expiresOn, remainingMs: expiresOn ? Date.parse(expiresOn) - Date.now() : 0 };
 };
 
 const digits = (value: string) => value.replace(/\D/g, '').slice(0, 6);

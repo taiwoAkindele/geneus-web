@@ -7,8 +7,9 @@ import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
 import { RegistrationRecoveryGate } from '@/modules/front-desk/registration/RegistrationRecoveryPrompt';
 
+import type { CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 /** `visit` is the booking chosen on the form; registering as a new person keeps it. */
-export type DuplicateNavState = { matchIds: string[]; visit?: RegistrationVisit } | null;
+export type DuplicateNavState = { matchIds: string[]; visit?: RegistrationVisit; cover?: CoverFieldsValue } | null;
 
 const REASON_LABEL: Record<MatchReason, string> = {
   name: '✓ Name matches',
@@ -57,7 +58,7 @@ const DuplicateCheck = () => {
   const registerAsNew = async () => {
     if (saving || reason.trim().length < 3) { setError('Explain why this is a different person or why review is needed'); return; }
     setSaving(true);
-    await savePatient(values, undefined, { candidateIds: state.matchIds, outcome: uncertain ? 'review_requested' : 'registration_distinct', reason }, state.visit);
+    await savePatient(values, undefined, { candidateIds: state.matchIds, outcome: uncertain ? 'review_requested' : 'registration_distinct', reason }, state.visit, state.cover);
     setSaving(false);
   };
 

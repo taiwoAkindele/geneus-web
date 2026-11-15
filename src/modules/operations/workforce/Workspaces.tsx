@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { currentFacilityRevisions, type AnyDocument, type ServiceSession } from '@shared';
 import { Button, DataTable, SectionTabs, SelectField, Sheet, TextAreaField, TextField, Tag } from '@/ui';
 import { useAuthorizationContext } from '@/session';
@@ -7,7 +7,8 @@ import { saveIntake, eventHeads, type WorkforceData } from '@/data/repos/workfor
 import { workforceReadiness } from '@/lib/api/workforce';
 import { showInterval, zonedInput } from '@/lib/workforceTime';
 import { RecordEditor } from './RecordEditor';
-import { FacilitySettings } from './FacilitySettings';
+import { FacilityDetailsStep } from '@/modules/administration/setup/FacilityDetailsStep';
+import { CareServicesStep } from '@/modules/administration/setup/CareServicesStep';
 import type { EditorKind } from './editorFields';
 import { useWorkforce } from './useWorkforce';
 import { humanize, intakeLabel, proposalState, recordName, unitPath } from './presentation';
@@ -25,14 +26,22 @@ type Edit = {
   preset?: Record<string, unknown>;
 };
 const canEdit = (kind: EditorKind, permissions: readonly string[]) => permissions.includes(({ unit: 'unit:manage', location: 'location:manage', service_definition: 'service:manage', service_offering: 'service:manage', practitioner_profile: 'practitioner:manage', staff_assignment: 'staff_assignment:manage', service_session: 'service_session:manage', billing_department: 'fee_item:manage', credential: 'credential:manage', capability_decision: 'clinical_capability:review', reviewer_delegation: 'clinical_capability:review' } as Record<EditorKind, string>)[kind]);
-export const RecordList = ({ records, data, onEdit, detail }: {
+const lifecycle = (r: AnyDocument) => 'active' in r ? r.active ? 'Available' : 'Retired' : 'status' in r ? humanize(String(r.status)) : 'configuration' in r ? humanize(String(r.configuration)) : '';
+/** Plain business status: sync state is shown only when something needs the reader. */
+const businessState = (r: AnyDocument, data: WorkforceData) => {
+  const sync = proposalState(r, data);
+  return sync === 'Needs reconciliation' ? <Tag tone="danger">Needs attention</Tag> : data.pending.has(r.id) ? <Tag tone="amber">Saving</Tag> : <Tag tone={lifecycle(r) === 'Retired' ? 'neutral' : 'green'}>{lifecycle(r) === 'Available' ? 'Active' : lifecycle(r)}</Tag>;
+};
+export const RecordList = ({ records, data, onEdit, detail, businessStatus = false }: {
   records: AnyDocument[];
   data: WorkforceData;
   onEdit?: (record: AnyDocument) => void;
   detail?: (record: AnyDocument) => ReactNode;
+  /** Show Active/Retired/Needs attention instead of the server-acceptance state. */
+  businessStatus?: boolean;
 }) => records.length ? <DataTable caption="Facility records" rows={records} rowKey={(r) => r.id} columns={[
   { key: 'name', label: 'Name', sortValue: recordName, render: (r) => <div className="min-w-[120px]"><p className="font-bold">{r.type === 'service_offering' ? <Link className="text-brand underline" to={`/facility/services/${encodeURIComponent(r.id)}`}>{r.name}</Link> : recordName(r)}</p><p className="mt-1 text-xs text-ink-muted">{detail?.(r)}</p></div> },
-  { key: 'state', label: 'State', render: (r) => <div className="space-y-1"><Tag tone={data.pending.has(r.id) ? 'amber' : 'neutral'}>{proposalState(r, data)}</Tag><p className="text-xs">{'active' in r ? r.active ? 'Available' : 'Retired' : 'status' in r ? humanize(String(r.status)) : 'configuration' in r ? humanize(String(r.configuration)) : ''}</p></div> },
+  { key: 'state', label: businessStatus ? 'Status' : 'State', render: (r) => businessStatus ? businessState(r, data) : <div className="space-y-1"><Tag tone={data.pending.has(r.id) ? 'amber' : 'neutral'}>{proposalState(r, data)}</Tag><p className="text-xs">{lifecycle(r)}</p></div> },
   { key: 'action', label: 'Action', render: (r) => onEdit ? <Button fullWidth={false} variant="outlined" disabled={data.pending.has(r.id)} onClick={() => onEdit(r)}>Review / edit</Button> : <span className="text-xs text-ink-muted">View only</span> },
 ]} /> : <Empty>No records match this view. Add the actual service, team or place when you are ready.</Empty>;
 const Readiness = () => {
@@ -59,33 +68,38 @@ const Readiness = () => {
 };
 export const FacilityWorkspace = () => {
   const query = useWorkforce(), context = useAuthorizationContext(), [params, setParams] = useSearchParams(), [search, setSearch] = useState(''), [editing, setEditing] = useState<Edit>();
-  const view = ['overview', 'services', 'structure', 'locations', 'finance', 'settings'].includes(params.get('view') || '') ? params.get('view')! : 'overview';
-  useEffect(() => { document.title = 'Facility setup · Geneus Health'; }, []);
+  // Keep bookmarked sections working after simplifying the navigation.
+  const requested = params.get('view');
+  const view = requested && ['services', 'structure', 'locations', 'finance', 'advanced'].includes(requested) ? requested : 'details';
+  useEffect(() => { document.title = 'Facility · Geneus Health'; }, []);
   if (query.loading || !query.data)
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   if (query.error)
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   const data = query.data;
-  const kind: EditorKind = view === 'structure' ? 'unit' : view === 'locations' ? 'location' : view === 'finance' ? 'billing_department' : 'service_offering';
-  const collection = view === 'structure' ? data.units : view === 'locations' ? data.locations : view === 'finance' ? data.departments : data.offerings;
+  const advanced = view === 'advanced' || view === 'finance';
+  const kind: EditorKind = view === 'structure' ? 'unit' : view === 'locations' ? 'location' : 'billing_department';
+  const collection = view === 'structure' ? data.units : view === 'locations' ? data.locations : data.departments;
   const records = collection.filter((r) => recordName(r).toLowerCase().includes(search.toLowerCase()));
   const change = (next: string) => { setSearch(''); setParams({ view: next }); };
-  return <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8"><header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-extrabold">Facility setup</h1><p className="mt-1 max-w-2xl text-sm text-ink-muted">Choose the care you provide, where it happens and who does it.</p></div>{view !== 'overview' && view !== 'settings' && canEdit(kind, context.permissions) ? <Button fullWidth={false} onClick={() => setEditing({ kind })}>Add {view === 'structure' ? 'team' : view === 'locations' ? 'location' : view === 'finance' ? 'financial department' : 'service'}</Button> : null}</header>
-    <SectionTabs label="Facility setup sections" value={view} onChange={change} options={[{ value: 'overview', label: 'Overview' }, { value: 'services', label: 'Services' }, { value: 'structure', label: 'Departments & units' }, { value: 'locations', label: 'Locations' }, { value: 'finance', label: 'Financial links' }, { value: 'settings', label: 'Settings' }]} />
-    {view === 'settings' ? <FacilitySettings /> : view === 'overview' ? <><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[
-      { title: 'Care services', count: data.offerings.filter((o) => o.configuration === 'active').length, description: 'Configured care activities', to: 'services' },
-      { title: 'Accountable teams', count: data.units.filter((u) => u.active).length, description: `${data.units.filter((u) => u.active && !u.kind).length} legacy classifications to review`, to: 'structure' },
-      { title: 'Actual places', count: data.locations.filter((l) => l.active).length, description: 'Rooms, wards, outreach and stores', to: 'locations' },
-      { title: 'Financial links', count: data.departments.filter((d) => d.active && !d.organizationUnitId).length, description: 'Existing financial teams awaiting mapping', to: 'finance' },
-    ].map((card) => <button key={card.title} onClick={() => change(card.to)} className={`${panel} min-h-32 text-left hover:border-brand`}><span className="block text-sm font-bold">{card.title}</span><strong className="my-2 block text-3xl">{card.count}</strong><span className="text-xs text-ink-muted">{card.description}</span></button>)}</div>
-      <section className={panel}><h2 className="text-lg font-bold">Complete setup in a few clear steps</h2><ol className="mt-3 space-y-3">{[{ label: 'Choose responsible teams', to: '/facility?view=structure', help: 'One care team may be enough for a PHC. Hospitals can nest units under departments.' }, { label: 'Add real locations', to: '/facility?view=locations', help: 'A place can be shared by several services; it is separate from the team responsible.' }, { label: 'Configure care services', to: '/facility?view=services', help: 'Choose the care activity, responsible team, places and patients accepted.' }, { label: 'Review people and assignments', to: '/admin/staff', help: 'Keep professional approval separate from software access and duty assignments.' }, { label: 'Plan service coverage', to: '/admin/staff?view=coverage', help: 'Create actual sessions, resources and sign-in links. Open intake separately.' }].map((step, index) => <li key={step.label} className="flex gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-tint font-bold text-brand">{index + 1}</span><div><Link to={step.to} className="inline-flex min-h-8 items-center font-bold text-brand underline">{step.label}</Link><p className="text-sm text-ink-muted">{step.help}</p></div></li>)}</ol></section>
-      {context.permissions.includes('staff:manage') ? <Readiness /> : null}<p className="text-sm text-ink-muted">Each saved step is kept independently. A failed proposal does not erase earlier setup. <Link to="/sync" className="font-bold text-brand underline">Review sync and rejected proposals</Link>.</p></> : <>
-      <p className="text-sm text-ink-muted">{view === 'structure' ? 'Teams own responsibility. Departments are optional; rooms belong under Locations.' : view === 'locations' ? 'Only add real places. A ward or bed entry is not a bed-occupancy system.' : view === 'finance' ? 'Link existing financial departments to accountable teams. Receiving accounts and historical amounts are preserved.' : 'A service is the care activity offered by a team. Configuration, equipment readiness, planned staffing and intake are separate.'}</p>
-      <TextField label={`Find ${view === 'structure' ? 'a team' : view === 'locations' ? 'a place' : view === 'finance' ? 'a financial department' : 'a service'}`} type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <RecordList records={records} data={data} onEdit={canEdit(kind, context.permissions) ? (previous) => setEditing({ kind, previous }) : undefined} detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Legacy team · classification needed'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? humanize(r.kind) : r.type === 'service_offering' ? `${unitPath(r.unitId, data.units)} · ${humanize(r.intakePolicy)} · Resources ${humanize(r.resourceReadiness)}` : r.type === 'billing_department' ? r.organizationUnitId ? unitPath(r.organizationUnitId, data.units) : 'Not yet linked' : ''} />
-    </>}
+  const recordSection = <section className={`${panel} min-w-0 space-y-4`}>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><h3 className="text-lg font-bold">{view === 'structure' ? 'Teams & units' : view === 'locations' ? 'Places & beds' : 'Financial team links'}</h3>
+        <p className="mt-1 max-w-2xl text-sm text-ink-muted">{view === 'structure' ? 'The teams responsible for care. Group units under departments when you need to.' : view === 'locations' ? 'The rooms, wards, beds and stores where care happens.' : 'Connect billing departments to responsible teams. Manage fees and payment accounts in Billing.'}</p></div>
+      {canEdit(kind, context.permissions) ? <Button fullWidth={false} onClick={() => setEditing({ kind })}>Add {view === 'structure' ? 'team' : view === 'locations' ? 'place' : 'financial department'}</Button> : null}
+    </div>
+    <TextField label={`Find ${view === 'structure' ? 'a team' : view === 'locations' ? 'a place' : 'a financial department'}`} type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
+    {records.length ? <RecordList businessStatus records={records} data={data} onEdit={canEdit(kind, context.permissions) ? (previous) => setEditing({ kind, previous }) : undefined} detail={(r) => r.type === 'unit' ? `${r.kind ? humanize(r.kind) : 'Classification needed'} · ${unitPath(r.id, data.units)}` : r.type === 'location' ? humanize(r.kind) : r.type === 'billing_department' ? r.organizationUnitId ? unitPath(r.organizationUnitId, data.units) : 'Not yet linked' : ''} /> : <Empty>{search ? 'No matches. Try another name.' : view === 'structure' ? 'No teams yet. Add the team responsible for care.' : view === 'locations' ? 'No places yet. Add a room, ward, bed or store.' : 'No financial departments yet.'}</Empty>}
+  </section>;
+  return <section aria-labelledby="facility-heading" className="min-w-0 space-y-5">
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="facility-heading" className="text-xl font-extrabold">Facility</h2><p className="mt-1 text-sm text-ink-muted">Manage your facility details, the care you provide and where it happens.</p></div><Link to="/setup" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Open setup guide</Link></header>
+    <SectionTabs label="Facility sections" value={advanced ? 'advanced' : view} onChange={change} options={[{ value: 'details', label: 'Details' }, { value: 'services', label: 'Care services' }, { value: 'structure', label: 'Teams & units' }, { value: 'locations', label: 'Places & beds' }, { value: 'advanced', label: 'Advanced' }]} />
+    {view === 'details' ? <section aria-labelledby="facility-details-heading" className={`${panel} space-y-4`}><div><h3 id="facility-details-heading" className="text-lg font-bold">Facility details</h3><p className="mt-1 text-sm text-ink-muted">Your facility name, address, contact details and local preferences.</p></div><FacilityDetailsStep mode="settings" /></section>
+      : view === 'services' ? <section className={`${panel} space-y-4`}><p className="text-sm text-ink-muted">The same care services you chose during setup. Each service has a responsible team and a place.</p><CareServicesStep mode="settings" /></section>
+      : advanced ? <div className="space-y-4">{recordSection}{context.permissions.includes('staff:manage') ? <details className={panel}><summary className="min-h-11 cursor-pointer py-2 font-bold">Clinical approval rollout</summary><div className="mt-3"><Readiness /></div></details> : null}<Link to="/billing/settings/fees" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Open Billing settings</Link></div>
+      : recordSection}
     {editing ? <RecordEditor key={`${editing.kind}:${editing.previous?.id || 'new'}`} {...editing} data={data} onClose={() => setEditing(undefined)} onSaved={query.reload} /> : null}
-  </div>;
+  </section>;
 };
 const IntakeEditor = ({ data, offeringId, session, onClose }: {
   data: WorkforceData;
@@ -114,15 +128,12 @@ export const CoverageWorkspace = ({ offeringId, embedded = false }: {
   offeringId?: string;
   embedded?: boolean;
 }) => {
-  const navigate = useNavigate();
   const query = useWorkforce(), context = useAuthorizationContext(), [params, setParams] = useSearchParams(), [date, setDate] = useState(params.get('date') || zonedInput(new Date().toISOString(), 'Africa/Lagos').slice(0, 10)), [service, setService] = useState(offeringId || ''), [editing, setEditing] = useState<Edit>(), [intake, setIntake] = useState<ServiceSession>();
   if (query.loading || !query.data || query.error)
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   const data = query.data, sessions = currentFacilityRevisions(data.sessions).filter((s) => (!service || s.offeringId === service) && zonedInput(s.startsAt, s.timeZone).slice(0, 10) <= date && zonedInput(new Date(Date.parse(s.endsAt) - 1).toISOString(), s.timeZone).slice(0, 10) >= date).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-  return <section className={embedded ? 'space-y-4' : 'mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8'}>{!embedded ? <><header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">Staff & roster</h1><Link to="/admin/staff" className="text-sm font-bold text-brand underline">Staff directory</Link></header><SectionTabs label="Staff sections" value="coverage" onChange={(view) => {
-    if (view !== 'coverage')
-      navigate(`/admin/staff?view=${view}`);
-  }} options={[{ value: 'directory', label: 'Staff' }, { value: 'coverage', label: 'Coverage' }, { value: 'roster', label: 'Sign-in windows' }]} /></> : null}
+  // Not embedded: Settings → Staff scheduling & coverage, which provides the page heading and sections.
+  return <section className={embedded ? 'space-y-4' : 'space-y-5'}>
     <div className="flex flex-wrap items-end gap-3"><div className="min-w-40 flex-1"><TextField label="Coverage date" type="date" value={date} onChange={(e) => {
       setDate(e.target.value); if (!embedded) {
         const next = new URLSearchParams(params);

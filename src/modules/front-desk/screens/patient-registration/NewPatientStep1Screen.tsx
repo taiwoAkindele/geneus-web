@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { VisitType, validCalendarDate, yearsBetween } from '@shared';
+import { validCalendarDate, yearsBetween } from '@shared';
 import { AppBar, Avatar, Button, ChoiceChip, SegmentedControl, SelectField, TextField } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { formatMoney } from '@/lib/money';
@@ -10,7 +10,8 @@ import { listFeeItems } from '@/data/repos/billing';
 import { listPatients, type PatientDetails } from '@/data/repos/patients';
 import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
-import { VISIT_TYPE_LABELS } from '@/modules/finance/billing/feeForm';
+import { CareServiceVisitFields } from '@/modules/front-desk/careServices/CareServiceVisitFields';
+import type { CareVisitChoice } from '@/data/repos/careServices';
 import {
   EMPTY_REGISTRATION, amountsDue, factsFromForm, newPatientFees, parseAge, toPatientDetails, useNextPatientNumber, useRegistrationDraft, useSavePatient, visitFor,
   type RegistrationNavState, type RegistrationValues,
@@ -18,6 +19,7 @@ import {
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/modules/front-desk/search';
 import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/modules/front-desk/registration/RegistrationRecoveryPrompt';
 import type { DuplicateNavState } from './DuplicateCheckScreen';
+import { RegistrationPayment, coverIssue, emptyCover, type CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 
 const todayIso = (): string => calendarDate();
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
@@ -58,14 +60,16 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const patients = usePatients();
   const fees = useLiveQuery(listFeeItems);
   const canBook = context.permissions.includes('appointment:create');
-  const [visitChoice, setVisitChoice] = useState<VisitType | ''>(canBook ? 'general' : '');
+  const [withVisit, setWithVisit] = useState(canBook);
+  const [care, setCare] = useState<CareVisitChoice>({ visitType: 'general' });
   const [saveError, setSaveError] = useState('');
+  const [payment, setPayment] = useState<'self_pay' | 'insurance'>('self_pay'); const [cover, setCover] = useState<CoverFieldsValue>(emptyCover);
   const [opening, setOpening] = useState(false);
 
   const { control, register, handleSubmit, getValues, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({ defaultValues: values });
   const live = watch();
   const provisional = live.identityStatus === 'provisional';
-  const visitType = !editing && !provisional && canBook && visitChoice ? visitChoice : undefined;
+  const visitType = !editing && !provisional && canBook && withVisit ? care.visitType : undefined;
 
   useEffect(() => {
     const subscription = watch((partial) => keep(partial));
@@ -89,15 +93,17 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     setSaveError('');
     keep(form);
     const complete: RegistrationValues = { ...values, ...form };
-    const visit = visitType ? visitFor(visitType) : undefined;
+    const visit = visitType ? visitFor(visitType, care.offeringId) : undefined;
+    const insured = !editing && !provisional && payment === 'insurance' ? cover : undefined;
+    if (insured && coverIssue(insured)) { setSaveError(coverIssue(insured)!); return; }
     try {
       if (provisional || editing) return await savePatient(complete, state.patientId);
       const found = findLikelyMatches(toPatientDetails(complete), await listPatients());
       if (found.length > 0) {
-        const duplicate: DuplicateNavState = { matchIds: found.map((match) => match.patient.patientId), visit };
+        const duplicate: DuplicateNavState = { matchIds: found.map((match) => match.patient.patientId), visit, ...(insured ? { cover: insured } : {}) };
         return navigate('/patients/duplicate', { state: duplicate });
       }
-      return await savePatient(complete, undefined, undefined, visit);
+      return await savePatient(complete, undefined, undefined, visit, insured);
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'The duplicate check could not be completed. Try again.'); }
   };
 
@@ -149,23 +155,20 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)]">
-              <div>
-                <div className="mb-1.5 flex min-h-5 items-center text-[13px] font-semibold text-ink-soft">Sex</div>
-                <Controller
-                  control={control}
-                  name="sex"
-                  rules={{ validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex' }}
-                  render={({ field }) => (
-                    <SegmentedControl
-                      ariaLabel="Sex"
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={[...(provisional ? [{ value: '' as const, label: 'Unknown' }] : []), { value: 'F', label: 'F' }, { value: 'M', label: 'M' }]}
-                    />
-                  )}
-                />
-                {errors.sex ? <p role="alert" className="mt-1.5 text-[13px] text-danger">{errors.sex.message}</p> : null}
-              </div>
+              <Controller
+                control={control}
+                name="sex"
+                rules={{ validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex' }}
+                render={({ field }) => (
+                  <SelectField
+                    {...field}
+                    label="Sex"
+                    required={!provisional}
+                    error={errors.sex?.message}
+                    options={[{ value: '', label: provisional ? 'Unknown' : 'Choose sex' }, { value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }]}
+                  />
+                )}
+              />
               <TextField
                 label="Age"
                 type="number"
@@ -248,16 +251,21 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
             </section>
           ) : null}
 
+          {!editing && !provisional ? <RegistrationPayment method={payment} onMethod={setPayment} cover={cover} onCover={setCover} /> : null}
+
           {!editing && !provisional && canBook ? (
             <section aria-labelledby="registration-visit" className="space-y-4 border-t border-outline-soft pt-6">
               <h2 id="registration-visit" className={sectionTitle}>Visit today</h2>
               <div className="grid items-start gap-4 md:grid-cols-2">
-                <SelectField
-                  label="Visit type"
-                  value={visitChoice}
-                  onChange={(event) => setVisitChoice(event.target.value as VisitType | '')}
-                  options={[...VisitType.options.map((value) => ({ value, label: VISIT_TYPE_LABELS[value] })), { value: '', label: 'No visit today — register only' }]}
-                />
+                <div className="space-y-3">
+                  <SelectField
+                    label="Visit today"
+                    value={withVisit ? 'yes' : ''}
+                    onChange={(event) => setWithVisit(event.target.value === 'yes')}
+                    options={[{ value: 'yes', label: 'Yes — the patient is here for care' }, { value: '', label: 'No visit today — register only' }]}
+                  />
+                  {withVisit ? <CareServiceVisitFields arrival="walk_in" value={care} onChange={setCare} /> : null}
+                </div>
                 <div aria-live="polite">
                   {fees.loading ? <p role="status" className="text-sm text-ink-muted">Reading fees…</p>
                     : fees.error ? <p role="alert" className="text-sm text-amber-text">Fees could not be read. They are still applied when you save.</p>

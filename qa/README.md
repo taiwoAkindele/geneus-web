@@ -1,5 +1,22 @@
 # Clinical browser acceptance
 
+Facility settings: run `node qa/overall-audit-browser.mjs qa/facility-settings-commands.json`
+with `OVERALL_AUDIT_OUTPUT=qa/artifacts/facility-settings/after`. The synthetic checks
+cover the compact details summary, on-demand editing, shared setup/settings care
+services, exclusion and preservation of lab tests, adding a service through
+Settings, search, legacy section links, read-only access and 1440/390/320px layouts.
+
+Run `node qa/overall-audit-browser.mjs qa/form-controls-commands.json` with
+`OVERALL_AUDIT_OUTPUT=qa/artifacts/form-controls` for the facility edit dialog's
+save/cancel behavior and the registration sex dropdown, including validation,
+draft continuity, unknown provisional demographics and phone layouts.
+
+Run `node qa/overall-audit-browser.mjs qa/facility-form-layout-commands.json`
+with `OVERALL_AUDIT_OUTPUT=qa/artifacts/facility-form-layout` for facility field
+order, select controls, the combined time-zone save and retry, side-by-side
+actions, modal viewport alignment at 1440/390/320px, and nested-dialog dismissal
+and scroll-lock restoration.
+
 Programme register starters are covered by
 [programme-starters-qa.md](programme-starters-qa.md), including commands for the new
 three-programme workflow and the existing visit/register regression scenarios.

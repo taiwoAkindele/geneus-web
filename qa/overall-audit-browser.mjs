@@ -71,7 +71,7 @@ try {
     throw new Error('Timed out: ' + expression + '\n' + await evaluate('document.body.innerText') + '\n' + errors.join('\n'));
   };
   const click = async (text, selector = 'button') => {
-    const point = await evaluate(`(() => { const node = [...(document.querySelector('dialog[open]') ?? document).querySelectorAll(${JSON.stringify(selector)})].sort((a,b)=>Number(Boolean(b.closest('nav[aria-label="Patient record sections"]')))-Number(Boolean(a.closest('nav[aria-label="Patient record sections"]')))).find(n => n.textContent.trim() === ${JSON.stringify(text)} && n.getClientRects().length); if (!node) throw new Error('Missing control: ' + ${JSON.stringify(text)}); node.scrollIntoView({block:'center'}); const r = node.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    const point = await evaluate(`(() => { const node = [...([...document.querySelectorAll('dialog[open]')].at(-1) ?? document).querySelectorAll(${JSON.stringify(selector)})].sort((a,b)=>Number(Boolean(b.closest('nav[aria-label="Patient record sections"]')))-Number(Boolean(a.closest('nav[aria-label="Patient record sections"]')))).find(n => n.textContent.trim() === ${JSON.stringify(text)} && n.getClientRects().length); if (!node) throw new Error('Missing control: ' + ${JSON.stringify(text)}); node.scrollIntoView({block:'center'}); const r = node.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
     await pause(120);
@@ -80,7 +80,7 @@ try {
   const inPage = (callback,...args) => evaluate('('+callback.toString()+')(...'+JSON.stringify(args)+')');
   const fill = async (label,value) => {
     await inPage((name,value) => {
-      const scope=document.querySelector('dialog[open]')??document;
+      const scope=[...document.querySelectorAll('dialog[open]')].at(-1)??document;
       const label=[...scope.querySelectorAll('label')].find(n=>n.textContent.trim().startsWith(name));
       const input=label?.control??label?.querySelector('input,textarea,select');
       if(!input)throw new Error('Missing field: '+name);
@@ -90,7 +90,7 @@ try {
     },label,value); await pause(120);
   };
   const clickLabel=async(label)=>{
-    const point=await inPage(label=>{const n=[...document.querySelectorAll('button')].find(n=>n.getAttribute('aria-label')===label&&n.getClientRects().length);if(!n)throw new Error('Missing labeled button: '+label);n.scrollIntoView({block:'center'});const r=n.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};},label);
+    const point=await inPage(label=>{const scope=[...document.querySelectorAll('dialog[open]')].at(-1)??document;const n=[...scope.querySelectorAll('button')].find(n=>n.getAttribute('aria-label')===label&&n.getClientRects().length);if(!n)throw new Error('Missing labeled button: '+label);n.scrollIntoView({block:'center'});const r=n.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};},label);
     await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
     await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});await pause(150);
   };

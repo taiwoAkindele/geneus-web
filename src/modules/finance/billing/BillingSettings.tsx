@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from '@/data';
 import { createBillingDepartment, listBillingDepartments } from '@/data/repos/billing';
 import { useAuthorizationContext } from '@/session';
-import { AppBar, Button, SelectField, TextField } from '@/ui';
+import { Button, SelectField, TextField } from '@/ui';
 import { billingRequest, type BillingConnection } from '@/lib/api/billing';
 
 type ProviderAccount = { providerAccountId: string; accountNumber: string; accountName: string; bankName: string };
 export const BillingSettings = () => {
-  const navigate = useNavigate(); const context = useAuthorizationContext(); const departments = useLiveQuery(listBillingDepartments);
+  const context = useAuthorizationContext(); const departments = useLiveQuery(listBillingDepartments);
   const [connection, setConnection] = useState<BillingConnection>(); const [secret, setSecret] = useState('');
   const [readingConnection, setReadingConnection] = useState(true), [connectionError, setConnectionError] = useState('');
   const [name, setName] = useState(''); const [departmentId, setDepartment] = useState('');
@@ -28,7 +27,7 @@ export const BillingSettings = () => {
     try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); }
     finally { working.current = false; setBusy(false); }
   };
-  return <div className="min-h-screen bg-surface"><AppBar title="Departments & accounts" onBack={() => navigate('/billing')} /><main className="mx-auto max-w-3xl space-y-5 px-5 pb-24 pt-4">
+  return <div className="mx-auto max-w-3xl space-y-5 px-5 pb-24 pt-4">
     {!allowed ? <p>Your account cannot configure billing.</p> : <>
       <section className="space-y-3 rounded-card border border-outline-soft bg-white p-4"><h1 className="text-xl font-bold">Billing departments</h1><p className="text-sm text-ink-muted">Add Pharmacy, Oncology, Dental, GS and any other department. Assign fees and receiving accounts to the department that collects them.</p>
         {departments.loading ? <p role="status">Reading departments…</p> : departments.error ? <p role="alert">Could not read departments. <button onClick={departments.reload}>Try again</button></p> : <ul className="space-y-2">{departments.data?.map((d) => <li key={d.id} className="rounded-field bg-surface p-2 text-sm">{d.name}</li>)}</ul>}
@@ -70,5 +69,5 @@ export const BillingSettings = () => {
       {error ? <div role="alert" className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}<Button variant="ghost" onClick={() => void perform(refresh)}>Retry connection</Button></div> : null}
       {notice ? <p role="status" className="rounded-card bg-brand-wash p-3 text-sm text-brand">{notice}</p> : null}
     </>}
-  </main></div>;
+  </div>;
 };

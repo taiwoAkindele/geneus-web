@@ -9,6 +9,7 @@ import { useAuthorizationContext } from '@/session';
 import { Button, SelectField, Sheet, TextAreaField, TextField } from '@/ui';
 import { CHECK_METHODS, CHECK_RESULTS } from './coverageLabels';
 import type { Facility } from '@shared';
+import { CoverFields, PlanApprovalSummary, coverIssue, emptyCover, type CoverFieldsValue } from './InsuranceAtCare';
 
 /** What this device was granted: setup (configure, no bill changes), active (billing), or nothing. */
 export const useDeviceInsurance = (): DeviceInsurance | undefined => {
@@ -25,6 +26,18 @@ export const useDeviceInsurance = (): DeviceInsurance | undefined => {
 export const useInsuranceSupported = () => useDeviceInsurance() !== undefined;
 
 const COVER_TABLES = ['patient_cover', 'cover_check', 'payer', 'facility'] as const;
+
+/** One plain status for a cover: never "verified" unless a recorded check covers today. */
+export const coverStatus = (cover: PatientCover, latest: CoverCheck | undefined, today: string | undefined): string => {
+  if (!cover.active) return 'Inactive';
+  if (today && cover.validTo && cover.validTo < today) return `Expired on ${cover.validTo}`;
+  if (!cover.enrolleeNumber.trim() || !cover.planCode.trim()) return 'Details incomplete';
+  if (!latest) return 'Not yet verified';
+  const current = today && latest.coversFrom <= today && today <= latest.coversTo;
+  if (latest.result === 'pending') return 'Verification pending with the payer';
+  if (latest.result === 'not_eligible') return current ? 'Not eligible (payer said so)' : 'Last found not eligible';
+  return current ? 'Verified for today' : 'Verified before; not checked for today';
+};
 
 /**
  * A patient's insurance cover on the Details tab. Recording cover and checks
@@ -61,6 +74,7 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
         <h3 className="font-bold">{payerName(cover.payerId)} · {cover.planCode}</h3>
         <p className="text-sm">Enrollee number <span className="font-mono">{cover.enrolleeNumber}</span> · {cover.relationship === 'principal' ? 'Principal' : `Dependant${cover.principalName ? ` of ${cover.principalName}` : ''}`}</p>
         <p className="text-xs text-ink-muted">{cover.active ? 'Active' : 'Inactive'}{cover.validFrom ? ` · from ${cover.validFrom}` : ''}{cover.validTo ? ` · until ${cover.validTo}` : ''}</p>
+        <p data-testid="cover-status" className="text-sm font-semibold">{coverStatus(cover, latest, today)}</p>
         {latest ? <p className="text-sm">Last check: <strong>{CHECK_RESULTS.find((r) => r.value === latest.result)?.label}</strong> for {latest.coversFrom === latest.coversTo ? latest.coversFrom : `${latest.coversFrom} to ${latest.coversTo}`} · {CHECK_METHODS.find((m) => m.value === latest.method)?.label}{latest.reference ? ` · ref ${latest.reference}` : ''}</p> : <p className="text-sm text-amber-text">Never checked. Bills stay undetermined until cover is checked.</p>}
         {!checkedToday && cover.active ? <p className="text-sm text-amber-text">Not checked for today.</p> : null}
         <div className="flex flex-wrap gap-2">
@@ -70,6 +84,7 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
         {history.length > 1 ? <details className="text-xs text-ink-muted"><summary className="min-h-[44px] cursor-pointer py-2">All checks ({history.length})</summary><ul className="space-y-1">{history.map((c) => <li key={c.id}>{new Date(c.createdOn).toLocaleString('en-GB')} · {CHECK_RESULTS.find((r) => r.value === c.result)?.label} · {c.coversFrom}–{c.coversTo}</li>)}</ul></details> : null}
       </article>;
     })}
+    {current.some((c) => c.active) ? <PlanApprovalSummary patientId={patientId} /> : null}
     {editing ? <CoverSheet patientId={patientId} existing={editing === 'new' ? undefined : editing} payers={payers.filter((p) => p.active)} onClose={() => setEditing(undefined)} /> : null}
     {checking ? <CheckSheet cover={checking} today={today} onClose={() => setChecking(undefined)} /> : null}
   </section>;
@@ -77,28 +92,21 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
 
 const CoverSheet = ({ patientId, existing, payers, onClose }: { patientId: string; existing?: PatientCover; payers: { id: string; name: string }[]; onClose: () => void }) => {
   const context = useAuthorizationContext();
-  const [payerId, setPayerId] = useState(existing?.payerId ?? payers[0]?.id ?? ''); const [planCode, setPlan] = useState(existing?.planCode ?? '');
-  const [enrollee, setEnrollee] = useState(existing?.enrolleeNumber ?? ''); const [relationship, setRelationship] = useState<PatientCover['relationship']>(existing?.relationship ?? 'principal');
-  const [principalName, setPrincipal] = useState(existing?.principalName ?? ''); const [validFrom, setFrom] = useState(existing?.validFrom ?? ''); const [validTo, setTo] = useState(existing?.validTo ?? '');
-  const [active, setActive] = useState(existing?.active ?? true); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [value, setValue] = useState<CoverFieldsValue>(() => existing ? { payerId: existing.payerId, planCode: existing.planCode, enrolleeNumber: existing.enrolleeNumber, relationship: existing.relationship, principalName: existing.principalName ?? '', validFrom: existing.validFrom ?? '', validTo: existing.validTo ?? '', active: existing.active } : { ...emptyCover(), payerId: payers[0]?.id ?? '' });
+  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true); setError('');
     try {
-      if (!payerId || !planCode.trim() || !enrollee.trim()) throw new Error('Choose the payer and enter the plan and enrollee number');
-      await recordCover({ patientId, payerId, planCode: planCode.trim(), enrolleeNumber: enrollee, relationship, principalName, validFrom, validTo, active, replaces: existing?.id }, context);
+      const issue = coverIssue(value); if (issue) throw new Error(issue);
+      await recordCover({ patientId, ...value, replaces: existing?.id }, context);
       onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the cover'); } finally { setBusy(false); }
   };
   return <Sheet title={existing ? 'Change insurance cover' : 'Add insurance cover'} onClose={onClose} closeDisabled={busy}>
     <div className="space-y-3">
-      {payers.length === 0 ? <p className="text-sm">No payers are set up yet. Ask the insurance officer.</p> : null}
-      <SelectField label="Payer" value={payerId} options={payers.map((p) => ({ value: p.id, label: p.name }))} onChange={(e) => setPayerId(e.target.value)} />
-      <TextField label="Plan code (as on the card)" value={planCode} onChange={(e) => setPlan(e.target.value)} />
-      <TextField label="Enrollee number" value={enrollee} onChange={(e) => setEnrollee(e.target.value)} />
-      <SelectField label="Member" value={relationship} options={[{ value: 'principal', label: 'Principal member' }, { value: 'dependant', label: 'Dependant' }]} onChange={(e) => setRelationship(e.target.value as PatientCover['relationship'])} />
-      {relationship === 'dependant' ? <TextField label="Principal member's name" value={principalName} onChange={(e) => setPrincipal(e.target.value)} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2"><TextField label="Valid from (optional)" type="date" value={validFrom} onChange={(e) => setFrom(e.target.value)} /><TextField label="Valid until (optional)" type="date" value={validTo} onChange={(e) => setTo(e.target.value)} /></div>
-      <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Cover is active</label>
+      <CoverFields value={value} onChange={setValue} />
+      <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={value.active} onChange={(e) => setValue({ ...value, active: e.target.checked })} />Cover is active</label>
+      <p className="text-xs text-ink-muted">Recording cover is not checking it. Record a check once the payer confirms eligibility.</p>
       {existing ? <p className="text-xs text-ink-muted">The previous cover stays in the history. Bills already confirmed keep the cover they were confirmed with.</p> : null}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
       <Button loading={busy} disabled={busy || payers.length === 0} onClick={() => void save()}>Save cover</Button>
@@ -145,9 +153,10 @@ export const CheckInCoverPrompt = ({ patientId, onRecord, recordHref }: { patien
     const current = currentCovers(patientId, covers).filter((c) => c.active);
     return today ? current.find((cover) => !checks.some((c) => c.coverId === cover.id && c.coversFrom <= today && today <= c.coversTo)) : undefined;
   }, [patientId, context.facilityId]), COVER_TABLES);
-  if (!supported || !data.data || !context.permissions.includes('cover:verify')) return null;
-  return <div role="status" className="flex flex-wrap items-center gap-2 rounded-field border border-amber-border bg-amber-bg p-3 text-sm">
+  if (!supported) return null;
+  if (!data.data || !context.permissions.includes('cover:verify')) return <PlanApprovalSummary patientId={patientId} />;
+  return <><PlanApprovalSummary patientId={patientId} /><div role="status" className="flex flex-wrap items-center gap-2 rounded-field border border-amber-border bg-amber-bg p-3 text-sm">
     <span className="flex-1"><strong>Cover not checked today.</strong> Bills stay undetermined until it is checked; care continues.</span>
     {onRecord ? <Button fullWidth={false} variant="outlined" onClick={onRecord}>Record check</Button> : recordHref ? <Link className="min-h-[44px] content-center font-bold text-brand underline" to={recordHref}>Record check</Link> : null}
-  </div>;
+  </div></>;
 };

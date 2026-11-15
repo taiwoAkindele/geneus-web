@@ -1,4 +1,4 @@
-import type { AuthorizationContext, OwnEmailStatus, StaffEmailRequestView } from '@shared';
+import type { AuthorizationContext, FacilityDetailsUpdate, OwnEmailStatus, StaffEmailRequestView } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, staffRequest } from './client';
 import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
@@ -12,8 +12,8 @@ import { VerificationRequired } from './insurance';
 const credential = () => { const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled'); return device.credential; };
 const send = async <T>(context: AuthorizationContext, path: string, body: unknown, needsVerification: boolean): Promise<T> => {
   const token = staffSessionToken(context);
-  if (needsVerification && !token) throw new VerificationRequired();
-  try { const result = await staffRequest<T>(path, credential(), token, body); touchStaffSession(); return result; }
+  void needsVerification; // The server checks who is acting and what they may do; no separate PIN step.
+  try { const result = await staffRequest<T>(path, credential(), token, body, context.userId); touchStaffSession(); return result; }
   catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
     throw cause;
@@ -25,6 +25,8 @@ export const timeZoneHistory = (context: AuthorizationContext) => send<{ changes
 export const saveTimeZone = (context: AuthorizationContext, timeZone: string, reason?: string) =>
   send<{ timeZone: string; changed: boolean }>(context, '/facility/time-zone', { timeZone, confirm: true, ...(reason?.trim() ? { reason: reason.trim() } : {}) }, true);
 
+/** A facility administrator corrects the hospital's details; the code is never sent and never changes. */
+export const saveFacilityDetails = (context: AuthorizationContext, details: FacilityDetailsUpdate) => send<{ changed: string[] }>(context, '/facility/details', details, true);
 export const ownEmailStatus = (context: AuthorizationContext) => send<OwnEmailStatus>(context, '/staff/me/email/status', { staffId: context.userId }, false);
 export const requestOwnEmailCode = (context: AuthorizationContext, email: string) => send<{ sentTo: string; expiresOn: string }>(context, '/staff/me/email/code', { staffId: context.userId, email }, false);
 export const confirmOwnEmail = (context: AuthorizationContext, email: string, code: string) => send<{ status: 'verified' | 'pending_approval' }>(context, '/staff/me/email', { staffId: context.userId, email, code }, false);

@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { FeeSettings } from '@/modules/finance/billing/FeeSettings';
 
-/** Existing bookmarks lead into the same Billing workspace. */
-export const FeeScheduleScreen = () => <Navigate to="/billing?tab=fees" replace />;
+/** Billing → Settings → Fees. */
+export const FeeScheduleScreen = () => <FeeSettings />;

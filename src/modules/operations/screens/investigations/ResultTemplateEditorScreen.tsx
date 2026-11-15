@@ -48,7 +48,7 @@ export const ResultTemplateEditorScreen = () => {
   // Tests already entered with another template in use cannot be added here.
   const claimed = useMemo(() => new Map((settings.data?.templates ?? []).filter((t) => t.id !== templateId && t.status === 'active').flatMap((t) => t.serviceDefinitionIds.map((id) => [id, t.name] as const))), [settings.data, templateId]);
   if (settings.loading && !settings.data) return <p role="status" className="p-6">Reading templates…</p>;
-  if (templateId && settings.data && !existing) return <div className="space-y-3 p-6"><p>This template was not found on this device.</p><Link className="font-bold text-brand" to="/investigations/settings">Back to result templates</Link></div>;
+  if (templateId && settings.data && !existing) return <div className="space-y-3 p-6"><p>This template was not found on this device.</p><Link className="font-bold text-brand" to="/laboratory/settings/templates">Back to result templates</Link></div>;
   if (!draft || !settings.data) return null;
   const { lists, tests, parts: library } = settings.data;
   const update = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
@@ -64,15 +64,15 @@ export const ResultTemplateEditorScreen = () => {
       await saveResultTemplate(candidate.data, context, existing);
       setInitial(JSON.stringify(draft));
       toast(`${candidate.data.name} saved`);
-      navigate('/investigations/settings');
+      navigate('/laboratory/settings/templates');
     } catch (cause) { setError(templateErrorText(cause)); } finally { setBusy(false); }
   };
 
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
-    <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-ink-soft"><Link className="font-bold text-brand" to="/investigations/catalogue">Investigation catalogue</Link><span aria-hidden="true">›</span><Link className="font-bold text-brand" to="/investigations/settings">Settings</Link><span aria-hidden="true">›</span><span>{existing?.name ?? 'New template'}</span></nav>
+    <nav aria-label="Template" className="flex flex-wrap gap-2 text-sm text-ink-soft"><Link className="font-bold text-brand" to="/laboratory/settings/templates">Result templates</Link><span aria-hidden="true">›</span><span>{existing?.name ?? 'New template'}</span></nav>
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3"><h1 className="text-[28px] font-extrabold">{existing ? existing.name : 'New result template'}</h1>{existing ? <Tag tone={STATUS_TONES[existing.status]}>{STATUS_LABELS[existing.status]}</Tag> : null}</div>
-      <div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} onClick={() => dirty ? setPanel('discard') : navigate('/investigations/settings')}>Cancel</Button><Button fullWidth={false} loading={busy} disabled={busy || !dirty} onClick={() => void save()}>Save template</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outlined" fullWidth={false} onClick={() => dirty ? setPanel('discard') : navigate('/laboratory/settings/templates')}>Cancel</Button><Button fullWidth={false} loading={busy} disabled={busy || !dirty} onClick={() => void save()}>Save template</Button></div>
     </header>
     {existing ? <Banner tone="info" title="Changes apply to results entered after you save">Results already published keep the version they were entered with.</Banner> : null}
     {error ? <p role="alert" className="text-danger-strong">{error}</p> : null}
@@ -103,7 +103,7 @@ export const ResultTemplateEditorScreen = () => {
                 <td className="px-3 py-2">{rangeSummary(part)}</td>
                 <td className="px-3 py-2"><input type="checkbox" className="h-5 w-5 min-h-0 accent-brand" aria-label={`${part.label} required`} checked={part.required} onChange={(e) => setPart(index, { ...part, required: e.target.checked })} /></td>
                 <td className="px-3 py-2"><div className="flex flex-nowrap justify-end gap-1">
-                  {part.libraryPartId ? <Link className="inline-flex min-h-[44px] items-center px-2 text-sm font-bold text-brand" to="/investigations/settings?tab=parts">Edit in library</Link> : <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => setPanel({ part: index })}>Edit</Button>}
+                  {part.libraryPartId ? <Link className="inline-flex min-h-[44px] items-center px-2 text-sm font-bold text-brand" to="/laboratory/settings/templates?tab=parts">Edit in library</Link> : <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => setPanel({ part: index })}>Edit</Button>}
                   <Button variant="ghost" fullWidth={false} className="w-11 px-0" aria-label={`Remove ${part.label}`} onClick={() => update({ parts: draft.parts.filter((_, i) => i !== index) })}>✕</Button>
                 </div></td>
               </tr>)}</tbody>
@@ -140,7 +140,7 @@ export const ResultTemplateEditorScreen = () => {
     </Sheet> : null}
     {panel === 'tests' ? <TestsSheet chosen={draft.tests} tests={tests} claimed={claimed} onClose={() => setPanel(undefined)} onSave={(chosen) => { update({ tests: chosen }); setPanel(undefined); }} /> : null}
     {panel === 'discard' ? <Sheet title="Discard your changes?" onClose={() => setPanel(undefined)}>
-      <div className="space-y-4"><p>Your changes to this template have not been saved.</p><div className="flex flex-wrap gap-2"><SheetCancelButton>Keep editing</SheetCancelButton><Button variant="danger-outline" fullWidth={false} onClick={() => { setInitial(JSON.stringify(draft)); navigate('/investigations/settings'); }}>Discard changes</Button></div></div>
+      <div className="space-y-4"><p>Your changes to this template have not been saved.</p><div className="flex flex-wrap gap-2"><SheetCancelButton>Keep editing</SheetCancelButton><Button variant="danger-outline" fullWidth={false} onClick={() => { setInitial(JSON.stringify(draft)); navigate('/laboratory/settings/templates'); }}>Discard changes</Button></div></div>
     </Sheet> : null}
   </div>;
 };

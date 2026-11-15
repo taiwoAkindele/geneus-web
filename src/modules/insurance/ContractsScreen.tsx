@@ -37,7 +37,7 @@ export const ContractsScreen = () => {
   const context = useAuthorizationContext();
   const supported = useInsuranceSupported();
   useEffect(() => { document.title = 'Payers & contracts · Geneus Health'; }, []);
-  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is off for this hospital. An administrator can start setup in <Link className="font-semibold text-brand" to="/settings/insurance/setup">Insurance settings</Link>.</p></main>;
+  if (!supported) return <main className="p-4"><h1 className="text-xl font-bold">Payers &amp; contracts</h1><p className="mt-2 text-sm">Insurance is off for this hospital. An administrator can start setup in <Link className="font-semibold text-brand" to="/insurance/settings/setup">Insurance settings</Link>.</p></main>;
   const canRead = context.permissions.includes('insurance_contract:read');
   return <main className="mx-auto max-w-5xl space-y-6 p-4">
     <header><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
