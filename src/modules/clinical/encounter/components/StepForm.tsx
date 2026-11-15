@@ -7,7 +7,7 @@ import { LabResultsForm } from '@/modules/clinical/resultTemplates/LabResultsFor
 import { ResultReviewReports } from '@/modules/clinical/resultTemplates/ResultReviewReports';
 import { Button, ChoiceChip, FieldLabel, Icon, SelectField, SelectOrTextField, TextAreaField, TextField } from '@/ui';
 import { ENCOUNTER_FIELD_HELP as H, PRESCRIPTION_DURATIONS, PRESCRIPTION_FREQUENCIES, PRESCRIPTION_ROUTES } from '../fieldHelp';
-import { INJECTION_ROUTES } from '../steps';
+import { CERTAINTY_LABEL, INJECTION_ROUTES } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 import { ApprovalWarning, PlanApprovalSummary } from '@/modules/insurance/InsuranceAtCare';
@@ -41,16 +41,23 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
   if (stepKey === 'complaint') {
     return <div className="space-y-4">
       <p className="text-xs leading-relaxed text-ink-muted">Use the fields relevant to this visit. You do not need to repeat the same information in each box. Leave findings blank if they were not assessed.</p>
-      <TextAreaField label="Patient's complaints" name="complaint_text" help={H.complaint}
+      <h3 className="text-sm font-bold uppercase tracking-wide text-ink-soft">What the patient reports</h3>
+      <TextAreaField label="Chief complaint" name="complaint_text" help={H.complaint}
         value={d.complaint.text} placeholder="In the patient's words — e.g. sore throat for two days"
         onChange={(event) => setField('complaint', 'text', event.target.value)} />
+      <TextAreaField label="Other presenting complaints (optional)" name="complaint_others" help={H.otherComplaints}
+        value={d.complaint.others ?? ''} placeholder={`One per line — e.g. ${H.otherComplaints.example}`}
+        onChange={(event) => setField('complaint', 'others', event.target.value)} />
+      <TextAreaField label="History of presenting complaint (optional)" name="complaint_historyOfPresentIllness" help={H.presentingIllness}
+        value={d.complaint.historyOfPresentIllness ?? ''} placeholder={`Example: ${H.presentingIllness.example}`}
+        onChange={(event) => setField('complaint', 'historyOfPresentIllness', event.target.value)} />
+      <h3 className="pt-2 text-sm font-bold uppercase tracking-wide text-ink-soft">Clinician's notes</h3>
       <TextAreaField label="Clinical note" name="complaint_note" help={H.clinicalNote}
         value={d.complaint.note} placeholder={`Example: ${H.clinicalNote.example}`}
         onChange={(event) => setField('complaint', 'note', event.target.value)} />
-      <details open={Boolean(d.complaint.historyOfPresentIllness || d.complaint.examination || d.complaint.assessment || d.complaint.plan)} className="rounded-field border border-outline-soft p-3">
-      <summary className="cursor-pointer text-sm font-bold text-brand">Use structured history, examination, assessment and plan</summary>
+      <details open={Boolean(d.complaint.examination || d.complaint.assessment || d.complaint.plan)} className="rounded-field border border-outline-soft p-3">
+      <summary className="cursor-pointer text-sm font-bold text-brand">Use structured examination, assessment and plan</summary>
       <div className="mt-4 space-y-4">{([
-        { key: 'historyOfPresentIllness', label: 'History of presenting illness', help: H.presentingIllness },
         { key: 'examination', label: 'Examination', help: H.examination },
         { key: 'assessment', label: 'Assessment', help: H.assessment },
         { key: 'plan', label: 'Clinical plan / advice', help: H.plan },
@@ -80,17 +87,17 @@ export const StepForm = ({ stepKey, ctl, correcting = false, patientId }: { step
     );
   }
 
-  if (stepKey === 'diagnosis') return <>        <DiagnosisSuggestions known={knownDiagnoses} /><TextField label="Diagnosis" help={H.diagnosis} name="dx" list={DIAGNOSIS_LIST_ID} autoComplete="off" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => { setField('diagnosis', 'dx', e.target.value); const match = knownCode(knownDiagnoses, e.target.value); if (match && !d.diagnosis.code?.trim()) { setField('diagnosis', 'code', match.code); setField('diagnosis', 'codingSystem', match.codingSystem); } }} />
+  if (stepKey === 'diagnosis') return <>        <p className="mb-3 text-xs leading-relaxed text-ink-muted">What you conclude from the complaints, examination and results. Record a working diagnosis as provisional; a long-term condition joins the problem list only when reviewed into it.</p><DiagnosisSuggestions known={knownDiagnoses} /><TextField label="Diagnosis" help={H.diagnosis} name="dx" list={DIAGNOSIS_LIST_ID} autoComplete="off" value={d.diagnosis.dx} placeholder="Diagnosis from findings…" onChange={(e) => { setField('diagnosis', 'dx', e.target.value); const match = knownCode(knownDiagnoses, e.target.value); if (match && !d.diagnosis.code?.trim()) { setField('diagnosis', 'code', match.code); setField('diagnosis', 'codingSystem', match.codingSystem); } }} />
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <TextField label="Diagnosis code (optional)" help={H.diagnosisCode} value={d.diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'code', e.target.value)} />
           <SelectField label="Coding system" help={H.codingSystem} value={d.diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'codingSystem', e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined)} />
-          <SelectField label="Diagnostic certainty" help={H.certainty} value={d.diagnosis.certainty ?? 'unknown'} options={['unknown', 'suspected', 'confirmed'].map((value) => ({ value, label: value }))} onChange={(e) => setField('diagnosis', 'certainty', e.target.value as 'unknown' | 'confirmed' | 'suspected')} />
+          <SelectField label="Diagnostic certainty" help={H.certainty} value={d.diagnosis.certainty ?? 'unknown'} options={(['unknown', 'suspected', 'confirmed'] as const).map((value) => ({ value, label: CERTAINTY_LABEL[value] }))} onChange={(e) => setField('diagnosis', 'certainty', e.target.value as 'unknown' | 'confirmed' | 'suspected')} />
         </div>
         {(d.diagnosis.diagnoses ?? []).map((diagnosis, index) => <div key={index} className="mt-3 space-y-2 rounded-field border border-outline p-3">
           <TextField label={`Additional diagnosis ${index + 1}`} help={H.additionalDiagnosis} value={diagnosis.label} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, label: e.target.value } : line))} />
           <TextField label="Code (optional)" help={H.diagnosisCode} value={diagnosis.code ?? ''} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, code: e.target.value.trim() || undefined } : line))} />
           <SelectField label="Coding system" help={H.codingSystem} value={diagnosis.codingSystem ?? ''} options={['', 'ICD-10', 'SNOMED CT', 'local'].map((value) => ({ value, label: value || 'Not coded' }))} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, codingSystem: e.target.value ? e.target.value as 'ICD-10' | 'SNOMED CT' | 'local' : undefined } : line))} />
-          <SelectField label="Certainty" help={H.certainty} value={diagnosis.certainty ?? 'unknown'} options={['unknown', 'suspected', 'confirmed'].map((value) => ({ value, label: value }))} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, certainty: e.target.value as 'unknown' | 'confirmed' | 'suspected' } : line))} />
+          <SelectField label="Certainty" help={H.certainty} value={diagnosis.certainty ?? 'unknown'} options={(['unknown', 'suspected', 'confirmed'] as const).map((value) => ({ value, label: CERTAINTY_LABEL[value] }))} onChange={(e) => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.map((line, i) => i === index ? { ...line, certainty: e.target.value as 'unknown' | 'confirmed' | 'suspected' } : line))} />
           <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', d.diagnosis.diagnoses!.filter((_, i) => i !== index))}>Remove diagnosis</Button>
         </div>)}
         <Button variant="ghost" onClick={() => setField('diagnosis', 'diagnoses', [...(d.diagnosis.diagnoses ?? []), { label: '', certainty: 'unknown' }])}>Add another diagnosis</Button>

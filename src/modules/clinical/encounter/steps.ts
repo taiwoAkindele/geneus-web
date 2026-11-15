@@ -6,10 +6,10 @@ export type StepDef = { key: StepKey; title: string; hint: string; short: string
  *  what order, is decided per-encounter by `stepsFor`. */
 export const STEP_DEFS: Record<StepKey, StepDef> = {
   vitals: { key: 'vitals', title: 'Vitals', hint: 'Temperature, blood pressure, pulse, weight, SpO₂', short: 'Vitals' },
-  complaint: { key: 'complaint', title: 'Chief complaint & clinical note', hint: "What the patient reports, plus the clinician's note", short: 'Complaint' },
+  complaint: { key: 'complaint', title: 'Complaints', hint: "What the patient reports — chief complaint, other complaints and their history — plus the clinician's note", short: 'Complaints' },
   lab_order: { key: 'lab_order', title: 'Lab investigations ordered', hint: 'Tests requested for the patient', short: 'Lab order' },
   lab_results: { key: 'lab_results', title: 'Lab results', hint: 'Findings entered against each ordered test', short: 'Results' },
-  diagnosis: { key: 'diagnosis', title: 'Assessment / diagnosis', hint: 'Record the clinical assessment independently of treatment', short: 'Diagnosis' },
+  diagnosis: { key: 'diagnosis', title: 'Diagnoses', hint: 'What the clinician concludes — working or confirmed diagnoses, coded where known', short: 'Diagnoses' },
   result_review: { key: 'result_review', title: 'Review laboratory results', hint: 'Record clinical acknowledgment and any action taken', short: 'Result review' },
   investigation_review: { key: 'investigation_review', title: 'Investigation decision', hint: 'Record whether testing is required', short: 'Testing decision' },
   prescription: { key: 'prescription', title: 'Medication orders', hint: 'Prescribe or record no medication required', short: 'Prescription' },
@@ -20,6 +20,12 @@ export const STEP_DEFS: Record<StepKey, StepDef> = {
   admission: { key: 'admission', title: 'Admission to facility', hint: 'Ward, bed and admitting note', short: 'Admission' },
   follow_up: { key: 'follow_up', title: 'Follow-up & close encounter', hint: 'Book a review, then lock the encounter', short: 'Follow-up' },
 };
+
+/**
+ * How diagnostic certainty reads to a clinician. The stored values (and what insurance claims
+ * read) are unchanged: suspected is the provisional or working diagnosis, confirmed the final one.
+ */
+export const CERTAINTY_LABEL = { unknown: 'Not stated', suspected: 'Provisional / working', confirmed: 'Confirmed / final' } as const;
 
 /** Saving a disposition (other than observation) closes the encounter, so it can never be skipped. */
 export const isClosingStep = (key: StepKey): boolean => key === 'disposition';

@@ -18,6 +18,18 @@ const availableActions = (event: InpatientEvent): [InpatientAction, string][] =>
   if (['arrive','transfer','continue_care'].includes(event.action)) return [['transfer', 'Transfer bed'], ['ready_for_discharge', 'Ready for discharge'], ['discharge', 'Record unexpected departure']];
   return [];
 };
+/** Per ward: free beds, beds with a patient, and beds not usable yet (reserved, awaiting cleaning or needing review). */
+const wardBedCounts = (beds: readonly { ward?: { id: string; name: string }; state: BedState }[]) => {
+  const wards = new Map<string, { id: string; name: string; available: number; occupied: number; unavailable: number }>();
+  for (const { ward, state } of beds) {
+    const id = ward?.id ?? '', counts = wards.get(id) ?? { id, name: ward?.name ?? 'Ward not configured', available: 0, occupied: 0, unavailable: 0 };
+    if (state.status === 'Available') counts.available++;
+    else if (state.status === 'Occupied') counts.occupied++;
+    else counts.unavailable++;
+    wards.set(id, counts);
+  }
+  return [...wards.values()].sort((a, b) => a.name.localeCompare(b.name));
+};
 export const InpatientScreen = () => {
   const query = useInpatient(), patients = usePatients(), context = useAuthorizationContext();
   const [params, setParams] = useSearchParams();
@@ -69,6 +81,7 @@ export const InpatientScreen = () => {
       { key: 'status', label: 'Stay status', render: (stay) => <><Tag tone={stay.action === 'confirm' || stay.action === 'reserve' ? 'amber' : 'slate'}>{INPATIENT_STATUS[stay.action]}</Tag>{data.pending.has(stay.id) ? <p className="mt-2 text-sm text-amber-text">Pending server confirmation</p> : null}</> },
       { key: 'action', label: 'Next action', render: (stay) => <div className="flex flex-col items-start gap-2">{availableActions(stay).map(([action, label]) => <Button key={action} variant="outlined" fullWidth={false} disabled={!supported} onClick={() => setTask({ action, admission: stay })}>{label}</Button>)}<Button variant="ghost" fullWidth={false} onClick={() => setActivity(stay.admissionId)}>Stay activity</Button></div> },
     ]} /> : <p className="rounded-field border border-dashed border-outline p-6">No inpatient stays match this view.</p> : null}
+    {tab === 'beds' && beds.length ? <ul aria-label="Beds by ward" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{wardBedCounts(beds).map((ward) => <li key={ward.id} className="rounded-card border border-outline-soft bg-white p-4"><p className="font-bold">{ward.name}</p><p className="mt-1 text-sm"><span className="font-bold text-brand">{ward.available}</span> available · <span className="font-bold">{ward.occupied}</span> occupied · <span className="font-bold">{ward.unavailable}</span> unavailable</p></li>)}</ul> : null}
     {tab === 'beds' ? beds.length ? <WardTable caption="Ward bed board" rows={beds} rowKey={(row) => row.bed.id} columns={[
       { key: 'bed', label: 'Ward / bed', render: (row) => <><p className="font-bold">{row.ward?.name ?? 'Ward not configured'}</p><p>{row.bed.name}</p></> },
       { key: 'status', label: 'Bed status', render: (row) => <><Tag tone={['Cleaning','Conflict'].includes(row.state.status) ? 'amber' : 'slate'}>{row.state.status}</Tag>{[row.state.admission?.id, row.state.release?.id].some((id) => id && data.pending.has(id)) || data.ready.some((event) => event.bedId === row.bed.id && data.pending.has(event.id)) ? <p className="mt-2 text-sm text-amber-text">Pending server confirmation</p> : null}</> },

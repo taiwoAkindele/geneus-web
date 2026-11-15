@@ -31,8 +31,8 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         ...(data.vitals.respiratoryRate ? { respiratoryRate: measured(data.vitals.respiratoryRate) } : {}),
       };
     case 'complaint':
-      // Saved as one item: the complaints are free text, written as the patient put them.
-      return { complaints: data.complaint.text.trim() ? [data.complaint.text.trim()] : [], note: text(data.complaint.note), ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => {
+      // The chief complaint first, then each other complaint — free text, as the patient put them.
+      return { complaints: [data.complaint.text, ...(data.complaint.others ?? '').split(/\r?\n/)].map((c) => c.trim()).filter(Boolean), note: text(data.complaint.note), ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => {
         const value = data.complaint[key as keyof EncounterData['complaint']];
         return value?.trim() ? [[key, value.trim()]] : [];
       })) };
@@ -145,7 +145,7 @@ export const fromStepValues = (key: StepKey, values: unknown, data: EncounterDat
     }
     case 'complaint': {
       const v = ENCOUNTER_STEP_VALUES.complaint.parse(values) as EncounterStepValues['complaint'];
-      return { ...data, complaint: { text: v.complaints.join(', '), note: v.note ?? '', ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => v[key as keyof typeof v] ? [[key, v[key as keyof typeof v]]] : [])) } };
+      return { ...data, complaint: { text: v.complaints[0] ?? '', ...(v.complaints.length > 1 ? { others: v.complaints.slice(1).join('\n') } : {}), note: v.note ?? '', ...Object.fromEntries(['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => v[key as keyof typeof v] ? [[key, v[key as keyof typeof v]]] : [])) } };
     }
     case 'result_review': { const v = ENCOUNTER_STEP_VALUES.result_review.parse(values); return { ...data, result_review: { ...v, note: v.note ?? '' } }; }
     case 'investigation_review': { const v = ENCOUNTER_STEP_VALUES.investigation_review.parse(values); return { ...data, investigation_review: { ...v, reason: v.reason ?? '' } }; }

@@ -2,23 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import type { StaffEmailRequestView } from '@shared';
 import { decideEmailRequest, listEmailRequests } from '@/lib/api/selfService';
 import { VerificationRequired } from '@/lib/api/insurance';
-import { StaffVerification } from '@/modules/insurance/StaffVerification';
+import { StaffVerification, useStaffVerification } from '@/modules/insurance/StaffVerification';
 import { useAuthorizationContext } from '@/session';
 import { Button, useToast } from '@/ui';
 
 /**
- * Email addresses waiting for an administrator's confirmation, read from the
- * server (online, staff:manage). `undefined` while unknown: offline, refused or
- * still loading — callers then simply show nothing.
+ * Email addresses waiting for an administrator's confirmation, left from the
+ * retired confirmation flow (new addresses are proven by their owners). Read
+ * from the server (online, staff:manage, the administrator's verified session).
+ * `undefined` while unknown: offline, no session, refused or still loading —
+ * callers then simply show nothing.
  */
 export const usePendingEmailRequests = () => {
   const context = useAuthorizationContext();
+  const { hasServerSession } = useStaffVerification();
   const allowed = context.permissions.includes('staff:manage');
   const [requests, setRequests] = useState<StaffEmailRequestView[]>(); const [error, setError] = useState('');
   const load = useCallback(() => {
-    if (!allowed) return;
+    if (!allowed || !hasServerSession) return;
     void listEmailRequests(context).then((r) => { setRequests(r.requests); setError(''); }, (cause) => setError(cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN to continue.' : cause instanceof Error ? cause.message : 'Could not load'));
-  }, [context, allowed]);
+  }, [context, allowed, hasServerSession]);
   useEffect(() => { load(); }, [load]);
   return { allowed, requests, error, reload: load };
 };
@@ -37,7 +40,7 @@ export const EmailConfirmationsCard = ({ staffId }: { staffId?: string }) => {
   return <section id="email" aria-label="Staff email confirmations" className="space-y-3 rounded-card border border-outline-soft bg-white p-5">
     <h2 className="text-lg font-bold">{staffId ? 'Email address waiting for confirmation' : 'Staff email confirmations'}</h2>
     <p className="text-sm text-ink-muted">Confirm only after checking with the person that the address is theirs.</p>
-    <StaffVerification purpose="Confirming staff email addresses"><Requests requests={mine} error={pending.error} reload={pending.reload} /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Confirming staff email addresses"><Requests requests={mine} error={pending.error} reload={pending.reload} /></StaffVerification>
   </section>;
 };
 

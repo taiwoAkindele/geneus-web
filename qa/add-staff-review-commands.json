@@ -1,0 +1,6 @@
+[
+  { "role": "facility_admin", "width": 1440, "path": "/admin/staff/invite", "fill": { "label": "Full name", "value": "Synthetic Grace Adeyemi" }, "evaluate": "(document.querySelector('[name=staff_roles][value=nurse]').click(),document.querySelector('[name=staff_roles][value=doctor]').click(),true)", "scroll": 0, "name": "08-add-staff-configured-desktop", "assert": "document.querySelector('[aria-label=\"Effective access\"]').innerText.includes('Nurse, Doctor')&&!document.querySelector('button[type=submit]').disabled", "description": "Configured desktop: role selection and the live access summary are visible together" },
+  { "width": 390, "path": "/admin/staff/invite", "fill": { "label": "Full name", "value": "Synthetic Grace Adeyemi" }, "evaluate": "(document.querySelector('[name=staff_roles][value=nurse]').click(),true)", "scroll": 0, "name": "09-add-staff-configured-phone" },
+  { "evaluate": "(()=>{const s=document.querySelector('[name=staff_login_access]').closest('section');window.scrollTo({top:s.getBoundingClientRect().top+scrollY-88});return true})()", "name": "10-add-staff-phone-access", "assert": "document.documentElement.scrollWidth<=innerWidth&&!document.querySelector('button[type=submit]').disabled", "description": "Phone: access choices stay compact and the action remains available while reviewing" },
+  { "finish": true }
+]

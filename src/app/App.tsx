@@ -76,6 +76,9 @@ const ShiftLoginScreen = lazy(() =>
 const PinApprovalScreen = lazy(() =>
   import('@/app/screens/staff-onboarding/PinApprovalScreen').then((m) => ({ default: m.PinApprovalScreen })),
 );
+const InvitationScreen = lazy(() =>
+  import('@/app/screens/staff-onboarding/InvitationScreen').then((m) => ({ default: m.InvitationScreen })),
+);
 
 // Daily use
 const FacilityHomeScreen = lazy(() =>
@@ -200,6 +203,8 @@ const App = () => {
             <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
             <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
             <Route path="/onboarding/accept" element={<CreatePinScreen />} />
+            {/* Opened from an invitation email, on any device: it decides what this device needs. */}
+            <Route path="/onboarding/invitation" element={<InvitationScreen />} />
           </Route>
 
           {/* Daily use — behind the facility and shift guards */}

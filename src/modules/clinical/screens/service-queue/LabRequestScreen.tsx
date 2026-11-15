@@ -81,7 +81,7 @@ const LabRequest = () => {
       <ul className="flex flex-wrap gap-2">{order.tests.map((test, index) => { const item = order.items?.[index]; return <li key={orderKey(enc.data, index)}><Tag tone={resulted.has(orderKey(enc.data, index)) ? 'green' : 'neutral'}>{test}{item?.priority === 'urgent' ? ' · Urgent' : ''}{resulted.has(orderKey(enc.data, index)) ? ' · Resulted' : ''}</Tag></li>; })}</ul>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         {enc.sig.lab_order ? <div><dt className="font-bold text-ink-soft">Requested by</dt><dd>{enc.sig.lab_order.actor} · {enc.sig.lab_order.date} {enc.sig.lab_order.time}</dd></div> : null}
-        {enc.data.complaint.text.trim() ? <div><dt className="font-bold text-ink-soft">Complaint</dt><dd className="whitespace-pre-wrap">{enc.data.complaint.text}</dd></div> : null}
+        {enc.data.complaint.text.trim() || enc.data.complaint.others?.trim() ? <div><dt className="font-bold text-ink-soft">Complaints</dt><dd className="whitespace-pre-wrap">{[enc.data.complaint.text, enc.data.complaint.others].filter((c) => c?.trim()).join('\n')}</dd></div> : null}
         {order.reason?.trim() ? <div className="sm:col-span-2"><dt className="font-bold text-ink-soft">Reason for the tests</dt><dd className="whitespace-pre-wrap">{order.reason}</dd></div> : null}
       </dl>
     </section>

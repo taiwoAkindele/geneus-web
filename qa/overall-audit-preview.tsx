@@ -18,6 +18,7 @@ import { DevicesScreen } from '@/modules/administration/screens/facility-onboard
 import { StockScreen } from '@/modules/inventory/screens/stock/StockScreen';
 import { SetupWizardScreen } from '@/modules/administration/setup/SetupWizardScreen';
 import { FacilityWorkspace, ServiceWorkspace } from '@/modules/operations/workforce/Workspaces';
+import { StaffWorkspace } from '@/modules/operations/workforce/StaffWorkspace';
 import { SettingsLayout } from '@/app/settings/SettingsLayout';
 import { MonthlySummaryScreen } from '@/modules/reports/screens/monthly-summary/MonthlySummaryScreen';
 import { FacilityHomeScreen } from '@/app/screens/facility-home/FacilityHomeScreen';
@@ -386,7 +387,7 @@ Object.assign(window,{setPatientHistoryAccess:(allowed:boolean)=>{
   db.rows.patients.push(toRow('patient',Patient.parse({...envelope,id:'QA-PHC-000003-K4',patientId:'QA-PHC-000003-K4',type:'patient',fullName:'Never Visited Patient',address:'Synthetic address',phone:'08099990000',legacyPaperRef:'OLD-314',sex:'male',ageYears:25})));
   listeners.forEach(listener=>listener());
 }});
-const SETUP_TABLES: Record<string, string> = { service_definition: 'service_definitions', service_offering: 'service_offerings', unit: 'units', location: 'locations' };
+const SETUP_TABLES: Record<string, string> = { service_definition: 'service_definitions', service_offering: 'service_offerings', unit: 'units', location: 'locations', staff: 'staff' };
 /** The hospital in the setup-wizard report: lab tests adopted (each an offering), one draft care service, no others. */
 Object.assign(window, { seedSetupScenario: async () => {
   await saveDeviceCredential({ deviceId: envelope.deviceId, facilityId: envelope.facilityId, credential: 'qa-credential', syncEndpoint: 'https://sync.example.org' });
@@ -476,6 +477,7 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/setup" element={<SetupWizardScreen />} />
   <Route path="/settings" element={<SettingsLayout />}><Route path="facility" element={<FacilityWorkspace />} /></Route>
   <Route path="/facility/services/:offeringId" element={<ServiceWorkspace />} />
+  <Route path="/admin/staff/:staffId" element={<StaffWorkspace />} />
   <Route path="/laboratory/settings/tests" element={<InvestigationCatalogueScreen />} />
   <Route path="/insurance" element={<InsuranceWorkspace />} />
   <Route path="/insurance/contracts" element={<ContractsScreen />} />

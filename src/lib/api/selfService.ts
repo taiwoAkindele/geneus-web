@@ -29,7 +29,7 @@ export const saveTimeZone = (context: AuthorizationContext, timeZone: string, re
 export const saveFacilityDetails = (context: AuthorizationContext, details: FacilityDetailsUpdate) => send<{ changed: string[] }>(context, '/facility/details', details, true);
 export const ownEmailStatus = (context: AuthorizationContext) => send<OwnEmailStatus>(context, '/staff/me/email/status', { staffId: context.userId }, false);
 export const requestOwnEmailCode = (context: AuthorizationContext, email: string) => send<{ sentTo: string; expiresOn: string }>(context, '/staff/me/email/code', { staffId: context.userId, email }, false);
-export const confirmOwnEmail = (context: AuthorizationContext, email: string, code: string) => send<{ status: 'verified' | 'pending_approval' }>(context, '/staff/me/email', { staffId: context.userId, email, code }, false);
+export const confirmOwnEmail = (context: AuthorizationContext, email: string, code: string) => send<{ status: 'verified' }>(context, '/staff/me/email', { staffId: context.userId, email, code }, false);
 export const listEmailRequests = (context: AuthorizationContext) => send<{ requests: StaffEmailRequestView[] }>(context, '/staff/email-requests/list', {}, true);
 export const decideEmailRequest = (context: AuthorizationContext, id: string, decision: 'approve' | 'reject', note?: string) =>
   send<{ ok: true }>(context, `/staff/email-requests/${encodeURIComponent(id)}/decide`, { decision, ...(note?.trim() ? { note: note.trim() } : {}) }, true);

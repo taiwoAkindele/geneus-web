@@ -188,6 +188,11 @@ export const saveWeeklyOccurrence = async (fields: Record<string, unknown>, cont
   }
   return saveWorkforce('service_session', fields, context, undefined, id);
 };
+/** One place of a batch ("Bed 1" … "Bed N"). Its id is fixed by the batch and position, so retrying an interrupted batch keeps what was saved. */
+export const saveBatchPlace = async (fields: Record<string, unknown>, context: AuthorizationContext, batchId: string, index: number): Promise<AnyDocument> => {
+  const id = `location:${batchId}:${index + 1}`;
+  return await findRecord<AnyDocument>('location', id) ?? saveWorkforce('location', fields, context, undefined, id);
+};
 export const validateAllocation = async (appointment: Appointment): Promise<void> => {
   if (appointment.allocation) {
     const data = await loadWorkforce();

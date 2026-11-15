@@ -30,8 +30,8 @@ export type EncounterData = {
   disposition: { kind: '' | 'home_care' | 'observation' | 'referral' | 'admission'; note: string; responsibleService: string; reassessOn: string; toFacilityId: string; previousEntryId?: string; followUpOn: string };
 
   vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string; height?: string; respiratoryRate?: string };
-  /** The complaints as typed, in the patient's words — free text, not a fixed list. */
-  complaint: { text: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
+  /** In the patient's words: `text` is the chief complaint, `others` any further complaints, one per line. */
+  complaint: { text: string; others?: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
   lab_order: { tests: string[]; items?: InvestigationItem[]; reason?: string };
   lab_results: Record<string, string>;
   /** Tests with a result template, by order item (or test name); others use `lab_results` text. */

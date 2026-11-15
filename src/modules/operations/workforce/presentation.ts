@@ -1,4 +1,4 @@
-import type { AnyDocument, SessionEvent, Unit } from '@shared';
+import { wardForBed, type AnyDocument, type Location, type SessionEvent, type Unit } from '@shared';
 import { eventHeads, type WorkforceData } from '@/data/repos/workforce';
 export const intakeLabel=(events:readonly SessionEvent[],data:Pick<WorkforceData,'pending'|'receipts'|'rejections'>):string=>{
   const refused=new Set([...data.receipts.filter((r)=>r.outcome==='rejected').map((r)=>r.id),...data.rejections.filter((r)=>r.type==='sync_rejection'&&!r.resolvedOn).map((r)=>r.type==='sync_rejection'?r.entityId:'')]);
@@ -19,3 +19,9 @@ export const unitPath = (id: string, units: readonly Unit[]): string => {
 };
 export const recordName = (record: AnyDocument): string => 'name' in record ? String(record.name) : 'label' in record ? String(record.label) : 'fullName' in record ? String(record.fullName) : humanize(record.type);
 export const proposalState = (record: AnyDocument, data: WorkforceData): string => data.pending.has(record.id) ? 'Saved here · awaiting server' : data.receipts.some((r) => r.id === record.id && r.outcome === 'rejected') || data.rejections.some((r) => r.type === 'sync_rejection' && r.entityId === record.id && !r.resolvedOn) ? 'Needs reconciliation' : 'Server accepted';
+/** A place's type, and for a ward how many active beds it holds (directly or inside its rooms). */
+export const placeDetail = (place: Location, locations: readonly Location[]): string => {
+  if (place.kind !== 'ward') return humanize(place.kind);
+  const beds = locations.filter((l) => l.kind === 'bed' && l.active && wardForBed(l, locations)?.id === place.id).length;
+  return `${humanize(place.kind)} · ${beds} bed${beds === 1 ? '' : 's'}`;
+};
