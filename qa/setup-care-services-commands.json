@@ -21,15 +21,8 @@
     "description": "A predefined service asks only for team and place, with a non-laboratory team and its own room chosen by default"
   },
   {
-    "assert": "(()=>{const d=document.querySelector('dialog[open]');const add=[...d.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add care service');return d.innerText.includes('Confirm it is you')&&add.disabled})()",
-    "description": "Without a confirmed staff session the sheet asks for the PIN and nothing can be saved"
-  },
-  { "fill": { "label": "Your PIN", "value": "123456" } },
-  {
-    "click": "Confirm",
-    "name": "setup-care-services-pin-confirmed",
-    "assert": "(()=>{const d=document.querySelector('dialog[open]');const add=[...d.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add care service');return !d.innerText.includes('Confirm it is you')&&!add.disabled})()",
-    "description": "After the PIN is confirmed by the server the service can be added"
+    "assert": "(()=>{const d=document.querySelector('dialog[open]');const add=[...d.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add care service');return !document.body.innerText.includes('Confirm it is you')&&!add.disabled})()",
+    "description": "No PIN confirmation is asked for: the service can be added straight away"
   },
   {
     "click": "Add care service",

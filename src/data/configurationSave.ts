@@ -63,13 +63,12 @@ export const saveConfiguration = async (context: AuthorizationContext, writes: r
   const device = getDeviceCredential();
   if (!device) throw new ConfigurationSaveError('failed', 'This device is not enrolled');
   const token = staffSessionToken(context);
-  if (!token) throw new ConfigurationSaveError('needs_pin', 'Confirm your PIN to save settings.');
   announce({ phase: 'saving' });
   try {
-    await staffRequest<ConfigurationSaveResponse>('/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(toMutation) });
+    await staffRequest<ConfigurationSaveResponse>('/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(toMutation) }, context.userId);
     touchStaffSession();
   } catch (cause) {
-    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); announce({ phase: 'refused', message: 'Confirm your PIN to save settings.' }); throw new ConfigurationSaveError('needs_pin', 'Confirm your PIN to save settings.'); }
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); announce({ phase: 'refused', message: 'Sign in again to save settings.' }); throw new ConfigurationSaveError('needs_pin', 'Sign in again to save settings.'); }
     if (cause instanceof ApiError && cause.code === 'offline') { announce({ phase: 'refused', message: cause.message }); throw new ConfigurationSaveError('offline', 'The server could not be reached, so nothing was saved. Connect, then save again.'); }
     const message = cause instanceof ApiError && cause.code === 'configuration_refused' ? `Not saved: ${cause.message}` : cause instanceof Error ? cause.message : 'The settings could not be saved';
     announce({ phase: 'refused', message });

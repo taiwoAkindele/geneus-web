@@ -397,6 +397,8 @@ Object.assign(window, { seedSetupScenario: async () => {
     if (url.endsWith('/staff/session')) return JSON.parse(String(init?.body)).pin === '123456'
       ? reply(200, { token: 'qa-session', staffId: actorId, expiresOn: new Date(Date.now() + 3600_000).toISOString(), idleMinutes: 30 })
       : reply(401, { error: 'wrong_pin', message: 'That PIN is not right' });
+    // The app names the person signed in; the synthetic server refuses a save without one, as the real one does.
+    if (url.endsWith('/config/save') && !new Headers(init?.headers).get('x-actor-staff-id')) return reply(403, { error: 'staff_required', message: 'Sign in to save settings' });
     if (url.endsWith('/config/save')) {
       const { mutations } = JSON.parse(String(init?.body)) as { mutations: { op: string; table: string; id: string; data: Record<string, unknown> }[] };
       for (const m of mutations) if (m.op === 'put') db.rows[SETUP_TABLES[m.table]].push(toRow(m.table as never, m.data));

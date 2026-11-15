@@ -1,7 +1,7 @@
 import type { ClaimSettlement, DiagnosisCatalogueImport, DiagnosisCatalogueSummary, DisputeOpen, DisputeResolve, LiabilityChange, PayerDecisionInput, RemittanceInput, RemittanceMatch, RemittanceRow, WriteOffInput } from '@shared';
 import type { AllocationSplit, AuthorizationContext, AuthorizationInput, ClaimAcknowledgementInput, ClaimAuthorization, ClaimIssue, ClaimState, ClaimSubmissionInput, ClaimView, ImportKind, ImportTemplate, ImportTemplateSave, InsuranceDocument, InsuranceDocumentUpload, InsuranceSetupStatus, InsuranceState, Payer, PayerContractTerms, PayerContractVersion, Refund, StoredSubmissionProfile, SubmissionProfile, TariffImport, TariffImportResult, UnsupportedTerm } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
-import { ApiError, binaryRequest, staffRequest } from './client';
+import { ApiError, binaryRequest, staffHeaders, staffRequest } from './client';
 import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
 
 /**
@@ -18,9 +18,8 @@ const call = async <T>(context: AuthorizationContext, path: string, body: unknow
   const device = getDeviceCredential();
   if (!device) throw new Error('This device is not enrolled');
   const token = staffSessionToken(context);
-  if (!token) throw new VerificationRequired();
   try {
-    const result = await staffRequest<T>(path, device.credential, token, body);
+    const result = await staffRequest<T>(path, device.credential, token, body, context.userId);
     touchStaffSession();
     return result;
   } catch (cause) {
@@ -92,11 +91,11 @@ const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((b) => b.to
 export const uploadInsuranceDocument = async (context: AuthorizationContext, file: File, meta: InsuranceDocumentUpload): Promise<InsuranceDocument> => {
   if (file.size > DOCUMENT_MAX_BYTES) throw new Error('Choose a PDF or image up to 10 MB');
   const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
-  const token = staffSessionToken(context); if (!token) throw new VerificationRequired();
+  const token = staffSessionToken(context);
   const bytes = await file.arrayBuffer();
   try {
     const response = await binaryRequest('/insurance/documents', { method: 'POST', cache: 'no-store', body: bytes, headers: {
-      authorization: `Bearer ${device.credential}`, 'x-staff-session': token, 'content-type': 'application/octet-stream',
+      authorization: `Bearer ${device.credential}`, ...staffHeaders(token, context.userId), 'content-type': 'application/octet-stream',
       'x-file-sha256': hex(await crypto.subtle.digest('SHA-256', bytes)), 'x-document-meta': encodeURIComponent(JSON.stringify(meta)),
     } });
     return await response.json() as InsuranceDocument;
@@ -109,8 +108,8 @@ export const uploadInsuranceDocument = async (context: AuthorizationContext, fil
 /** Downloads a stored document to the user's device; the server audits every download. */
 export const downloadInsuranceDocument = async (context: AuthorizationContext, document_: InsuranceDocument) => {
   const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled');
-  const token = staffSessionToken(context); if (!token) throw new VerificationRequired();
-  const response = await binaryRequest(`/insurance/documents/${encodeURIComponent(document_.id)}/file`, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${device.credential}`, 'x-staff-session': token } });
+  const token = staffSessionToken(context);
+  const response = await binaryRequest(`/insurance/documents/${encodeURIComponent(document_.id)}/file`, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${device.credential}`, ...staffHeaders(token, context.userId) } });
   const url = URL.createObjectURL(await response.blob());
   try { const a = document.createElement('a'); a.href = url; a.download = document_.fileName; a.click(); } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
 };
