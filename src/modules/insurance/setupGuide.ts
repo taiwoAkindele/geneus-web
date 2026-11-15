@@ -16,7 +16,7 @@ export const DEVICE_REASONS: Record<DeviceBlockReason, { problem: string; fix: s
   revoked_with_unsent_changes: { problem: 'was revoked while it still held unsent work', fix: 'The administrator activating a contract confirms that this work will not arrive.' },
 };
 
-const payerStep = (payer: { id: string; name: string }, text: string, label: string) => ({ text, action: { label, to: `/settings/insurance/payers?payer=${encodeURIComponent(payer.id)}` } });
+const payerStep = (payer: { id: string; name: string }, text: string, label: string) => ({ text, action: { label, to: `/insurance/settings/payers?payer=${encodeURIComponent(payer.id)}` } });
 
 export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
   switch (item.kind) {
@@ -26,19 +26,19 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
         : { title: 'Facility time zone', status: 'Facility time zone has not been configured.', why: 'This is required to calculate insurance service dates accurately: cover checks and contract dates are judged by the local date of each service.', who: 'Facility administrator', steps: [], action: { label: 'Configure time zone', to: '/settings/facility?view=settings' } };
     case 'payers_added':
       return { title: 'Payers', status: item.ok ? `${item.count} payer${item.count === 1 ? '' : 's'} added` : 'No payers have been added yet.', why: 'Cover, contracts and claims all belong to a payer: an HMO, a state scheme or a company.', who: 'Insurance officer',
-        steps: [], action: { label: item.ok ? 'Manage payers' : 'Add a payer', to: '/settings/insurance/payers' } };
+        steps: [], action: { label: item.ok ? 'Manage payers' : 'Add a payer', to: '/insurance/settings/payers' } };
     case 'active_contract': {
       const missing = item.payers ?? [];
       return { title: 'Active contracts', status: item.ok ? `${item.count} active contract${item.count === 1 ? '' : 's'}${missing.length ? `; ${missing.length} payer${missing.length === 1 ? '' : 's'} still without one` : ''}` : 'No contract is active yet.',
         why: 'What a patient and a payer each owe comes from the payer\'s contract. Without one, insured charges cannot be estimated.', who: 'Insurance officer prepares it; a facility administrator activates it',
-        steps: missing.map((p) => payerStep(p, `${p.name} has no active contract.`, `Set up ${p.name}'s contract`)), ...(missing.length ? {} : { action: { label: 'Payers & contracts', to: '/settings/insurance/payers' } }) };
+        steps: missing.map((p) => payerStep(p, `${p.name} has no active contract.`, `Set up ${p.name}'s contract`)), ...(missing.length ? {} : { action: { label: 'Payers & contracts', to: '/insurance/settings/payers' } }) };
     }
     case 'officer_with_verified_email': {
       // Who can confirm insurance work: administrators always can; the server knows who they are from their PIN.
       const people = item.people ?? [];
       return { title: 'Someone who can confirm insurance work', status: item.ok ? `${people.map((p) => p.name).join(', ') || item.count + ' people'} can confirm insurance work` : 'Nobody here can confirm insurance work.',
         why: 'Confirming insurance splits and preparing claims is done by an administrator or an insurance officer.', who: 'Facility administrator',
-        steps: item.ok ? [] : [{ text: 'Give someone the insurance officer role.', action: { label: 'Open Staff & access', to: '/settings/staff' } }] };
+        steps: item.ok ? [] : [{ text: 'Give someone the insurance officer role.', action: { label: 'Open Staff', to: '/admin/staff' } }] };
     }
     case 'devices_ready': {
       const devices = item.devices ?? [];

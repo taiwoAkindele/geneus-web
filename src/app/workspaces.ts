@@ -2,10 +2,10 @@ import type { AuthorizationContext, Permission, Role } from '@shared';
 import { clinicalDocumentAccess } from '@shared';
 import type { IconName } from '@/ui';
 import { navigationFor } from './navigation';
-import { insuranceBillingWork } from '@/data/insuranceSupport';
+import { insuranceBillingWork, insuranceSupported } from '@/data/insuranceSupport';
 import { settingsTabsFor } from './settings/settingsTabs';
 
-export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'inventory' | 'reports' | 'settings';
+export type WorkspaceId = 'front-desk' | 'clinical' | 'finance' | 'inventory' | 'reports' | 'staff' | 'settings';
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'> & Partial<Pick<AuthorizationContext, 'facilityId' | 'deviceId'>>;
 /** `also` lists other pages that belong to this link, so it stays highlighted there. */
 export type WorkspaceLink = { key: string; label: string; description: string; to: string; icon: IconName; also?: readonly string[] };
@@ -53,8 +53,10 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       link('transfers', 'Transfer reconciliation', 'Match incoming transfers to the correct account.', '/billing?tab=transfers', 'referrals'),
       link('financial-reports', 'Payments & financial reports', 'Review collections and recorded receipts.', '/billing?tab=reports', 'month'),
     ] : []),
-      // Daily insurance work appears once billing is active; setting insurance up lives under Settings.
-      ...(insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund') ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
+      // Daily insurance work appears once billing is active. During setup it also shows to the people
+      // setting insurance up, because its header Settings menu is where that setup lives.
+      ...((insuranceBillingWork(context) && has(context, 'coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund'))
+        || (insuranceSupported(context) && has(context, 'insurance_contract:manage', 'insurance_contract:activate')) ? [link('insurance', 'Insurance work', 'Confirm insurance splits, resolve undecided cover and refund credits.', '/insurance', 'finance')] : []),
       ...(insuranceBillingWork(context) && has(context, 'coverage:confirm') ? [link('claims', 'Claims', 'Prepare, export and record claims to payers.', '/insurance/claims', 'month')] : []),
       ...(insuranceBillingWork(context) && has(context, 'insurance_remittance:record') ? [link('payer-payments', 'Payer payments', 'Record what payers paid and follow up what they still owe.', '/insurance/payments', 'finance')] : []),
     ] },
@@ -63,10 +65,12 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(keys.has('registers') ? [link('registers', 'Register books', 'Record and review entries in facility programme books.', '/registers', 'registers')] : []),
       ...(keys.has('month') ? [link('monthly', 'Monthly reports', 'Review recorded facility activity by month.', '/reports/month', 'month')] : []),
     ] : [] },
-    // Every facility setting, one page per area: the same tabs as the Settings page.
-    { id: 'settings', label: 'Settings', description: 'Facility, staff, devices, billing and insurance setup', icon: 'settings', links: settingsTabsFor(context).map((tab) => ({
+    // People, their facility access, roster and coverage: one page with its own sections.
+    { id: 'staff', label: 'Staff', description: 'People, access, roster and coverage', icon: 'patients', links: keys.has('staff') ? [link('staff', 'Staff', 'People, facility access, roster and coverage.', '/admin/staff', 'patients')] : [] },
+    // Facility-wide settings, one page per area: the same tabs as the Settings page.
+    { id: 'settings', label: 'Settings', description: 'Facility, devices, organization and account', icon: 'settings', links: settingsTabsFor(context).map((tab) => ({
       ...link(tab.key === 'devices' ? 'devices' : `settings-${tab.key}`, tab.label, tab.description, tab.to, tab.icon),
-      ...(tab.key === 'staff' ? { also: ['/admin/staff'] } : tab.key === 'facility' ? { also: ['/facility'] } : tab.key === 'catalogue' ? { also: ['/investigations'] } : {}),
+      ...(tab.key === 'facility' ? { also: ['/facility'] } : {}),
     })) },
   ];
   return modules.filter((workspace) => workspace.links.length > 0);
@@ -78,9 +82,12 @@ export const workspaceForLocation = (pathname: string, _search: string, availabl
   if (pathname.startsWith('/workspace/')) return find(pathname.split('/')[2]);
   if (pathname === '/home' || pathname === '/sync') return undefined;
   if (pathname.startsWith('/patients')) return find(preferred === 'finance' || preferred === 'clinical' ? preferred : 'front-desk');
+  if (pathname === '/admin/staff' || pathname.startsWith('/admin/staff/')) return find('staff');
   if (pathname.startsWith('/settings') || pathname.startsWith('/admin')) return find('settings');
-  if (pathname.startsWith('/referrals')) return find('clinical');
-  if (pathname.startsWith('/investigations') || pathname.startsWith('/organization') || pathname.startsWith('/facility')) return find('settings');
+  if (pathname.startsWith('/referrals') || pathname.startsWith('/investigations')) return find('clinical');
+  if (pathname.startsWith('/organization') || pathname.startsWith('/facility')) return find('settings');
+  // Insurance work and its settings belong to the Finance module.
+  if (pathname === '/insurance' || pathname.startsWith('/insurance/')) return find('finance');
   if (pathname.startsWith('/documents') || pathname.startsWith('/admissions') || pathname.startsWith('/encounters') || pathname.startsWith('/clinical/') || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/laboratory/') || pathname.startsWith('/pharmacy/') || pathname.startsWith('/units') || pathname === '/clinical-reviews') return find('clinical');
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') return find('finance');
   if (pathname.startsWith('/stock')) return find('inventory');

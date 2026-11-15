@@ -7,7 +7,9 @@ import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { settingsTabsFor } from './settingsTabs';
 
 /**
- * Settings: everything a facility configures, one tab per area. Settings are
+ * Settings: facility-wide configuration, one tab per area. Module setup (lab
+ * catalogue, fees, insurance) lives in each module's Settings menu and Staff
+ * is its own module. Settings are
  * readable offline from this device's copy, but saved only online, in the
  * name of the person signed in, and only once the server accepts them.
  */
@@ -33,8 +35,8 @@ export const SettingsLayout = () => {
   </div>;
 };
 
-/** Connection, identity and save state, so nobody wonders whether a setting was saved. */
-const SaveStatus = () => {
+/** Connection, identity and save state, so nobody wonders whether a setting was saved. Also shown on module settings pages. */
+export const SaveStatus = () => {
   const sync = useSyncStatus();
   const [state, setState] = useState<ConfigurationSaveState>();
   useEffect(() => {

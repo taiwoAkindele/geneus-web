@@ -13,6 +13,7 @@ import { Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
 import { UNDETERMINED } from './coverageLabels';
 import { StaffVerification } from './StaffVerification';
 import { useDeviceInsurance } from './CoverCard';
+import { ModuleSettingsMenu } from '@/app/ModuleSettingsMenu';
 
 type Row = ReturnType<typeof billingRows>[number];
 
@@ -92,7 +93,7 @@ export const InsuranceWorkspace = () => {
     return { routine, exceptions, undetermined, selfPaidWhileCovered, credits, names };
   }, [data]);
 
-  if (insurance !== 'active' && insurance !== 'history') return <main className="p-4"><h1 className="text-xl font-bold">Insurance work</h1><p className="mt-2 text-sm">{insurance === 'setup' ? 'The hospital is setting up insurance. There is no insurance billing work until billing is activated.' : 'Insurance is off for this hospital.'} See <Link className="font-semibold text-brand" to="/settings/insurance/setup">Insurance settings</Link>.</p></main>;
+  if (insurance !== 'active' && insurance !== 'history') return <main className="p-4"><header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-xl font-bold">Insurance work</h1><ModuleSettingsMenu module="insurance" /></header><p className="mt-2 text-sm">{insurance === 'setup' ? 'The hospital is setting up insurance. There is no insurance billing work until billing is activated.' : 'Insurance is off for this hospital.'} See <Link className="font-semibold text-brand" to="/insurance/settings/setup">Insurance settings</Link>.</p></main>;
   if (!view) return <main className="p-4"><p role="status">Loading insurance work…</p></main>;
   const canConfirm = context.permissions.includes('coverage:confirm');
   const money = (rows: Row[], pick: (r: Row) => number) => [...new Set(rows.map((r) => r.charge.currency))].map((c) => formatMoney(rows.filter((r) => r.charge.currency === c).reduce((n, r) => n + pick(r), 0), c)).join(' + ');
@@ -111,7 +112,7 @@ export const InsuranceWorkspace = () => {
 
   return <main className="mx-auto max-w-4xl space-y-6 p-4">
     <header className="flex flex-wrap items-end justify-between gap-2"><div><h1 className="text-2xl font-extrabold">Insurance work</h1><p className="text-sm text-ink-soft">Confirm insurance splits, resolve undecided cover and refund credits.</p></div>
-      {context.permissions.some((p) => p.startsWith('insurance_contract:')) ? <Link className="font-bold text-brand underline" to="/settings/insurance/payers">Payers &amp; contracts</Link> : null}</header>
+      <ModuleSettingsMenu module="insurance" /></header>
     {error ? <p role="alert" className="rounded-field border border-danger bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
     {outcomes.some((o) => o.outcome === 'skipped') ? <section aria-label="Needs review" className="rounded-card border border-amber-border bg-amber-bg p-3 text-sm"><p className="font-bold">Not confirmed</p><ul>{outcomes.filter((o): o is Extract<ConfirmOutcome, { outcome: 'skipped' }> => o.outcome === 'skipped').map((o) => <li key={o.chargeId}>{data?.charges.find((c) => c.id === o.chargeId)?.description ?? o.chargeId}: {SKIP_REASONS[o.reason] ?? (o.reason.startsWith('undetermined:') ? UNDETERMINED[o.reason.slice(13) as UndeterminedReason]?.label ?? o.reason : o.reason)}</li>)}</ul></section> : null}
 

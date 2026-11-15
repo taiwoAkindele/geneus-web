@@ -56,7 +56,7 @@ const CopySheet = ({ onClose }: { onClose: () => void }) => {
       <p className="text-sm text-ink-soft">The copy starts as a draft with the same parts. Choose the tests it is for before putting it in use.</p>
       {settings.data?.templates.length ? <ul className="divide-y divide-outline-soft">{settings.data.templates.map((t) => <li key={t.id} className="flex items-center justify-between gap-3 py-2">
         <span className="text-sm"><b>{t.name}</b><span className="block text-xs text-ink-soft">{templateResultType(t.parts)} · {t.parts.length} {t.parts.length === 1 ? 'part' : 'parts'}</span></span>
-        <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(`/investigations/settings/templates/new?copy=${encodeURIComponent(t.id)}`)}>Copy</Button>
+        <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(`/laboratory/settings/templates/new?copy=${encodeURIComponent(t.id)}`)}>Copy</Button>
       </li>)}</ul> : <p className="text-sm">There are no templates to copy yet.</p>}
       <SheetCancelButton />
     </div>
@@ -115,13 +115,13 @@ export const CatalogueSettingsScreen = () => {
   const close = () => { setPanel(undefined); templates.reload(); parts.reload(); lists.reload(); allLists.reload(); };
 
   const templateColumns: TableColumn<TemplateRow>[] = [
-    { key: 'name', label: 'Template', render: ({ template }) => <div className="min-w-[180px]"><Link className="font-bold text-brand" to={`/investigations/settings/templates/${encodeURIComponent(template.id)}`}>{template.name}</Link><p className="text-xs text-ink-soft">Updated {updated(template)}</p></div> },
+    { key: 'name', label: 'Template', render: ({ template }) => <div className="min-w-[180px]"><Link className="font-bold text-brand" to={`/laboratory/settings/templates/${encodeURIComponent(template.id)}`}>{template.name}</Link><p className="text-xs text-ink-soft">Updated {updated(template)}</p></div> },
     { key: 'type', label: 'Result type', className: 'hidden md:table-cell', render: ({ template }) => templateResultType(template.parts) },
     { key: 'parts', label: 'Parts', className: 'hidden md:table-cell', render: ({ template }) => template.parts.length },
     // One line, ending in "…" when long; the full list is the tooltip and is read in full by screen readers.
     { key: 'tests', label: 'Used by', render: ({ tests }) => tests.length ? <span className="block max-w-[320px] truncate" title={tests.join(', ')}>{tests.join(', ')}</span> : <span className="text-ink-soft">No tests yet</span> },
     { key: 'status', label: 'Status', render: ({ template }) => <Tag className="whitespace-nowrap" tone={STATUS_TONES[template.status]}>{STATUS_LABELS[template.status]}</Tag> },
-    { key: 'actions', label: 'Action', render: ({ template }) => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(`/investigations/settings/templates/${encodeURIComponent(template.id)}`)}>Edit</Button> },
+    { key: 'actions', label: 'Action', render: ({ template }) => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(`/laboratory/settings/templates/${encodeURIComponent(template.id)}`)}>Edit</Button> },
   ];
   const partColumns: TableColumn<{ part: ResultPartDefinition; uses: number }>[] = [
     { key: 'name', label: 'Part', render: ({ part }) => <p className="font-bold">{part.part.label}{part.active ? null : <Tag className="ml-2">Not available</Tag>}</p> },
@@ -140,7 +140,7 @@ export const CatalogueSettingsScreen = () => {
   const createActions = [
     { label: 'Start from a standard template', onSelect: () => setPanel('standard') },
     { label: 'Copy one of your templates', onSelect: () => setPanel('copy') },
-    { label: 'Start blank', onSelect: () => navigate('/investigations/settings/templates/new') },
+    { label: 'Start blank', onSelect: () => navigate('/laboratory/settings/templates/new') },
   ];
   const current = tab === 'templates' ? templates : tab === 'parts' ? parts : lists;
   const searchLabel = tab === 'templates' ? 'Search templates' : tab === 'parts' ? 'Search parts' : 'Search answer lists';
@@ -148,8 +148,7 @@ export const CatalogueSettingsScreen = () => {
   const editingList = typeof panel === 'object' && panel.kind === 'list' ? panel : undefined;
 
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
-    <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-ink-soft"><Link className="font-bold text-brand" to="/investigations/catalogue">Investigation catalogue</Link><span aria-hidden="true">›</span><span>Settings</span></nav>
-    <h1 className="text-[28px] font-extrabold">Catalogue settings</h1>
+    <h1 className="text-[28px] font-extrabold">Result templates</h1>
     <SectionTabs label="Settings sections" value={tab} options={TABS} onChange={(value) => set({ tab: value === 'templates' ? '' : value, q: '', page: '' })} />
     <div className="flex flex-wrap items-end gap-3">
       <div className="min-w-0 flex-[1_1_240px]"><label htmlFor="settings-search" className="mb-2 block text-sm font-bold">{searchLabel}</label><div className="flex min-h-[52px] items-center gap-3 rounded-field border border-outline px-4"><Icon name="search" className="h-5 w-5 shrink-0 text-ink-soft" /><input id="settings-search" type="search" value={query} onChange={(e) => set({ q: e.target.value, page: '' })} placeholder={tab === 'templates' ? 'Template name or test name' : tab === 'parts' ? 'Part name' : 'List name or answer'} className="min-w-0 flex-1 border-0 bg-transparent p-0 outline-none" autoComplete="off" /></div></div>

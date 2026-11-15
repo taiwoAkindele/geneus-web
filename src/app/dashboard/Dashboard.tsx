@@ -63,7 +63,7 @@ const FacilityWork = () => {
   const actions = [
     ...(canStaff ? [{ label: 'Staff & roster', detail: `${roster.length} active staff profiles · not an attendance count`, to: '/admin/staff', icon: 'patients' as const }] : []),
     ...(context.permissions.includes('unit:manage') ? [{ label: 'Units & rooms', detail: `${units.data?.filter((unit) => unit.active).length ?? 0} active units`, to: '/admin/units', icon: 'referrals' as const }] : []),
-    ...(context.permissions.includes('fee_item:manage') ? [{ label: 'Fees & payment setup', detail: 'Prices, departments and receiving accounts', to: '/settings/billing/fees', icon: 'registers' as const }] : []),
+    ...(context.permissions.includes('fee_item:manage') ? [{ label: 'Fees & payment setup', detail: 'Prices, departments and receiving accounts', to: '/billing/settings/fees', icon: 'registers' as const }] : []),
     ...(context.permissions.includes('device:enroll') || context.permissions.includes('device:revoke') ? [{ label: 'Facility devices', detail: 'Enrollment and device access', to: '/settings/devices', icon: 'lock' as const }] : []),
   ];
   return <Section title="Facility management" description="Your management duties, alongside your daily work." to="/settings" linkLabel="Settings" loading={loading || units.loading} error={error ?? units.error} reload={() => { reload(); units.reload(); }}>

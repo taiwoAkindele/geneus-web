@@ -34,10 +34,10 @@ const HELP: Record<SetupStepId, string> = {
   staff: 'Add the people who work here, give them their duties and plan their shifts so they can sign in.',
 };
 const LATER = [
-  { label: 'Payment accounts', description: 'Receiving accounts for transfers and cards.', to: '/settings/billing/payments' },
-  { label: 'Lab catalogue', description: 'Tests, result templates and their prices.', to: '/settings/catalogue' },
+  { label: 'Payment accounts', description: 'Receiving accounts for transfers and cards.', to: '/billing/settings/payments' },
+  { label: 'Lab catalogue', description: 'Tests, result templates and their prices.', to: '/laboratory/settings/tests' },
   { label: 'Pharmacy stock', description: 'Medicines, supplies and their selling prices.', to: '/stock' },
-  { label: 'Insurance', description: 'Payers, contracts and claims readiness.', to: '/settings/insurance/setup' },
+  { label: 'Insurance', description: 'Payers, contracts and claims readiness.', to: '/insurance/settings/setup' },
   { label: 'Devices', description: 'Enroll the other devices staff will use.', to: '/settings/devices' },
 ];
 
@@ -64,8 +64,8 @@ const Links = ({ items }: { items: { label: string; to: string; primary?: boolea
 
 const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
   if (step === 'facility') return <FacilityDetailsStep />;
-  if (step === 'prices') return <Links items={[{ label: 'Open price list', to: '/settings/billing/fees', primary: true }, { label: 'Link stock prices', to: '/stock' }]} />;
-  if (step === 'staff') return <Links items={[{ label: 'Open staff & access', to: '/settings/staff', primary: true }, { label: 'Invite staff', to: '/admin/staff/invite' }]} />;
+  if (step === 'prices') return <Links items={[{ label: 'Open price list', to: '/billing/settings/fees', primary: true }, { label: 'Link stock prices', to: '/stock' }]} />;
+  if (step === 'staff') return <Links items={[{ label: 'Open Staff', to: '/admin/staff', primary: true }, { label: 'Invite staff', to: '/admin/staff/invite' }]} />;
   if (step === 'services') return <CareServicesStep />;
   return <StepEditor step={step} />;
 };

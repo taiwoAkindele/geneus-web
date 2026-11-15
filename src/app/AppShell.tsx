@@ -153,7 +153,7 @@ export const AppShell = () => {
   const { pathname } = useLocation();
   const { current } = useWorkspace();
   // The billing workspace already owns its main landmark.
-  const Content = pathname === '/billing' || pathname === '/billing/settings' ? 'div' : 'main';
+  const Content = pathname === '/billing' ? 'div' : 'main';
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }); }, [pathname]);
   const { unreadCount, markAllRead, shift, user, facility } = useSession();
   const { search } = useLocation();

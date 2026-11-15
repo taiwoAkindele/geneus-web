@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { currentFacilityRevisions, type AnyDocument, type ServiceSession } from '@shared';
 import { Button, DataTable, SectionTabs, SelectField, Sheet, TextAreaField, TextField, Tag } from '@/ui';
 import { useAuthorizationContext } from '@/session';
@@ -10,6 +10,7 @@ import { RecordEditor } from './RecordEditor';
 import { FacilitySettings } from './FacilitySettings';
 import type { EditorKind } from './editorFields';
 import { useWorkforce } from './useWorkforce';
+import { StaffSectionTabs } from '@/modules/operations/staff/StaffSections';
 import { humanize, intakeLabel, proposalState, recordName, unitPath } from './presentation';
 export const WorkspaceLoading = ({ error, reload }: {
   error?: Error;
@@ -122,15 +123,11 @@ export const CoverageWorkspace = ({ offeringId, embedded = false }: {
   offeringId?: string;
   embedded?: boolean;
 }) => {
-  const navigate = useNavigate();
   const query = useWorkforce(), context = useAuthorizationContext(), [params, setParams] = useSearchParams(), [date, setDate] = useState(params.get('date') || zonedInput(new Date().toISOString(), 'Africa/Lagos').slice(0, 10)), [service, setService] = useState(offeringId || ''), [editing, setEditing] = useState<Edit>(), [intake, setIntake] = useState<ServiceSession>();
   if (query.loading || !query.data || query.error)
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   const data = query.data, sessions = currentFacilityRevisions(data.sessions).filter((s) => (!service || s.offeringId === service) && zonedInput(s.startsAt, s.timeZone).slice(0, 10) <= date && zonedInput(new Date(Date.parse(s.endsAt) - 1).toISOString(), s.timeZone).slice(0, 10) >= date).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-  return <section className={embedded ? 'space-y-4' : 'mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8'}>{!embedded ? <><header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">Staff & roster</h1><Link to="/admin/staff" className="text-sm font-bold text-brand underline">Staff directory</Link></header><SectionTabs label="Staff sections" value="coverage" onChange={(view) => {
-    if (view !== 'coverage')
-      navigate(`/admin/staff?view=${view}`);
-  }} options={[{ value: 'directory', label: 'Staff' }, { value: 'coverage', label: 'Coverage' }, { value: 'roster', label: 'Sign-in windows' }]} /></> : null}
+  return <section className={embedded ? 'space-y-4' : 'mx-auto max-w-7xl space-y-5 px-4 py-5 md:px-8'}>{!embedded ? <><header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">Staff & roster</h1><Link to="/admin/staff" className="text-sm font-bold text-brand underline">Staff directory</Link></header><StaffSectionTabs value="coverage" /></> : null}
     <div className="flex flex-wrap items-end gap-3"><div className="min-w-40 flex-1"><TextField label="Coverage date" type="date" value={date} onChange={(e) => {
       setDate(e.target.value); if (!embedded) {
         const next = new URLSearchParams(params);

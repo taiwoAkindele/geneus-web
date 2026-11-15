@@ -7,6 +7,7 @@ import { visitDate } from '@/modules/clinical/encounter/VisitTable';
 import { PatientChartAccess } from '@/modules/front-desk/patients/PatientChartAccess';
 import { labRequestPath } from './LabRequestScreen';
 import { dispensePath } from './DispenseScreen';
+import { ModuleSettingsMenu } from '@/app/ModuleSettingsMenu';
 
 type Station = 'lab' | 'pharmacy';
 const COPY = {
@@ -39,7 +40,7 @@ const ServiceQueue = ({ station }: { station: Station }) => {
       : <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => navigate(to)}>View</Button>; } },
   ];
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
-    <h1 className="text-[28px] font-extrabold">{copy.title}</h1>
+    <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">{copy.title}</h1>{station === 'lab' ? <ModuleSettingsMenu module="laboratory" /> : null}</header>
     <SectionTabs label={`${copy.title} requests`} value={tab} onChange={(value) => set({ tab: value === 'open' ? '' : value, page: '' })} options={[{ value: 'open', label: 'Open requests', count: queue?.open.length ?? 0 }, { value: 'completed', label: 'Completed requests', count: queue?.completed.length ?? 0 }, ...(station === 'pharmacy' ? [{ value: 'pricing', label: 'Needs a price', count: [...queue?.open ?? [], ...queue?.completed ?? []].filter((r) => r.billingPending).length }] : [])]} />
     <div><label htmlFor="request-search" className="mb-2 block text-sm font-bold">Search</label><div className="flex min-h-[52px] items-center gap-3 rounded-field border border-outline px-4"><Icon name="search" className="h-5 w-5 shrink-0 text-ink-soft" /><input id="request-search" type="search" value={params.get('q') ?? ''} onChange={(e) => set({ q: e.target.value, page: '' })} placeholder={copy.search} className="min-w-0 flex-1 border-0 bg-transparent p-0 outline-none" autoComplete="off" /></div></div>
     {queues.loading || patients.loading ? <p role="status">Reading requests…</p> : queues.error ? <div role="alert"><p>Requests could not be read.</p><Button fullWidth={false} onClick={queues.reload}>Try again</Button></div>
