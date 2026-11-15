@@ -70,14 +70,21 @@ const DetailsForm = ({ facility }: { facility: Facility }) => {
  * Step 1: the details registration already captured, ready to confirm or
  * correct, with the time zone and currency set from the country.
  */
-export const FacilityDetailsStep = () => {
+export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'settings' }) => {
   const facility = useLiveQuery(getFacility, ['facility']).data;
   const context = useAuthorizationContext();
   if (!facility) return <p className="text-sm text-ink-muted">Reading facility details…</p>;
-  // The server lets only a facility administrator change these.
-  if (!(context.role === 'facility_admin' || context.roles?.includes('facility_admin'))) return <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-ink-muted">Facility</dt><dd className="font-bold">{facility.name}</dd></div><div><dt className="text-ink-muted">Facility code</dt><dd className="font-mono font-bold">{facility.code}</dd></div></dl>;
+  const values = facilityForm(facility);
+  const levelNames = { chc: 'Community health centre', phc: 'Primary', general_hospital: 'Secondary', teaching_hospital: 'Tertiary', specialist: 'Specialist' };
+  const summary = <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
+    ['Facility', facility.name], ['Facility code', facility.code], ['State', facility.state], ['LGA', facility.lga],
+    ['Address', facility.address], ['Phone', facility.phone], ['Level of care', levelNames[facility.level]],
+    ['Country', COUNTRIES.find((c) => c.code === values.country)?.name ?? values.country], ['Currency', values.currency], ['Time zone', facility.timeZone],
+  ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-ink-muted">{label}</dt><dd className="break-words font-bold">{value || 'Not set'}</dd></div>)}</dl>;
+  // The server lets only a writable facility administrator change these.
+  if (!(context.role === 'facility_admin' || context.roles?.includes('facility_admin')) || !context.permissions.includes('staff:manage')) return summary;
   return <div className="space-y-5">
-    <DetailsForm facility={facility} />
-    {facility.timeZone ? <FacilitySettings /> : null}
+    {mode === 'settings' ? <>{summary}<details className="rounded-field border border-outline-soft p-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-brand">Edit facility details</summary><div className="mt-3"><DetailsForm facility={facility} /></div></details></> : <DetailsForm facility={facility} />}
+    {facility.timeZone ? <details className="rounded-field border border-outline-soft p-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">Time zone: {facility.timeZone}<span className="ml-2 font-normal text-ink-muted">Change time zone</span></summary><div className="mt-3"><FacilitySettings /></div></details> : null}
   </div>;
 };

@@ -17,7 +17,7 @@ const isAdmin = (context: Viewer) => context.role === 'facility_admin' || Boolea
 export const schedulingPlanner = (context: Viewer) => isAdmin(context) || has(context, 'roster:assign', 'service_session:manage', 'staff_assignment:manage', 'staff:manage');
 
 export const settingsTabsFor = (context: Viewer): SettingsTab[] => [
-  ...(isAdmin(context) || has(context, 'unit:manage', 'location:manage', 'service:manage', 'staff_assignment:manage') ? [{ key: 'facility', label: 'Facility', description: 'Time zone, services, departments, locations and financial links.', to: '/settings/facility', icon: 'referrals' as IconName }] : []),
+  ...(isAdmin(context) || has(context, 'unit:manage', 'location:manage', 'service:manage', 'staff_assignment:manage') ? [{ key: 'facility', label: 'Facility', description: 'Facility details, care services, teams and places.', to: '/settings/facility', icon: 'referrals' as IconName }] : []),
   // Facility-wide workforce planning. Clinicians open walk-in intake from Coverage (via Home), so they may
   // reach it too, without a Settings entry in their sidebar.
   ...(schedulingPlanner(context) || has(context, 'service_session:operate') ? [{ key: 'scheduling', label: 'Staff scheduling & coverage', description: 'Sign-in windows and service coverage for the whole facility.', to: '/settings/scheduling', icon: 'clock' as IconName,

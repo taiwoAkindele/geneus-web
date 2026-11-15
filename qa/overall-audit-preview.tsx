@@ -1,6 +1,6 @@
 /** Overall UX audit fixture. Actual screens and providers; synthetic, in-memory records only. */
 import React, { useEffect } from 'react';
-import { WardCareEvent } from '@shared';
+import { Facility, WardCareEvent } from '@shared';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Appointment, BillingDepartment, Charge, ClinicalEvent, Device, Encounter, EncounterEntry, FeeItem, Handoff, Patient, Payment, RegisterDefinition, RegisterEntry, Staff, StockItem, StockMovement, SyncRejection, Unit } from '@shared';
@@ -17,6 +17,8 @@ import { toRow } from '@/data/rows';
 import { DevicesScreen } from '@/modules/administration/screens/facility-onboarding/DevicesScreen';
 import { StockScreen } from '@/modules/inventory/screens/stock/StockScreen';
 import { SetupWizardScreen } from '@/modules/administration/setup/SetupWizardScreen';
+import { FacilityWorkspace, ServiceWorkspace } from '@/modules/operations/workforce/Workspaces';
+import { SettingsLayout } from '@/app/settings/SettingsLayout';
 import { MonthlySummaryScreen } from '@/modules/reports/screens/monthly-summary/MonthlySummaryScreen';
 import { FacilityHomeScreen } from '@/app/screens/facility-home/FacilityHomeScreen';
 import { WorkspaceScreen } from '@/app/screens/workspace/WorkspaceScreen';
@@ -388,6 +390,7 @@ const SETUP_TABLES: Record<string, string> = { service_definition: 'service_defi
 /** The hospital in the setup-wizard report: lab tests adopted (each an offering), one draft care service, no others. */
 Object.assign(window, { seedSetupScenario: async () => {
   await saveDeviceCredential({ deviceId: envelope.deviceId, facilityId: envelope.facilityId, credential: 'qa-credential', syncEndpoint: 'https://sync.example.org' });
+  db.rows.facilities = [toRow('facility', Facility.parse({ ...envelope, id: envelope.facilityId, type: 'facility', code: envelope.facilityId, name: 'Synthetic clinical facility', state: 'Oyo', lga: 'Ibadan South West', country: 'NG', currency: 'NGN', timeZone: 'Africa/Lagos' }))];
   const place = (id: string, name: string, kind: string, extra = {}) => toRow('location', Location.parse({ ...envelope, schemaVersion: 5, id, type: 'location', name, kind, ...extra }));
   db.rows.locations = [place('location:lab', 'Laboratory', 'room', { unitId: 'unit:2' }), place('location:c1', 'Consulting room 1', 'room', { unitId: 'unit:1' }), place('location:fw', 'Female ward', 'ward'), place('location:fw1', 'FW-01', 'bed', { parentId: 'location:fw' })];
   // A synthetic server: PIN 123456 opens a staff session; a configuration save is applied as sync would deliver it.
@@ -401,7 +404,11 @@ Object.assign(window, { seedSetupScenario: async () => {
     if (url.endsWith('/config/save') && !new Headers(init?.headers).get('x-actor-staff-id')) return reply(403, { error: 'staff_required', message: 'Sign in to save settings' });
     if (url.endsWith('/config/save')) {
       const { mutations } = JSON.parse(String(init?.body)) as { mutations: { op: string; table: string; id: string; data: Record<string, unknown> }[] };
-      for (const m of mutations) if (m.op === 'put') db.rows[SETUP_TABLES[m.table]].push(toRow(m.table as never, m.data));
+      for (const m of mutations) if (m.op === 'put') {
+        const rows = db.rows[SETUP_TABLES[m.table]], row = toRow(m.table as never, m.data);
+        const index = rows.findIndex((r) => r.id === m.id);
+        if (index < 0) rows.push(row); else rows[index] = row;
+      }
       listeners.forEach((listener) => listener());
       return reply(200, { applied: mutations.length, duplicates: 0, rejected: [] });
     }
@@ -452,6 +459,9 @@ createRoot(document.getElementById('root')!).render(<ToastProvider><SessionProvi
   <Route path="/referrals/track" element={<UnavailableScreen title="Referrals" description="Cross-facility referral tracking is not available in this version. Continue using your facility’s established referral process." />} />
   <Route path="/stock" element={<StockScreen />} />
   <Route path="/setup" element={<SetupWizardScreen />} />
+  <Route path="/settings" element={<SettingsLayout />}><Route path="facility" element={<FacilityWorkspace />} /></Route>
+  <Route path="/facility/services/:offeringId" element={<ServiceWorkspace />} />
+  <Route path="/laboratory/settings/tests" element={<InvestigationCatalogueScreen />} />
   <Route path="/insurance" element={<InsuranceWorkspace />} />
   <Route path="/insurance/contracts" element={<ContractsScreen />} />
 </Route></Routes></MemoryRouter></RegistrationDraftProvider></RegistersProvider></AppointmentsProvider></Ready></SessionProvider></ToastProvider>);
