@@ -5,7 +5,7 @@ import {
   type AuthorizationContext,
   type Charge,
   type ExemptionFacts,
-  type FeeItem,
+  FeeItem,
   type Payment,
   type BillingAdjustment,
   type IncomingTransfer,
@@ -22,6 +22,7 @@ import { mintReceiptNumber } from '@/lib/receiptNumber';
 import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
 import { usablePharmacyEffects } from './pharmacyAcceptance';
 import { estimatesFor, loadCoverage } from './insurance';
+import { saveConfiguration } from '../configurationSave';
 
 /** Coverage and refunds for these charges, as this device holds them. */
 export const balanceCoverage = async (charges: readonly Charge[]): Promise<BalanceCoverage> => {
@@ -75,6 +76,25 @@ export const createFeeItem = async (draft: FeeDraft, context: AuthorizationConte
 
 export const updateFeeItem = async (id: string, draft: FeeDraft, context: AuthorizationContext): Promise<FeeItem> =>
   updateRecord<FeeItem>(context, 'fee_item:manage', 'fee_item', id, { ...feeValues(draft), priceVersion: undefined });
+
+/** Basic edits never replace hidden policies or legacy department/currency attribution. */
+const saveFeeChanges = async (fee: FeeItem, changes: Partial<FeeItem>, context: AuthorizationContext): Promise<FeeItem> => {
+  assertAllowed(context, 'fee_item:manage');
+  const stamped = { ...changes, updatedBy: context.userId, updatedOn: new Date().toISOString() };
+  const updated = FeeItem.parse({ ...fee, ...stamped });
+  // Compare with the fields the editor actually showed, not a fresh read that could conceal a concurrent edit.
+  await saveConfiguration(context, [{ op: 'patch', type: 'fee_item', id: fee.id, changes: stamped, current: fee }]);
+  return updated;
+};
+
+export const updateCatalogueItem = (fee: FeeItem, draft: Pick<FeeItem, 'name' | 'category' | 'amountMinor'>, context: AuthorizationContext): Promise<FeeItem> => {
+  if (draft.category !== fee.category) throw new Error('This item’s category is protected until its insurance impact can be reviewed.');
+  assertAmountMinor(draft.amountMinor);
+  return saveFeeChanges(fee, { name: draft.name.trim(), amountMinor: draft.amountMinor, priceVersion: undefined }, context);
+};
+
+export const updateFeePolicy = (fee: FeeItem, policy: Pick<FeeItem, 'chargeWhen' | 'exemptions'>, context: AuthorizationContext): Promise<FeeItem> =>
+  saveFeeChanges(fee, policy, context);
 
 /** Retire instead of delete: every old bill must still name its fee. */
 export const setFeeItemActive = (id: string, active: boolean, context: AuthorizationContext) =>

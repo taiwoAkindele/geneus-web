@@ -16,7 +16,7 @@ import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from '.
 import {
   balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
   isAppointmentConfirmed, listFeeItems, paymentsForPatient, recordPayment, reversePayment,
-  setFeeItemActive, updateFeeItem, type FeeDraft,
+  setFeeItemActive, updateFeeItem, updateCatalogueItem, updateFeePolicy, type FeeDraft,
   adjustCharge, adjustmentsForPatient,
 } from './repos/billing';
 import { book, changeAppointment, listAppointments, newPatientBookingRecords } from './repos/appointments';
@@ -25,6 +25,7 @@ import { CLINICAL_REVIEWS_TABLE, DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, TABLE_FOR 
 import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from './repos/registers';
 import { discardRegisterRecovery, readRegisterRecovery, writeRegisterRecovery } from './repos/registerDrafts';
 import { fakeDatabase } from './testing/fakeDatabase';
+import { feeDraftFromForm } from '@/modules/finance/billing/feeForm';
 
 /**
  * Node's built-in SQLite (Node 22.5+) — no dependency. The app has no Node
@@ -397,6 +398,29 @@ describe('the write path against a real SQLite', () => {
   });
 
   describe('offline billing', () => {
+    it('does not charge newly created catalogue items at registration or booking, but allows direct billing offline', async () => {
+      const fee = await createFeeItem(feeDraftFromForm({ name: 'Selected test', category: 'laboratory', amount: '500' }), contextFor('facility_admin'));
+      const patient = await registerPatient({ fullName: 'Synthetic patient', address: 'Test', sex: 'female', ageYears: 30 }, contextFor('records_officer'));
+      await book({ patientId: patient.id, reason: 'Unrelated consultation', visitType: 'general' }, contextFor('records_officer'));
+      expect(await chargesForPatient(patient.id)).toEqual([]);
+      const bill = await createCharge(fee.id, { patientId: patient.id, facts: { ageYears: 30, sex: 'female' } }, contextFor('records_officer'));
+      expect(bill).toMatchObject({ feeItemId: fee.id, category: 'laboratory', listPriceMinor: 50000, amountMinor: 50000 });
+      await recordPayment({ patientId: patient.id, method: 'cash', currency: 'NGN', allocations: [{ chargeId: bill.id, amountMinor: 20000 }] }, contextFor('cashier'));
+      expect(chargeBalances([bill], await paymentsForPatient(patient.id))[0].balanceMinor).toBe(30000);
+    });
+
+    it('edits basic fields and policies separately without changing hidden configuration or existing bills', async () => {
+      const admin = contextFor('facility_admin');
+      const fee = await createFeeItem({ name: 'Existing visit', category: 'consultation', departmentId: 'department:legacy', amountMinor: 150000, currency: 'USD', chargeWhen: 'every_visit', exemptions: [{ reason: 'Under five', ageUnderYears: 5 }] }, admin);
+      const bill = await createCharge(fee.id, { patientId: 'OOE-PHC-000047-K2', facts: { ageYears: 30, sex: 'female' } }, contextFor('records_officer'));
+      await updateFeePolicy(fee, { chargeWhen: 'first_visit', exemptions: [{ reason: 'Under ten', ageUnderYears: 10 }] }, admin);
+      await updateCatalogueItem(fee, { name: 'Updated visit', category: fee.category, amountMinor: 200000 }, admin);
+      const changed = (await listFeeItems()).find((row) => row.id === fee.id)!;
+      expect(changed).toMatchObject({ id: fee.id, departmentId: 'department:legacy', currency: 'USD', chargeWhen: 'first_visit', amountMinor: 200000, exemptions: [{ reason: 'Under ten', ageUnderYears: 10 }] });
+      expect((await chargesForPatient(bill.patientId))[0]).toEqual(bill);
+      expect(() => updateCatalogueItem(changed, { name: changed.name, category: 'laboratory', amountMinor: changed.amountMinor }, admin)).toThrow(/insurance impact/);
+    });
+
     const patientId = 'OOE-PHC-000047-K2';
     const otherPatientId = 'OOE-PHC-000048-AB';
     const draft = (extra: Partial<FeeDraft> = {}): FeeDraft => ({

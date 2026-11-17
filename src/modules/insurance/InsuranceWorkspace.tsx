@@ -121,7 +121,7 @@ export const InsuranceWorkspace = () => {
       <p className="text-sm text-ink-soft">Verified cover, calculable terms, no approval needed, no choice recorded and nothing overpaid.</p>
       {view.routine.length === 0 ? <p className="text-sm">Nothing routine is waiting.</p> : <>
         <ul className="divide-y divide-outline-soft rounded-card border border-outline-soft bg-white">{view.routine.map((v) => <li key={v.key} className="p-3"><p className="font-semibold">{v.name}</p>{visitLine(v)}</li>)}</ul>
-        {canConfirm ? <StaffVerification purpose="Confirming insurance splits"><Button loading={busy === 'routine'} disabled={Boolean(busy)} onClick={() => void run('routine', { chargeIds: routineIds, basis: 'routine_bulk' })}>Confirm {view.routine.length} routine visit{view.routine.length === 1 ? '' : 's'}</Button></StaffVerification> : null}
+        {canConfirm ? <StaffVerification requireServerSession purpose="Confirming insurance splits"><Button loading={busy === 'routine'} disabled={Boolean(busy)} onClick={() => void run('routine', { chargeIds: routineIds, basis: 'routine_bulk' })}>Confirm {view.routine.length} routine visit{view.routine.length === 1 ? '' : 's'}</Button></StaffVerification> : null}
       </>}
     </section>
 
@@ -132,7 +132,7 @@ export const InsuranceWorkspace = () => {
         ...view.selfPaidWhileCovered.map((r) => ({ key: `self:${r.charge.id}`, name: view.names.get(r.charge.patientId) ?? r.charge.patientId, rows: [r], detail: <p className="text-sm">{r.charge.description}</p>, why: 'Paid without insurance, but cover was verified for that date' })),
       ].map((item) => <article key={item.key} className="space-y-2 rounded-card border border-outline-soft bg-white p-3">
         <p className="font-semibold">{item.name}</p>{item.detail}<p className="text-sm text-amber-text">{item.why}</p>
-        {canConfirm ? <StaffVerification purpose="Reviewing an insurance exception">
+        {canConfirm ? <StaffVerification requireServerSession purpose="Reviewing an insurance exception">
           <TextAreaField label="Reason for your decision" value={reasons[item.key] ?? ''} onChange={(e) => setReasons((v) => ({ ...v, [item.key]: e.target.value }))} />
           <div className="flex flex-wrap gap-2">
             <Button fullWidth={false} loading={busy === item.key + ':cover'} disabled={Boolean(busy) || !reasons[item.key]?.trim()} onClick={() => void run(item.key + ':cover', { chargeIds: item.rows.map((r) => r.charge.id), basis: 'exception', decision: 'apply_cover', reason: reasons[item.key] })}>Apply cover</Button>
@@ -149,7 +149,7 @@ export const InsuranceWorkspace = () => {
       {view.undetermined.size === 0 ? <p className="text-sm">Every insured charge has a decision or an estimate.</p> : [...view.undetermined].map(([reason, rows]) => <article key={reason} className="rounded-card border border-outline-soft bg-white p-3">
         <h3 className="font-semibold">{UNDETERMINED[reason].label} ({rows.length})</h3><p className="text-sm text-ink-soft">{UNDETERMINED[reason].next}</p>
         <ul className="mt-2 space-y-1 text-sm">{rows.slice(0, 20).map((r) => <li key={r.charge.id}><Link className="text-brand underline" to={`/patients/profile?patient=${encodeURIComponent(r.charge.patientId)}&tab=details`}>{view.names.get(r.charge.patientId) ?? r.charge.patientId}</Link> · {r.charge.description} · {formatMoney(r.undeterminedMinor, r.charge.currency)}
-          {reason === 'not_eligible' && canConfirm ? <StaffVerification purpose="Recording that the patient pays"><TextAreaField label="Reason for your decision" value={reasons[r.charge.id] ?? ''} onChange={(e) => setReasons((v) => ({ ...v, [r.charge.id]: e.target.value }))} />
+          {reason === 'not_eligible' && canConfirm ? <StaffVerification requireServerSession purpose="Recording that the patient pays"><TextAreaField label="Reason for your decision" value={reasons[r.charge.id] ?? ''} onChange={(e) => setReasons((v) => ({ ...v, [r.charge.id]: e.target.value }))} />
             <LiabilityForm patientId={r.charge.patientId} checks={data?.insurance.checks ?? []} canApprove={context.permissions.includes('coverage:approve_liability_change')} payerExpected={false}
               busy={busy === r.charge.id} disabled={Boolean(busy) || !reasons[r.charge.id]?.trim()} onSubmit={(liability) => void run(r.charge.id, { chargeIds: [r.charge.id], basis: 'exception', decision: 'self_pay', reason: reasons[r.charge.id], liability })} /></StaffVerification> : null}</li>)}</ul>
       </article>)}

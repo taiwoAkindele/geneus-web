@@ -140,7 +140,7 @@ export const PatientAuthorizations = ({ patientId }: { patientId: string }) => {
   if (!insurance || insurance === 'history' || !context.permissions.includes('cover:verify')) return null;
   return <section id="authorizations" aria-label="Authorizations" className="space-y-3 rounded-card border border-outline-soft bg-white p-4">
     <h2 className="font-bold">Payer authorizations and referrals</h2>
-    <StaffVerification purpose="Payer authorizations"><AuthorizationsBody patientId={patientId} /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Payer authorizations"><AuthorizationsBody patientId={patientId} /></StaffVerification>
   </section>;
 };
 

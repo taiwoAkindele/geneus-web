@@ -63,9 +63,13 @@ export const saveConfiguration = async (context: AuthorizationContext, writes: r
   const device = getDeviceCredential();
   if (!device) throw new ConfigurationSaveError('failed', 'This device is not enrolled');
   const token = staffSessionToken(context);
+  // Only the separate, narrow policy edit opts in. Older full-fee forms cannot do this accidentally.
+  const policyOnly = writes.length > 0 && writes.every((w) => w.type === 'fee_item' && w.op === 'patch'
+    && Object.keys(w.changes).some((key) => key === 'chargeWhen' || key === 'exemptions')
+    && Object.keys(w.changes).every((key) => ['chargeWhen', 'exemptions', 'updatedBy', 'updatedOn'].includes(key)));
   announce({ phase: 'saving' });
   try {
-    await staffRequest<ConfigurationSaveResponse>('/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(toMutation) }, context.userId);
+    await staffRequest<ConfigurationSaveResponse>(policyOnly ? '/config/save?billingPolicy=1' : '/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(toMutation) }, context.userId);
     touchStaffSession();
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); announce({ phase: 'refused', message: 'Sign in again to save settings.' }); throw new ConfigurationSaveError('needs_pin', 'Sign in again to save settings.'); }

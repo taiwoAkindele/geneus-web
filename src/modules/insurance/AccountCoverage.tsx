@@ -84,7 +84,7 @@ export const RefundSheet = ({ row, onClose, onDone }: { row: ChargeBalance; onCl
     } catch (cause) { setError(cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN, then refund.' : cause instanceof Error ? cause.message : 'The refund was not recorded'); } finally { setBusy(false); }
   };
   return <Sheet title="Refund credit" eyebrow={(row.charge as Charge).description} onClose={onClose} closeDisabled={busy}>
-    <StaffVerification purpose="Refunding a credit">
+    <StaffVerification requireServerSession purpose="Refunding a credit">
       <div className="space-y-3">
         <p className="text-sm">Credit on this charge: <strong>{formatMoney(credit, row.charge.currency)}</strong>. Hand the money back before saving.</p>
         <TextField label="Amount refunded" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
