@@ -102,10 +102,10 @@ export const saveWardStep = async (session: WardSession, step: EncounterEntry['s
     if (!patient) throw new Error('The patient record is unavailable');
     const fees = await allOfType<FeeItem>('fee_item');
     for (const item of (values.items ?? []) as InvestigationItem[]) {
-      if (!item.feeItemId) continue;
+      if (!item.feeItemId || item.billingReviewReason) continue;
       const fee = fees.find((f) => f.id === item.feeItemId && f.active);
       if (!fee) throw new Error('The investigation price is unavailable');
-      records.push({ permission: 'charge:create', type: 'charge', record: { ...newCharge({ ...fee, amountMinor: item.priceMinor!, currency: item.currency! }, { patientId: patient.id, encounterId: session.id, facts: patientBillingFacts(patient) }, context), id: 'charge:order:' + item.id, orderItemId: item.id, orderEntryId: entry.id } });
+      records.push({ permission: 'charge:create', type: 'charge', record: { ...newCharge({ ...fee, amountMinor: item.priceMinor!, currency: item.currency!, ...(item.catalogueSource==='billing'?{name:item.name,priceVersion:item.feePriceVersion,exemptions:item.exemptions??fee.exemptions}: {}) }, { patientId: patient.id, encounterId: session.id, facts: patientBillingFacts(patient) }, context), id: 'charge:order:' + item.id, orderItemId: item.id, orderEntryId: entry.id } });
     }
     records.push({ permission: 'encounter:record', type: 'encounter_entry', record: { ...entry, id: newId('encounter_entry'), step: 'investigation_review', values: { decision: 'ordered', orderEntryId: entry.id }, labReport: undefined } });
   }

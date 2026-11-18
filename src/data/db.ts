@@ -1,3 +1,4 @@
+import { billingCatalogueEnabled } from './billingCatalogueSupport';
 import { activeWorkspace } from './facilityWorkspaces';
 import {
   parseDocument,
@@ -50,7 +51,7 @@ export const envelope = (context: AuthorizationContext, createdOn = nowIso()) =>
   deviceId: context.deviceId,
   createdBy: context.userId,
   createdOn,
-  schemaVersion: SCHEMA_VERSION,
+  schemaVersion: billingCatalogueEnabled(context) ? SCHEMA_VERSION : 5,
 });
 
 const validate = <T extends AnyDocument>(record: unknown): T => {

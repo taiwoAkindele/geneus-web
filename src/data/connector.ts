@@ -1,5 +1,6 @@
 import type { CrudEntry, PowerSyncBackendConnector, PowerSyncCredentials } from '@powersync/web';
 import type { UploadMutation, UploadRequest } from '@shared';
+import { rememberBillingCatalogue } from './billingCatalogueSupport';
 import { fetchSyncToken, uploadMutations, WORKFORCE_VERSIONS } from '@/lib/api/sync';
 import { FACILITY_DOCUMENT_POLICY, requiresFacilityContract } from '@shared';
 import { refreshWorkforceKeys } from './workforceAuthority';
@@ -63,6 +64,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     if (!device) return null;
     try {
       const minted = await fetchSyncToken(device.credential);
+      rememberBillingCatalogue(device,minted.billingCatalogueEnabled);
       rememberInpatientSupport(device, minted.inpatientWorkflowVersion);
       rememberWardCareSupport(device, minted.wardCareVersion);
       rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
@@ -88,7 +90,7 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     for (;;) {
       const transaction = await db.getNextCrudTransaction();
       if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion,handshake.insuranceBillingActive,handshake.insuranceBillingPeriods);}
+        try{const handshake=await fetchSyncToken(device.credential,0);rememberBillingCatalogue(device,handshake.billingCatalogueEnabled);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion,handshake.insuranceBillingActive,handshake.insuranceBillingPeriods);}
         catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
         return;
       }

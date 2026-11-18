@@ -4,11 +4,12 @@ import { FeeCategory, type FeeItem } from '@shared';
 import type { FeeDraft } from '@/data/repos/billing';
 import { Button, SelectField, Sheet, SheetCancelButton, TextField } from '@/ui';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
+import { isLegacyFeeCategory } from '@shared';
 import { CATEGORY_LABELS, feeDraftFromForm, feeFormValues, type FeeForm } from './feeForm';
 
-type Props = { fee?: FeeItem; defaultCurrency?: string; onSave: (draft: FeeDraft) => Promise<void>; onClose: () => void };
+type Props = { fee?: FeeItem; defaultCurrency?: string; expandedCategories?:boolean; onSave: (draft: FeeDraft) => Promise<void>; onClose: () => void };
 
-export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', onSave, onClose }: Props) => {
+export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', expandedCategories=false, onSave, onClose }: Props) => {
   const { register, handleSubmit, setError, formState: { errors, isSubmitting, isDirty } } = useForm<FeeForm>({ defaultValues: feeFormValues(fee) });
   const saving = useRef(false);
   const currency = fee?.currency ?? defaultCurrency;
@@ -23,7 +24,7 @@ export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', onSave, onClose }
     <form id="catalogue-item-form" onSubmit={save} className="space-y-4">
       <fieldset disabled={isSubmitting} className="space-y-4">
         <TextField label="Item name" required {...register('name', { required: 'Enter an item name' })} error={errors.name?.message} />
-        <SelectField label="Category" required disabled={Boolean(fee)} options={FeeCategory.options.map((value) => ({ value, label: CATEGORY_LABELS[value] }))} {...register('category')} />
+        <SelectField label="Category" required disabled={Boolean(fee)} options={FeeCategory.options.filter(value=>expandedCategories || isLegacyFeeCategory(value) || fee?.category===value).map((value) => ({ value, label: CATEGORY_LABELS[value] }))} {...register('category')} />
         {fee ? <p className="text-sm text-ink-muted">The category is protected to preserve insurance coverage. Price and name can still be edited.</p> : null}
         <TextField label="Price" required inputMode="decimal" hint={'Currency: ' + currency} {...register('amount', { required: 'Enter a price' })} error={errors.amount?.message} />
         <p className="text-sm text-ink-muted">{fee ? 'Existing bills keep their original price. Automatic charging and exemptions are managed separately.' : 'This item is charged only when selected. Creating it does not add it to patient appointments.'}</p>

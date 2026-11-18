@@ -34,6 +34,29 @@ describe('pharmacy supplies against real SQLite', () => {
   });
   afterEach(async () => { setDatabaseForTests(undefined); await storage.db.close(); vi.unstubAllGlobals(); });
   const save = (id: string, details = d()) => saveDispensing(patientId, encounterId, details, context(), id);
+  it('retains attributable unpriced 2+1 supplies in review after completion and a later prescription, without another charge',async()=>{
+    await storage.seed({...base,id:'manual:three',type:'charge',patientId,feeItemId:'fee:one',category:'other',description:'Existing three-unit bill',listPriceMinor:300,amountMinor:300,currency:'NGN'} as Charge);
+    await storage.db.execute('UPDATE encounter_entries SET "values"=? WHERE id=?',[JSON.stringify({...source.values,prescription:(source.values.prescription as {quantity:number}[]).map(line=>({...line,quantity:3}))}),source.id]);
+    const unpriced=(quantity:number,previousEntryId?:string)=>d({catalogueVersion:1,quantity,previousEntryId,billing:'unpriced',feeItemId:undefined,unitPriceMinor:undefined,currency:undefined,chargedMinor:undefined,reason:'Existing manual three-unit bill requires review',complete:quantity===1});
+    const first=await save('unpriced:two',unpriced(2));await save('unpriced:one',unpriced(1,first.id));
+    const records=await readPharmacy(patientId,encounterId);
+    const completed=requestQueues(records.entries).pharmacy.completed[0];
+    expect(completed).toMatchObject({billingPending:2,billingReviews:[{id:first.id,quantity:2,recordedBy:'staff:pharmacist'},{id:'unpriced:one',quantity:1,recordedBy:'staff:pharmacist'}]});
+    const later=EncounterEntry.parse({...source,id:'rx:later',createdOn:new Date().toISOString()});
+    const queue=requestQueues([...records.entries,later]);
+    expect(queue.pharmacy.completed.find(r=>r.id===source.id)).toMatchObject({superseded:true,billingPending:2});
+    const none=EncounterEntry.parse({...later,values:{decision:'none_required',prescription:[]}});
+    expect(requestQueues([...records.entries,none]).pharmacy.completed.find(r=>r.id===source.id)).toMatchObject({superseded:true,billingPending:2});
+    expect(records.charges.map(c=>c.id)).toEqual(['manual:three']);
+    expect(await allOfType<Payment>('payment')).toEqual([]);
+  });
+  it('denies financial-only staff a clinical supply before any SQLite write',async()=>{
+    const cashier=authorizationFor({staff:{staffId:'staff:cashier',role:'cashier',permission:'read_write'},facilityId:'TEST',deviceId:'device:one'});
+    const count=(await allOfType<EncounterEntry>('encounter_entry')).length;
+    await expect(saveDispensing(patientId,encounterId,d(),cashier,'cashier:invalid')).rejects.toThrow();
+    expect(await allOfType<EncounterEntry>('encounter_entry')).toHaveLength(count);
+    expect(await chargesForPatient(patientId)).toEqual([]);
+  });
   it('queues and supplies signed discharge medicines directly, keeping revised summaries out of new supply', async () => {
     const summary = WardCareEvent.parse({ ...base, id: 'summary:one', type: 'ward_care_event', admissionId: 'stay:one', patientId, encounterId, occurredOn: base.createdOn, values: { kind: 'discharge', admissionReason: 'Recorded reason', diagnoses: 'Recorded diagnosis', course: 'Recorded care', instructions: 'Reviewed instructions', takeHome: source.values.prescription, sourceEntryIds: [], patientName: 'Synthetic patient', patientIdentifier: patientId, admittedOn: base.createdOn } });
     await storage.seed(summary);

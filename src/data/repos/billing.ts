@@ -23,6 +23,9 @@ import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord,
 import { usablePharmacyEffects } from './pharmacyAcceptance';
 import { estimatesFor, loadCoverage } from './insurance';
 import { saveConfiguration } from '../configurationSave';
+import { billingCatalogueEnabled } from '../billingCatalogueSupport';
+import { getDatabase } from '../database';
+import { fromRow, type Row } from '../rows';
 
 /** Coverage and refunds for these charges, as this device holds them. */
 export const balanceCoverage = async (charges: readonly Charge[]): Promise<BalanceCoverage> => {
@@ -33,6 +36,14 @@ export const balanceCoverage = async (charges: readonly Charge[]): Promise<Balan
 export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
 
 export const listFeeItems = () => allOfType<FeeItem>('fee_item');
+/** A hospital-wide local query. Category narrows a view, never staff access. */
+export const cataloguePage = async ({search='',category='',page=0,pageSize=25,facilityId}:{search?:string;category?:string;page?:number;pageSize?:number;facilityId?:string}={}) => {
+  const db=getDatabase(), like=`%${search.trim().replace(/[\\%_]/g,c=>'\\'+c)}%`;
+  const where=`WHERE active=1 AND name LIKE ? ESCAPE '\\'${category?' AND category=?':''}${facilityId?' AND "facilityId"=?':''}`;
+  const params=[like,...(category?[category]:[]),...(facilityId?[facilityId]:[])];
+  const [count,rows]=await Promise.all([db.getOptional<{n:number}>(`SELECT COUNT(*) AS n FROM fee_items ${where}`,params),db.getAll<Row>(`SELECT * FROM fee_items ${where} ORDER BY name COLLATE NOCASE,id LIMIT ? OFFSET ?`,[...params,pageSize,Math.max(0,page)*pageSize])]);
+  return {total:Number(count?.n??0),items:rows.map(r=>fromRow<FeeItem>('fee_item',r))};
+};
 export const chargesForPatient = (patientId: string) => allWhere<Charge>('charge', 'patientId', patientId).then(usablePharmacyEffects);
 export const paymentsForPatient = (patientId: string) => allWhere<Payment>('payment', 'patientId', patientId);
 export const adjustmentsForPatient = (patientId: string) => allWhere<BillingAdjustment>('billing_adjustment', 'patientId', patientId).then(usablePharmacyEffects);
@@ -101,6 +112,9 @@ export const setFeeItemActive = (id: string, active: boolean, context: Authoriza
   updateRecord<FeeItem>(context, 'fee_item:manage', 'fee_item', id, { active });
 
 export type ChargeDraft = {
+  quantity?: number;
+  unitOfMeasure?: string;
+  servicePointId?: string;
   patientId: string;
   facts: ExemptionFacts;
   appointmentId?: string;
@@ -112,9 +126,17 @@ export const newCharge = (fee: FeeItem, draft: ChargeDraft, context: Authorizati
   if (fee.facilityId !== context.facilityId) throw new Error('This fee belongs to another facility');
   if (!fee.active) throw new Error('This fee has been retired');
   assertAmountMinor(fee.amountMinor);
+  const evidence=fee.priceEvidenceVersion===1 && billingCatalogueEnabled(context);
+  const quantity=draft.quantity??1;
+  if(!Number.isFinite(quantity)||quantity<=0||quantity>1000000)throw new Error('Enter a valid quantity');
+  if(quantity!==1 && !evidence)throw new Error('Connect once to receive verified quantity-price support. Existing single-unit billing remains available');
+  if(draft.servicePointId && !evidence)throw new Error('Service-point attribution is waiting for catalogue compatibility. Leave it blank to continue existing billing');
+  const total=Math.round(fee.amountMinor*quantity);assertAmountMinor(total);
   const exemption = findExemption(fee.exemptions, draft.facts);
   return {
     ...envelope(context),
+    // A previously downloaded legacy head remains usable during a delayed metadata sync.
+    schemaVersion:evidence?6:5,
     id: fee.chargeWhen === 'first_visit' ? `charge:first:${draft.patientId}:${fee.id}` : newId('charge'),
     type: 'charge',
     patientId: draft.patientId,
@@ -122,8 +144,10 @@ export const newCharge = (fee: FeeItem, draft: ChargeDraft, context: Authorizati
     description: fee.name,
     category: fee.category,
     departmentId: fee.departmentId ?? undefined,
-    listPriceMinor: fee.amountMinor,
-    amountMinor: exemption ? 0 : fee.amountMinor,
+    ...(evidence?{feePriceVersion:fee.priceVersion,quantity,unitPriceMinor:fee.amountMinor,unitOfMeasure:draft.unitOfMeasure}:{}),
+    servicePointId:draft.servicePointId,
+    listPriceMinor: total,
+    amountMinor: exemption ? 0 : total,
     currency: fee.currency,
     exemptionReason: exemption?.reason,
     appointmentId: draft.appointmentId,

@@ -3,8 +3,9 @@ import type { FeeDraft } from '@/data/repos/billing';
 import { amountInput, parseAmount } from '@/lib/money';
 
 export const CATEGORY_LABELS: Record<FeeCategory, string> = {
+  pharmacy: 'Pharmacy', maternity: 'Maternity', admission: 'Admission / Accommodation', imaging: 'Imaging',
   registration: 'Registration', card: 'Patient card', consultation: 'Consultation',
-  laboratory: 'Laboratory', procedure: 'Procedure', other: 'Other',
+  laboratory: 'Laboratory', procedure: 'Procedure', other: 'General / Other',
 };
 export const CHARGE_WHEN_LABELS: Record<ChargeWhen, string> = {
   first_visit: 'First visit only', every_visit: 'Every visit', when_ordered: 'Only when selected',

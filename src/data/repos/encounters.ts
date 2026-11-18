@@ -151,10 +151,10 @@ export const saveStep = async (save: StepSave, context: AuthorizationContext): P
     const patient = await findRecord<Patient>('patient', save.patientId);
     if (!patient) throw new Error('The patient is not available');
     for (const item of values.items as InvestigationItem[]) {
-      if (!item.feeItemId) continue;
+      if (!item.feeItemId || item.billingReviewReason) continue;
       const fee = await findRecord<FeeItem>('fee_item', item.feeItemId);
       if (!fee || fee.facilityId !== context.facilityId || !fee.active) throw new Error('An investigation fee is unavailable. Review the catalogue');
-      const snapshot = { ...fee, amountMinor: item.priceMinor!, currency: item.currency! };
+      const snapshot = { ...fee, amountMinor: item.priceMinor!, currency: item.currency!, ...(item.catalogueSource==='billing'?{name:item.name,priceVersion:item.feePriceVersion,exemptions:item.exemptions??fee.exemptions}: {}) };
       const charge = { ...newCharge(snapshot, { patientId: patient.id, encounterId, facts: patientBillingFacts(patient) }, context), id: 'charge:order:' + item.id, orderItemId: item.id, orderEntryId: entry.id };
       records.push({ permission: 'charge:create', type: 'charge', record: charge });
     }
