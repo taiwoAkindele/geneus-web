@@ -480,6 +480,33 @@ Patient consent/documents, cross-facility identity and portal access remain late
 Camera decoding and printer/low-memory-phone field acceptance still require supported
 hardware. Source/test validation uses isolated copies with authoritative shared source.
 
+## Billing Release 1 (17 November 2026; local review)
+
+The existing `/billing/settings/fees` route is now Price Catalogue. Its basic
+form requires name, category and price; new items inherit facility currency and
+use `when_ordered`, with no department or exemptions. Existing categories are
+protected pending insurance-impact validation in Release 2. Basic edits preserve
+legacy currency, department, automatic policy and historical charges. A separate
+editor saves existing automatic charging/exemption fields with explicit policy
+intent; enabling automation requires confirmation. Saves compare the editor's
+original snapshot through the existing online configuration boundary.
+
+Protected online billing and insurance tasks send the existing verified staff
+session and use the existing PIN/enrollment UI when proof is missing. Strict
+guards preserve mounted form state after expiry and never automatically replay a
+financial mutation. Operational callers retain the verification component's
+existing default; local cash, manual charges and operational uploads retain their
+offline authorization and queue behavior. No permission, schema or dependency
+changes. Later catalogue/module, general-account and statement releases are deferred.
+
+Validation: 536 frontend tests, both consumer typechecks, optimized QA-mode
+Vite/PWA build and initial-JavaScript budget (219.3 KB gzip / 300 KB) pass. Six
+real Chrome workflows against synthetic PostgreSQL/PowerSync pass, including
+390px creation, PIN renewal with draft retention, policy editing, insurance
+access, cashier restrictions and offline cash followed by exactly one server
+payment. No commit, push or deployment. See the [implementation report](../docs/billing-release-1-2026-11-17/README.md)
+for complete files, evidence and limits.
+
 
 Validation: 205 frontend tests and 302 server/shared tests pass. Both typechecks
 and the production build pass. Seven identity browser workflows and four session

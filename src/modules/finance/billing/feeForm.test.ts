@@ -1,35 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { emptyRule, EXEMPTION_PRESETS, feeDraftFromForm, feeFormValues, type FeeForm } from './feeForm';
+import { feeDraftFromForm, feeFormValues } from './feeForm';
 
-const form = (): FeeForm => ({ ...feeFormValues(), name: ' Consultation ', amount: '1500.29', currency: 'ngn' });
-
-describe('fee schedule form', () => {
-  it('turns each optional preset into an editable rule accepted by the contract', () => {
-    for (const preset of EXEMPTION_PRESETS) {
-      const values = form(); values.exemptions = [preset.rule];
-      expect(feeDraftFromForm(values).exemptions[0].reason).toBe(preset.rule.reason);
+describe('basic Price Catalogue form', () => {
+  it('creates only explicitly selected fees for every supported category', () => {
+    for (const category of ['registration', 'card', 'consultation', 'laboratory', 'procedure', 'other'] as const) {
+      expect(feeDraftFromForm({ name: ' Test item ', category, amount: '1500.29' }, 'ngn')).toMatchObject({
+        name: 'Test item', category, amountMinor: 150029, currency: 'NGN', chargeWhen: 'when_ordered', departmentId: null, exemptions: [],
+      });
     }
   });
-  it('normalizes money and optional rule fields into the shared shape', () => {
-    const values = form();
-    values.exemptions = [{ ...emptyRule(), reason: ' Under-5 ', ageUnderYears: '5' }];
-    expect(feeDraftFromForm(values)).toMatchObject({
-      name: 'Consultation', amountMinor: 150029, currency: 'NGN',
-      exemptions: [{ reason: 'Under-5', ageUnderYears: 5, ageFromYears: undefined, visitTypes: undefined }],
-    });
+  it('has exactly three basic fields and preserves zero prices', () => {
+    expect(Object.keys(feeFormValues()).sort()).toEqual(['amount', 'category', 'name']);
+    expect(feeDraftFromForm({ name: 'Free item', category: 'other', amount: '0' }).amountMinor).toBe(0);
   });
-
-  it('keeps age zero as a condition, while an empty value means no condition', () => {
-    const values = form();
-    values.exemptions = [{ ...emptyRule(), reason: 'Children', ageFromYears: '0', ageUnderYears: '5' }];
-    expect(feeDraftFromForm(values).exemptions[0].ageFromYears).toBe(0);
-  });
-
-  it('explains which rule has no conditions or an impossible age range', () => {
-    const values = form();
-    values.exemptions = [{ ...emptyRule(), reason: 'Policy' }];
-    expect(() => feeDraftFromForm(values)).toThrow(/Exemption 1: An exemption needs at least one condition/);
-    values.exemptions[0] = { ...emptyRule(), reason: 'Policy', ageFromYears: '10', ageUnderYears: '5' };
-    expect(() => feeDraftFromForm(values)).toThrow(/Exemption 1: No patient/);
+  it('inherits the supplied currency and rejects invalid money or an empty name', () => {
+    expect(feeDraftFromForm({ name: 'Item', category: 'other', amount: '5' }, 'USD').currency).toBe('USD');
+    expect(() => feeDraftFromForm({ name: '', category: 'other', amount: '5' })).toThrow();
+    expect(() => feeDraftFromForm({ name: 'Item', category: 'other', amount: '-1' })).toThrow();
   });
 });

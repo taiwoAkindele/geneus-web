@@ -42,7 +42,7 @@ export const ContractsScreen = () => {
   return <main className="mx-auto max-w-5xl space-y-6 p-4">
     <header><h1 className="text-2xl font-extrabold">Payers &amp; contracts</h1>
       <p className="text-sm text-ink-soft">Contract prices stay on the server. Devices receive only what the patient pays, once a version is activated.</p></header>
-    <StaffVerification purpose="Managing payer contracts"><ContractsBody canRead={canRead} /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Managing payer contracts"><ContractsBody canRead={canRead} /></StaffVerification>
   </main>;
 };
 

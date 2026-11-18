@@ -7,7 +7,7 @@ export const CATEGORY_LABELS: Record<FeeCategory, string> = {
   laboratory: 'Laboratory', procedure: 'Procedure', other: 'Other',
 };
 export const CHARGE_WHEN_LABELS: Record<ChargeWhen, string> = {
-  first_visit: 'First visit only', every_visit: 'Every visit', when_ordered: 'When ordered',
+  first_visit: 'First visit only', every_visit: 'Every visit', when_ordered: 'Only when selected',
 };
 export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   general: 'General', follow_up: 'Follow-up', antenatal: 'Antenatal', postnatal: 'Postnatal',
@@ -25,9 +25,9 @@ export type RuleForm = {
 export type FeeForm = {
   name: string;
   category: FeeCategory;
-  departmentId?: string;
   amount: string;
-  currency: string;
+};
+export type FeePolicyForm = {
   chargeWhen: ChargeWhen;
   exemptions: RuleForm[];
 };
@@ -46,33 +46,43 @@ export const FEE_CURRENCIES = [
 
 export const emptyRule = (): RuleForm => ({ reason: '', ageUnderYears: '', ageFromYears: '', sex: '', visitTypes: [] });
 
-export const feeFormValues = (fee?: FeeItem, currency = ''): FeeForm => ({
+export const feeFormValues = (fee?: FeeItem): FeeForm => ({
   name: fee?.name ?? '',
   category: fee?.category ?? 'consultation',
-  departmentId: fee?.departmentId ?? '',
   amount: fee ? amountInput(fee.amountMinor, fee.currency) : '',
-  currency: fee?.currency ?? currency,
-  chargeWhen: fee?.chargeWhen ?? 'every_visit',
-  exemptions: fee?.exemptions.map((rule) => ({
+});
+
+export const feePolicyValues = (fee: FeeItem): FeePolicyForm => ({
+  chargeWhen: fee.chargeWhen,
+  exemptions: fee.exemptions.map((rule) => ({
     reason: rule.reason,
     ageUnderYears: rule.ageUnderYears === undefined ? '' : String(rule.ageUnderYears),
     ageFromYears: rule.ageFromYears === undefined ? '' : String(rule.ageFromYears),
     sex: rule.sex ?? '',
     visitTypes: rule.visitTypes ?? [],
-  })) ?? [],
+  })),
 });
 
 const draftSchema = FeeItem.pick({ name: true, category: true, departmentId: true, amountMinor: true, currency: true, chargeWhen: true, exemptions: true });
 
 /** Forms hold strings; the shared schema remains the authority for the saved shape. */
-export const feeDraftFromForm = (form: FeeForm): FeeDraft => {
-  const currency = form.currency.trim().toUpperCase();
+export const feeDraftFromForm = (form: FeeForm, currencyCode = 'NGN'): FeeDraft => {
+  const currency = currencyCode.trim().toUpperCase();
   const result = draftSchema.safeParse({
     name: form.name.trim(),
     category: form.category,
-    departmentId: form.departmentId || undefined,
+    departmentId: null,
     amountMinor: parseAmount(form.amount, currency),
     currency,
+    chargeWhen: 'when_ordered',
+    exemptions: [],
+  });
+  if (!result.success) throw new Error(result.error.issues.map((issue) => issue.message).join('. '));
+  return result.data;
+};
+
+export const feePolicyFromForm = (form: FeePolicyForm): Pick<FeeItem, 'chargeWhen' | 'exemptions'> => {
+  const result = FeeItem.pick({ chargeWhen: true, exemptions: true }).safeParse({
     chargeWhen: form.chargeWhen,
     exemptions: form.exemptions.map((rule) => ({
       reason: rule.reason.trim(),

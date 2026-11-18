@@ -27,7 +27,7 @@ export const InsuranceSettings = () => {
   return <main className="mx-auto max-w-3xl space-y-6 p-4">
     <header><h1 className="text-2xl font-extrabold">Insurance settings</h1>
       <p className="text-sm text-ink-soft">Prepare insurance without changing any bill. Billing starts only when every requirement is met and Geneus approves it.</p></header>
-    <StaffVerification purpose="Insurance settings"><SettingsBody /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Insurance settings"><SettingsBody /></StaffVerification>
   </main>;
 };
 

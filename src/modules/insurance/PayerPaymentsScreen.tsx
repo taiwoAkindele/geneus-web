@@ -52,7 +52,7 @@ export const PayerPaymentsScreen = () => {
   if (insurance !== 'active' && insurance !== 'history') return <main className="p-4"><h1 className="text-xl font-bold">Payer payments</h1><p className="mt-2 text-sm">Payer payments start once insurance billing is active.</p></main>;
   return <main className="mx-auto max-w-6xl space-y-6 p-4">
     <header><h1 className="text-2xl font-extrabold">Payer payments</h1><p className="text-sm text-ink-soft">Record what payers paid, match it to claims and follow up what is still owed. Payer money never enters a patient's account.</p></header>
-    <StaffVerification purpose="Payer payments"><Body /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Payer payments"><Body /></StaffVerification>
   </main>;
 };
 

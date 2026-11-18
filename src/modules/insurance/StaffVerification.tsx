@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuthorizationContext } from '@/session';
 import { Button, TextField } from '@/ui';
 import { ApiError } from '@/lib/api/client';
@@ -7,10 +7,9 @@ import { requestWorkforceCode } from '@/lib/api/workforce';
 import { useSyncStatus } from '@/data';
 
 /**
- * Whether online actions can go ahead. They always can: the server acts on the
- * person signed in on this enrolled device and checks their role and permissions
- * itself, so no separate PIN confirmation is asked for. A PIN session, when one
- * is open, is still sent along.
+ * Keep the existing device-based default for operational callers. Protected
+ * financial callers explicitly require hasServerSession and send its proof;
+ * signing in online normally establishes that session without another prompt.
  */
 export const useStaffVerification = () => {
   const context = useAuthorizationContext();
@@ -37,7 +36,7 @@ const REFUSALS: Record<string, string> = {
  * panel appears only when it has not happened yet (signed in offline, or idle
  * for 30 minutes) and asks for the PIN again. No emailed code is needed.
  *
- * `requireServerSession`: for binding a contact or handing out PIN authority,
+ * `requireServerSession`: for financial actions, contact binding or PIN authority,
  * where the server accepts only a PIN-proven session — never just the person
  * the device says is signed in — the panel shows until that session exists.
  */
@@ -48,7 +47,9 @@ export const StaffVerification = ({ children, purpose, requireServerSession = fa
   const verified = deviceVerified && (!requireServerSession || hasServerSession);
   const [pin, setPin] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [enrol, setEnrol] = useState<'choose' | 'setup' | 'email'>(); const [proof, setProof] = useState(''); const [sentTo, setSentTo] = useState('');
-  if (verified) return <>{children}</>;
+  const previouslyVerified = useRef(false);
+  if (verified) previouslyVerified.current = true;
+  if (verified && !requireServerSession) return <>{children}</>;
   const online = sync.connected || (typeof navigator !== 'undefined' && navigator.onLine);
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true); setError('');
@@ -58,7 +59,7 @@ export const StaffVerification = ({ children, purpose, requireServerSession = fa
       else setError(cause instanceof ApiError ? REFUSALS[cause.code] ?? cause.message : cause instanceof Error ? cause.message : 'Could not confirm');
     } finally { setBusy(false); }
   };
-  return <section aria-label="Confirm it is you" className="space-y-3 rounded-card border border-outline-soft bg-white p-4">
+  return <><section hidden={verified} aria-label="Confirm it is you" className="space-y-3 rounded-card border border-outline-soft bg-white p-4">
     <h2 className="font-bold">Confirm it is you</h2>
     <p className="text-sm text-ink-soft">{purpose} is saved directly on the server, in your name. Enter your PIN so the server knows who is signed in on this device.</p>
     {!online ? <p role="alert" className="text-sm text-amber-text">This needs an internet connection. Connect, then try again.</p> : null}
@@ -78,5 +79,5 @@ export const StaffVerification = ({ children, purpose, requireServerSession = fa
         <div className="flex gap-2"><Button type="submit" fullWidth={false} loading={busy} disabled={pin.length !== 6 || !proof.trim()}>Register my PIN</Button><Button type="button" variant="ghost" fullWidth={false} onClick={() => setEnrol('choose')}>Back</Button></div>
       </form>}
     </div>}
-  </section>;
+  </section><div hidden={!verified}>{verified || previouslyVerified.current ? children : null}</div></>;
 };

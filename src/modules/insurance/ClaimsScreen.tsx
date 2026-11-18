@@ -45,7 +45,7 @@ export const ClaimsScreen = () => {
   if (insurance !== 'active' && insurance !== 'history') return <main className="p-4"><h1 className="text-xl font-bold">Claims</h1><p className="mt-2 text-sm">Claims start once insurance billing is active.</p></main>;
   return <main className="mx-auto max-w-6xl space-y-6 p-4">
     <header><h1 className="text-2xl font-extrabold">Claims</h1><p className="text-sm text-ink-soft">Prepare, export and record claims through each payer's own channel. Exporting is not submitting, and submitting is not approval.</p></header>
-    <StaffVerification purpose="Preparing claims"><ClaimsBody /></StaffVerification>
+    <StaffVerification requireServerSession purpose="Preparing claims"><ClaimsBody /></StaffVerification>
   </main>;
 };
 
