@@ -7,6 +7,22 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Billing Releases 2A/2B (18 November 2026)
+
+Central catalogue discovery, optional category filters, fee-first Laboratory
+ordering and Pharmacy price consumption are implemented locally. Operational
+screens link central IDs and display read-only prices. Migration 0041, schema 6
+and compatible active readers precede incompatible catalogue writes. Existing
+URLs, financial permissions, automatic fee policies and offline cash remain.
+Source association, category reclassification and later releases are deferred.
+The acceptance correction keeps older/completed unresolved sources visible and
+adds a read-only financial review view of existing requests, with attribution and
+patient bills. It grants no clinical signing and adds no persisted review engine
+or source-association decision.
+See [scope, validation and limitations](../docs/billing-release-2ab-2026-11-18/README.md).
+Canonical shared changes remain in `geneus-shared`; local verification uses
+isolated consumer copies until separately authorized commits/submodule promotion.
+
 ### Continuing inpatient care (5 November 2026)
 
 The patient chart's Ward care tab groups signed nursing checks, doctor reviews,

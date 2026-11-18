@@ -2,11 +2,14 @@ import type { AuthorizationContext, StockItem, StockMovement } from '@shared';
 import { allOfType, envelope, insertRecord, newId, updateRecord } from '../db';
 import { usablePharmacyEffects } from './pharmacyAcceptance';
 import { pharmacySupported } from '../pharmacySupport';
+import { listFeeItems } from './billing';
 
 export const listStockItems = () => allOfType<StockItem>('stock_item');
 export const listStockMovements = () => allOfType<StockMovement>('stock_movement').then(usablePharmacyEffects);
-export const linkStockPrice = (id: string, feeItemId: string | undefined, context: AuthorizationContext) => {
+export const linkStockPrice = async (id: string, feeItemId: string | undefined, context: AuthorizationContext) => {
   if (!pharmacySupported(context)) throw new Error('Connect once to enable medicine selling-price links');
+  const current=(await listStockItems()).find(s=>s.id===id);
+  if(feeItemId && feeItemId!==current?.feeItemId && !(await listFeeItems()).some(f=>f.id===feeItemId && f.facilityId===context.facilityId && f.active && f.category==='pharmacy'))throw new Error('Choose an active central Pharmacy item');
   return updateRecord<StockItem>(context, 'stock_item:manage', 'stock_item', id, { feeItemId });
 };
 

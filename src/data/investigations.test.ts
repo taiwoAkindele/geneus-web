@@ -1,14 +1,16 @@
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 // The server and sync are stood in for: an accepted configuration save lands in local SQLite as sync would deliver it.
 vi.mock('./configurationSave', async (importOriginal) => ({ ...(await importOriginal<typeof import('./configurationSave')>()), saveConfiguration: (await import('./configurationSave.localDouble')).saveConfigurationLocally }));
-import { Location,ServiceDefinition,ServiceOffering,Staff,Unit } from '@shared';
+import { FeeItem, Location,ServiceDefinition,ServiceOffering,Staff,Unit } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { memoryStorage } from '@/lib/testing/memoryStorage';
 import { resetSecureStorageForTests } from '@/lib/secureStorage';
 import { sqliteTestDatabase } from './testing/sqliteDatabase';
 import { setDatabaseForTests } from './database';
 import { recordServerContact } from './deviceCredential';
-import { loadCataloguePage,setInvestigationPrice } from './repos/investigations';
+import { loadCataloguePage,loadInvestigationCatalogue,linkInvestigationDefinition,selectInvestigation } from './repos/investigations';
+import { rememberBillingCatalogue } from './billingCatalogueSupport';
+import { ensureFacilityWorkspace } from './facilityWorkspaces';
 import { listFeeItems } from './repos/billing';
 
 const base={facilityId:'TEST',schemaVersion:5,createdBy:'staff:admin',deviceId:'device:one',createdOn:'2026-11-01T08:00:00Z'};
@@ -44,22 +46,36 @@ describe('lab test catalogue on the device',()=>{
     expect((await loadCataloguePage(admin(),{query:'50%_'})).total).toBe(0);
   });
 
-  it('creates a laboratory fee for an unpriced test, then updates that fee in place',async()=>{
+  it('links operational details to a centrally priced item without creating or changing a fee',async()=>{
     await seedTest('Lipid profile');
-    let [row]=(await loadCataloguePage(admin(),{})).items;
-    expect(row.fee).toBeUndefined();
-    await setInvestigationPrice(row,450000,admin());
-    [row]=(await loadCataloguePage(admin(),{})).items;
-    expect(row.fee).toMatchObject({name:'Lipid profile',category:'laboratory',chargeWhen:'when_ordered',amountMinor:450000,currency:'NGN'});
-    await setInvestigationPrice(row,500000,admin());
-    expect((await listFeeItems()).map(fee=>fee.amountMinor)).toEqual([500000]);
+    const fee=FeeItem.parse({...base,id:'fee:lipids',type:'fee_item',name:'Central lipids',category:'laboratory',chargeWhen:'when_ordered',amountMinor:450000,currency:'NGN',priceVersion:'version:one',priceEvidenceVersion:1});
+    await store.seed(fee);
+    const [row]=(await loadCataloguePage(admin(),{})).items;
+    await linkInvestigationDefinition(row.definition,fee.id,admin());
+    expect(await listFeeItems()).toEqual([fee]);
+    const item=selectInvestigation({fee,definition:undefined,offering:undefined,central:true});
+    expect(item).toMatchObject({feeItemId:fee.id,catalogueSource:'billing',priceMinor:450000,feePriceVersion:'version:one'});
+    expect(item.serviceDefinitionId).toBeUndefined();
   });
 
-  it('refuses a price change from staff who cannot manage fees',async()=>{
+  it('refuses an operational association from staff who cannot manage services',async()=>{
     await seedTest('Widal test');
     const nurse=authorizationFor({staff:{staffId:'staff:nurse',role:'nurse',permission:'read_write'},facilityId:'TEST',deviceId:'device:one'});
     const [row]=(await loadCataloguePage(admin(),{})).items;
-    await expect(setInvestigationPrice(row,1000,nurse)).rejects.toThrow();
+    await expect(linkInvestigationDefinition(row.definition,'missing:fee',nurse)).rejects.toThrow();
     expect(await listFeeItems()).toEqual([]);
+  });
+  it('retains an explicit legacy investigation profile during central discovery',async()=>{
+    await ensureFacilityWorkspace({facilityId:'TEST',deviceId:'device:one',credential:'device:one.synthetic',syncEndpoint:'http://localhost'});
+    rememberBillingCatalogue(admin(),true);
+    await seedTest('Existing profile');
+    const fee=FeeItem.parse({...base,id:'fee:existing',type:'fee_item',name:'Central profile',category:'laboratory',chargeWhen:'when_ordered',amountMinor:700000,currency:'NGN',priceVersion:'price:current',priceEvidenceVersion:1});
+    await store.seed(fee);
+    const offering=(await loadCataloguePage(admin(),{})).items[0].offering!;
+    await store.db.execute('UPDATE service_offerings SET "feeItemId"=? WHERE id=?',[fee.id,offering.id]);
+    const row=(await loadInvestigationCatalogue()).items.find(i=>i.central && i.fee.id===fee.id)!;
+    expect(selectInvestigation(row)).toMatchObject({catalogueSource:'billing',feeItemId:fee.id,offeringId:offering.id,serviceDefinitionId:offering.serviceDefinitionId,specimen:'Serum'});
+    expect((await loadCataloguePage(admin(),{})).items).toHaveLength(1);
+    expect(await listFeeItems()).toEqual([fee]);
   });
 });

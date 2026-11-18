@@ -18,6 +18,7 @@ export type ServiceRequest = {
   pending: string[];
   completedOn?: string;
   billingPending?: number;
+  billingReviews?: { id: string; name: string; reason: string; recordedBy: string; recordedOn: string; quantity?: number; unit?: string }[];
   quantityTracked?: boolean;
   partSupplied?: boolean;
   superseded?: boolean;
@@ -34,7 +35,12 @@ const quantityRequest = (source: PharmacyPrescription, saved: readonly Encounter
   const pending = states.filter((state) => !state.complete || state.conflict).map((state) => state.line!.drug);
   const priced = new Set(saved.map((e) => dispensingDetails(e)?.priceFor).filter(Boolean));
   const billingPending = saved.filter((e) => { const d = dispensingDetails(e); return d?.prescriptionEntryId === source.id && d.action === 'supply' && d.billing === 'unpriced' && !priced.has(e.id) && unreturnedQuantity(e, saved) > 0; }).length;
-  return { id: source.id, encounterId: source.encounterId, patientId: source.patientId, requestedOn: source.createdOn, items: prescriptionLines(source).map((line) => line.drug), pending, billingPending, quantityTracked: true, partSupplied: states.some((state) => state.supplied > 0) && pending.length > 0 };
+  const billingReviews = saved.flatMap(e=>{
+    const d=dispensingDetails(e);
+    if(d?.prescriptionEntryId!==source.id || d.action!=='supply' || d.billing!=='unpriced' || priced.has(e.id) || unreturnedQuantity(e,saved)<=0)return [];
+    return [{id:e.id,name:prescriptionLines(source).find(line=>line.lineId===d.lineId)?.drug??'Medicine supply',reason:d.reason??'Billing item requires review',recordedBy:e.createdBy,recordedOn:e.createdOn,quantity:unreturnedQuantity(e,saved),unit:d.unit}];
+  });
+  return { id: source.id, encounterId: source.encounterId, patientId: source.patientId, requestedOn: source.createdOn, items: prescriptionLines(source).map((line) => line.drug), pending, billingPending, billingReviews, quantityTracked: true, partSupplied: states.some((state) => state.supplied > 0) && pending.length > 0 };
 };
 
 export const requestQueues = (entries: readonly EncounterEntry[], wardEvents: readonly WardCareEvent[] = []): { lab: RequestQueue; pharmacy: RequestQueue } => {
@@ -43,18 +49,24 @@ export const requestQueues = (entries: readonly EncounterEntry[], wardEvents: re
   const lab: RequestQueue = { open: [], completed: [] }, pharmacy: RequestQueue = { open: [], completed: [] };
   for (const [encounterId, saved] of byEncounter) {
     const order = latest(saved, 'lab_order');
-    if (order) {
-      const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values);
+    for (const requested of saved.filter(e=>e.step==='lab_order')) {
+      const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(requested.values);
       const results = saved.filter((e) => e.step === 'lab_results');
       const done = new Set(results.flatMap((e) => ENCOUNTER_STEP_VALUES.lab_results.parse(e.values).results.map((r) => r.orderItemId ?? r.test)));
       const pending = tests.filter((test, index) => !done.has(items?.[index]?.id ?? test));
-      const request = { id: order.id, encounterId, patientId: order.patientId, requestedOn: order.createdOn, items: tests, pending };
-      if (pending.length) lab.open.push(request);
+      const billingReviews=items?.filter(i=>i.billingReviewReason).map(i=>({id:i.id,name:i.name,reason:i.billingReviewReason!,recordedBy:requested.createdBy,recordedOn:requested.createdOn}));
+      if(requested.id!==order?.id && !billingReviews?.length)continue;
+      const request = { id: requested.id, encounterId, patientId: requested.patientId, requestedOn: requested.createdOn, items: tests, pending, billingPending:billingReviews?.length,billingReviews, ...(requested.id!==order?.id?{superseded:true}:{}) };
+      if (pending.length && requested.id===order?.id) lab.open.push(request);
       else lab.completed.push({ ...request, completedOn: results.map((e) => e.createdOn).sort().reverse()[0] });
     }
     // A visit recorded in the retired order carried its prescription on the diagnosis.
     const medication = latest(saved, 'prescription') ?? latest(saved, 'diagnosis');
     if (medication) {
+      for(const older of saved.filter(e=>e.id!==medication.id && (e.step==='prescription'||e.step==='diagnosis'))){
+        const prior=quantityRequest(older,saved);
+        if(prior.billingPending)pharmacy.completed.push({...prior,superseded:true,pending:[]});
+      }
       const { prescription } = medication.step === 'prescription' ? ENCOUNTER_STEP_VALUES.prescription.parse(medication.values) : ENCOUNTER_STEP_VALUES.diagnosis.parse(medication.values);
       if (prescription.length) {
         const quantityTracked = saved.some((e) => e.pharmacyVersion === 1);

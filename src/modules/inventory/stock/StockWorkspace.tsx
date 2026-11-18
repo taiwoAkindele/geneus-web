@@ -83,7 +83,7 @@ export const StockWorkspace = () => {
       </section> : params.get('item') ? <p role="alert">The selected item is not available on this device.</p> : null}
     </>}
     <p className="text-xs leading-relaxed text-ink-muted">Saved movements are permanent. Correct a counted difference with a new adjustment and a reason. Other devices' movements arrive when this device syncs; this is not a live physical count.</p>
-    {item && context.permissions.includes('stock_item:manage') && pharmacySupported(context) ? <Button variant="outlined" fullWidth={false} onClick={() => setPricing(true)}>Set medicine selling price</Button> : null}
+    {item && context.permissions.includes('stock_item:manage') && pharmacySupported(context) ? <Button variant="outlined" fullWidth={false} onClick={() => setPricing(true)}>Link Billing Item</Button> : null}
     {pricing && item ? <StockPriceSheet item={item} onClose={() => setPricing(false)} onSaved={query.reload} /> : null}
     {adding ? <StockForm onClose={() => setAdding(false)} onSaved={query.reload} /> : null}
     {moving && item ? <StockForm item={item} onClose={() => setMoving(false)} onSaved={query.reload} /> : null}

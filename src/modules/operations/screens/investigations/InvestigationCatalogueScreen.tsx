@@ -1,10 +1,13 @@
+import { CatalogueBrowser } from '@/modules/finance/billing/CatalogueBrowser';
+import { StaffVerification } from '@/modules/insurance/StaffVerification';
+import type { FeeItem } from '@shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { addOwnTests, adoptStandardTests, loadCataloguePage, loadStandardTests, setInvestigationPrice, type AddedTests, type CatalogueRow, type OwnTest } from '@/data/repos/investigations';
+import { addOwnTests, adoptStandardTests, loadCataloguePage, loadStandardTests, linkInvestigationDefinition, type AddedTests, type CatalogueRow, type OwnTest } from '@/data/repos/investigations';
 import { ActionMenu, Button, DataTable, Icon, SelectAllCheckbox, Sheet, SheetCancelButton, Tag, TextField, type TableColumn } from '@/ui';
-import { amountInput, formatMoney, parseAmount } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { parseTestCsv, TEST_CSV_TEMPLATE, type CsvIssue } from '@/modules/operations/investigations/testCsv';
 
 type Panel = 'single' | 'upload' | 'standard' | { edit: CatalogueRow };
@@ -13,7 +16,7 @@ const isStandard = (row: CatalogueRow) => row.definition.concept.system !== 'loc
 const plural = (count: number) => `${count} ${count === 1 ? 'test' : 'tests'}`;
 
 const AddedMessage = ({ added, skipped }: AddedTests) => <div role="status" className="space-y-1 rounded-field border border-outline-soft bg-brand-wash p-3 text-sm">
-  <p className="font-bold">{added.length ? `Added ${plural(added.length)}. Set prices with Edit.` : 'No new tests were added.'}</p>
+  <p className="font-bold">{added.length ? `Added ${plural(added.length)}. Link an existing Billing item with Edit.` : 'No new tests were added.'}</p>
   {skipped.length ? <p>Skipped because they are already in the catalogue: {skipped.join(', ')}</p> : null}
 </div>;
 
@@ -34,7 +37,7 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
       <TextField label="Specimen" value={draft.specimen} onChange={(e) => setDraft({ ...draft, specimen: e.target.value })} />
       <TextField label="Classification" value={draft.classification} onChange={(e) => setDraft({ ...draft, classification: e.target.value })} />
       <TextField label="Other names (optional)" value={draft.aliases} onChange={(e) => setDraft({ ...draft, aliases: e.target.value })} />
-      <p className="text-sm text-ink-soft">Separate other names with commas, for example "FBC, CBC". Set the price with Edit after adding.</p>
+      <p className="text-sm text-ink-soft">Separate other names with commas, for example "FBC, CBC". Manage the price in Billing; attach the existing item after adding clinical details.</p>
       {error ? <p role="alert" className="text-danger-strong">{error}</p> : null}
       <div className="flex flex-wrap gap-2"><SheetCancelButton /><Button fullWidth={false} loading={busy} disabled={busy || !draft.name.trim() || !draft.specimen.trim() || !draft.classification.trim()} onClick={() => void save()}>Add test</Button></div>
     </div>
@@ -107,28 +110,19 @@ const StandardTestsSheet = ({ onClose }: { onClose: () => void }) => {
   </Sheet>;
 };
 
-const EditSheet = ({ row, onClose }: { row: CatalogueRow; onClose: () => void }) => {
-  const context = useAuthorizationContext(), canPrice = context.permissions.includes('fee_item:manage');
-  const currency = row.fee?.currency ?? 'NGN';
-  const [price, setPrice] = useState(row.fee ? amountInput(row.fee.amountMinor, currency) : ''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const save = async () => {
-    setBusy(true); setError('');
-    try { await setInvestigationPrice(row, parseAmount(price, currency), context); onClose(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save'); } finally { setBusy(false); }
-  };
-  return <Sheet title={row.definition.name} eyebrow="Edit test" placement="side" onClose={onClose}>
-    <div className="space-y-4">
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="font-semibold text-ink-soft">Specimen</dt><dd>{row.definition.investigation?.specimen}</dd></div>
-        <div><dt className="font-semibold text-ink-soft">Classification</dt><dd>{row.definition.investigation?.department}</dd></div>
-      </dl>
-      {canPrice ? <><TextField label={`Price (${currency})`} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /><p className="text-sm text-ink-soft">Charged when the test is ordered. Orders already placed keep the price they recorded.</p></>
-        : <p className="text-sm">Setting a price needs permission to manage fees. Ask a facility administrator.</p>}
-      {row.offering ? <Link className="inline-flex min-h-[44px] items-center font-bold text-brand" to={`/facility/services/${encodeURIComponent(row.offering.id)}`}>Availability and other settings</Link> : null}
-      {error ? <p role="alert" className="text-danger-strong">{error}</p> : null}
-      <div className="flex flex-wrap gap-2"><SheetCancelButton />{canPrice ? <Button fullWidth={false} loading={busy} disabled={busy || !price.trim()} onClick={() => void save()}>Save price</Button> : null}</div>
-    </div>
-  </Sheet>;
+const EditSheet = ({ row, onClose }: {row:CatalogueRow;onClose:()=>void})=>{
+ const context=useAuthorizationContext(),[chosen,setChosen]=useState<FeeItem>(),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const save=async()=>{if(!chosen||busy)return;setBusy(true);try{await linkInvestigationDefinition(row.definition,chosen.id,context);onClose();}catch(cause){setError(errorText(cause));}finally{setBusy(false);}};
+ return <Sheet title={row.definition.name} eyebrow="Clinical configuration" placement="side" onClose={onClose}>
+ <p>Specimen: {row.definition.investigation?.specimen}. Classification: {row.definition.investigation?.department}.</p>
+ <p className="my-3 text-sm">Standard prices are managed exclusively in Billing. Linking an item adds no price definition.</p>
+ {context.permissions.includes('fee_item:manage')?<Link className="font-bold text-brand" to="/billing/settings/fees">Manage price in Billing</Link>:null}
+ <CatalogueBrowser initialCategory="laboratory" canSelect={f=>f.category==='laboratory'} onSelect={setChosen}/>
+ {chosen?<p>Link to {chosen.name} · {formatMoney(chosen.amountMinor,chosen.currency)}</p>:null}
+ {error?<p role="alert">{error}</p>:null}
+ <StaffVerification requireServerSession purpose="Linking a central Billing item"><Button disabled={!chosen||busy} loading={busy} onClick={()=>void save()}>Link Billing Item</Button></StaffVerification>
+ {row.offering?<Link className="block py-3 font-bold text-brand" to={'/facility/services/'+encodeURIComponent(row.offering.id)}>Operational availability and other settings</Link>:null}<SheetCancelButton/>
+ </Sheet>;
 };
 
 export const InvestigationCatalogueScreen = () => {
@@ -140,6 +134,7 @@ export const InvestigationCatalogueScreen = () => {
   useEffect(() => { document.title = 'Investigation catalogue · Geneus Health'; }, []);
   const set = (changes: Record<string, string>) => setParams((current) => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); } return next; }, { replace: true });
   const close = () => { setPanel(undefined); data.reload(); };
+  const operational=params.get('view')==='operational';
   const empty = data.data?.total === 0 && !query;
   const columns: TableColumn<CatalogueRow>[] = [
     { key: 'name', label: 'Test', sortValue: (row) => row.definition.name, render: (row) => <div className="min-w-[160px]"><p className="font-bold text-brand">{row.definition.name}</p>{row.definition.investigation?.aliases.length ? <p className="text-xs text-ink-soft">Also: {row.definition.investigation.aliases.join(', ')}</p> : null}</div> },
@@ -152,11 +147,12 @@ export const InvestigationCatalogueScreen = () => {
   ];
   const addActions = [{ label: 'Add a single test', onSelect: () => setPanel('single') }, { label: 'Upload a list of tests', onSelect: () => setPanel('upload') }, { label: 'Choose from standard tests', onSelect: () => setPanel('standard') }];
   // Result templates, parts and answer lists are the next Laboratory settings page.
-  return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
+  if(!operational)return <div className="space-y-5 px-4 py-5 md:px-8"><h1 className="text-2xl font-extrabold">Laboratory catalogue</h1><CatalogueBrowser initialCategory="laboratory"/><Button variant="outlined" fullWidth={false} onClick={()=>setParams({view:'operational'})}>Clinical definitions and templates</Button></div>;
+  return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8"><Button variant="ghost" fullWidth={false} onClick={()=>setParams({})}>Central Billing items</Button>
     <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Investigation catalogue</h1><div className="flex flex-wrap gap-2">{canManage && !empty ? <ActionMenu label="Add tests" title="Add tests" actions={addActions} /> : null}</div></header>
     {empty ? <section aria-label="No tests yet" className="flex flex-col items-center gap-3 rounded-card border border-dashed border-outline px-6 py-10 text-center">
       <h2 className="text-xl font-extrabold">This facility has no lab tests yet</h2>
-      <p className="max-w-xl text-ink-soft">Start with standard tests used in most facilities, with specimens and other names already filled in. You can set prices, or add your own tests afterwards.</p>
+      <p className="max-w-xl text-ink-soft">Start with standard tests used in most facilities, with specimens and other names already filled in. Prices are configured in Billing. Clinical definitions and templates remain separate.</p>
       {canManage ? <div className="mt-2 flex flex-wrap justify-center gap-2"><Button fullWidth={false} onClick={() => setPanel('standard')}>Choose from standard tests</Button><Button variant="outlined" fullWidth={false} onClick={() => setPanel('upload')}>Upload a list of tests</Button><Button variant="outlined" fullWidth={false} onClick={() => setPanel('single')}>Add a single test</Button></div>
         : <p className="text-sm">Ask a facility administrator to add the tests this facility performs.</p>}
     </section> : <>

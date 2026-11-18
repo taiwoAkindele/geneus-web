@@ -13,6 +13,7 @@ import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, WORKFORCE_DRAFTS_TABLE, WORKFORCE_
  * cheap phone, so each one names the query it serves.
  */
 const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
+  fee_item: { catalogue: ['category','name'] },
   patient: { name: ['fullName'], phone: ['phone'], folder: ['legacyPaperRef'], nin: ['nin'] },
   patient_identity_event: { patient: ['patientId'], other: ['otherPatientId'] },
   appointment: { patient: ['patientId'], scheduled: ['scheduledFor'] },

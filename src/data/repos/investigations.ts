@@ -3,7 +3,7 @@ import { allOfType } from '../db';
 import { getDatabase } from '../database';
 import { fromRow, type Row } from '../rows';
 import { TABLE_FOR } from '../tables';
-import { createFeeItem, updateFeeItem } from './billing';
+import { billingCatalogueEnabled } from '../billingCatalogueSupport';
 import { getFacility } from './facility';
 import { saveWorkforce } from './workforce';
 import { assertAllowed } from '@/auth/authorization';
@@ -14,19 +14,25 @@ export const loadInvestigationCatalogue = async () => {
     allOfType<FeeItem>('fee_item'), allOfType<Unit>('unit'), allOfType<Location>('location'), getFacility(),
   ]);
   return { definitions, offerings, fees, units, locations, facility,
-    items: offerings.flatMap((offering) => {
+    items: [...(billingCatalogueEnabled() ? fees.filter(f=>f.active && f.category==='laboratory').map(fee=>{
+      const direct=definitions.find(d=>d.active && d.orderable && d.feeItemId===fee.id);
+      const offering=direct?undefined:offerings.find(o=>o.feeItemId===fee.id && o.configuration==='active' && o.resourceReadiness==='available' && definitions.some(d=>d.id===o.serviceDefinitionId && d.active && d.orderable && d.investigation));
+      return {fee,central:true as const,definition:direct??definitions.find(d=>d.id===offering?.serviceDefinitionId),offering};
+    }) : []), ...offerings.flatMap((offering) => {
       const definition = definitions.find((d) => d.id === offering.serviceDefinitionId && d.active && d.orderable && d.investigation);
       if (!definition || offering.configuration !== 'active' || offering.resourceReadiness !== 'available') return [];
       const fee = fees.find((f) => f.id === offering.feeItemId && f.active);
-      return [{ offering, definition, fee }];
-    }),
+      if(billingCatalogueEnabled() && fee?.category==='laboratory')return [];
+      return [{ offering, definition, fee,central:false as const }];
+    })],
   };
 };
 export type InvestigationCatalogue = Awaited<ReturnType<typeof loadInvestigationCatalogue>>;
-export const selectInvestigation = ({ definition, offering, fee }: InvestigationCatalogue['items'][number]): InvestigationItem => ({
-  id: `order_item:${crypto.randomUUID()}`, name: offering.name,
-  serviceDefinitionId: definition.id, offeringId: offering.id, catalogueRevision: offering.revision, definitionRevision: definition.revision,
-  specimen: definition.investigation!.specimen, priority: 'routine',
+export const selectInvestigation = ({ definition, offering, fee,central }: InvestigationCatalogue['items'][number]): InvestigationItem => ({
+  id: `order_item:${crypto.randomUUID()}`, name: central?fee!.name:offering!.name,
+  ...(central?{catalogueSource:'billing' as const,exemptions:fee!.exemptions}:{}),
+  serviceDefinitionId: definition?.id, offeringId: offering?.id, catalogueRevision: offering?.revision, definitionRevision: definition?.revision,
+  specimen: definition?.investigation?.specimen, priority: 'routine',
   ...(fee ? { feeItemId: fee.id, feePriceVersion: fee.priceVersion, priceMinor: fee.amountMinor, currency: fee.currency } : {}),
 });
 
@@ -105,36 +111,28 @@ export const loadCataloguePage = async (context: AuthorizationContext, { query =
   const definitions = rows.map((row) => fromRow<ServiceDefinition>('service_definition', row));
   const ids = definitions.map((d) => d.id), marks = ids.map(() => '?').join(',');
   const offerings = ids.length ? (await db.getAll<Row>(`SELECT * FROM ${TABLE_FOR.service_offering} WHERE "serviceDefinitionId" IN (${marks})`, ids)).map((row) => fromRow<ServiceOffering>('service_offering', row)) : [];
-  const feeIds = [...new Set(offerings.flatMap((o) => o.feeItemId ? [o.feeItemId] : []))];
+  const feeIds = [...new Set([...definitions, ...offerings].flatMap((o) => o.feeItemId ? [o.feeItemId] : []))];
   const fees = feeIds.length ? (await db.getAll<Row>(`SELECT * FROM ${TABLE_FOR.fee_item} WHERE id IN (${feeIds.map(() => '?').join(',')})`, feeIds)).map((row) => fromRow<FeeItem>('fee_item', row)) : [];
   // The result template in use for each test on this page; a test has at most one.
   const templates = ids.length ? await db.getAll<{ test: string; name: string; parts: number }>(`SELECT j.value AS test, t."name" AS name, json_array_length(t."parts") AS parts FROM ${TABLE_FOR.result_template} t, json_each(t."serviceDefinitionIds") j WHERE t."status" = 'active' AND j.value IN (${marks})`, ids) : [];
   const items: CatalogueRow[] = definitions.map((definition) => {
     const own = offerings.filter((o) => o.serviceDefinitionId === definition.id), offering = own.find((o) => o.configuration === 'active') ?? own[0];
     const template = templates.find((t) => t.test === definition.id);
-    return { definition, offering, fee: fees.find((f) => f.id === offering?.feeItemId && f.active), ...(template ? { template: { name: template.name, parts: Number(template.parts) } } : {}) };
+    return { definition, offering, fee: fees.find((f) => f.id === (definition.feeItemId ?? offering?.feeItemId) && f.active), ...(template ? { template: { name: template.name, parts: Number(template.parts) } } : {}) };
   });
   return { items, total: Number(count?.total ?? 0) };
 };
 
-/**
- * Sets a test's price. A fee used only by this test is updated; otherwise a new
- * laboratory fee charged when ordered is created and linked. Existing orders keep
- * the price they recorded.
- */
-export const setInvestigationPrice = async (row: CatalogueRow, amountMinor: number, context: AuthorizationContext) => {
-  assertAllowed(context, 'fee_item:manage');
-  if (!row.offering) throw new Error('This test has no offering to price. Review it in Facility services');
-  const catalogue = await loadInvestigationCatalogue();
-  const shared = row.fee && catalogue.offerings.some((o) => o.id !== row.offering!.id && o.feeItemId === row.fee!.id);
-  if (row.fee && !shared) return updateFeeItem(row.fee.id, { name: row.fee.name, category: row.fee.category, departmentId: row.fee.departmentId ?? null, amountMinor, currency: row.fee.currency, chargeWhen: row.fee.chargeWhen, exemptions: row.fee.exemptions }, context);
-  const currency = row.fee?.currency ?? catalogue.fees.find((f) => f.facilityId === context.facilityId && f.active)?.currency ?? 'NGN';
-  const fee = await createFeeItem({ name: row.definition.name, category: 'laboratory', departmentId: null, amountMinor, currency, chargeWhen: 'when_ordered', exemptions: [] }, context);
-  return linkInvestigationFee(row.offering, fee.id, context);
-};
-
+/** Associates existing clinical configuration with a central fee; never authors prices. */
 export const linkInvestigationFee = async (offering: ServiceOffering, feeItemId: string, context: AuthorizationContext) => {
   const catalogue = await loadInvestigationCatalogue();
-  if (!catalogue.fees.some((fee) => fee.id === feeItemId && fee.facilityId === context.facilityId && fee.active)) throw new Error('Choose an active fee belonging to this facility');
+  if (!catalogue.fees.some((fee) => fee.id === feeItemId && fee.facilityId === context.facilityId && fee.active && (fee.category==='laboratory' || fee.id===offering.feeItemId))) throw new Error('Choose an active central Laboratory item');
   return saveWorkforce('service_offering', { feeItemId }, context, offering);
+};
+export const linkInvestigationDefinition = async (definition:ServiceDefinition,feeItemId:string,context:AuthorizationContext)=>{
+ const fee=(await allOfType<FeeItem>('fee_item')).find(f=>f.id===feeItemId && f.facilityId===context.facilityId && f.active && f.category==='laboratory');
+ if(!fee)throw new Error('Choose an active central Laboratory item');
+ const offerings=(await allOfType<ServiceOffering>('service_offering')).filter(o=>o.serviceDefinitionId===definition.id);
+ if([definition,...offerings].some(o=>o.feeItemId && o.feeItemId!==feeItemId))throw new Error('This clinical definition already references a different fee. Review its existing association before changing it.');
+ return saveWorkforce('service_definition',{feeItemId},context,definition);
 };

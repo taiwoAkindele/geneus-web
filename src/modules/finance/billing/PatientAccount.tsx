@@ -1,7 +1,10 @@
+import { useLiveQuery } from '@/data';
+import { CatalogueBrowser } from './CatalogueBrowser';
+import { allOfType } from '@/data/db';
+import type { Location } from '@shared';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { useEffect, useRef, useState } from 'react';
 import { linkedPatientIds, type IncomingTransfer, type Payment } from '@shared';
-import { useLiveQuery } from '@/data';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
 import { adjustCharge, createCharge, patientBillingFacts, recordPayment } from '@/data/repos/billing';
 import { useAuthorizationContext } from '@/session';
@@ -16,6 +19,7 @@ import type { ChargeBalance } from '@/data/repos/billing';
 import { ChargeCoverage, RefundSheet, SelfPaySheet } from '@/modules/insurance/AccountCoverage';
 
 
+const loadServicePoints=()=>allOfType<Location>('location');
 export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved, onSelectAccount }: {
   patientId: string; transfer?: IncomingTransfer; data: BillingData; onClose: () => void;
   onReceipt: (p: Payment) => void; onSaved: () => void;
@@ -35,6 +39,8 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [fieldError, setFieldError] = useState<string>();
+  const [quantity,setQuantity]=useState('1'),[unit,setUnit]=useState(''),[servicePoint,setServicePoint]=useState('');
+  const servicePoints=useLiveQuery(loadServicePoints,['location']);
   const [review, setReview] = useState<ReturnType<typeof preparePayment>>();
   const [leaving, setLeaving] = useState<() => void>();
   const [accounts, setAccounts] = useState<ReceivingAccount[]>();
@@ -91,7 +97,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   });
   const addFee = () => perform(async () => {
     if (!patient || !feeId) throw new Error('Select a fee');
-    await createCharge(feeId, { patientId, facts: patientBillingFacts(patient) }, context);
+    await createCharge(feeId, { patientId, facts: patientBillingFacts(patient), quantity:Number(quantity),unitOfMeasure:unit.trim()||undefined,servicePointId:servicePoint||undefined }, context);
     setFeeId('');
   });
   const reduce = () => perform(async () => {
@@ -134,7 +140,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
         <div className="mt-2 flex flex-wrap gap-2">{r.receipts.filter((p) => !p.reverses && p.method !== 'waiver').map((p) => <button type="button" key={p.id} className="min-h-[44px] break-all text-left text-xs font-bold text-brand underline" onClick={() => requestLeave(() => onReceipt(p))}>{p.receiptNumber}</button>)}</div>
       </article>)}
       {adjusting ? <div className="space-y-3 rounded-card bg-surface p-3"><SelectField label="Adjustment" value={kind} options={[{ value: 'discount', label: 'Discount' }, { value: 'waiver', label: 'Waive remaining balance' }]} onChange={(e) => setKind(e.target.value as typeof kind)} />{kind === 'discount' ? <><label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={percent} onChange={(e) => setPercent(e.target.checked)} />Percentage discount</label><TextField label={percent ? 'Percentage' : 'Discount amount'} value={reduction} inputMode="decimal" onChange={(e) => setReduction(e.target.value)} /></> : null}<TextField label="Reason" required value={reason} onChange={(e) => setReason(e.target.value)} /><Button onClick={() => void reduce()}>Save adjustment</Button></div> : null}
-      {context.permissions.includes('charge:create') && !transfer ? <div className="space-y-2 border-t border-outline-soft pt-3"><SelectField label="Add a fee to this patient" value={feeId} options={[{ value: '', label: 'Choose a fee' }, ...data.fees.filter((f) => f.active).map((f) => ({ value: f.id, label: `${f.name} — ${formatMoney(f.amountMinor, f.currency)}` }))]} onChange={(e) => setFeeId(e.target.value)} /><Button variant="outlined" disabled={!feeId} onClick={() => void addFee()}>Add to bill</Button></div> : null}
+      {context.permissions.includes('charge:create') && !transfer ? <div className="space-y-2 border-t border-outline-soft pt-3"><CatalogueBrowser onSelect={fee=>setFeeId(fee.id)}/>{feeId?<><p className="font-bold">Selected: {data.fees.find(f=>f.id===feeId)?.name}</p><TextField label="Quantity" type="number" min="0.000001" value={quantity} onChange={e=>setQuantity(e.target.value)}/><TextField label="Quantity unit (optional)" value={unit} onChange={e=>setUnit(e.target.value)}/><SelectField label="Service point (optional)" value={servicePoint} options={[{value:"",label:"Not recorded"},...(servicePoints.data??[]).filter(l=>l.active).map(l=>({value:l.id,label:l.name}))]} onChange={e=>setServicePoint(e.target.value)}/></>:null}<Button variant="outlined" disabled={!feeId} onClick={() => void addFee()}>Add to bill</Button></div> : null}
     </fieldset>
     {error ? <div ref={errorSummary} tabIndex={-1} role="alert" className="my-3 rounded-field border border-danger bg-danger-bg p-3 text-sm text-danger"><p>{error}</p>{fieldError ? <button type="button" className="mt-1 min-h-[44px] font-bold underline" onClick={() => document.getElementById('amount-' + fieldError)?.focus()}>Go to amount</button> : null}</div> : null}
     {selfPay ? <SelfPaySheet row={selfPay.row} cover={selfPay.cover} check={selfPay.check} onClose={() => setSelfPay(undefined)} onSaved={() => { setSelfPay(undefined); toast('Choice recorded. The patient now owes the full price for this charge.'); onSaved(); }} /> : null}

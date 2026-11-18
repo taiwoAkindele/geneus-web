@@ -10,6 +10,21 @@ const entry = (encounterId: string, step: EncounterEntry['step'], values: Record
 } as EncounterEntry);
 
 describe('laboratory and pharmacy requests', () => {
+  const reviewOrder=(visit:string,name='Full Blood Count')=>entry(visit,'lab_order',{tests:[name],items:[{id:'item:'+minute,name,catalogueSource:'billing',feeItemId:'fee:fbc',feePriceVersion:'price:fbc',priceMinor:700000,currency:'NGN',billingReviewReason:'An existing manual bill needs financial review'}]});
+  it('keeps financial review separate from completed clinical results, with source attribution',()=>{
+    const order=reviewOrder('encounter:1'),item=(order.values.items as {id:string}[])[0];
+    const result=entry(order.encounterId,'lab_results',{results:[{test:'Full Blood Count',orderItemId:item.id,result:'Recorded free-text result'}]},'staff:lab');
+    const before=JSON.stringify([order,result]),queue=requestQueues([order,result]).lab;
+    expect(queue.open).toHaveLength(0);
+    expect(queue.completed[0]).toMatchObject({id:order.id,billingPending:1,billingReviews:[{id:item.id,name:'Full Blood Count',recordedBy:order.createdBy,recordedOn:order.createdOn,reason:'An existing manual bill needs financial review'}]});
+    expect(JSON.stringify([order,result])).toBe(before);
+  });
+  it('retains an earlier unresolved lab request when a later request becomes current',()=>{
+    const old=reviewOrder('encounter:1'),current=entry('encounter:1','lab_order',{tests:['Ultrasound request'],items:[{id:'item:new',name:'Ultrasound request',custom:true}]});
+    const queue=requestQueues([old,current]).lab;
+    expect(queue.open.map(r=>r.id)).toEqual([current.id]);
+    expect(queue.completed).toMatchObject([{id:old.id,superseded:true,billingPending:1}]);
+  });
   it('keeps a test request open until every test has a result, then completes it', () => {
     const order = entry('encounter:1', 'lab_order', { tests: ['Full blood count', 'Malaria RDT'] });
     const partial = entry('encounter:1', 'lab_results', { results: [{ test: 'Malaria RDT', result: 'Positive' }] }, 'staff:lab');
