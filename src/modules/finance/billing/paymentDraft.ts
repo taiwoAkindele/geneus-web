@@ -13,7 +13,7 @@ export const preparePayment = (rows: readonly ChargeBalance[], amounts: Readonly
   const allocations = selected.map((row) => {
     try {
       if (row.charge.currency !== currency) throw new Error('Collect one currency at a time.');
-      if (transfer && (transfer.currency !== currency || transfer.mode !== 'live' || (transfer.departmentId && transfer.departmentId !== row.charge.departmentId))) throw new Error('Choose fees belonging to this transfer’s currency and department.');
+      if (transfer && (transfer.currency !== currency || transfer.mode !== 'live')) throw new Error('Choose fees in this verified transfer’s currency.');
       const amountMinor = parseAmount(amounts[row.charge.id], currency);
       if (amountMinor <= 0 || amountMinor > row.balanceMinor) throw new Error('Enter an amount greater than zero and no more than the unpaid balance.');
       return { chargeId: row.charge.id, amountMinor };

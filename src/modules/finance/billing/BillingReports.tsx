@@ -1,4 +1,5 @@
 import { FeeCategory } from '@shared';
+import {FinancialSnapshotReport} from './FinancialSnapshotReport';
 import { formatMoney } from '@/lib/money';
 import { collectionAllocations } from './ledger';
 import type { BillingData } from './useBilling';
@@ -15,6 +16,7 @@ export const BillingReports = ({ data, currency, from, to, departmentId, search 
   const refunds = (data.insurance?.refunds ?? []).filter((r) => r.currency === currency && (!from || calendarDate(r.createdOn) >= from) && (!to || calendarDate(r.createdOn) <= to));
   const refundedBy = (id?: string) => refunds.filter((r) => !id || r.createdBy === id).reduce((n, r) => n + r.amountMinor, 0);
   return <div className="space-y-4">
+    <FinancialSnapshotReport key={currency} currency={currency}/>
     <p className="text-sm">Collections use payment dates. Waivers and exemptions are reductions, not cash received. Select Patient charges for patient-level discounts, waivers and debts.</p>
     {!allocations.length ? <p role="status" className="rounded-field border border-outline-soft bg-white p-4 text-sm">No collections match these filters.</p> : null}
     {refunds.length ? <div className="rounded-card border border-outline-soft bg-white p-4"><p>Refunds handed back</p><strong>{money(refundedBy())}</strong><ul className="mt-2 space-y-1 text-xs text-ink-muted">{refunds.map((r) => <li key={r.id}>{r.refundNumber} · {data.patients.find((p) => p.patientId === r.patientId)?.fullName ?? r.patientId} · {money(r.amountMinor)} · {r.method} · {data.staff.find((st) => st.staffId === r.createdBy)?.fullName ?? r.createdBy}</li>)}</ul></div> : null}

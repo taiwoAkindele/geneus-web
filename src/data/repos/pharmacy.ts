@@ -1,4 +1,6 @@
 import { EncounterEntry, DispensingDetails, dispensingDetails, dispensingSummary, pharmacyIssues, pharmacyEffects, type Encounter, type Appointment, type AnyDocument, type AuthorizationContext, type DocType, type PharmacyRecords, type Patient, type StockItem, type StockMovement, type FeeItem, type Charge, type BillingAdjustment, type WardCareEvent, type SyncRejection } from '@shared';
+import {integratedBillingEnabled} from '../integratedBillingSupport';
+import type {ServiceChargeAllocation} from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { allOfType, allWhere, findRecord, envelope, insertRecords, type NewRecord } from '../db';
 import { fieldKindsFor } from '../contractShape';
@@ -39,7 +41,8 @@ export const readPharmacy = async (patientId: string, encounterId: string, reade
     }
   }
   const effects = <T extends { dispenseEntryId?: string }>(records: T[]) => records.filter((r) => !r.dispenseEntryId || !blocked.has(r.dispenseEntryId));
-  return { refusedSupplies: entries.filter((e) => e.pharmacyVersion === 1 && blocked.has(e.id)), visitType: header?.visitType ?? booking?.visitType, entries: entries.filter((e) => e.patientId === patientId && e.encounterId === encounterId && !blocked.has(e.id)), items, movements: effects(movements), fees, charges: effects(charges).filter((c) => c.patientId === patientId), adjustments: effects(adjustments).filter((a) => a.patientId === patientId), patient: patients.find((p) => p.patientId === patientId), wardEvents: wardEvents.filter((e) => e.patientId === patientId && !blocked.has(e.id)) };
+  const serviceAllocations=await read<ServiceChargeAllocation>('service_charge_allocation','patientId',patientId);
+  return { integratedBilling:integratedBillingEnabled(),serviceAllocations,refusedSupplies: entries.filter((e) => e.pharmacyVersion === 1 && blocked.has(e.id)), visitType: header?.visitType ?? booking?.visitType, entries: entries.filter((e) => e.patientId === patientId && e.encounterId === encounterId && !blocked.has(e.id)), items, movements: effects(movements), fees, charges: effects(charges).filter((c) => c.patientId === patientId), adjustments: effects(adjustments).filter((a) => a.patientId === patientId), patient: patients.find((p) => p.patientId === patientId), wardEvents: wardEvents.filter((e) => e.patientId === patientId && !blocked.has(e.id)) };
 };
 export const loadPharmacy = async (patientId: string, encounterId: string, context: AuthorizationContext) => {
   assertAllowed(context, 'patient_chart:read');

@@ -27,7 +27,7 @@ const FIELD_LABELS: Record<ClaimExportField, string> = {
   authorizationCode: 'Authorization code', referralNumber: 'Referral number', payerServiceCode: "Payer's service code", serviceName: 'Service', category: 'Category', quantity: 'Quantity',
   unitPrice: 'Unit price', amountClaimed: 'Amount claimed', patientShare: 'Patient share', listPrice: 'Hospital price', fulfilledOn: 'Date performed',
 };
-const EVIDENCE: Record<string, string> = { administrative: 'Administrative', result: 'Result recorded', dispense: 'Supplied', visit: 'Seen by a clinician', completion: 'Recorded as done', not_done: 'Not done', missing: 'No record it was done' };
+const EVIDENCE: Record<string, string> = { association:'Associated clinical evidence',administrative: 'Administrative', result: 'Result recorded', dispense: 'Supplied', visit: 'Seen by a clinician', completion: 'Recorded as done', not_done: 'Not done', missing: 'No record it was done' };
 const today = () => new Date().toISOString().slice(0, 10);
 /** Final exports made on this screen, so a submission can name the exact files that were sent. */
 const recentExports: { exportId: string; format: string; claimIds: string[]; at: string }[] = [];

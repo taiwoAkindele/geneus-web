@@ -25,7 +25,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
     { key: 'home', label: 'Home', to: '/home', match: '/home', icon: 'home', bottom: true, group: 'Daily work' },
     { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', icon: 'patients', bottom: true, group: 'Daily work' },
   ];
-  if (roles.some((role) => ['facility_admin', 'cashier', 'supervisor'].includes(role)) || context.permissions.some((permission) => ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission))) {
+  if (roles.some((role) => ['facility_admin', 'cashier', 'supervisor'].includes(role)) || context.permissions.some((permission) => ['charge:associate','payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission))) {
     items.push({ key: 'billing', label: 'Billing', to: '/billing', match: '/billing', icon: 'registers', bottom: context.role === 'cashier', group: 'Money' });
   }
   if (dailyWork) items.push(

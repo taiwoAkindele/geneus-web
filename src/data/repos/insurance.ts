@@ -6,7 +6,7 @@ import { allOfType, allWhere, envelope, findRecord, insertRecord, newId } from '
 import { getDeviceCredential } from '../deviceCredential';
 import { insuranceBillingPeriods } from '../insuranceSupport';
 
-/** The records the shared estimate reads. With insurance off they are all empty and every charge is cash. */
+/** Inputs to the shared estimate. Confirmed historical responsibilities survive deactivation. */
 export type CoverageData = CoverageRecords & { payers: Payer[]; refunds: Refund[]; timeZone?: string; timeZoneHistory?: { timeZone: string; from: string }[]; entries: Map<string, EncounterEntry>; billingPeriods: InsuranceBillingPeriod[] };
 
 export const listPayers = () => allOfType<Payer>('payer');
@@ -123,6 +123,9 @@ export type CompletionItem = { charge: Charge; patientName: string; fulfillment:
  * is shown to have happened — the same rule the server applies to claims.
  */
 export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
+  const {listServiceAllocations}=await import('./serviceAllocations');
+  const associations=await listServiceAllocations();
+  const associatedEntries=associations.length?await allOfType<EncounterEntry>('encounter_entry'):[];
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const [allocations, completions] = await Promise.all([allOfType<CoverageAllocation>('coverage_allocation'), allOfType<ServiceCompletion>('service_completion')]);
   const superseded = new Set(allocations.map((a) => a.supersedes).filter(Boolean));
@@ -139,7 +142,7 @@ export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
     const charge = await findRecord<Charge>('charge', chargeId);
     if (!charge || charge.createdOn < since) continue;
     const visit = charge.encounterId ?? (charge.appointmentId ? (await allWhere<Encounter>('encounter', 'appointmentId', charge.appointmentId))[0]?.id : undefined);
-    const fulfillment = serviceFulfillment(charge, {
+    const fulfillment = serviceFulfillment(charge, {associations,associatedEntries,
       results: await entries(charge.encounterId), visitEntries: await entries(visit),
       dispense: charge.dispenseEntryId ? await findRecord<EncounterEntry>('encounter_entry', charge.dispenseEntryId) : undefined,
       completion: current.get(charge.id),

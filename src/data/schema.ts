@@ -20,6 +20,7 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   charge: { patient: ['patientId'], appointment: ['appointmentId'] },
   payment: { patient: ['patientId'], transfer: ['incomingTransferId'] },
   billing_adjustment: { charge: ['chargeId'], patient: ['patientId'] },
+  service_charge_allocation:{charge:['chargeId'],source:['sourceEntryId','sourceItemId'],patient:['patientId']},
   encounter: { patient: ['patientId'] },
   ward_care_event: { admission: ['admissionId'], encounter: ['encounterId'], patient: ['patientId'] },
   handoff: { toUnit: ['toUnitId'], patient: ['patientId'] },
@@ -77,6 +78,7 @@ const draftsTable = new Table(
 );
 
 export const AppSchema = new Schema({
+  patient_statement_snapshots:new Table({patientId:column.text,currency:column.text,cutoff:column.text,data:column.text},{localOnly:true,indexes:{patient:['patientId','currency']}}),
   ...Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
   [DRAFTS_TABLE]: draftsTable,
   [WORKFORCE_DRAFTS_TABLE]: new Table({ staffId:column.text, deviceId:column.text, slot:column.text, data:column.text, updatedOn:column.text }, { localOnly:true, indexes:{owner:['staffId','deviceId','slot']} }),

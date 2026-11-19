@@ -17,6 +17,7 @@ const describe = (item: CompletionItem) => {
     case 'completion': return `Recorded as done ${new Date(f.on).toLocaleString('en-GB')}`;
     case 'result': return 'Result recorded';
     case 'dispense': return 'Supplied';
+    case 'association': return 'Associated clinical services completed';
     case 'visit': return 'Seen by a clinician';
     case 'administrative': return 'Administrative';
   }

@@ -58,6 +58,7 @@ export const recordRefund = (context: AuthorizationContext, input: { id: string;
 
 /** Plain-language reasons for confirmation outcomes the officer sees. */
 export const SKIP_REASONS: Record<string, string> = {
+  returned_quantity_requires_explicit_insurance_review:'Returned units have an approved quantity decision. Review the return and claim revision rather than restoring the original quantity.',
   already_confirmed: 'Already confirmed', not_routine: 'Needs individual review', schedule_mismatch: 'Cover data changed — refresh and review',
   contract_unavailable: 'Contract version unavailable', reason_required: 'Give a reason', patient_liability_not_permitted: 'The contract does not allow billing the patient',
   choose_cover_first: 'Choose which cover applies first', self_pay_prohibited_by_payer: 'The contract prohibits paying without insurance', not_found: 'Charge not found',
