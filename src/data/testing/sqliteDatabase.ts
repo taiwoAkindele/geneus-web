@@ -13,6 +13,7 @@ export const sqliteTestDatabase = () => {
   for (const [type, table] of Object.entries(TABLE_FOR)) sqlite.exec(`CREATE TABLE ${table}(id TEXT PRIMARY KEY,${[...Object.keys(fieldKindsFor(type as DocType)).filter((field) => field !== 'id'), '_metadata'].map((field) => `"${field}"`).join(',')})`);
   sqlite.exec(`CREATE TABLE ps_crud(id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE ${WORKFORCE_RECEIPTS_TABLE}(id TEXT PRIMARY KEY,clientId INTEGER,outcome TEXT); CREATE TABLE ${CLINICAL_REVIEWS_TABLE}(id TEXT PRIMARY KEY,facilityId,staffId,semanticKey,data);`);
   const bind = (args: unknown[]) => args.map((value) => value === undefined ? null : value);
+  sqlite.exec('CREATE TABLE patient_statement_snapshots(id TEXT PRIMARY KEY,patientId TEXT,currency TEXT,cutoff TEXT,data TEXT)');
   const execute = async (sql: string, args: unknown[] = []) => sqlite.prepare(sql).run(...bind(args));
   const getOptional = async <T>(sql: string, args: unknown[] = []) => sqlite.prepare(sql).get(...bind(args)) as T ?? null;
   const db: LocalDatabase = { ...fakeDatabase(), execute, getOptional, getAll: async <T>(sql: string,args: unknown[] = []) => sqlite.prepare(sql).all(...bind(args)) as T[],

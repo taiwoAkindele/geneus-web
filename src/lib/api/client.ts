@@ -81,7 +81,7 @@ export const postAsDevice = <T>(path: string, credential: string, body?: unknown
 export const isUnauthorized = (cause: unknown): boolean => cause instanceof ApiError && cause.status === 401;
 
 /** Who is acting: the person signed in on this enrolled device, and their server session when one is open. */
-export const staffHeaders = (session: string | undefined, actor: string | undefined): Record<string, string> => ({ 'x-billing-catalogue-version': '1', ...(session ? { 'x-staff-session': session } : {}), ...(actor ? { 'x-actor-staff-id': actor } : {}) });
+export const staffHeaders = (session: string | undefined, actor: string | undefined): Record<string, string> => ({ 'x-integrated-billing-version':'1','x-billing-catalogue-version': '1', ...(session ? { 'x-staff-session': session } : {}), ...(actor ? { 'x-actor-staff-id': actor } : {}) });
 /** An online action by the signed-in person: the device credential plus who is acting. */
 export const staffRequest = <T>(path: string, credential: string, session: string | undefined, body?: unknown, actor?: string): Promise<T> =>
   request<T>(path, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...staffHeaders(session, actor), 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });

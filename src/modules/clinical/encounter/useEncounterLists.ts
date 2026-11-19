@@ -1,3 +1,4 @@
+import {listServiceAllocations} from '@/data/repos/serviceAllocations';
 import { useCallback } from 'react';
 import { useDeviceContext, useLiveQuery, type LiveQuery } from '@/data';
 import { encountersForPatient, entriesAtSteps, entriesForEncounter, listEncounters, listEncounterEntries } from '@/data/repos/encounters';
@@ -50,5 +51,5 @@ export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient
 /** Laboratory and pharmacy requests, open and completed, kept current as steps are saved on any device. */
 export const useRequestQueues = () => {
   const { facility, deviceId } = useDeviceContext();
-  return useLiveQuery(useCallback(async () => { const [entries, summaries] = await Promise.all([entriesAtSteps(REQUEST_STEPS).then(usablePharmacyEntries), dischargePrescriptions(facility?.id, deviceId)]); return requestQueues(entries, summaries); }, [facility?.id, deviceId]));
+  return useLiveQuery(useCallback(async () => { const [entries, summaries,allocations] = await Promise.all([entriesAtSteps(REQUEST_STEPS).then(usablePharmacyEntries), dischargePrescriptions(facility?.id, deviceId),listServiceAllocations()]); return requestQueues(entries, summaries,allocations); }, [facility?.id, deviceId]));
 };

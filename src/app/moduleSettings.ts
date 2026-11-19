@@ -33,10 +33,10 @@ export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): Module
     ...page('payers', 'Payers & contracts', '/insurance/settings/payers', has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate')),
   ] };
   // Everyone who works in Billing may read the price list; only fee managers change it.
-  const billing = roleIn(context, 'cashier', 'facility_admin', 'supervisor') || has(context, 'fee_item:manage', 'payment:receive', 'payment:waive');
+  const billing = roleIn(context, 'cashier', 'facility_admin', 'supervisor') || has(context, 'charge:associate','fee_item:manage', 'payment:receive', 'payment:waive');
   return { id, label: 'Billing', home: '/billing', base: '/billing/settings', pages: [
     ...page('fees', 'Price Catalogue', '/billing/settings/fees', billing),
-    ...page('accounts', 'Departments & accounts', '/billing/settings/payments', roleIn(context, 'facility_admin') || has(context, 'fee_item:manage')),
+    ...page('accounts', 'Payment settings', '/billing/settings/payments', roleIn(context, 'facility_admin') || has(context, 'fee_item:manage')),
   ] };
 };
 

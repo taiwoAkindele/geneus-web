@@ -30,6 +30,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'handoff:create': 'Send patients to another unit', 'handoff:update': 'Update unit handoffs',
   'referral:create': 'Create referrals', 'referral:update': 'Update referrals',
   'register_entry:create': 'Add register entries', 'stock_movement:create': 'Record stock movements',
+  'charge:associate':'Associate services with charges',
   'charge:create': 'Raise patient charges', 'payment:receive': 'Receive payments',
   'payment:waive': 'Discount or waive fees', 'payment:reverse': 'Reverse payments', 'payment:refund': 'Refund patient credits',
   'insurance_contract:read': 'Read payer contracts and tariffs', 'insurance_contract:manage': 'Edit payers, contracts and tariffs',

@@ -18,5 +18,5 @@ export const billingRequest = async <T>(context: AuthorizationContext, path: str
 export const matchTransfer = (context: AuthorizationContext, id: string, patientId: string, allocations: PaymentAllocation[], requestId: string) =>
   billingRequest<Payment>(context, `transfers/${encodeURIComponent(id)}/match`, { patientId, allocations, requestId });
 
-export type ReceivingAccount = { id: string; accountNumber: string; accountName: string; bankName: string; departmentId?: string; mode: string };
-export type BillingConnection = { configured: boolean; mode?: string; accounts: ReceivingAccount[]; webhookPath: string; encryptionReady: boolean };
+export type ReceivingAccount = { id: string; accountNumber: string; accountName: string; bankName: string; departmentId?: string; mode: string; general?:boolean };
+export type BillingConnection = { configured: boolean; mode?: string; receivingAccountId?:string; accounts: ReceivingAccount[]; webhookPath: string; encryptionReady: boolean };

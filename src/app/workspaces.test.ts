@@ -32,7 +32,7 @@ describe('module workspaces', () => {
   it('keeps module setup in each module’s Settings menu, not in global Settings or the module pages', () => {
     const admin = context('facility_admin');
     expect(moduleSettingsFor('laboratory', admin).pages.map((p) => p.label)).toEqual(['Tests', 'Result templates', 'Result parts', 'Answer lists']);
-    expect(moduleSettingsFor('billing', admin).pages.map((p) => p.label)).toEqual(['Price Catalogue', 'Departments & accounts']);
+    expect(moduleSettingsFor('billing', admin).pages.map((p) => p.label)).toEqual(['Price Catalogue', 'Payment settings']);
     expect(moduleSettingsFor('insurance', admin).pages.map((p) => p.key)).toEqual(['setup', 'payers']);
     // A section shortcut opens its page: Result parts is a tab of Result templates.
     expect(activeSettingsPage(moduleSettingsFor('laboratory', admin), '/laboratory/settings/templates/abc')?.key).toBe('templates');

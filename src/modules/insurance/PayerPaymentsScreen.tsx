@@ -1,3 +1,4 @@
+import {VerifiedReceiptPicker} from '@/modules/finance/billing/ReceiptCapacity';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RemittanceMethod, type Payer, type RemittanceMatch, type RemittanceRow } from '@shared';
 import { useLiveQuery } from '@/data';
@@ -133,6 +134,7 @@ const Payments = ({ payers, claims, remittances, payerName, onChanged, onError }
   const [method, setMethod] = useState<'transfer' | 'cheque' | 'cash' | 'other'>('transfer'); const [account, setAccount] = useState(''); const [note, setNote] = useState('');
   const [values, setValues] = useState<Record<string, string>>({}); const [busy, setBusy] = useState(''); const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const [allocating, setAllocating] = useState(''); const [later, setLater] = useState<Record<string, string>>({}); const [reversing, setReversing] = useState(''); const [reason, setReason] = useState('');
+  const [incomingTransferId,setIncomingTransfer]=useState('');
   const currency = 'NGN';
   const open = claims.filter((c) => c.payerId === payerId && c.settlement.outstandingMinor > 0);
   const allocations = allocationsFrom(values, currency);
@@ -140,7 +142,7 @@ const Payments = ({ payers, claims, remittances, payerName, onChanged, onError }
   const record = async () => {
     setBusy('record');
     try {
-      const r = await recordRemittance(context, { payerId, receivedOn, reference: reference.trim(), amountMinor: total, currency, method, ...(account.trim() ? { receivingAccount: account.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}), allocations, requestKey });
+      const r = await recordRemittance(context, { payerId, receivedOn, reference: reference.trim(), amountMinor: total, currency, method, ...(method==='transfer'&&incomingTransferId?{incomingTransferId}:{}), ...(account.trim() ? { receivingAccount: account.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}), allocations, requestKey });
       toast(`Payment recorded: ${formatMoney(r.allocatedMinor, currency)} allocated${r.unallocatedMinor ? `, ${formatMoney(r.unallocatedMinor, currency)} still to match` : ''}.`);
       setReference(''); setAmount(''); setValues({}); setNote(''); setRequestKey(crypto.randomUUID()); await onChanged();
     } catch (cause) { onError(describeError(cause)); } finally { setBusy(''); }
@@ -156,6 +158,7 @@ const Payments = ({ payers, claims, remittances, payerName, onChanged, onError }
         <SelectField label="Received by" value={method} options={RemittanceMethod.options.map((m) => ({ value: m, label: METHOD_LABELS[m] }))} onChange={(e) => setMethod(e.target.value as typeof method)} />
         <TextField label="Into account (optional)" value={account} onChange={(e) => setAccount(e.target.value)} />
       </div>
+      {method==='transfer'?<VerifiedReceiptPicker value={incomingTransferId} onChange={setIncomingTransfer}/>:null}
       <TextField label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
       {payerId ? <><h3 className="font-semibold">Which claims it pays</h3><AllocationInputs claims={open} values={values} onChange={setValues} currency={currency} />
         <p className="text-sm">Allocated {formatMoney(allocated, currency)} of {formatMoney(total, currency)}{total > allocated ? ` · ${formatMoney(total - allocated, currency)} stays unallocated until matched` : ''}</p></> : null}
@@ -218,12 +221,13 @@ const ImportAdvice = ({ payers, claims, onChanged, onError }: { payers: Payer[];
       if (templateName.trim()) await saveImportTemplate(context, { kind: 'remittance', payerId, name: templateName.trim(), headers: headers.map((h) => h.slice(0, 200)), headerRow, mapping }).catch(() => undefined);
     } catch (cause) { onError(describeError(cause)); }
   };
+  const [incomingTransferId,setIncomingTransfer]=useState('');
   const accepted = (review ?? []).filter((r) => r.accept && r.claimId && r.paidMinor);
   const total = toMinor(amount) ?? 0; const allocated = accepted.reduce((n, r) => n + (r.paidMinor ?? 0), 0);
   const record = async () => {
     setBusy(true);
     try {
-      const result = await recordRemittance(context, { payerId, receivedOn, reference: reference.trim(), amountMinor: total, currency: 'NGN', method,
+      const result = await recordRemittance(context, { payerId, receivedOn, reference: reference.trim(), amountMinor: total, currency: 'NGN', method, ...(method==='transfer'&&incomingTransferId?{incomingTransferId}:{}),
         allocations: accepted.map((r) => ({ claimId: r.claimId!, amountMinor: r.paidMinor! })), source: { fileName: file!.fileName, sha256: file!.sha256, rows: rows.length }, requestKey });
       // The advice's approved amounts become the payer's recorded decisions, only for confirmed rows.
       let decided = 0;
@@ -268,6 +272,7 @@ const ImportAdvice = ({ payers, claims, onChanged, onError }: { payers: Payer[];
         <TextField label="Amount actually received" inputMode="decimal" value={amount} onChange={(e) => setAmount(typed(e.target.value))} />
         <SelectField label="Received by" value={method} options={RemittanceMethod.options.map((m) => ({ value: m, label: METHOD_LABELS[m] }))} onChange={(e) => setMethod(e.target.value as typeof method)} />
       </div>
+      {method==='transfer'?<VerifiedReceiptPicker value={incomingTransferId} onChange={setIncomingTransfer}/>:null}
       <label className="flex min-h-[40px] items-center gap-2 text-sm"><input type="checkbox" checked={decisions} onChange={(e) => setDecisions(e.target.checked)} />Also record the payer's approved amounts as its decisions (for claims without one)</label>
       <p className="text-sm">{accepted.length} row{accepted.length === 1 ? '' : 's'} accepted · {formatMoney(allocated, 'NGN')} allocated of {formatMoney(total, 'NGN')}</p>
       {allocated > total ? <p className="text-sm text-danger">More is allocated than was received.</p> : null}

@@ -1,3 +1,4 @@
+import {integratedBillingEnabled} from './integratedBillingSupport';
 import { billingCatalogueEnabled } from './billingCatalogueSupport';
 import { activeWorkspace } from './facilityWorkspaces';
 import {
@@ -51,7 +52,7 @@ export const envelope = (context: AuthorizationContext, createdOn = nowIso()) =>
   deviceId: context.deviceId,
   createdBy: context.userId,
   createdOn,
-  schemaVersion: billingCatalogueEnabled(context) ? SCHEMA_VERSION : 5,
+  schemaVersion: integratedBillingEnabled(context) ? SCHEMA_VERSION : billingCatalogueEnabled(context) ? 6 : 5,
 });
 
 const validate = <T extends AnyDocument>(record: unknown): T => {

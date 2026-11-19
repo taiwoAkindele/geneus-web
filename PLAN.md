@@ -706,3 +706,18 @@ See [implementation](../docs/PHARMACY-STOCK-BILLING-2026-11-08.md) and
 - **Invitation links.** `/onboarding/invitation` opens the link from an invitation email
   and takes the shortest path this device allows. See docs/ARCHITECTURE.md §3
   (Invitation links).
+
+## Integrated Billing ? local implementation, 19 November 2026
+
+Billing review now supports explicit exact-source financial associations with
+authorization before SQLite, server-confirmed capacity and durable refusals.
+Physical returns retain clinical validation and separate financial review.
+Insured credits need a verified connected insurance reviewer; cash refunds
+remain separate. Payment settings select one general receiving account while
+retaining legacy account history. Patient and insurer bank collection consult
+the same verified receipt availability. Itemized, category and account statements
+print/export one server projection. A labeled confirmed cutoff can be cached
+offline; current cash collection continues through existing offline repositories.
+New records/permissions are gated on compatible readers and expired older tokens.
+No clinical signing authority, category reclassification or new workflow adapters
+are added. See ../docs/integrated-billing-2026-11-18/README.md.
