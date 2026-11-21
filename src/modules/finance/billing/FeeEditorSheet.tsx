@@ -22,8 +22,9 @@ export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', expandedCategorie
     catch (cause) { const message = userMessage(cause, 'This item was not saved. Try again.'); setError('root', { message }); toast(message, { tone: 'error' }); }
     finally { saving.current = false; }
   });
-  return <Sheet title={fee ? 'Edit item' : 'Add item'} eyebrow="Price Catalogue" onClose={() => { if (!saving.current) onClose(); }} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty} placement="side">
+  return <Sheet title={fee ? 'Edit item' : 'Add item'} eyebrow="Prices" onClose={() => { if (!saving.current) onClose(); }} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty} placement="side">
     <form id="catalogue-item-form" onSubmit={save} className="space-y-4">
+      {fee ? <p className="text-xs text-ink-muted">Item ID <span className="select-all break-all font-mono">{fee.id}</span> · used to update this price from a spreadsheet</p> : null}
       <fieldset disabled={isSubmitting} className="space-y-4">
         <TextField label="Item name" required {...register('name', { required: 'Enter an item name' })} error={errors.name?.message} />
         <SelectField label="Category" required disabled={Boolean(fee)} options={FeeCategory.options.filter(value=>expandedCategories || isLegacyFeeCategory(value) || fee?.category===value).map((value) => ({ value, label: CATEGORY_LABELS[value] }))} {...register('category')} />
