@@ -30,13 +30,13 @@ const HELP: Record<SetupStepId, string> = {
   teams: 'Teams own responsibility for care. One care team may be enough for a primary health centre; hospitals can nest units under departments.',
   places: 'Add the real rooms, wards, beds and stores. A place can be shared by several services and is separate from the team responsible for it.',
   services: 'Choose the kinds of care this hospital provides, which team runs each and where it happens. A hospital that does not see patients for a kind of care simply leaves it out.',
-  prices: 'Set the fees patients are charged, such as registration and consultation. Lab test prices are set in the Lab catalogue and medicine prices in Stock.',
+  prices: 'Upload or enter all hospital prices in the central Billing catalogue, including laboratory tests and medicines. Clinical and stock configuration stays separate.',
   staff: 'Add the people who work here, give them their duties and plan their shifts so they can sign in.',
 };
 const LATER = [
   { label: 'Payment accounts', description: 'Receiving accounts for transfers and cards.', to: '/billing/settings/payments' },
-  { label: 'Lab catalogue', description: 'Tests, result templates and their prices.', to: '/laboratory/settings/tests' },
-  { label: 'Pharmacy stock', description: 'Medicines, supplies and their selling prices.', to: '/stock' },
+  { label: 'Lab catalogue', description: 'Tests and result templates. Prices come from Billing.', to: '/laboratory/settings/tests' },
+  { label: 'Pharmacy stock', description: 'Medicine stock and supplies. Selling prices come from Billing.', to: '/stock' },
   { label: 'Insurance', description: 'Payers, contracts and claims readiness.', to: '/insurance/settings/setup' },
   { label: 'Devices', description: 'Enroll the other devices staff will use.', to: '/settings/devices' },
 ];
@@ -64,7 +64,7 @@ const Links = ({ items }: { items: { label: string; to: string; primary?: boolea
 
 const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
   if (step === 'facility') return <FacilityDetailsStep />;
-  if (step === 'prices') return <Links items={[{ label: 'Open price list', to: '/billing/settings/fees', primary: true }, { label: 'Link stock prices', to: '/stock' }]} />;
+  if (step === 'prices') return <Links items={[{ label: 'Set up billing', to: '/billing/settings/setup', primary: true }, { label: 'Open price catalogue', to: '/billing/settings/fees' }]} />;
   if (step === 'staff') return <Links items={[{ label: 'Open Staff', to: '/admin/staff', primary: true }, { label: 'Invite staff', to: '/admin/staff/invite' }]} />;
   if (step === 'services') return <CareServicesStep />;
   return <StepEditor step={step} />;

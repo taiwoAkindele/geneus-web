@@ -46,7 +46,7 @@ export const setupSteps = (facts: SetupFacts, notNeeded: ReadonlySet<SetupStepId
   const unfinished = care.filter((o) => o.configuration === 'draft' || o.configuration === 'proposed');
   const fees = facts.fees.filter((f) => f.active);
   const priced = new Set(fees.map((f) => f.id));
-  // Only a lab test is priced through its offering; care services are charged through visit fees.
+  // Optional operational links are separate from the central prices used for direct billing.
   const unpricedTests = facts.offerings.filter((o) => o.configuration === 'active' && isLabTestOffering(o, facts.definitions) && (!o.feeItemId || !priced.has(o.feeItemId)));
   const unpricedStock = facts.stock.filter((s) => !s.feeItemId || !priced.has(s.feeItemId));
   const staff = facts.staff.filter((s) => s.active);
@@ -68,8 +68,8 @@ export const setupSteps = (facts: SetupFacts, notNeeded: ReadonlySet<SetupStepId
     { id: 'prices', label: 'Prices', done: fees.length > 0, started: false,
       summary: fees.length ? plural(fees.length, 'active price') : 'No prices yet',
       notes: [
-        ...(unpricedTests.length ? [`${plural(unpricedTests.length, 'lab test')} without a price. Set them in the Lab catalogue.`] : []),
-        ...(unpricedStock.length ? [`${plural(unpricedStock.length, 'stock item')} without a price.`] : []),
+        ...(unpricedTests.length ? [`${plural(unpricedTests.length, 'lab test')} without a linked Billing item. Link it in Laboratory when configuring ordering; direct Billing remains available.`] : []),
+        ...(unpricedStock.length ? [`${plural(unpricedStock.length, 'stock item')} without a linked Billing item. Stock configuration is separate from selling prices.`] : []),
       ] },
     { id: 'staff', label: 'Staff & shifts', done: staff.length > 1, started: staff.length === 1,
       summary: staff.length > 1 ? plural(staff.length, 'active staff member') : 'Only you so far',

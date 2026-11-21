@@ -40,7 +40,7 @@ describe('hospital setup progress', () => {
     expect(byId.services).toMatchObject({ status: 'done', notes: ['1 care service still in draft or awaiting review.'] });
     expect(byId.prices.status).toBe('done');
     // A care service is charged through visit fees, so it is never reported as unpriced.
-    expect(byId.prices.notes).toEqual(['1 stock item without a price.']);
+    expect(byId.prices.notes).toEqual(['1 stock item without a linked Billing item. Stock configuration is separate from selling prices.']);
   });
 
   describe('care services and lab tests', () => {
@@ -55,7 +55,7 @@ describe('hospital setup progress', () => {
       const steps = setupSteps(facts({ definitions, offerings: [test('Haemoglobin', 'd-hb'), test('Full blood count', 'd-fbc', { feeItemId: 'f1' })], fees: [{ id: 'f1', active: true }] }));
       const services = steps.find((s) => s.id === 'services')!;
       expect(services).toMatchObject({ label: 'Care services', status: 'todo', summary: 'No care services yet', notes: [] });
-      expect(steps.find((s) => s.id === 'prices')!.notes).toEqual(['1 lab test without a price. Set them in the Lab catalogue.']);
+      expect(steps.find((s) => s.id === 'prices')!.notes).toEqual(['1 lab test without a linked Billing item. Link it in Laboratory when configuring ordering; direct Billing remains available.']);
     });
 
     it('counts only active care services, alongside any number of lab tests', () => {

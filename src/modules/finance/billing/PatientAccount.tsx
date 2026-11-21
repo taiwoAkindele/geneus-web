@@ -23,7 +23,8 @@ import { ChargeCoverage, RefundSheet, SelfPaySheet } from '@/modules/insurance/A
 
 
 const loadServicePoints=()=>allOfType<Location>('location');
-export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved, onSelectAccount }: {
+export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, onSaved, onSelectAccount, chargeIds, billReference }: {
+  chargeIds?: readonly string[]; billReference?: string;
   patientId: string; transfer?: IncomingTransfer; data: BillingData; onClose: () => void;
   onReceipt: (p: Payment) => void; onSaved: () => void;
   onSelectAccount: (patientId: string) => void;
@@ -59,7 +60,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   useEffect(() => { if (review) reviewSection.current?.focus(); }, [review]);
   const saving = useRef(false);
   const requestId = useRef(crypto.randomUUID());
-  const rows = billingRows(data.charges.filter((c) => c.patientId === patientId), data.payments, data.adjustments, data.coverage);
+  const rows = billingRows(data.charges.filter((c) => c.patientId === patientId && (!chargeIds || chargeIds.includes(c.id))), data.payments, data.adjustments, data.coverage);
   const patient = data.patients.find((p) => p.patientId === patientId);
   const dirty = Object.values(amounts).some((value) => Boolean(value.trim())) || Boolean(received.trim() || feeId || adjusting || reduction || reason);
   const requestLeave = (action: () => void) => { if (dirty) setLeaving(() => action); else action(); };
@@ -104,7 +105,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
   });
   const addFee = () => perform(async () => {
     if (!patient || !feeId) throw new Error('Select a fee');
-    await createCharge(feeId, { patientId, facts: patientBillingFacts(patient), quantity:Number(quantity),unitOfMeasure:unit.trim()||undefined,servicePointId:servicePoint||undefined }, context);
+    await createCharge(feeId, { patientId, facts: patientBillingFacts(patient), billId:rows[0]?.charge.billId, quantity:Number(quantity),unitOfMeasure:unit.trim()||undefined,servicePointId:servicePoint||undefined }, context);
     setFeeId('');
   });
   const reduce = () => perform(async () => {
@@ -120,13 +121,13 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
     setAdjusting(''); setReason(''); setReduction(''); setAmounts({}); setReceived('');
   });
   if(statementOpen)return <PatientStatement patientId={patientId} currencies={[...new Set(rows.map(r=>r.charge.currency))].length?[...new Set(rows.map(r=>r.charge.currency))]:['NGN']} onClose={()=>setStatementOpen(false)}/>;
-  return <Sheet title={review ? 'Review payment' : patient?.fullName ?? patientId} eyebrow={transfer ? 'Match bank transfer' : 'Patient billing account'} onClose={onClose} closeDisabled={busy} hasUnsavedChanges={dirty}>
+  return <Sheet title={review ? 'Review payment' : patient?.fullName ?? patientId} eyebrow={transfer ? 'Link bank payment to bill' : billReference ?? 'Patient billing history'} onClose={onClose} closeDisabled={busy} hasUnsavedChanges={dirty}>
     <p className="mb-3 font-mono text-xs text-ink-muted">{patientId}</p>
-    {!transfer&&!review?<Button variant="outlined" onClick={()=>requestLeave(()=>setStatementOpen(true))}>Patient bill and statements</Button>:null}
-    {!transfer&&!review?<ServiceAssociationHistory patientId={patientId}/>:null}
+    {!transfer&&!review?<Button variant="outlined" onClick={()=>requestLeave(()=>setStatementOpen(true))}>Full patient statement</Button>:null}
+    {!transfer&&!review?<details><summary className="cursor-pointer py-3 font-bold">Service associations and review history</summary><ServiceAssociationHistory patientId={patientId}/></details>:null}
     {leaving ? <div role="alert" className="mb-4 rounded-field border border-amber-border bg-amber-bg p-4 text-sm"><p className="font-bold">Discard this unfinished payment?</p><p className="mt-1">No payment has been recorded. The amounts you entered will be cleared.</p><div className="mt-3 flex flex-wrap gap-2"><Button fullWidth={false} onClick={() => setLeaving(undefined)}>Keep editing</Button><Button fullWidth={false} variant="outlined" onClick={() => { setLeaving(undefined); leaving(); }}>Discard and continue</Button></div></div> : null}
     {review ? <section ref={reviewSection} tabIndex={-1} className="space-y-4 outline-none" aria-label="Payment review"><h3 className="font-bold">{patient?.fullName ?? patientId}</h3><p className="text-sm">{transfer ? 'Bank transfer allocation · requires a connection' : 'Cash received · saved on this device first'}</p><dl className="divide-y divide-outline-soft">{review.allocations.map((allocation) => <div key={allocation.chargeId} className="flex justify-between gap-3 py-3"><dt>{rows.find((row) => row.charge.id === allocation.chargeId)?.charge.description}</dt><dd className="font-mono font-bold">{formatMoney(allocation.amountMinor, review.currency)}</dd></div>)}</dl><p className="text-xl font-extrabold">Total {formatMoney(review.amountMinor, review.currency)}</p><p className="text-sm text-ink-muted">Confirm that the patient, amount and method are correct. A receipt will be issued after the payment is recorded.</p></section> : null}
-    {linkedIds.length > 1 ? <section className="mb-3 space-y-2 rounded-field border border-outline p-3"><h3 className="text-sm font-bold">Accounts under linked patient IDs</h3><p className="text-xs text-ink-muted">Each bill and receipt keeps its original patient ID. Review the other accounts before raising another fee.</p>{linkedIds.filter((id) => id !== patientId).map((id) => <Button key={id} variant="ghost" onClick={() => requestLeave(() => onSelectAccount(id))}>{data.patients.find((p) => p.id === id)?.fullName ?? id} · {id}</Button>)}</section> : null}
+    {linkedIds.length > 1 ? <section className="mb-3 space-y-2 rounded-field border border-outline p-3"><h3 className="text-sm font-bold">Bills under linked patient IDs</h3><p className="text-xs text-ink-muted">Each bill and receipt keeps its original patient ID. Review the other patient IDs before raising another fee.</p>{linkedIds.filter((id) => id !== patientId).map((id) => <Button key={id} variant="ghost" onClick={() => requestLeave(() => onSelectAccount(id))}>{data.patients.find((p) => p.id === id)?.fullName ?? id} · {id}</Button>)}</section> : null}
     {transfer ? <p className="mb-3 rounded-card bg-brand-wash p-3 text-sm">Available to match: <strong>{available===undefined?'Awaiting verified capacity':formatMoney(available,transfer.currency)}</strong>. Matching needs a connection; bills must have synced.</p> : null}
     {transfer?<StaffVerification requireServerSession purpose="Verifying shared receipt capacity"><Button variant="outlined" onClick={()=>void capacity.refresh()}>Refresh verified availability</Button>{capacity.error?<p role="alert">{capacity.error}</p>:null}</StaffVerification>:null}
     <fieldset disabled={busy} className={review ? 'hidden' : 'space-y-3'}>
@@ -152,7 +153,7 @@ export const PatientAccount = ({ patientId, transfer, data, onClose, onReceipt, 
         <div className="mt-2 flex flex-wrap gap-2">{r.receipts.filter((p) => !p.reverses && p.method !== 'waiver').map((p) => <button type="button" key={p.id} className="min-h-[44px] break-all text-left text-xs font-bold text-brand underline" onClick={() => requestLeave(() => onReceipt(p))}>{p.receiptNumber}</button>)}</div>
       </article>)}
       {adjusting ? <div className="space-y-3 rounded-card bg-surface p-3"><SelectField label="Adjustment" value={kind} options={[{ value: 'discount', label: 'Discount' }, { value: 'waiver', label: 'Waive remaining balance' }]} onChange={(e) => setKind(e.target.value as typeof kind)} />{kind === 'discount' ? <><label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={percent} onChange={(e) => setPercent(e.target.checked)} />Percentage discount</label><TextField label={percent ? 'Percentage' : 'Discount amount'} value={reduction} inputMode="decimal" onChange={(e) => setReduction(e.target.value)} /></> : null}<TextField label="Reason" required value={reason} onChange={(e) => setReason(e.target.value)} /><Button onClick={() => void reduce()}>Save adjustment</Button></div> : null}
-      {context.permissions.includes('charge:create') && !transfer ? <div className="space-y-2 border-t border-outline-soft pt-3"><CatalogueBrowser onSelect={fee=>setFeeId(fee.id)}/>{feeId?<><p className="font-bold">Selected: {data.fees.find(f=>f.id===feeId)?.name}</p><TextField label="Quantity" type="number" min="0.000001" value={quantity} onChange={e=>setQuantity(e.target.value)}/><TextField label="Quantity unit (optional)" value={unit} onChange={e=>setUnit(e.target.value)}/><SelectField label="Service point (optional)" value={servicePoint} options={[{value:"",label:"Not recorded"},...(servicePoints.data??[]).filter(l=>l.active).map(l=>({value:l.id,label:l.name}))]} onChange={e=>setServicePoint(e.target.value)}/></>:null}<Button variant="outlined" disabled={!feeId} onClick={() => void addFee()}>Add to bill</Button></div> : null}
+      {context.permissions.includes('charge:create') && !transfer && (!chargeIds || rows[0]?.charge.billId) ? <div className="space-y-2 border-t border-outline-soft pt-3"><CatalogueBrowser onSelect={fee=>setFeeId(fee.id)}/>{feeId?<><p className="font-bold">Selected: {data.fees.find(f=>f.id===feeId)?.name}</p><TextField label="Quantity" type="number" min="0.000001" value={quantity} onChange={e=>setQuantity(e.target.value)}/><TextField label="Quantity unit (optional)" value={unit} onChange={e=>setUnit(e.target.value)}/><SelectField label="Service point (optional)" value={servicePoint} options={[{value:"",label:"Not recorded"},...(servicePoints.data??[]).filter(l=>l.active).map(l=>({value:l.id,label:l.name}))]} onChange={e=>setServicePoint(e.target.value)}/></>:null}<Button variant="outlined" disabled={!feeId} onClick={() => void addFee()}>Add to bill</Button></div> : null}
     </fieldset>
     {error ? <div ref={errorSummary} tabIndex={-1} role="alert" className="my-3 rounded-field border border-danger bg-danger-bg p-3 text-sm text-danger"><p>{error}</p>{fieldError ? <button type="button" className="mt-1 min-h-[44px] font-bold underline" onClick={() => document.getElementById('amount-' + fieldError)?.focus()}>Go to amount</button> : null}</div> : null}
     {selfPay ? <SelfPaySheet row={selfPay.row} cover={selfPay.cover} check={selfPay.check} onClose={() => setSelfPay(undefined)} onSaved={() => { setSelfPay(undefined); toast('Choice recorded. The patient now owes the full price for this charge.'); onSaved(); }} /> : null}

@@ -35,6 +35,7 @@ export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): Module
   // Everyone who works in Billing may read the price list; only fee managers change it.
   const billing = roleIn(context, 'cashier', 'facility_admin', 'supervisor') || has(context, 'charge:associate','fee_item:manage', 'payment:receive', 'payment:waive');
   return { id, label: 'Billing', home: '/billing', base: '/billing/settings', pages: [
+    ...page('setup', 'Billing setup', '/billing/settings/setup', has(context, 'fee_item:manage')),
     ...page('fees', 'Price Catalogue', '/billing/settings/fees', billing),
     ...page('accounts', 'Payment settings', '/billing/settings/payments', roleIn(context, 'facility_admin') || has(context, 'fee_item:manage')),
   ] };

@@ -29,6 +29,7 @@ export type ConfigurationWrite =
   | { op: 'patch'; type: DocType; id: string; changes: Record<string, unknown>; current: AnyDocument };
 
 /** The same mutation the sync connector would build, so the server applies exactly its usual rules. */
+const importMutations = new WeakMap<ConfigurationWrite, UploadMutation>();
 const toMutation = (write: ConfigurationWrite): UploadMutation => {
   if (write.op === 'put') {
     const data = decodeValues(write.type, toRow(write.type, write.record as unknown as Record<string, unknown>));
@@ -58,7 +59,7 @@ const arrival = async (writes: readonly ConfigurationWrite[], timeoutMs = 20_000
   return false;
 };
 
-export const saveConfiguration = async (context: AuthorizationContext, writes: readonly ConfigurationWrite[]): Promise<{ arrived: boolean }> => {
+export const saveConfiguration = async (context: AuthorizationContext, writes: readonly ConfigurationWrite[], options?: { billingImport?: boolean }): Promise<{ arrived: boolean }> => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) throw new ConfigurationSaveError('offline', 'Settings are saved on the server and need an internet connection. Connect, then save again.');
   const device = getDeviceCredential();
   if (!device) throw new ConfigurationSaveError('failed', 'This device is not enrolled');
@@ -69,7 +70,7 @@ export const saveConfiguration = async (context: AuthorizationContext, writes: r
     && Object.keys(w.changes).every((key) => ['chargeWhen', 'exemptions', 'updatedBy', 'updatedOn'].includes(key)));
   announce({ phase: 'saving' });
   try {
-    await staffRequest<ConfigurationSaveResponse>(policyOnly ? '/config/save?billingPolicy=1' : '/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(toMutation) }, context.userId);
+    await staffRequest<ConfigurationSaveResponse>(options?.billingImport ? '/config/save?billingImport=1' : policyOnly ? '/config/save?billingPolicy=1' : '/config/save', device.credential, token, { ...WORKFORCE_VERSIONS, transactionId: null, mutations: writes.map(w => {if(!options?.billingImport)return toMutation(w);let m=importMutations.get(w);if(!m){m=toMutation(w);if(m.op==='patch'&&w.op==='patch'&&w.current.type==='fee_item')m.previous={...m.previous,name:w.current.name,category:w.current.category,currency:w.current.currency};importMutations.set(w,m);}return m;}) }, context.userId);
     touchStaffSession();
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); announce({ phase: 'refused', message: 'Sign in again to save settings.' }); throw new ConfigurationSaveError('needs_pin', 'Sign in again to save settings.'); }

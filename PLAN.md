@@ -7,6 +7,10 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Billing design adoption (19 November 2026)
+
+The approved Bills / Payments prototype is applied locally. New manual bills use optional charge billId metadata; existing history is untouched. Price upload uses verified fee-only atomic configuration batches. Billing setup reuses existing catalogue and receiving-account settings. Migration 0043 and canonical shared contract promotion must precede new clients; no Git promotion or deployment has been performed. See [implementation and validation](../docs/billing-design-implementation-2026-11-19/README.md).
+
 ### Billing Releases 2A/2B (18 November 2026)
 
 Central catalogue discovery, optional category filters, fee-first Laboratory

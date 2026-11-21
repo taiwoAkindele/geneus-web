@@ -144,6 +144,7 @@ const FeeScheduleScreen = lazy(() =>
   import('@/modules/finance/screens/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
 );
 const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
+const BillingSetup = lazy(() => import('@/modules/finance/billing/BillingSetup').then(m=>({default:m.BillingSetup})));
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
 const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
@@ -259,6 +260,7 @@ const App = () => {
               <Route path="*" element={null} />
             </Route>
             <Route path="/billing/settings" element={<ModuleSettingsLayout module="billing" />}>
+              <Route path="setup" element={<RequireCapability permissions={['fee_item:manage']}><BillingSetup /></RequireCapability>} />
               <Route path="fees" element={<FeeScheduleScreen />} />
               <Route path="payments" element={<BillingSettingsScreen />} />
               <Route path="*" element={null} />
