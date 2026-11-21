@@ -49,9 +49,10 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
       ...(insuranceBillingWork(context) && has(context, 'encounter:record') ? [link('service-completion', 'Service completion', 'Record insured services as done or not done.', '/clinical/service-completion', 'encounter')] : []),
     ] },
     { id: 'finance', label: 'Finance', description: 'Bills, payments and prices', icon: 'finance', links: [...(keys.has('billing') ? [
-      link('accounts', 'Bills', 'Create bills, review charges and receive payments.', '/billing?tab=bills', 'finance'),
-      link('transfers', 'Payments', 'View cash and bank payments, receipts and bill allocations.', '/billing?tab=payments', 'referrals'),
-      link('financial-reports', 'Reports', 'Review collections and financial reports.', '/billing?tab=reports', 'month'),
+      link('accounts', 'Bills', 'Bills with money still due, and receiving payment.', '/billing?tab=bills', 'finance'),
+      link('transfers', 'Payment history', 'Every completed payment and its receipt.', '/billing?tab=payments', 'referrals'),
+      link('financial-reports', 'Reports', 'Collections by period, category and staff.', '/billing?tab=reports', 'month'),
+      link('prices', 'Prices', 'The hospital price list.', '/billing/prices', 'registers'),
     ] : []),
       // Daily insurance work appears once billing is active. During setup it also shows to the people
       // setting insurance up, because its header Settings menu is where that setup lives.
@@ -102,7 +103,7 @@ export const activeWorkspaceLink = (workspace: Workspace, pathname: string, sear
     const tab=current.get('tab');
     if(tab==='transfers')current.set('tab','payments');
     else if(!tab||['collections','review','categories','departments'].includes(tab))current.set('tab','bills');
-    if(pathname.startsWith('/billing/settings'))return workspace.links.find(l=>l.to==='/billing?tab=bills')?.key;
+    if(pathname.startsWith('/billing/prices'))return workspace.links.find(l=>l.to==='/billing/prices')?.key;
   }
   return [...workspace.links].sort((a, b) => b.to.split('?')[0].length - a.to.split('?')[0].length).find((item) => {
     const [path, query] = item.to.split('?');

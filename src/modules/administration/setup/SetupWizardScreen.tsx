@@ -34,7 +34,7 @@ const HELP: Record<SetupStepId, string> = {
   staff: 'Add the people who work here, give them their duties and plan their shifts so they can sign in.',
 };
 const LATER = [
-  { label: 'Payment accounts', description: 'Receiving accounts for transfers and cards.', to: '/billing/settings/payments' },
+  { label: 'Bank transfers', description: 'Paystack and the hospital receiving account.', to: '/settings/billing' },
   { label: 'Lab catalogue', description: 'Tests and result templates. Prices come from Billing.', to: '/laboratory/settings/tests' },
   { label: 'Pharmacy stock', description: 'Medicine stock and supplies. Selling prices come from Billing.', to: '/stock' },
   { label: 'Insurance', description: 'Payers, contracts and claims readiness.', to: '/insurance/settings/setup' },
@@ -64,7 +64,7 @@ const Links = ({ items }: { items: { label: string; to: string; primary?: boolea
 
 const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
   if (step === 'facility') return <FacilityDetailsStep />;
-  if (step === 'prices') return <Links items={[{ label: 'Set up billing', to: '/billing/settings/setup', primary: true }, { label: 'Open price catalogue', to: '/billing/settings/fees' }]} />;
+  if (step === 'prices') return <Links items={[{ label: 'Open prices', to: '/billing/prices', primary: true }, { label: 'Set up bank transfers', to: '/settings/billing' }]} />;
   if (step === 'staff') return <Links items={[{ label: 'Open Staff', to: '/admin/staff', primary: true }, { label: 'Invite staff', to: '/admin/staff/invite' }]} />;
   if (step === 'services') return <CareServicesStep />;
   return <StepEditor step={step} />;

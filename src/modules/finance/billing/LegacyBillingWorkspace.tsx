@@ -5,7 +5,6 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { FeeCategory, type IncomingTransfer, type Payment } from '@shared';
 import { Button, SectionTabs, SelectField, Sheet, TextField } from '@/ui';
 import { useAuthorizationContext, useSession } from '@/session';
-import { ModuleSettingsMenu } from '@/app/ModuleSettingsMenu';
 import { formatMoney } from '@/lib/money';
 import { calendarDate } from '@/lib/calendarDate';
 import { billingRequest } from '@/lib/api/billing';
@@ -34,7 +33,7 @@ export const LegacyBillingWorkspace = () => {
   const receiptCapacity=useReceiptCapacity((data?.transfers??[]).slice(-200).map(t=>t.id),data?.payments.length); const tab = params.get('tab') ?? 'collections'; const category = params.get('category') ?? '';
   if (!allowed) return <p className="p-5">Billing access has not been assigned to your account.</p>;
   // The price list moved to Billing → Settings → Fees; earlier bookmarks follow it.
-  if (tab === 'fees') return <Navigate to="/billing/settings/fees" replace />;
+  if (tab === 'fees') return <Navigate to="/billing/prices" replace />;
   const activeFilterCount = [tab === 'departments' ? '' : search, from, to, departmentId, ['collections', 'categories'].includes(tab) && status !== 'all' ? status : ''].filter(Boolean).length;
   const go = (nextTab: string, nextCategory = '') => setParams({ tab: nextTab, ...(nextCategory ? { category: nextCategory } : {}) });
   const currencies = [...new Set([...(data?.fees.map((f) => f.currency) ?? []), ...(data?.charges.map((c) => c.currency) ?? []), ...(data?.transfers.map((t) => t.currency) ?? [])])].sort();
@@ -58,7 +57,7 @@ export const LegacyBillingWorkspace = () => {
     finally { setImporting(false); }
   };
   return <div className="min-h-screen bg-surface"><main className="space-y-4 px-5 pb-24 pt-3 md:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">{category ? CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? 'Fees' : 'Billing'}</h1><div className="flex flex-wrap gap-2"><Button fullWidth={false} className="px-3 py-2 text-sm" onClick={() => { setTransfer(undefined); setChoosePatient(true); }}>Find patient history</Button><ModuleSettingsMenu module="billing" /></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">{category ? CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? 'Fees' : 'Billing'}</h1><div className="flex flex-wrap gap-2"><Button fullWidth={false} className="px-3 py-2 text-sm" onClick={() => { setTransfer(undefined); setChoosePatient(true); }}>Find patient history</Button></div></div>
       <SectionTabs label="Billing sections" value={tab} onChange={(value) => go(value)} options={[['categories', 'Historical charge categories'], ['departments', 'Legacy departments']].map(([value, label]) => ({ value, label }))} />
       <p className="text-xs text-ink-muted">Records on this device update when it syncs. Cash works offline; bank transfers appear after provider verification and sync.</p>
       {query.loading ? <div role="status" className="h-40 animate-pulse rounded-card bg-surface-muted" aria-label="Loading billing" /> : query.error || !data ? <div role="alert">Billing records could not be read.<Button variant="ghost" onClick={query.reload}>Try again</Button></div> : tab==='review'?<BillingReviewList data={data} onPatient={id=>{setTransfer(undefined);openPatient(id);}}/>:<>

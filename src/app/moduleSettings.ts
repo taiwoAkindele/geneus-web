@@ -1,4 +1,4 @@
-import type { AuthorizationContext, Permission, Role } from '@shared';
+import type { AuthorizationContext, Permission } from '@shared';
 
 /**
  * Configuration that belongs to one module (its catalogue, price list, payers)
@@ -9,13 +9,12 @@ import type { AuthorizationContext, Permission, Role } from '@shared';
  * still check every save. `tab: false` marks a menu shortcut into a section of
  * another page (for example a tab of Result templates), not a page of its own.
  */
-export type ModuleSettingsId = 'laboratory' | 'insurance' | 'billing';
+export type ModuleSettingsId = 'laboratory' | 'insurance';
 export type ModuleSettingsPage = { key: string; label: string; to: string; tab: boolean };
 export type ModuleSettings = { id: ModuleSettingsId; label: string; home: string; base: string; pages: ModuleSettingsPage[] };
 type Viewer = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
 const has = (context: Viewer, ...permissions: Permission[]) => permissions.some((permission) => context.permissions.includes(permission));
-const roleIn = (context: Viewer, ...roles: Role[]) => (context.roles ?? [context.role]).some((role) => roles.includes(role));
 const page = (key: string, label: string, to: string, allowed: boolean, tab = true): ModuleSettingsPage[] => allowed ? [{ key, label, to, tab }] : [];
 
 export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): ModuleSettings => {
@@ -28,16 +27,10 @@ export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): Module
       ...page('answers', 'Answer lists', '/laboratory/settings/templates?tab=answers', templates, false),
     ] };
   }
-  if (id === 'insurance') return { id, label: 'Insurance', home: '/insurance', base: '/insurance/settings', pages: [
+  // Billing has no module settings menu: Prices is a Finance page and bank collection is in Settings → Billing.
+  return { id, label: 'Insurance', home: '/insurance', base: '/insurance/settings', pages: [
     ...page('setup', 'Setup & readiness', '/insurance/settings/setup', has(context, 'insurance_contract:activate', 'insurance_contract:manage')),
     ...page('payers', 'Payers & contracts', '/insurance/settings/payers', has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate')),
-  ] };
-  // Everyone who works in Billing may read the price list; only fee managers change it.
-  const billing = roleIn(context, 'cashier', 'facility_admin', 'supervisor') || has(context, 'charge:associate','fee_item:manage', 'payment:receive', 'payment:waive');
-  return { id, label: 'Billing', home: '/billing', base: '/billing/settings', pages: [
-    ...page('setup', 'Billing setup', '/billing/settings/setup', has(context, 'fee_item:manage')),
-    ...page('fees', 'Price Catalogue', '/billing/settings/fees', billing),
-    ...page('accounts', 'Payment settings', '/billing/settings/payments', roleIn(context, 'facility_admin') || has(context, 'fee_item:manage')),
   ] };
 };
 

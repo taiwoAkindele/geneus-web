@@ -14,7 +14,7 @@ export const MovedTo = ({ to }: { to: string }) => {
   return <Navigate to={`${to}${search}`} replace />;
 };
 
-/** Billing and insurance setup moved from global Settings into each module: /settings/billing/fees → /billing/settings/fees. */
+/** Billing and insurance setup moved from global Settings into each module: /settings/insurance/* → /insurance/settings/*. Billing prices are at /billing/prices and bank collection at /settings/billing. */
 export const MovedFromOldSettings = () => {
   const { pathname } = useLocation();
   return <MovedTo to={pathname.replace(/^\/settings\/(billing|insurance)/, '/$1/settings')} />;

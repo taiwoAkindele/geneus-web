@@ -144,7 +144,6 @@ const FeeScheduleScreen = lazy(() =>
   import('@/modules/finance/screens/billing/FeeScheduleScreen').then((m) => ({ default: m.FeeScheduleScreen })),
 );
 const BillingScreen = lazy(() => import('@/modules/finance/screens/billing/BillingScreen').then((m) => ({ default: m.BillingScreen })));
-const BillingSetup = lazy(() => import('@/modules/finance/billing/BillingSetup').then(m=>({default:m.BillingSetup})));
 const BillingSettingsScreen = lazy(() => import('@/modules/finance/screens/billing/BillingSettingsScreen').then((m) => ({ default: m.BillingSettingsScreen })));
 const InsuranceWorkspace = lazy(() => import('@/modules/insurance/InsuranceWorkspace').then((m) => ({ default: m.InsuranceWorkspace })));
 const ClaimsScreen = lazy(() => import('@/modules/insurance/ClaimsScreen').then((m) => ({ default: m.ClaimsScreen })));
@@ -249,6 +248,7 @@ const App = () => {
               <Route path="devices" element={<DevicesScreen />} />
               <Route path="organization" element={<RequireCapability permissions={['staff:manage']}><OrganizationScreen /></RequireCapability>} />
               <Route path="account" element={<AccountSecurity />} />
+              <Route path="billing" element={<BillingSettingsScreen />} />
               <Route path="*" element={null} />
             </Route>
             {/* Module settings: each module's own configuration, opened from its header Settings menu (src/app/moduleSettings.ts). */}
@@ -259,12 +259,12 @@ const App = () => {
               <Route path="templates/:templateId" element={<RequireCapability permissions={['result_template:manage']}><ResultTemplateEditorScreen /></RequireCapability>} />
               <Route path="*" element={null} />
             </Route>
-            <Route path="/billing/settings" element={<ModuleSettingsLayout module="billing" />}>
-              <Route path="setup" element={<RequireCapability permissions={['fee_item:manage']}><BillingSetup /></RequireCapability>} />
-              <Route path="fees" element={<FeeScheduleScreen />} />
-              <Route path="payments" element={<BillingSettingsScreen />} />
-              <Route path="*" element={null} />
-            </Route>
+            {/* Billing: Prices is a Finance page; bank collection lives in Settings → Billing. Earlier settings addresses redirect. */}
+            <Route path="/billing/prices" element={<FeeScheduleScreen />} />
+            <Route path="/billing/settings" element={<MovedTo to="/billing/prices" />} />
+            <Route path="/billing/settings/fees" element={<MovedTo to="/billing/prices" />} />
+            <Route path="/billing/settings/payments" element={<MovedTo to="/settings/billing" />} />
+            <Route path="/billing/settings/*" element={<MovedTo to="/billing" />} />
             <Route path="/insurance/settings" element={<ModuleSettingsLayout module="insurance" />}>
               <Route path="setup" element={<RequireCapability permissions={['insurance_contract:activate', 'insurance_contract:manage']}><InsuranceSettings /></RequireCapability>} />
               <Route path="payers" element={<RequireCapability permissions={['insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate']}><ContractsScreen /></RequireCapability>} />
@@ -278,7 +278,8 @@ const App = () => {
             {/* Earlier addresses of settings pages move to their current place, keeping any query. */}
             <Route path="/admin" element={<MovedTo to="/settings" />} />
             <Route path="/settings/staff" element={<MovedTo to="/admin/staff" />} />
-            <Route path="/settings/billing/*" element={<MovedFromOldSettings />} />
+            <Route path="/settings/billing/fees" element={<MovedTo to="/billing/prices" />} />
+            <Route path="/settings/billing/*" element={<MovedTo to="/settings/billing" />} />
             <Route path="/settings/insurance/*" element={<MovedFromOldSettings />} />
             <Route path="/settings/catalogue" element={<MovedTo to="/laboratory/settings/tests" />} />
             <Route path="/profile" element={<MyProfileScreen />} />
@@ -293,13 +294,13 @@ const App = () => {
             <Route path="/facility/services/:offeringId" element={<ServiceScreen />} />
             <Route path="/admin/units" element={<Navigate to="/settings/facility?view=structure" replace />} />
             <Route path="/billing" element={<BillingScreen />} />
-            <Route path="/billing/fees" element={<MovedTo to="/billing/settings/fees" />} />
+            <Route path="/billing/fees" element={<MovedTo to="/billing/prices" />} />
             <Route path="/insurance" element={<RequireCapability permissions={['coverage:confirm', 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate', 'payment:refund']}><InsuranceWorkspace /></RequireCapability>} />
             <Route path="/insurance/claims" element={<RequireCapability permissions={['coverage:confirm']}><ClaimsScreen /></RequireCapability>} />
             <Route path="/insurance/payments" element={<RequireCapability permissions={['insurance_remittance:record']}><PayerPaymentsScreen /></RequireCapability>} />
             <Route path="/clinical/service-completion" element={<RequireCapability permissions={['encounter:record']}><ServiceCompletionScreen /></RequireCapability>} />
             <Route path="/insurance/contracts" element={<MovedTo to="/insurance/settings/payers" />} />
-            <Route path="/admin/fees" element={<Navigate to="/billing/settings/fees" replace />} />
+            <Route path="/admin/fees" element={<Navigate to="/billing/prices" replace />} />
             <Route path="/admin/devices" element={<MovedTo to="/settings/devices" />} />
             <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
           </Route>
