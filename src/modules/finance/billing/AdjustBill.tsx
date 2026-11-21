@@ -7,6 +7,7 @@ import { adjustCharge, createCharge, patientBillingFacts, type ChargeBalance } f
 import { useAuthorizationContext } from '@/session';
 import { Button, SelectField, Sheet, TextField, useToast } from '@/ui';
 import { parseAmount } from '@/lib/money';
+import { userMessage } from '@/lib/api/userMessage';
 import { ChargeCoverage, RefundSheet, SelfPaySheet } from '@/modules/insurance/AccountCoverage';
 import { ServiceAssociationHistory } from './ServiceAssociations';
 import { CatalogueBrowser } from './CatalogueBrowser';
@@ -48,7 +49,7 @@ export const AdjustBill = ({ patientId, chargeIds, data, onClose, onSaved, onOpe
   const perform = async (action: () => Promise<unknown>, done: string) => {
     if (saving.current) return;
     saving.current = true; setBusy(true); setError('');
-    try { await action(); toast(done); onSaved(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); }
+    try { await action(); toast(done); onSaved(); } catch (e) { const message = userMessage(e, 'The change was not saved. Try again.'); setError(message); toast(message, { tone: 'error' }); }
     finally { saving.current = false; setBusy(false); }
   };
   const reduce = () => perform(async () => {

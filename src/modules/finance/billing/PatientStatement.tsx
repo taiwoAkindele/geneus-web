@@ -5,6 +5,7 @@ import {useAuthorizationContext} from '@/session';
 import {StaffVerification} from '@/modules/insurance/StaffVerification';
 import {Button,SelectField,Sheet} from '@/ui';
 import {formatMoney} from '@/lib/money';
+import {userMessage} from '@/lib/api/userMessage';
 import {downloadCsv} from '@/lib/csv';
 import {CATEGORY_LABELS} from './feeForm';
 
@@ -20,8 +21,8 @@ export const statementCsvRows=(s:Statement)=>[
 const Totals=({totals,money}:{totals:StatementTotals;money:(n:number)=>string})=><p className="text-sm">Original {money(totals.originalMinor)} · Net {money(totals.netMinor)} · Patient balance {money(totals.patientBalanceMinor)}</p>;
 export const PatientStatement=({patientId,currencies,onClose}:{patientId:string;currencies:string[];onClose:()=>void})=>{
  const context=useAuthorizationContext(),[currency,setCurrency]=useState(currencies[0]??'NGN'),[statement,setStatement]=useState<Statement>(),[mode,setMode]=useState('itemized'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[cached,setCached]=useState(false),root=useRef<HTMLDivElement>(null);
- useEffect(()=>{let active=true;setStatement(undefined);setError('');void cachedPatientStatement(context,patientId,currency).then(s=>{if(active){setStatement(s);setCached(Boolean(s));}},e=>{if(active)setError(e instanceof Error?e.message:'Could not read saved statement');});return()=>{active=false;};},[patientId,currency]);
- const refresh=async()=>{setBusy(true);setError('');try{setStatement(await fetchPatientStatement(context,patientId,currency));setCached(false);}catch(e){setError(e instanceof Error?e.message:'Could not generate a statement');}finally{setBusy(false);}};
+ useEffect(()=>{let active=true;setStatement(undefined);setError('');void cachedPatientStatement(context,patientId,currency).then(s=>{if(active){setStatement(s);setCached(Boolean(s));}},e=>{if(active)setError(userMessage(e,'The saved statement could not be read.'));});return()=>{active=false;};},[patientId,currency]);
+ const refresh=async()=>{setBusy(true);setError('');try{setStatement(await fetchPatientStatement(context,patientId,currency));setCached(false);}catch(e){setError(userMessage(e,'The statement could not be generated. Try again.'));}finally{setBusy(false);}};
  const money=(n:number)=>formatMoney(n,currency);
  const print=()=>{
   if(!statement||!root.current)return;

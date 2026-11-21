@@ -52,7 +52,7 @@ export const LegacyBillingWorkspace = () => {
   const openPatient = (id: string) => { setPatientId(id); setChoosePatient(false); };
   const importTransfer = async () => {
     if (importing) return; setImporting(true); setImportError('');
-    try { await billingRequest(context, 'transfers/import', { actorStaffId: context.userId, reference }); setReference(''); query.reload(); }
+    try { await billingRequest(context, 'transfers/import', { reference }); setReference(''); query.reload(); }
     catch (e) { setImportError(e instanceof Error ? e.message : 'Could not check the transfer'); }
     finally { setImporting(false); }
   };

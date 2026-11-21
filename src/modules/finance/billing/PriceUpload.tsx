@@ -1,7 +1,8 @@
 import {useRef,useState} from 'react';
 import type {FeeItem} from '@shared';
 import {useAuthorizationContext} from '@/session';
-import {Button,Sheet} from '@/ui';
+import {Button,Sheet,useToast} from '@/ui';
+import {userMessage} from '@/lib/api/userMessage';
 import {StaffVerification} from '@/modules/insurance/StaffVerification';
 import {saveConfiguration,type ConfigurationWrite} from '@/data/configurationSave';
 import {downloadCsv} from '@/lib/csv';
@@ -9,7 +10,7 @@ import {previewPrices,preparePriceWrites,type PriceImportRow} from './priceImpor
 import {CATEGORY_LABELS} from './feeForm';
 
 export const PriceUpload=({fees,currency,onClose,onSaved}:{fees:FeeItem[];currency:string;onClose:()=>void;onSaved:()=>void})=>{
-  const context=useAuthorizationContext(),[rows,setRows]=useState<PriceImportRow[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const context=useAuthorizationContext(),toast=useToast(),[rows,setRows]=useState<PriceImportRow[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const writes=useRef<ConfigurationWrite[]>(),saving=useRef(false);
   const read=async(file?:File)=>{if(!file)return;setError('');setNotice('');setRows([]);writes.current=undefined;setBusy(true);
     try{if(file.size>4*1024*1024)throw new Error('Use a file smaller than 4 MB');if(!/\.(csv|xlsx)$/i.test(file.name))throw new Error('Choose a CSV or Excel (.xlsx) file');
@@ -17,10 +18,10 @@ export const PriceUpload=({fees,currency,onClose,onSaved}:{fees:FeeItem[];curren
       if(book.SheetNames.length!==1)throw new Error('Use one worksheet per upload');const sheet=book.Sheets[book.SheetNames[0]];
       if(Object.values(sheet).some(cell=>cell&&typeof cell==='object'&&'f' in cell))throw new Error('Replace spreadsheet formulas with values before uploading');
       const result=previewPrices(XLSX.utils.sheet_to_json<unknown[]>(sheet,{header:1,raw:false,defval:''}),fees,currency);if(!result.length)throw new Error('No items found');setRows(result);
-    }catch(e){setError(e instanceof Error?e.message:'Could not read file');}finally{setBusy(false);}};
+    }catch(e){const message=userMessage(e,'The file could not be read. Check it is a CSV or Excel price list.');setError(message);toast(message,{tone:'error'});}finally{setBusy(false);}};
   const save=async()=>{if(saving.current)return;saving.current=true;setBusy(true);setError('');
-    try{writes.current??=preparePriceWrites(rows,context,currency);const result=await saveConfiguration(context,writes.current,{billingImport:true});setNotice(result.arrived?'Prices imported.':'Saved on the server. Prices will appear on this device after synchronization.');setRows([]);onSaved();}
-    catch(e){setError(e instanceof Error?e.message:'Import failed');}finally{setBusy(false);saving.current=false;}};
+    try{writes.current??=preparePriceWrites(rows,context,currency);const result=await saveConfiguration(context,writes.current,{billingImport:true});{const done=result.arrived?'Prices imported.':'Prices saved. They appear on this device after it syncs.';setNotice(done);toast(done);}setRows([]);onSaved();}
+    catch(e){const message=userMessage(e,'The prices were not imported. Try again.');setError(message);toast(message,{tone:'error'});}finally{setBusy(false);saving.current=false;}};
   return <Sheet title="Upload prices" eyebrow="Price Catalogue" onClose={onClose} closeDisabled={busy} hasUnsavedChanges={Boolean(rows.length)} placement="side"><div className="space-y-4">
     <p>Upload CSV or Excel. Three required columns: Name, Category, Price. Description is optional. Prices use {currency}.</p>
     <Button variant="outlined" disabled={busy} onClick={()=>downloadCsv('billing-price-template.csv',[['Name','Category','Price','Description','Item ID'],['Full Blood Count','Laboratory','5000','','']])}>Download template</Button>

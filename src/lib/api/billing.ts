@@ -7,7 +7,10 @@ export const billingRequest = async <T>(context: AuthorizationContext, path: str
   const credential = getDeviceCredential();
   if (!credential) throw new Error('This device is not enrolled');
   try {
-    const result = await staffRequest<T>(`/billing/${path}`, credential.credential, staffSessionToken(context), { ...body, actorStaffId: context.userId }, context.userId);
+    // Who is acting travels only in the x-actor-staff-id header, beside the PIN-verified session; the server checks they match.
+    // A caller can't name a different actor in the body: any such field is dropped.
+    const { actorStaffId: _dropped, ...fields } = body;
+    const result = await staffRequest<T>(`/billing/${path}`, credential.credential, staffSessionToken(context), fields, context.userId);
     touchStaffSession();
     return result;
   } catch (cause) {

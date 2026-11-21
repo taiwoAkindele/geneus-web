@@ -1,7 +1,8 @@
 import {useRef,useState} from 'react';
 import type {FeeItem} from '@shared';
 import {useAuthorizationContext} from '@/session';
-import {Button,Sheet,TextField} from '@/ui';
+import {Button,Sheet,TextField,useToast} from '@/ui';
+import {userMessage} from '@/lib/api/userMessage';
 import {createBill,patientBillingFacts} from '@/data/repos/billing';
 import {formatMoney} from '@/lib/money';
 import {CatalogueBrowser} from './CatalogueBrowser';
@@ -9,12 +10,12 @@ import type {BillingData} from './useBilling';
 import {billKey} from './billDocuments';
 
 export const NewBill=({data,onClose,onCreated}:{data:BillingData;onClose:()=>void;onCreated:(id:string)=>void})=>{
- const context=useAuthorizationContext(),[patientId,setPatient]=useState(''),[search,setSearch]=useState(''),[items,setItems]=useState<{fee:FeeItem;quantity:string}[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),saving=useRef(false);
+ const context=useAuthorizationContext(),toast=useToast(),[patientId,setPatient]=useState(''),[search,setSearch]=useState(''),[items,setItems]=useState<{fee:FeeItem;quantity:string}[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),saving=useRef(false);
  const patient=data.patients.find(p=>p.patientId===patientId);
  const save=async()=>{if(!patient||saving.current)return;saving.current=true;setBusy(true);setError('');try{
    const charges=await createBill(items.map(i=>({feeId:i.fee.id,quantity:Number(i.quantity),priceVersion:i.fee.priceVersion,amountMinor:i.fee.amountMinor,currency:i.fee.currency})),{patientId,facts:patientBillingFacts(patient)},context);
-   onCreated(billKey(charges[0]));
- }catch(e){setError(e instanceof Error?e.message:'Could not create bill');}finally{setBusy(false);saving.current=false;}};
+   toast('Bill created');onCreated(billKey(charges[0]));
+ }catch(e){const message=userMessage(e,'The bill was not created. Try again.');setError(message);toast(message,{tone:'error'});}finally{setBusy(false);saving.current=false;}};
  return <Sheet title="New bill" eyebrow="Billing" onClose={onClose} closeDisabled={busy} hasUnsavedChanges={Boolean(items.length)} placement="side"><fieldset disabled={busy} className="space-y-4">
    {patient?<div className="rounded-card bg-brand-wash p-3"><strong>{patient.fullName}</strong><p className="text-sm">{patient.patientId}</p><Button variant="ghost" onClick={()=>setPatient('')}>Change patient</Button></div>:<><TextField label="Find patient" type="search" value={search} onChange={e=>setSearch(e.target.value)}/><div className="max-h-52 overflow-auto">{data.patients.filter(p=>`${p.fullName} ${p.patientId}`.toLowerCase().includes(search.toLowerCase())).slice(0,25).map(p=><button type="button" key={p.id} className="block min-h-[44px] w-full border-b border-outline-soft p-2 text-left" onClick={()=>setPatient(p.patientId)}>{p.fullName} · {p.patientId}</button>)}</div></>}
    <CatalogueBrowser onSelect={fee=>setItems(old=>old.some(i=>i.fee.id===fee.id)?old:[...old,{fee,quantity:'1'}])} canSelect={fee=>!items.some(i=>i.fee.id===fee.id)}/>

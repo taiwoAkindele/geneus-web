@@ -2,7 +2,8 @@ import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { FeeCategory, type FeeItem } from '@shared';
 import type { FeeDraft } from '@/data/repos/billing';
-import { Button, SelectField, Sheet, SheetCancelButton, TextField } from '@/ui';
+import { Button, SelectField, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
+import { userMessage } from '@/lib/api/userMessage';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { isLegacyFeeCategory } from '@shared';
 import { CATEGORY_LABELS, feeDraftFromForm, feeFormValues, type FeeForm } from './feeForm';
@@ -12,12 +13,13 @@ type Props = { fee?: FeeItem; defaultCurrency?: string; expandedCategories?:bool
 export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', expandedCategories=false, onSave, onClose }: Props) => {
   const { register, handleSubmit, setError, formState: { errors, isSubmitting, isDirty } } = useForm<FeeForm>({ defaultValues: feeFormValues(fee) });
   const saving = useRef(false);
+  const toast = useToast();
   const currency = fee?.currency ?? defaultCurrency;
   const save = handleSubmit(async (values) => {
     if (saving.current) return;
     saving.current = true;
     try { await onSave(feeDraftFromForm({ ...values, category: fee?.category ?? values.category }, currency)); }
-    catch (cause) { setError('root', { message: cause instanceof Error ? cause.message : 'Could not save this item. Try again.' }); }
+    catch (cause) { const message = userMessage(cause, 'This item was not saved. Try again.'); setError('root', { message }); toast(message, { tone: 'error' }); }
     finally { saving.current = false; }
   });
   return <Sheet title={fee ? 'Edit item' : 'Add item'} eyebrow="Price Catalogue" onClose={() => { if (!saving.current) onClose(); }} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty} placement="side">

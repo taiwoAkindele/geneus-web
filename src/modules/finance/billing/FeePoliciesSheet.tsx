@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { ChargeWhen, VisitType, type FeeItem } from '@shared';
-import { Button, SelectField, Sheet, SheetCancelButton, TextField } from '@/ui';
+import { Button, SelectField, Sheet, SheetCancelButton, TextField, useToast } from '@/ui';
+import { userMessage } from '@/lib/api/userMessage';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { CHARGE_WHEN_LABELS, emptyRule, EXEMPTION_PRESETS, feePolicyFromForm, feePolicyValues, VISIT_TYPE_LABELS, type FeePolicyForm } from './feeForm';
 
@@ -9,6 +10,7 @@ export const FeePoliciesSheet = ({ fee, onSave, onClose }: { fee: FeeItem; onSav
   const { register, control, handleSubmit, setError, watch, formState: { errors, isDirty, isSubmitting } } = useForm<FeePolicyForm>({ defaultValues: feePolicyValues(fee) });
   const { fields, append, remove } = useFieldArray({ control, name: 'exemptions' });
   const saving = useRef(false);
+  const toast = useToast();
   const [confirmed, setConfirmed] = useState(false);
   const enabling = watch('chargeWhen') !== 'when_ordered' && watch('chargeWhen') !== fee.chargeWhen;
   const save = handleSubmit(async (values) => {
@@ -16,7 +18,7 @@ export const FeePoliciesSheet = ({ fee, onSave, onClose }: { fee: FeeItem; onSav
     if (enabling && !confirmed) { setError('root', { message: 'Confirm the automatic charging change before saving.' }); return; }
     saving.current = true;
     try { await onSave(feePolicyFromForm(values)); }
-    catch (cause) { setError('root', { message: cause instanceof Error ? cause.message : 'Could not save the policy.' }); }
+    catch (cause) { const message = userMessage(cause, 'The charging rules were not saved. Try again.'); setError('root', { message }); toast(message, { tone: 'error' }); }
     finally { saving.current = false; }
   });
   return <Sheet title="Automatic charging & exemptions" eyebrow={fee.name} placement="side" onClose={() => { if (!saving.current) onClose(); }} closeDisabled={isSubmitting} hasUnsavedChanges={isDirty}>

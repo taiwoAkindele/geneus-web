@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { IncomingTransfer, Payment } from '@shared';
 import { useAuthorizationContext } from '@/session';
-import { Button, SelectField, Sheet, TextField } from '@/ui';
+import { Button, SelectField, Sheet, TextField, useToast } from '@/ui';
 import { billingRequest } from '@/lib/api/billing';
+import { userMessage } from '@/lib/api/userMessage';
 import { calendarDate } from '@/lib/calendarDate';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { historyDocuments, unlinkedTransfers, type BillDocument, type HistoryDocument } from './billDocuments';
@@ -20,6 +21,7 @@ export const PaymentHistory = ({ data, bills, onOpenBill, onReceipt, onLink, onC
   data: BillingData; bills: readonly BillDocument[]; onOpenBill: (id: string) => void; onReceipt: (p: Payment) => void; onLink: (t: IncomingTransfer) => void; onChanged: () => void;
 }) => {
   const context = useAuthorizationContext();
+  const toast = useToast();
   const canReceive = context.permissions.includes('payment:receive');
   const [kind, setKind] = useState<Kind>('all');
   const [search, setSearch] = useState('');
@@ -47,8 +49,8 @@ export const PaymentHistory = ({ data, bills, onOpenBill, onReceipt, onLink, onC
 
   const check = async () => {
     if (busy) return; setBusy(true); setError('');
-    try { await billingRequest(context, 'transfers/import', { actorStaffId: context.userId, reference: reference.trim() }); setReference(''); setChecking(false); onChanged(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not check that reference'); }
+    try { await billingRequest(context, 'transfers/import', { reference: reference.trim() }); setReference(''); setChecking(false); toast('Transfer confirmed. Link it to a bill from the list above.'); onChanged(); }
+    catch (e) { const message = userMessage(e, 'That transfer could not be confirmed. Check the reference and try again.'); setError(message); toast(message, { tone: 'error' }); }
     finally { setBusy(false); }
   };
   const action = (p: HistoryDocument) => p.payment ? <Button variant="ghost" fullWidth={false} className="!px-2 !py-1 text-sm" onClick={() => onReceipt(p.payment!)}>Receipt</Button>

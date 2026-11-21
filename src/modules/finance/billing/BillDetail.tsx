@@ -2,7 +2,7 @@ import {useCallback,useRef,useState} from 'react';
 import type {CoverageFinancialSummary,IncomingTransfer,Payment} from '@shared';
 import {useLiveQuery} from '@/data';
 import {allWhere} from '@/data/db';
-import {ActionMenu,Button,Sheet} from '@/ui';
+import {ActionMenu,Button,Sheet,useToast} from '@/ui';
 import {useAuthorizationContext} from '@/session';
 import type {BillDocument} from './billDocuments';
 import type {BillingData} from './useBilling';
@@ -18,7 +18,7 @@ type Event={id:string;at:string;text:string;by:string;amount?:number;payment?:Pa
 
 /** One bill: who it's for, what is due, one way to receive payment; everything else is in the ⋯ menu. */
 export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,onOpenPatient}:{bill:BillDocument;data:BillingData;transfer?:IncomingTransfer;questions:readonly BillingQuestion[];onBack:()=>void;onReceipt:(p:Payment,fresh:boolean)=>void;onSaved:()=>void;onOpenPatient:(patientId:string)=>void})=>{
- const context=useAuthorizationContext(),root=useRef<HTMLDivElement>(null);
+ const context=useAuthorizationContext(),toast=useToast(),root=useRef<HTMLDivElement>(null);
  const [sheet,setSheet]=useState<'pay'|'adjust'|'statement'|'questions'|undefined>(transfer?'pay':undefined),[error,setError]=useState('');
  const summaries=useLiveQuery(useCallback(()=>allWhere<CoverageFinancialSummary>('coverage_financial_summary','patientId',bill.patientId),[bill.patientId]),['coverage_financial_summary']);
  const money=(n:number)=>displayMoney(n,bill.currency),patient=data.patients.find(p=>p.patientId===bill.patientId);
@@ -35,7 +35,7 @@ export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,
   ...data.adjustments.filter(a=>chargeIds.includes(a.chargeId)).map(a=>({id:a.id,at:a.createdOn,by:staff(a.createdBy),amount:-a.amountMinor,text:`${a.dispenseEntryId?'Medicine return credit':a.kind==='discount'?'Discount':'Waiver'} · ${a.reason}`})),
   ...data.coverage.refunds.filter(r=>r.allocations.some(a=>chargeIds.includes(a.chargeId))).map(r=>({id:r.id,at:r.createdOn,by:staff(r.createdBy),amount:-r.allocations.filter(a=>chargeIds.includes(a.chargeId)).reduce((n,a)=>n+a.amountMinor,0),text:`Refund handed back · ${r.method}`})),
  ].sort((a,b)=>b.at.localeCompare(a.at));
- const print=()=>{const popup=window.open('','_blank','width=900,height=1000');if(!popup||!root.current){setError('The print window was blocked. Allow pop-ups for this app and try again.');return;}setError('');popup.document.title=bill.reference;
+ const print=()=>{const popup=window.open('','_blank','width=900,height=1000');if(!popup||!root.current){const message='The print window was blocked. Allow pop-ups for this app and try again.';setError(message);toast(message,{tone:'error'});return;}setError('');popup.document.title=bill.reference;
   const style=popup.document.createElement('style');style.textContent='body{font:14px Arial;color:#18342b;margin:30px}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}.r{text-align:right}.print-hide,.md\\:hidden{display:none!important}';popup.document.head.append(style);
   const heading=popup.document.createElement('p');heading.textContent=new Date().toLocaleString('en-GB');popup.document.body.append(heading,root.current.cloneNode(true));popup.focus();popup.print();};
  const line=(r:BillDocument['rows'][number])=>{

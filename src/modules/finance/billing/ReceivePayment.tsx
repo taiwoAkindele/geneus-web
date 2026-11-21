@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { IncomingTransfer, Payment } from '@shared';
 import { recordPayment } from '@/data/repos/billing';
 import { useAuthorizationContext } from '@/session';
-import { Button, SegmentedControl, Sheet, TextField } from '@/ui';
+import { Button, SegmentedControl, Sheet, TextField, useToast } from '@/ui';
+import { userMessage } from '@/lib/api/userMessage';
 import { amountInput, parseAmount } from '@/lib/money';
 import { billingRequest, matchTransfer, type ReceivingAccount } from '@/lib/api/billing';
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
@@ -33,6 +34,7 @@ export const ReceivePayment = ({ patientId, chargeIds, data, transfer: given, on
   onClose: () => void; onReceipt: (payment: Payment) => void; onSaved: () => void;
 }) => {
   const context = useAuthorizationContext();
+  const toast = useToast();
   const allowed = context.permissions.includes('payment:receive');
   const rows = billingRows(data.charges.filter((c) => c.patientId === patientId && chargeIds.includes(c.id)), data.payments, data.adjustments, data.coverage);
   const patient = data.patients.find((p) => p.patientId === patientId);
@@ -94,7 +96,7 @@ export const ReceivePayment = ({ patientId, chargeIds, data, transfer: given, on
   const startReview = () => {
     setError(''); setFieldError(undefined);
     try { setReview(check()); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the payment amount.'); if (cause instanceof PaymentInputError && cause.chargeId) { setFieldError(cause.chargeId); setShowSplit(true); } }
+    catch (cause) { const message = userMessage(cause, 'Check the payment amount.'); setError(message); toast(message, { tone: 'error' }); if (cause instanceof PaymentInputError && cause.chargeId) { setFieldError(cause.chargeId); setShowSplit(true); } }
   };
   const record = async () => {
     if (saving.current) return;
@@ -105,9 +107,10 @@ export const ReceivePayment = ({ patientId, chargeIds, data, transfer: given, on
       const payment = bankTransfer
         ? await matchTransfer(context, bankTransfer.id, patientId, checked.allocations, requestId.current)
         : await recordPayment({ patientId, method: 'cash', currency: checked.currency, allocations: checked.allocations }, context);
+      toast(bankTransfer ? `${money(payment.amountMinor)} applied from the transfer` : `${money(payment.amountMinor)} cash recorded`);
       onReceipt(payment);
       onSaved();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not record the payment. Try again.'); }
+    } catch (cause) { const message = userMessage(cause, 'The payment was not recorded. Try again.'); setError(message); toast(message, { tone: 'error' }); }
     finally { saving.current = false; setBusy(false); }
   };
 
@@ -139,7 +142,7 @@ export const ReceivePayment = ({ patientId, chargeIds, data, transfer: given, on
             {candidates.length ? candidates.slice(0, 12).map(({ transfer: t, applied }) => { const left = capacity.sources[t.id]?.availableMinor ?? t.amountMinor - applied; return <button key={t.id} type="button" disabled={left <= 0} onClick={() => pick(t)} className="flex w-full items-center justify-between gap-3 rounded-field border-[1.5px] border-outline bg-white p-3 text-left text-sm hover:border-brand disabled:opacity-50">
               <span><strong className="block">{t.payerName ?? 'Bank transfer'}</strong><span className="text-ink-muted">{whenText(t.receivedOn)} · {displayMoney(left, t.currency)} left</span></span><span className="font-semibold tabular-nums">{displayMoney(t.amountMinor, t.currency)}</span></button>; })
               : <p className="rounded-field bg-surface-muted p-3 text-sm">No verified transfers are waiting. When the patient's transfer arrives it appears here. A missing one can be checked by reference in Payment history.</p>}
-            <Button variant="ghost" fullWidth={false} className="!px-0" onClick={() => void billingRequest<ReceivingAccount[]>(context, 'accounts/list', { actorStaffId: context.userId }).then(setAccounts, (e) => setError(e instanceof Error ? e.message : 'Could not read the account details.'))}>Show account details for the patient</Button>
+            <Button variant="ghost" fullWidth={false} className="!px-0" onClick={() => void billingRequest<ReceivingAccount[]>(context, 'accounts/list', {}).then(setAccounts, (e) => { const message = userMessage(e, 'The account details could not be read. Try again.'); setError(message); toast(message, { tone: 'error' }); })}>Show account details for the patient</Button>
             {accounts?.filter((a) => a.general).map((a) => <div key={a.id} className="rounded-field bg-brand-wash p-3 text-sm"><p>{a.bankName} · {a.accountName}</p><p className="font-mono text-lg">{a.accountNumber}</p></div>)}
             {accounts && !accounts.some((a) => a.general) ? <p className="text-sm">No receiving account is set up. An administrator can add one in Settings → Billing.</p> : null}
           </div>}

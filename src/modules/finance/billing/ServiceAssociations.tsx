@@ -8,11 +8,12 @@ import {allOfType} from '@/data/db';
 import {listServiceAllocations,requestServiceAllocation} from '@/data/repos/serviceAllocations';
 import {useIntegratedBilling} from '@/data/integratedBillingSupport';
 import {useAuthorizationContext} from '@/session';
-import {Button,SelectField,TextField} from '@/ui';
+import {Button,SelectField,TextField,useToast} from '@/ui';
+import {userMessage} from '@/lib/api/userMessage';
 import {formatMoney} from '@/lib/money';
 
 export const AssociationEditor=({patientId,sourceKind,sourceEntryId,sourceItemId,quantity,unit,charges,onSaved}:{patientId:string;sourceKind:'laboratory'|'pharmacy';sourceEntryId:string;sourceItemId:string;quantity:number;unit:string;charges:readonly Charge[];onSaved:()=>void})=>{
- const context=useAuthorizationContext(),enabled=useIntegratedBilling(context),query=useLiveQuery(listServiceAllocations,['service_charge_allocation','sync_rejection']);
+ const toast=useToast(),context=useAuthorizationContext(),enabled=useIntegratedBilling(context),query=useLiveQuery(listServiceAllocations,['service_charge_allocation','sync_rejection']);
  const [chargeId,setCharge]=useState(''),[amount,setAmount]=useState(String(quantity)),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const records=query.data??[],used=allocatedQuantity(records,a=>a.sourceEntryId===sourceEntryId&&a.sourceItemId===sourceItemId),pending=records.filter(a=>!a.acceptedOn&&a.sourceEntryId===sourceEntryId&&a.sourceItemId===sourceItemId);
  if(!context.permissions.includes('charge:associate'))return <p className="text-xs">An authorized financial reviewer can record the exact charge association.</p>;
@@ -26,7 +27,7 @@ export const AssociationEditor=({patientId,sourceKind,sourceEntryId,sourceItemId
  {chargeId?<p className="text-xs">Remaining purchased quantity: {(()=>{const c=candidates.find(c=>c.id===chargeId)!;return c.quantity===undefined?'Historical quantity unavailable':Math.max(0,c.quantity-allocatedQuantity(records,a=>a.chargeId===c.id)-creditedQuantity(records,c.id));})()}. Payment alone does not identify this service.{!candidates.find(c=>c.id===chargeId)?.unitOfMeasure?' This charge has no recorded unit. Verify its purchase evidence: the first accepted association records this exact source unit and cannot infer a pack conversion.':''}</p>:null}
  <TextField label={`Quantity to associate (${unit})`} type="number" value={amount} onChange={e=>setAmount(e.target.value)}/>
  <TextField label="Evidence and reason for this exact association" value={reason} onChange={e=>setReason(e.target.value)}/>
- <Button disabled={!enabled||busy||query.loading||Boolean(query.error)||!chargeId||reason.trim().length<3||pending.length>0||!(Number(amount)>0)} onClick={()=>{setBusy(true);setError('');void requestServiceAllocation({patientId,chargeId,sourceKind,sourceEntryId,sourceItemId,quantity:Number(amount),unit,action:'allocate',reason,creditReturnedUnits:false},context).then(()=>{query.reload();onSaved();setReason('');},e=>setError(e instanceof Error?e.message:'Could not save association')).finally(()=>setBusy(false));}}>Request charge association</Button>
+ <Button disabled={!enabled||busy||query.loading||Boolean(query.error)||!chargeId||reason.trim().length<3||pending.length>0||!(Number(amount)>0)} onClick={()=>{setBusy(true);setError('');void requestServiceAllocation({patientId,chargeId,sourceKind,sourceEntryId,sourceItemId,quantity:Number(amount),unit,action:'allocate',reason,creditReturnedUnits:false},context).then(()=>{toast('Charge link requested. It is confirmed once the server accepts it.');query.reload();onSaved();setReason('');},e=>{const message=userMessage(e,'The charge link was not saved. Try again.');setError(message);toast(message,{tone:'error'});}).finally(()=>setBusy(false));}}>Request charge association</Button>
  {error?<p role="alert">{error}</p>:null}</div>;
 };
 
@@ -44,7 +45,7 @@ export const ServiceReturnReviews=({charges,onPatient,patientId}:{charges:Charge
  return <section aria-label="Returned supplies awaiting financial resolution" className="space-y-3"><h3 className="font-bold">Returns awaiting financial review</h3>{query.error?<p role="alert">Could not read recorded returns.</p>:reviews.length?reviews.map(r=><article key={r.entry.id} className="space-y-2 rounded-card border border-amber-border bg-amber-bg p-3"><p>{r.quantity} {r.unit} returned · {r.entry.patientId}</p><p className="break-all text-xs">Return {r.entry.id} · supply {r.source.id} · recorded by {r.entry.createdBy}</p><p className="text-sm">The physical return is retained. It is not an automatic refund or insurer responsibility change. Associate the original purchased quantity if necessary, then review its exact release in the patient account.</p><AssociationEditor patientId={r.entry.patientId} sourceKind="pharmacy" sourceEntryId={r.source.id} sourceItemId={r.source.id} quantity={r.supply?.quantity??r.quantity} unit={r.unit!} charges={charges} onSaved={query.reload}/><Button onClick={()=>onPatient(r.entry.patientId)}>Review return and patient account</Button></article>):<p className="text-sm">No recorded returns awaiting financial resolution on this device.</p>}</section>;
 };
 export const ServiceAssociationHistory=({patientId}:{patientId:string})=>{
- const query=useLiveQuery(readAssociationHistory,['service_charge_allocation','encounter_entry','coverage_allocation']),context=useAuthorizationContext(),enabled=useIntegratedBilling(context);
+ const query=useLiveQuery(readAssociationHistory,['service_charge_allocation','encounter_entry','coverage_allocation']),context=useAuthorizationContext(),toast=useToast(),say=(message:string)=>{setNotice(message);toast(message);},enabled=useIntegratedBilling(context);
  const [selected,setSelected]=useState<ServiceChargeAllocation>(),[quantity,setQuantity]=useState('1'),[returnId,setReturn]=useState(''),[credit,setCredit]=useState(false),[reason,setReason]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[insuranceRequestId,setInsuranceRequest]=useState(()=>crypto.randomUUID());
  const records=(query.data?.allocations??[]).filter(a=>a.patientId===patientId),returns=(query.data?.entries??[]).filter(e=>e.patientId===patientId&&dispensingDetails(e)?.action==='return');
  const relevantReturns=selected?returns.filter(e=>dispensingDetails(e)?.returnOf===selected.sourceEntryId):[];
@@ -54,10 +55,10 @@ export const ServiceAssociationHistory=({patientId}:{patientId:string})=>{
   if(!selected)return;setBusy(true);setError('');setNotice('');
   const input={patientId,chargeId:selected.chargeId,sourceKind:selected.sourceKind,sourceEntryId:selected.sourceEntryId,sourceItemId:selected.sourceItemId,unit:selected.unit,quantity:Number(quantity),action:'release' as const,reversesId:selected.id,...(returnId?{returnEntryId:returnId}:{}),creditReturnedUnits:credit,reason};
   try{
-   if(insured&&credit){const result=await billingRequest<{claimReviewRequired:boolean}>(context,'associations/insurance-return',{requestId:insuranceRequestId,input});setNotice(result.claimReviewRequired?'Insurance return confirmed. Review the affected claim revision in Insurance; earlier payments remain intact.':'Insurance return confirmed using the original calculation rules. Any patient refund remains a separate verified action.');}
-   else{await requestServiceAllocation(input,context);setNotice('Financial release requested. It remains pending until server confirmation.');}
+   if(insured&&credit){const result=await billingRequest<{claimReviewRequired:boolean}>(context,'associations/insurance-return',{requestId:insuranceRequestId,input});say(result.claimReviewRequired?'Insurance return confirmed. Review the affected claim revision in Insurance; earlier payments remain intact.':'Insurance return confirmed using the original calculation rules. Any patient refund remains a separate verified action.');}
+   else{await requestServiceAllocation(input,context);say('Financial release requested. It remains pending until server confirmation.');}
    query.reload();setSelected(undefined);
-  }catch(e){setError(e instanceof Error?e.message:'Could not save release');}finally{setBusy(false);}
+  }catch(e){const message=userMessage(e,'The release was not saved. Try again.');setError(message);toast(message,{tone:'error'});}finally{setBusy(false);}
  };
  if(query.loading&&!query.data)return <p>Reading service associations…</p>;
  if(query.error)return <p role="alert">Could not read service associations.</p>;

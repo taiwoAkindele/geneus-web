@@ -5,6 +5,7 @@ import type { FeeItem } from '@shared';
 import { useAuthorizationContext } from '@/session';
 import { setFeeItemActive } from '@/data/repos/billing';
 import { Button, DataTable, SelectField, Tag, TextField, useToast } from '@/ui';
+import { userMessage } from '@/lib/api/userMessage';
 import { formatMoney } from '@/lib/money';
 import { CATEGORY_LABELS, CHARGE_WHEN_LABELS } from './feeForm';
 
@@ -19,7 +20,7 @@ export const FeeCatalog = ({ fees, onEdit, onPolicy, onChanged }: { fees: readon
     if (lock.current) return;
     lock.current = true; setBusyId(fee.id);
     try { await setFeeItemActive(fee.id, !fee.active, context); toast(fee.active ? 'Fee retired. Existing patient bills keep their prices.' : 'Fee restored.'); onChanged(); }
-    catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not change this fee.', { tone: 'error' }); }
+    catch (cause) { toast(userMessage(cause, 'This price could not be changed. Try again.'), { tone: 'error' }); }
     finally { lock.current = false; setBusyId(undefined); }
   };
   const actions = (fee: FeeItem) => <div className="flex flex-wrap items-start gap-2">

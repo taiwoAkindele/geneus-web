@@ -5,7 +5,8 @@ import { coverageDataAge, electSelfPay, selfPayOffered, type CoverageData } from
 import { recordRefund, VerificationRequired } from '@/lib/api/insurance';
 import { amountInput, formatMoney, parseAmount } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
-import { Button, SelectField, Sheet, TextAreaField, TextField } from '@/ui';
+import { Button, SelectField, Sheet, TextAreaField, TextField, useToast } from '@/ui';
+import { userMessage } from '@/lib/api/userMessage';
 import { coverageLine } from './coverageLabels';
 import { StaffVerification } from './StaffVerification';
 
@@ -43,13 +44,14 @@ export const ChargeCoverage = ({ row, insurance, onSelfPay, onRefund }: {
 export const SelfPaySheet = ({ row, cover, check, onClose, onSaved }: { row: ChargeBalance; cover: PatientCover; check?: CoverCheck; onClose: () => void; onSaved: () => void }) => {
   const context = useAuthorizationContext();
   const [agreed, setAgreed] = useState(false); const [note, setNote] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const toast = useToast();
   const save = async () => {
     setBusy(true); setError('');
     try {
       if (!agreed) throw new Error('Confirm that the patient agreed to pay without insurance');
       await electSelfPay({ patientId: row.charge.patientId, coverId: cover.id, chargeIds: [row.charge.id], reason: check ? 'not_eligible' : 'patient_choice', coverCheckId: check?.id, note }, context);
       onSaved();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not record the choice'); } finally { setBusy(false); }
+    } catch (cause) { const message = userMessage(cause, 'The choice was not recorded. Try again.'); setError(message); toast(message, { tone: 'error' }); } finally { setBusy(false); }
   };
   return <Sheet title="Pay without insurance" eyebrow={row.charge.description} onClose={onClose} closeDisabled={busy}>
     <div className="space-y-3">
@@ -73,6 +75,7 @@ export const RefundSheet = ({ row, onClose, onDone }: { row: ChargeBalance; onCl
   const credit = -row.balanceMinor;
   const [amount, setAmount] = useState(amountInput(credit, row.charge.currency)); const [method, setMethod] = useState<Refund['method']>('cash');
   const [reason, setReason] = useState(''); const [reference, setReference] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const toast = useToast();
   const [id] = useState(() => `refund:${crypto.randomUUID()}`);
   const save = async () => {
     setBusy(true); setError('');
@@ -81,7 +84,7 @@ export const RefundSheet = ({ row, onClose, onDone }: { row: ChargeBalance; onCl
       if (amountMinor <= 0 || amountMinor > credit) throw new Error(`Refund up to ${formatMoney(credit, row.charge.currency)}`);
       if (!reason.trim()) throw new Error('Give the reason for the refund');
       onDone(await recordRefund(context, { id, patientId: row.charge.patientId, method, currency: row.charge.currency, allocations: [{ chargeId: row.charge.id, amountMinor }], reason: reason.trim(), reference: reference.trim() || undefined }));
-    } catch (cause) { setError(cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN, then refund.' : cause instanceof Error ? cause.message : 'The refund was not recorded'); } finally { setBusy(false); }
+    } catch (cause) { const message = cause instanceof VerificationRequired ? 'Your session with the server ended. Confirm your PIN, then refund.' : userMessage(cause, 'The refund was not recorded. Try again.'); setError(message); toast(message, { tone: 'error' }); } finally { setBusy(false); }
   };
   return <Sheet title="Refund credit" eyebrow={(row.charge as Charge).description} onClose={onClose} closeDisabled={busy}>
     <StaffVerification requireServerSession purpose="Refunding a credit">

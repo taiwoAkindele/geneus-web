@@ -14,7 +14,8 @@ describe('verified online billing requests', () => {
   it('sends the actor-bound session and preserves the allocation request identity', async () => {
     vi.mocked(staffRequest).mockResolvedValue({ id: 'payment:request' });
     await matchTransfer(context, 'transfer:one', 'TEST-000001-K2', [{ chargeId: 'charge:one', amountMinor: 1000 }], 'stable-request');
-    expect(staffRequest).toHaveBeenCalledWith('/billing/transfers/transfer%3Aone/match', 'synthetic-device', 'synthetic-session', expect.objectContaining({ requestId: 'stable-request', actorStaffId: context.userId }), context.userId);
+    expect(staffRequest).toHaveBeenCalledWith('/billing/transfers/transfer%3Aone/match', 'synthetic-device', 'synthetic-session', expect.objectContaining({ requestId: 'stable-request' }), context.userId);
+    expect(vi.mocked(staffRequest).mock.calls[0][3]).not.toHaveProperty('actorStaffId');
     expect(touchStaffSession).toHaveBeenCalledOnce();
   });
   it('clears an expired session and never automatically replays a financial request', async () => {
@@ -23,6 +24,8 @@ describe('verified online billing requests', () => {
     expect(staffRequest).toHaveBeenCalledOnce();
     expect(forgetStaffSession).toHaveBeenCalledOnce();
     expect(touchStaffSession).not.toHaveBeenCalled();
-    expect(vi.mocked(staffRequest).mock.calls[0][3]).toMatchObject({ actorStaffId: context.userId });
+    // The actor is the signed-in person, sent as the header argument; a body attempt to name someone else is dropped.
+    expect(vi.mocked(staffRequest).mock.calls[0][3]).not.toHaveProperty('actorStaffId');
+    expect(vi.mocked(staffRequest).mock.calls[0][4]).toBe(context.userId);
   });
 });
