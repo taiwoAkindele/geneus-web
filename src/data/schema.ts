@@ -20,6 +20,7 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   charge: { patient: ['patientId'], appointment: ['appointmentId'] },
   payment: { patient: ['patientId'], transfer: ['incomingTransferId'] },
   billing_adjustment: { charge: ['chargeId'], patient: ['patientId'] },
+  patient_contact: { patient: ['patientId'] },
   service_charge_allocation:{charge:['chargeId'],source:['sourceEntryId','sourceItemId'],patient:['patientId']},
   encounter: { patient: ['patientId'] },
   ward_care_event: { admission: ['admissionId'], encounter: ['encounterId'], patient: ['patientId'] },

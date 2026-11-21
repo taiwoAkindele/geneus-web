@@ -18,6 +18,8 @@ export type RegistrationValues = {
   age: string;
   dateOfBirth: string;
   phone: string;
+  /** Kept on the patient's contact record, not the patient (see patientContacts). */
+  email: string;
   address: string;
   occupation: string;
   religion: Religion | '';
@@ -40,6 +42,7 @@ export const EMPTY_REGISTRATION: RegistrationValues = {
   age: '',
   dateOfBirth: '',
   phone: '',
+  email: '',
   address: '',
   occupation: '',
   religion: '',
@@ -100,6 +103,7 @@ export const fromPatient = (patient: Patient): RegistrationValues => ({
   age: patient.ageYears === undefined ? '' : String(patientAge(patient)),
   dateOfBirth: patient.dateOfBirth ?? '',
   phone: patient.phone ?? '',
+  email: '',
   address: patient.address ?? '',
   occupation: patient.occupation ?? '',
   religion: isReligion(patient.religion) ? patient.religion : '',
