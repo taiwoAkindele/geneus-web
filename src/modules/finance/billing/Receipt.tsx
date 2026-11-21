@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Payment } from '@shared';
-import { Button, Sheet } from '@/ui';
+import { Button, Sheet, useToast } from '@/ui';
 import { formatMoney } from '@/lib/money';
 import { useSession } from '@/session';
 import type { BillingData } from './useBilling';
@@ -12,6 +12,7 @@ import { displayMoney } from './billingUi';
  */
 export const Receipt = ({ payment, data, onClose, fresh = false, onNextPatient }: { payment: Payment; data: BillingData; onClose: () => void; fresh?: boolean; onNextPatient?: () => void }) => {
   const { facility } = useSession();
+  const toast = useToast();
   const patient = data.patients.find((p) => p.patientId === payment.patientId);
   const staff = data.staff.find((s) => s.staffId === payment.createdBy);
   const [printError, setPrintError] = useState('');
@@ -19,7 +20,7 @@ export const Receipt = ({ payment, data, onClose, fresh = false, onNextPatient }
   const method = payment.method === 'cash' ? 'Cash' : payment.method === 'transfer' ? 'Bank transfer' : payment.method;
   const print = () => {
     const popup = window.open('', '_blank', 'width=500,height=650');
-    if (!popup) { setPrintError('The print window was blocked. Allow pop-ups for this app and try again. The payment is already recorded; do not record it again.'); return; }
+    if (!popup) { const message = 'The print window was blocked. Allow pop-ups for this app and try again. The payment is already recorded; do not record it again.'; setPrintError(message); toast(message, { tone: 'error' }); return; }
     setPrintError('');
     const root = document.createElement('main');
     const lines = [facility.name, payment.reverses ? 'Payment reversal · not a new collection' : 'Payment receipt', payment.receiptNumber, patient?.fullName ?? payment.patientId, payment.patientId,

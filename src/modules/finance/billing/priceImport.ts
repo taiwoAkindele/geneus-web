@@ -5,14 +5,23 @@ import { envelope, newId } from '@/data/db';
 import type { ConfigurationWrite } from '@/data/configurationSave';
 
 export type PriceImportRow = { line:number; name:string; category:string; price:string; description:string; itemId:string; error?:string; fee?:FeeItem; amountMinor?:number };
+/** Spreadsheet column name for a zero-based index: 0 → A, 26 → AA. */
+const columnLetter = (index:number):string => (index>=26?columnLetter(Math.floor(index/26)-1):'')+String.fromCharCode(65+index%26);
 const categoryOf = (value:string) => FeeCategory.options.find(c=>c===value.toLowerCase()||CATEGORY_LABELS[c].toLowerCase()===value.toLowerCase());
 export const previewPrices = (rows: readonly unknown[][], fees: readonly FeeItem[], currency:string): PriceImportRow[] => {
   if(rows.length<2)throw new Error('Include a header and at least one price');
   const headers=rows[0].map(v=>String(v??'').trim().toLowerCase().replace(/[ _-]/g,''));
-  if(['name','category','price'].some(h=>!headers.includes(h)))throw new Error('Required columns: Name, Category, Price. Optional: Description, Item ID.');
-  if(new Set(headers).size!==headers.length)throw new Error('Column names must be unique');
-  if(headers.some(h=>!['name','category','price','description','itemid','currency'].includes(h)))throw new Error('Use only Name, Category, Price, Description, Item ID and optional Currency columns');
-  if(rows.length>501)throw new Error('Upload at most 500 items at a time');
+  // Spreadsheets often keep empty columns beside the data too. A column with no heading is ignored when it is
+  // empty, and refused when it holds values, so nothing typed is silently dropped.
+  const blank=(v:unknown)=>String(v??'').trim()==='';
+  const width=Math.max(headers.length,...rows.map(r=>r.length));
+  for(let i=0;i<width;i++)if(!headers[i]&&rows.slice(1).some(r=>!blank(r[i])))throw new Error(`Column ${columnLetter(i)} has values but no heading. Give it a heading or delete it.`);
+  const named=headers.filter(Boolean);
+  if(['name','category','price'].some(h=>!named.includes(h)))throw new Error('Required columns: Name, Category, Price. Optional: Description, Item ID.');
+  if(new Set(named).size!==named.length)throw new Error('Each column heading can appear only once');
+  if(named.some(h=>!['name','category','price','description','itemid','currency'].includes(h)))throw new Error('Use only Name, Category, Price, Description, Item ID and optional Currency columns');
+  // Spreadsheets often keep thousands of empty rows below the data (formatted columns, touched cells); only items count.
+  if(rows.slice(1).filter(cells=>cells.some(c=>String(c??'').trim()!=='')).length>500)throw new Error('Upload at most 500 items at a time');
   const seen=new Set<string>(),ids=new Set<string>();
   return rows.slice(1).flatMap((cells,index)=>{
     if(cells.every(c=>String(c??'').trim()===''))return [];

@@ -34,7 +34,7 @@ const HELP: Record<SetupStepId, string> = {
   staff: 'Add the people who work here, give them their duties and plan their shifts so they can sign in.',
 };
 const LATER = [
-  { label: 'Bank transfers', description: 'Paystack and the hospital receiving account.', to: '/settings/billing' },
+  { label: 'Bank transfers', description: "The payment provider and the hospital's account.", to: '/settings/billing' },
   { label: 'Lab catalogue', description: 'Tests and result templates. Prices come from Billing.', to: '/laboratory/settings/tests' },
   { label: 'Pharmacy stock', description: 'Medicine stock and supplies. Selling prices come from Billing.', to: '/stock' },
   { label: 'Insurance', description: 'Payers, contracts and claims readiness.', to: '/insurance/settings/setup' },

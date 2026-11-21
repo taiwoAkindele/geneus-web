@@ -33,6 +33,12 @@ import { documentScope } from './documentFiles';
 export type ConnectorOptions = {
   /** Called when the server no longer recognises this device's credential. */
   onDeenrolled: () => Promise<void>;
+  /**
+   * How many local writes are still waiting to upload. Reported with every sync token so the server's
+   * device readiness (e.g. the Billing catalogue switch) sees the real queue. Without it, or if counting
+   * fails, the device reports 1: never claiming an empty queue it can't confirm.
+   */
+  pendingUploads?: () => Promise<number>;
 };
 
 /** One queued write as the contract describes it (SCHEMA.md §12). */
@@ -56,7 +62,7 @@ export const toMutation = (entry: CrudEntry): UploadMutation => {
   };
 };
 
-export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBackendConnector => {
+export const createConnector = ({ onDeenrolled, pendingUploads }: ConnectorOptions): PowerSyncBackendConnector => {
   const enrolledDevice = getDeviceCredential();
   const fileScope=enrolledDevice?documentScope(enrolledDevice):undefined;
   return ({
@@ -64,7 +70,9 @@ export const createConnector = ({ onDeenrolled }: ConnectorOptions): PowerSyncBa
     const device = enrolledDevice;
     if (!device) return null;
     try {
-      const minted = await fetchSyncToken(device.credential);
+      let pending = 1;
+      try { if (pendingUploads) { const n = await pendingUploads(); if (Number.isSafeInteger(n) && n >= 0) pending = n; } } catch { /* Unknown queue: keep reporting 1. */ }
+      const minted = await fetchSyncToken(device.credential, pending);
       rememberBillingCatalogue(device,minted.billingCatalogueEnabled);
       rememberIntegratedBilling(device,minted.integratedBillingEnabled);
       rememberInpatientSupport(device, minted.inpatientWorkflowVersion);

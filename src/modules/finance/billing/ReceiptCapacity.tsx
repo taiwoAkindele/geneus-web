@@ -5,12 +5,13 @@ import {billingRequest} from '@/lib/api/billing';
 import {useLiveQuery} from '@/data';
 import {listIncomingTransfers} from '@/data/repos/billing';
 import {formatMoney} from '@/lib/money';
+import {userMessage} from '@/lib/api/userMessage';
 import {Button,SelectField} from '@/ui';
 type Capacity={id:string;patientMinor:number;payerMinor:number;availableMinor:number;overRecognizedMinor:number};
 export const useReceiptCapacity=(ids:readonly string[],revision?:unknown)=>{
  const context=useAuthorizationContext(),{hasServerSession}=useStaffVerification(),key=[...new Set(ids)].sort().slice(0,200).join('|');
  const [sources,setSources]=useState<Record<string,Capacity>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const refresh=useCallback(async()=>{if(!key||!hasServerSession){setSources({});return;}setBusy(true);setError('');try{const response=await billingRequest<{sources:Capacity[]}>(context,'transfers/capacity',{ids:key.split('|')});setSources(Object.fromEntries(response.sources.map(c=>[c.id,c])));}catch(e){setSources({});setError(e instanceof Error?e.message:'Could not verify receipt capacity');}finally{setBusy(false);}},[key,hasServerSession,context.userId]);
+ const refresh=useCallback(async()=>{if(!key||!hasServerSession){setSources({});return;}setBusy(true);setError('');try{const response=await billingRequest<{sources:Capacity[]}>(context,'transfers/capacity',{ids:key.split('|')});setSources(Object.fromEntries(response.sources.map(c=>[c.id,c])));}catch(e){setSources({});setError(userMessage(e,'Could not check how much of each transfer is left.'));}finally{setBusy(false);}},[key,hasServerSession,context.userId]);
  useEffect(()=>{void refresh();},[refresh,revision]);
  return {sources,error,busy,refresh,hasServerSession};
 };
