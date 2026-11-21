@@ -87,6 +87,7 @@ describe('connector', () => {
       expect(lastServerContactOn()).toBe('2026-09-12T12:00:00Z');
     });
 
+it('reports the real upload queue with the token, and 1 when it cannot be counted', async () => {      const body = async (pendingUploads?: () => Promise<number>) => {        const fetch = respond(200, { token: 'jwt', expiresOn: '2026-09-12T13:00:00Z', syncEndpoint: 'http://sync', serverTime: '2026-09-12T12:00:00Z', keys: [] });        vi.stubGlobal('fetch', fetch);        await createConnector({ onDeenrolled: vi.fn(), pendingUploads }).fetchCredentials();        return JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit).body)) as { pendingMutationCount: number };      };      expect((await body(async () => 0)).pendingMutationCount).toBe(0);      expect((await body(async () => 3)).pendingMutationCount).toBe(3);      expect((await body(async () => { throw new Error('database closed'); })).pendingMutationCount).toBe(1);      expect((await body()).pendingMutationCount).toBe(1);    });
     it('returns nothing on an unenrolled device', async () => {
       clearDeviceCredential();
       expect(await createConnector({ onDeenrolled: vi.fn() }).fetchCredentials()).toBeNull();

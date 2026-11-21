@@ -38,10 +38,12 @@ export const startSync = async (): Promise<LocalDatabase> => {
   if (credential && db.currentStatus.hasSynced) await markWorkspacePrepared(credential.deviceId);
   if (credential && !preparedListeners.has(db)) { preparedListeners.add(db); db.registerListener({ statusChanged: (status) => { if (status.hasSynced) void markWorkspacePrepared(credential.deviceId); } }); }
   const scopedDeenrollment = async () => { if (!isWorkspaceSwitching() && getDeviceCredential()?.deviceId === credential?.deviceId) await onDeenrolled(); };
-  await db.connect(createConnector({ onDeenrolled: scopedDeenrollment }));
+  // Both connections report the main database's queue: it is the one that holds this device's unsent work.
+  const pendingUploads = async () => (await db.getOptional<{ n: number }>('SELECT count(*) AS n FROM ps_crud'))?.n ?? 0;
+  await db.connect(createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }));
   // The encrypted database replacing a legacy one downloads in the background;
   // it has no local writes, so it never uploads (database.ts).
-  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled: scopedDeenrollment }));
+  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }));
   return db;
 };
 
