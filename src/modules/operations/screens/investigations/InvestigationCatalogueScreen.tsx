@@ -116,7 +116,7 @@ const EditSheet = ({ row, onClose }: {row:CatalogueRow;onClose:()=>void})=>{
  return <Sheet title={row.definition.name} eyebrow="Clinical configuration" placement="side" onClose={onClose}>
  <p>Specimen: {row.definition.investigation?.specimen}. Classification: {row.definition.investigation?.department}.</p>
  <p className="my-3 text-sm">Standard prices are managed exclusively in Billing. Linking an item adds no price definition.</p>
- {context.permissions.includes('fee_item:manage')?<Link className="font-bold text-brand" to="/billing/settings/fees">Manage price in Billing</Link>:null}
+ {context.permissions.includes('fee_item:manage')?<Link className="font-bold text-brand" to="/billing/prices">Manage price in Billing</Link>:null}
  <CatalogueBrowser initialCategory="laboratory" canSelect={f=>f.category==='laboratory'} onSelect={setChosen}/>
  {chosen?<p>Link to {chosen.name} · {formatMoney(chosen.amountMinor,chosen.currency)}</p>:null}
  {error?<p role="alert">{error}</p>:null}

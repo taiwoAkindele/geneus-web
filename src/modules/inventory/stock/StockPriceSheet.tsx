@@ -16,7 +16,7 @@ export const StockPriceSheet=({item,onClose,onSaved}:{item:StockItem;onClose:()=
    <CatalogueBrowser initialCategory="pharmacy" canSelect={f=>f.category==='pharmacy'||f.id===item.feeItemId} onSelect={fee=>setFeeId(fee.id)}/>
    <p className="break-all text-sm">Selected Billing item: {feeId||'None — supply needs billing review'}</p>
    <Button variant="ghost" fullWidth={false} onClick={()=>setFeeId('')}>Clear association</Button>
-   {context.permissions.includes('fee_item:manage')?<Link className="block py-3 font-bold text-brand" to="/billing/settings/fees">Manage prices in Billing</Link>:null}
+   {context.permissions.includes('fee_item:manage')?<Link className="block py-3 font-bold text-brand" to="/billing/prices">Manage prices in Billing</Link>:null}
    {error?<p role="alert">{error}</p>:null}
    <StaffVerification requireServerSession purpose="Linking a stock item to Billing"><Button loading={saving} onClick={()=>void save()}>Save Billing link</Button></StaffVerification>
   </div>

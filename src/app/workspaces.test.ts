@@ -13,7 +13,7 @@ describe('module workspaces', () => {
     expect(workspacesFor(context('facility_admin')).map((workspace) => workspace.id)).toEqual(['front-desk', 'clinical', 'finance', 'inventory', 'reports', 'staff', 'settings']);
     expect(workspacesFor(context('facility_admin')).find((w) => w.id === 'staff')?.links.map((l) => l.to)).toEqual(['/admin/staff']);
     expect(workspacesFor(context('facility_admin')).find((w) => w.id === 'settings')?.links.map((l) => l.label))
-      .toEqual(['Facility', 'Staff scheduling & coverage', 'Devices', 'Organization', 'Account & security']);
+      .toEqual(['Facility', 'Staff scheduling & coverage', 'Billing', 'Devices', 'Organization', 'Account & security']);
   });
 
   it('keeps facility-wide workforce planning in Settings, reachable by clinicians running intake without a Settings menu', () => {
@@ -32,13 +32,15 @@ describe('module workspaces', () => {
   it('keeps module setup in each module’s Settings menu, not in global Settings or the module pages', () => {
     const admin = context('facility_admin');
     expect(moduleSettingsFor('laboratory', admin).pages.map((p) => p.label)).toEqual(['Tests', 'Result templates', 'Result parts', 'Answer lists']);
-    expect(moduleSettingsFor('billing', admin).pages.map((p) => p.label)).toEqual(['Price Catalogue', 'Payment settings']);
     expect(moduleSettingsFor('insurance', admin).pages.map((p) => p.key)).toEqual(['setup', 'payers']);
     // A section shortcut opens its page: Result parts is a tab of Result templates.
     expect(activeSettingsPage(moduleSettingsFor('laboratory', admin), '/laboratory/settings/templates/abc')?.key).toBe('templates');
-    expect(activeSettingsPage(moduleSettingsFor('billing', admin), '/billing/settings/payments')?.key).toBe('accounts');
-    // A cashier may read the price list but not set up payment accounts; a nurse has no lab settings.
-    expect(moduleSettingsFor('billing', context('cashier')).pages.map((p) => p.key)).toEqual(['fees']);
+    // Billing has no settings menu: Prices is a Finance page and bank collection is Settings → Billing.
+    expect(workspacesFor(admin).find((w) => w.id === 'finance')?.links.map((l) => l.label)).toEqual(expect.arrayContaining(['Bills', 'Payment history', 'Reports', 'Prices']));
+    expect(workspacesFor(admin).find((w) => w.id === 'settings')?.links.map((l) => l.to)).toContain('/settings/billing');
+    // A cashier may read prices but not set up bank collection; a nurse has no lab settings.
+    expect(workspacesFor(context('cashier')).find((w) => w.id === 'finance')?.links.map((l) => l.key)).toContain('prices');
+    expect(workspacesFor(context('cashier')).map((w) => w.id)).not.toContain('settings');
     expect(moduleSettingsFor('laboratory', context('nurse')).pages).toEqual([]);
   });
 
@@ -66,12 +68,11 @@ describe('module workspaces', () => {
     expect(pharmacy.links.map((item) => item.key)).not.toContain('laboratory');
   });
 
-  it('places delegated billing configuration in Billing settings, without a global Settings module', () => {
+  it('gives delegated billing configuration only Prices and Settings → Billing', () => {
     const cashier = { role: 'cashier' as const, roles: ['cashier' as const], permissions: ['payment:receive' as const, 'fee_item:manage' as const] };
     const available = workspacesFor(cashier);
-    expect(available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key)).not.toContain('fees');
-    expect(available.map((workspace) => workspace.id)).not.toContain('settings');
-    expect(moduleSettingsFor('billing', cashier).pages.map((p) => p.key)).toEqual(['fees', 'accounts']);
+    expect(available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key)).toContain('prices');
+    expect(available.find((workspace) => workspace.id === 'settings')?.links.map((item) => item.to)).toEqual(['/settings/billing']);
     expect(workspacesFor(context('nurse')).map((workspace) => workspace.id)).not.toContain('settings');
   });
 
@@ -85,7 +86,8 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/admin/staff/staff:1', '', available)?.id).toBe('staff');
     expect(workspaceForLocation('/admin/devices/add', '', available)?.id).toBe('settings');
     expect(workspaceForLocation('/insurance/settings/payers', '?payer=x', available)?.id).toBe('finance');
-    expect(workspaceForLocation('/billing/settings/fees', '', available)?.id).toBe('finance');
+    expect(workspaceForLocation('/billing/prices', '', available)?.id).toBe('finance');
+    expect(workspaceForLocation('/settings/billing', '', available)?.id).toBe('settings');
     expect(workspaceForLocation('/laboratory/settings/tests', '', available)?.id).toBe('clinical');
     expect(workspaceForLocation('/facility', '?view=settings', available)?.id).toBe('settings');
     expect(workspaceForLocation('/home', '', available)).toBeUndefined();
@@ -132,7 +134,9 @@ describe('module workspaces', () => {
     expect(activeWorkspaceLink(finance, '/billing', '?tab=transfers')).toBe('transfers');
     // Module settings pages keep their module's page selected.
     expect(activeWorkspaceLink(clinical, '/laboratory/settings/templates', '?tab=parts')).toBe('laboratory');
-    expect(activeWorkspaceLink(finance, '/billing/settings/fees', '')).toBe('accounts');
+    expect(activeWorkspaceLink(finance, '/billing/prices', '')).toBe('prices');
+    expect(activeWorkspaceLink(finance, '/billing', '?tab=payments')).toBe('transfers');
+    expect(activeWorkspaceLink(finance, '/billing', '?tab=bills&bill=x')).toBe('accounts');
     const settings = available.find((workspace) => workspace.id === 'settings')!;
     expect(activeWorkspaceLink(settings, '/settings/devices', '')).toBe('devices');
   });

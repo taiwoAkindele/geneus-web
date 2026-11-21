@@ -19,7 +19,7 @@ import {
 import { assertAllowed } from '@/auth/authorization';
 import { assertAmountMinor } from '@/lib/money';
 import { mintReceiptNumber } from '@/lib/receiptNumber';
-import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord, newId, updateRecord } from '../db';
+import { allOfType, allWhere, fieldValuesOf, envelope, findRecord, insertRecord, insertRecords, newId, updateRecord } from '../db';
 import { usablePharmacyEffects } from './pharmacyAcceptance';
 import { estimatesFor, loadCoverage } from './insurance';
 import { saveConfiguration } from '../configurationSave';
@@ -33,7 +33,7 @@ export const balanceCoverage = async (charges: readonly Charge[]): Promise<Balan
   return { estimates: estimatesFor(charges, data), refunds: data.refunds };
 };
 
-export type FeeDraft = Pick<FeeItem, 'name' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
+export type FeeDraft = Pick<FeeItem, 'name' | 'description' | 'category' | 'amountMinor' | 'currency' | 'chargeWhen' | 'exemptions' | 'departmentId'>;
 
 export const listFeeItems = () => allOfType<FeeItem>('fee_item');
 /** A hospital-wide local query. Category narrows a view, never staff access. */
@@ -77,7 +77,7 @@ export const adjustCharge = async (chargeId: string, kind: BillingAdjustment['ki
 
 const feeValues = (draft: FeeDraft): FeeDraft => {
   assertAmountMinor(draft.amountMinor);
-  return { name: draft.name.trim(), category: draft.category, departmentId: draft.departmentId || null, amountMinor: draft.amountMinor, currency: draft.currency.trim().toUpperCase(), chargeWhen: draft.chargeWhen, exemptions: draft.exemptions };
+  return { name: draft.name.trim(), description: draft.description?.trim() || undefined, category: draft.category, departmentId: draft.departmentId || null, amountMinor: draft.amountMinor, currency: draft.currency.trim().toUpperCase(), chargeWhen: draft.chargeWhen, exemptions: draft.exemptions };
 };
 
 export const createFeeItem = async (draft: FeeDraft, context: AuthorizationContext): Promise<FeeItem> =>
@@ -98,10 +98,10 @@ const saveFeeChanges = async (fee: FeeItem, changes: Partial<FeeItem>, context: 
   return updated;
 };
 
-export const updateCatalogueItem = (fee: FeeItem, draft: Pick<FeeItem, 'name' | 'category' | 'amountMinor'>, context: AuthorizationContext): Promise<FeeItem> => {
+export const updateCatalogueItem = (fee: FeeItem, draft: Pick<FeeItem, 'name' | 'description' | 'category' | 'amountMinor'>, context: AuthorizationContext): Promise<FeeItem> => {
   if (draft.category !== fee.category) throw new Error('This item’s category is protected until its insurance impact can be reviewed.');
   assertAmountMinor(draft.amountMinor);
-  return saveFeeChanges(fee, { name: draft.name.trim(), amountMinor: draft.amountMinor, priceVersion: undefined }, context);
+  return saveFeeChanges(fee, { name: draft.name.trim(), description: draft.description?.trim() || '', amountMinor: draft.amountMinor, priceVersion: undefined } as Partial<FeeItem>, context);
 };
 
 export const updateFeePolicy = (fee: FeeItem, policy: Pick<FeeItem, 'chargeWhen' | 'exemptions'>, context: AuthorizationContext): Promise<FeeItem> =>
@@ -112,6 +112,7 @@ export const setFeeItemActive = (id: string, active: boolean, context: Authoriza
   updateRecord<FeeItem>(context, 'fee_item:manage', 'fee_item', id, { active });
 
 export type ChargeDraft = {
+  billId?: string;
   quantity?: number;
   unitOfMeasure?: string;
   servicePointId?: string;
@@ -139,6 +140,7 @@ export const newCharge = (fee: FeeItem, draft: ChargeDraft, context: Authorizati
     schemaVersion:evidence?6:5,
     id: fee.chargeWhen === 'first_visit' ? `charge:first:${draft.patientId}:${fee.id}` : newId('charge'),
     type: 'charge',
+    billId: draft.billId,
     patientId: draft.patientId,
     feeItemId: fee.id,
     description: fee.name,
@@ -160,6 +162,23 @@ export const createCharge = async (feeId: string, draft: ChargeDraft, context: A
   const fee = await findRecord<FeeItem>('fee_item', feeId);
   if (!fee) throw new Error('This fee is no longer available');
   return insertRecord<Charge>(context, 'charge:create', 'charge', newCharge(fee, draft, context));
+};
+
+/** One local transaction captures all selected prices. No changes to historic charges. */
+export const createBill = async (items: readonly {feeId:string;quantity:number;priceVersion?:string;amountMinor?:number;currency?:string}[], draft: ChargeDraft, context: AuthorizationContext) => {
+  assertAllowed(context, 'charge:create');
+  if (!items.length || items.length > 100) throw new Error('Select between 1 and 100 items');
+  if (new Set(items.map(i=>i.feeId)).size !== items.length) throw new Error('Use quantity instead of adding the same item twice');
+  const billId = crypto.randomUUID();
+  const charges = await Promise.all(items.map(async item => {
+    const fee = await findRecord<FeeItem>('fee_item',item.feeId);
+    if (!fee) throw new Error('A selected price is no longer available');
+    if ((item.amountMinor !== undefined && fee.amountMinor !== item.amountMinor) || (item.currency !== undefined && fee.currency !== item.currency) || (item.priceVersion !== undefined && fee.priceVersion !== item.priceVersion)) throw new Error('A selected price changed. Remove that item and select it again to review the current price.');
+    return newCharge(fee,{...draft,billId,quantity:item.quantity},context);
+  }));
+  if (new Set(charges.map(c=>c.currency)).size !== 1) throw new Error('Use one currency per bill');
+  await insertRecords(context,charges.map(record=>({permission:'charge:create' as const,type:'charge' as const,record})));
+  return charges;
 };
 
 export type PaymentDraft = Pick<Payment, 'patientId' | 'method' | 'currency' | 'allocations' | 'reference' | 'reason'>;

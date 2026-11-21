@@ -28,7 +28,7 @@ export const PatientStatement=({patientId,currencies,onClose}:{patientId:string;
   const popup=window.open('','_blank','width=900,height=1000');if(!popup){setError('Allow pop-ups to open the print preview.');return;}
   popup.document.title=`Patient statement ${patientId}`;const style=popup.document.createElement('style');style.textContent='body{font:13px Arial,sans-serif;margin:32px;color:#17252b}h1{font-size:24px}h2{font-size:18px;margin-top:24px}h3{font-size:15px}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid #ddd;padding:7px}dl>div{display:flex;justify-content:space-between;gap:20px;padding:4px}dd{margin:0;font-weight:bold}article{break-inside:avoid;margin:12px 0}p{line-height:1.5} .print-hide{display:none}@page{size:A4;margin:15mm}';popup.document.head.append(style);popup.document.body.append(root.current.cloneNode(true));popup.focus();popup.print();
  };
- return <Sheet title="Patient statement" onClose={onClose} eyebrow="Patient accounts"><div className="space-y-3">
+ return <Sheet title="Patient statement" onClose={onClose} eyebrow="Billing"><div className="space-y-3">
  <SelectField label="Statement currency" disabled={busy} value={currency} onChange={e=>setCurrency(e.target.value)} options={currencies.map(c=>({value:c,label:c}))}/>
  <StaffVerification requireServerSession purpose="Generating a complete patient statement"><Button loading={busy} onClick={()=>void refresh()}>Generate current statement</Button></StaffVerification>
  {cached?<p role="status" className="rounded-field bg-amber-bg p-3 text-sm">Saved server-confirmed snapshot. Its cutoff is shown below; later activity and unsynchronized work are excluded. It remains available offline.</p>:null}

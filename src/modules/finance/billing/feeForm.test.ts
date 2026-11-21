@@ -9,8 +9,8 @@ describe('basic Price Catalogue form', () => {
       });
     }
   });
-  it('has exactly three basic fields and preserves zero prices', () => {
-    expect(Object.keys(feeFormValues()).sort()).toEqual(['amount', 'category', 'name']);
+  it('has three required fields, an optional description, and preserves zero prices', () => {
+    expect(Object.keys(feeFormValues()).sort()).toEqual(['amount', 'category', 'description', 'name']);
     expect(feeDraftFromForm({ name: 'Free item', category: 'other', amount: '0' }).amountMinor).toBe(0);
   });
   it('inherits the supplied currency and rejects invalid money or an empty name', () => {

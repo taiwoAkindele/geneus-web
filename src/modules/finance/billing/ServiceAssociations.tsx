@@ -31,10 +31,10 @@ export const AssociationEditor=({patientId,sourceKind,sourceEntryId,sourceItemId
 };
 
 const readAssociationHistory=async()=>{const [allocations,entries,charges,coverageDecisions]=await Promise.all([listServiceAllocations(),allOfType<EncounterEntry>('encounter_entry'),allOfType<Charge>('charge'),allOfType<CoverageAllocation>('coverage_allocation')]);return {allocations,entries,charges,coverageDecisions};};
-export const ServiceReturnReviews=({charges,onPatient}:{charges:Charge[];onPatient:(id:string)=>void})=>{
+export const ServiceReturnReviews=({charges,onPatient,patientId}:{charges:Charge[];onPatient:(id:string)=>void;patientId?:string})=>{
  const query=useLiveQuery(readAssociationHistory,['service_charge_allocation','encounter_entry']);
  const allocations=query.data?.allocations??[],entries=query.data?.entries??[];
- const reviews=entries.flatMap(e=>{
+ const reviews=entries.filter(e=>!patientId||e.patientId===patientId).flatMap(e=>{
   const d=dispensingDetails(e);if(d?.action!=='return'||d.creditMinor!==0)return [];
   const source=entries.find(s=>s.id===d.returnOf),supply=source&&dispensingDetails(source);
   if(!source||supply?.billing==='outside')return [];

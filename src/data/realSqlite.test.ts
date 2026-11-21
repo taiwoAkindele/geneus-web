@@ -14,7 +14,7 @@ import { registerPatient, updatePatient, getPatient, listPatients } from './repo
 import { EMPTY_REGISTRATION, fromPatient, toPatientDetails } from '@/modules/front-desk/registration/registrationValues';
 import { identityReviewRecords, listIdentityEvents, patientIdentityIds } from './repos/patientIdentity';
 import {
-  balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createFeeItem,
+  balancesByCurrency, chargeBalances, chargesForPatient, createCharge, createBill, createFeeItem,
   isAppointmentConfirmed, listFeeItems, paymentsForPatient, recordPayment, reversePayment,
   setFeeItemActive, updateFeeItem, updateCatalogueItem, updateFeePolicy, type FeeDraft,
   adjustCharge, adjustmentsForPatient,
@@ -398,6 +398,25 @@ describe('the write path against a real SQLite', () => {
   });
 
   describe('offline billing', () => {
+    it('captures a multi-item manual bill atomically and retains its reference and prices after catalogue edits', async () => {
+      const admin=contextFor('facility_admin'),patientId='OOE-PHC-000047-K2',facts={sex:'female' as const,ageYears:30};
+      const first=await createFeeItem(feeDraftFromForm({name:'First',category:'laboratory',amount:'100'}),admin);
+      const second=await createFeeItem(feeDraftFromForm({name:'Second',category:'procedure',amount:'200'}),admin);
+      const charges=await createBill([{feeId:first.id,quantity:1,amountMinor:first.amountMinor},{feeId:second.id,quantity:1}],{patientId,facts},admin);
+      expect(charges[0].billId).toMatch(/^[a-f0-9-]{36}$/);expect(charges[1].billId).toBe(charges[0].billId);
+      await updateCatalogueItem(first,{name:first.name,category:first.category,amountMinor:15000},admin);
+      expect((await chargesForPatient(patientId)).map(c=>c.amountMinor).sort()).toEqual([10000,20000]);
+      await expect(createBill([{feeId:first.id,quantity:1,amountMinor:first.amountMinor}],{patientId,facts},admin)).rejects.toThrow(/price changed/);
+      await expect(createBill([{feeId:second.id,quantity:1}],{patientId,facts},contextFor('cashier'))).rejects.toThrow();
+    });
+    it('rolls back every new bill line if an intentional first-visit fee already exists', async () => {
+      const admin=contextFor('facility_admin'),patientId='OOE-PHC-000047-K2',facts={sex:'female' as const,ageYears:30};
+      const automatic=await createFeeItem({name:'Registration',category:'registration',amountMinor:10000,currency:'NGN',chargeWhen:'first_visit',exemptions:[]},admin);
+      await createCharge(automatic.id,{patientId,facts},admin);
+      const manual=await createFeeItem(feeDraftFromForm({name:'Manual',category:'procedure',amount:'200'}),admin);
+      await expect(createBill([{feeId:manual.id,quantity:1},{feeId:automatic.id,quantity:1}],{patientId,facts},admin)).rejects.toThrow();
+      const charges=await chargesForPatient(patientId);expect(charges).toHaveLength(1);expect(charges[0].feeItemId).toBe(automatic.id);
+    });
     it('does not charge newly created catalogue items at registration or booking, but allows direct billing offline', async () => {
       const fee = await createFeeItem(feeDraftFromForm({ name: 'Selected test', category: 'laboratory', amount: '500' }), contextFor('facility_admin'));
       const patient = await registerPatient({ fullName: 'Synthetic patient', address: 'Test', sex: 'female', ageYears: 30 }, contextFor('records_officer'));

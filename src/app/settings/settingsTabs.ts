@@ -22,6 +22,8 @@ export const settingsTabsFor = (context: Viewer): SettingsTab[] => [
   // reach it too, without a Settings entry in their sidebar.
   ...(schedulingPlanner(context) || has(context, 'service_session:operate') ? [{ key: 'scheduling', label: 'Staff scheduling & coverage', description: 'Sign-in windows and service coverage for the whole facility.', to: '/settings/scheduling', icon: 'clock' as IconName,
     ...(schedulingPlanner(context) ? {} : { navigation: false as const }) }] : []),
+  // Bank transfer collection is configured once, so it sits with facility configuration rather than daily Billing.
+  ...(isAdmin(context) || has(context, 'fee_item:manage') ? [{ key: 'billing', label: 'Billing', description: 'Bank transfer collection: Paystack and the receiving account.', to: '/settings/billing', icon: 'finance' as IconName }] : []),
   ...(isAdmin(context) || has(context, 'device:enroll', 'device:revoke') ? [{ key: 'devices', label: 'Devices', description: 'Enrolled devices, their sync status and access.', to: '/settings/devices', icon: 'lock' as IconName }] : []),
   ...(isAdmin(context) ? [{ key: 'organization', label: 'Organization', description: 'Linked facilities, and staff access requests from them.', to: '/settings/organization', icon: 'referrals' as IconName }] : []),
   ...(isAdmin(context) || has(context, 'staff:manage') ? [{ key: 'account', label: 'Account & security', description: 'Administrator account recovery.', to: '/settings/account', icon: 'settings' as IconName }] : []),

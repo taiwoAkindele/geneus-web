@@ -24,6 +24,7 @@ export type RuleForm = {
   visitTypes: VisitType[];
 };
 export type FeeForm = {
+  description?: string;
   name: string;
   category: FeeCategory;
   amount: string;
@@ -49,6 +50,7 @@ export const emptyRule = (): RuleForm => ({ reason: '', ageUnderYears: '', ageFr
 
 export const feeFormValues = (fee?: FeeItem): FeeForm => ({
   name: fee?.name ?? '',
+  description: fee?.description ?? '',
   category: fee?.category ?? 'consultation',
   amount: fee ? amountInput(fee.amountMinor, fee.currency) : '',
 });
@@ -64,13 +66,14 @@ export const feePolicyValues = (fee: FeeItem): FeePolicyForm => ({
   })),
 });
 
-const draftSchema = FeeItem.pick({ name: true, category: true, departmentId: true, amountMinor: true, currency: true, chargeWhen: true, exemptions: true });
+const draftSchema = FeeItem.pick({ description: true, name: true, category: true, departmentId: true, amountMinor: true, currency: true, chargeWhen: true, exemptions: true });
 
 /** Forms hold strings; the shared schema remains the authority for the saved shape. */
 export const feeDraftFromForm = (form: FeeForm, currencyCode = 'NGN'): FeeDraft => {
   const currency = currencyCode.trim().toUpperCase();
   const result = draftSchema.safeParse({
     name: form.name.trim(),
+    description: form.description?.trim() || undefined,
     category: form.category,
     departmentId: null,
     amountMinor: parseAmount(form.amount, currency),

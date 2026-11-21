@@ -27,6 +27,7 @@ export const FeeEditorSheet = ({ fee, defaultCurrency = 'NGN', expandedCategorie
         <SelectField label="Category" required disabled={Boolean(fee)} options={FeeCategory.options.filter(value=>expandedCategories || isLegacyFeeCategory(value) || fee?.category===value).map((value) => ({ value, label: CATEGORY_LABELS[value] }))} {...register('category')} />
         {fee ? <p className="text-sm text-ink-muted">The category is protected to preserve insurance coverage. Price and name can still be edited.</p> : null}
         <TextField label="Price" required inputMode="decimal" hint={'Currency: ' + currency} {...register('amount', { required: 'Enter a price' })} error={errors.amount?.message} />
+        <TextField label="Description (optional)" {...register('description', {maxLength:1000})} />
         <p className="text-sm text-ink-muted">{fee ? 'Existing bills keep their original price. Automatic charging and exemptions are managed separately.' : 'This item is charged only when selected. Creating it does not add it to patient appointments.'}</p>
       </fieldset>
       {errors.root ? <p role="alert" className="rounded-card bg-danger-bg p-3 text-sm text-danger">{errors.root.message}</p> : null}
