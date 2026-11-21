@@ -17,6 +17,12 @@ const BY_CODE: Record<string, string> = {
   invalid_signature: 'The request could not be verified.',
 };
 
+const PROVIDER: Record<string, string> = {
+  provider_refused: 'The provider refused this operation. Check the account\'s access and settings with the provider.',
+  provider_unavailable: 'The provider could not be reached. Try again in a moment.',
+  provider_unexpected_reply: 'The provider\'s reply wasn\'t in the expected form. Try again, or contact support.',
+};
+
 /** Signs of system detail that must never reach the screen. */
 const INTERNAL = [
   /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/,            // environment/setting names such as SOME_SECRET_KEY
@@ -35,6 +41,9 @@ export const userMessage = (cause: unknown, fallback: string): string => {
   if (cause instanceof ApiError) {
     if (BY_CODE[cause.code]) return BY_CODE[cause.code];
     if (cause.status === 401) return 'This device needs to sign in again.';
+    // A payment provider's refusal: the server already made the message safe; it is filtered again here.
+    // Only a refusal carries the provider's own reason; other provider failures use fixed wording.
+    if (PROVIDER[cause.code]) return cause.code === 'provider_refused' && safe(cause.message) ? sentence(cause.message) : PROVIDER[cause.code];
     if (cause.status !== undefined && cause.status >= 500) return 'Something went wrong on the server. Try again in a moment.';
     // A generic 400 says nothing useful; the caller knows what was being saved.
     if (cause.code === 'bad_request' || cause.code === 'invalid_request') return sentence(fallback);

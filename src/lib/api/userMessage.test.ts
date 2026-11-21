@@ -31,6 +31,13 @@ describe('messages shown to staff', () => {
     expect(userMessage(new ApiError('not_configured', 'The server administrator must configure BILLING_ENCRYPTION_KEY first', 503), fallback)).toBe('This needs server setup first. Ask your system administrator.');
     expect(userMessage(new ApiError('offline', 'Cannot reach the Geneus server', undefined), fallback)).toBe("You're offline. Check the connection and try again.");
   });
+  it('shows a payment provider’s refusal reason, still filtered', () => {
+    expect(userMessage(new ApiError('provider_refused', 'The provider refused this operation: Dedicated NUBAN not available for this business.', 502), fallback))
+      .toBe('The provider refused this operation: Dedicated NUBAN not available for this business.');
+    expect(userMessage(new ApiError('provider_refused', 'The provider refused this operation: see https://x.test', 502), fallback))
+      .toBe("The provider refused this operation. Check the account's access and settings with the provider.");
+    expect(userMessage(new ApiError('provider_unavailable', 'anything', 502), fallback)).toBe('The provider could not be reached. Try again in a moment.');
+  });
   it('falls back for anything that is not an error message', () => {
     expect(userMessage(undefined, fallback)).toBe(fallback);
     expect(userMessage({ code: 42 }, fallback)).toBe(fallback);

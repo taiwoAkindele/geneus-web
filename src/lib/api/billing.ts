@@ -22,4 +22,11 @@ export const matchTransfer = (context: AuthorizationContext, id: string, patient
   billingRequest<Payment>(context, `transfers/${encodeURIComponent(id)}/match`, { patientId, allocations, requestId });
 
 export type ReceivingAccount = { id: string; accountNumber: string; accountName: string; bankName: string; departmentId?: string; mode: string; general?:boolean };
-export type BillingConnection = { configured: boolean; mode?: string; receivingAccountId?:string; accounts: ReceivingAccount[]; webhookPath: string; encryptionReady: boolean };
+export type BillingConnection = { configured: boolean; provider?: string; mode?: string; receivingAccountId?:string; accounts: ReceivingAccount[]; webhookPath: string; encryptionReady: boolean };
+/** A payment provider as the server describes it; the setup screen is drawn from this. Never contains secrets. */
+export type ProviderDescriptor = {
+  id: string; name: string; countries: string[]; currencies: string[];
+  credentialFields: { key: string; label: string; secret: boolean; pattern?: string; help?: string }[];
+  accountFields: { key: string; label: string; type: 'email' | 'tel' | 'text'; help?: string }[];
+  can: { createAccount: boolean; listAccounts: boolean; verifyByReference: boolean };
+};
