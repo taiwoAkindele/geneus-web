@@ -42,8 +42,8 @@ export const userMessage = (cause: unknown, fallback: string): string => {
     if (BY_CODE[cause.code]) return BY_CODE[cause.code];
     if (cause.status === 401) return 'This device needs to sign in again.';
     // A payment provider's refusal: the server already made the message safe; it is filtered again here.
-    // Only a refusal carries the provider's own reason; other provider failures use fixed wording.
-    if (PROVIDER[cause.code]) return cause.code === 'provider_refused' && safe(cause.message) ? sentence(cause.message) : PROVIDER[cause.code];
+    // A refusal or "unavailable" carries the server's already-safe message (with the provider's reason); an unexpected reply uses fixed wording.
+    if (PROVIDER[cause.code]) return cause.code !== 'provider_unexpected_reply' && safe(cause.message) ? sentence(cause.message) : PROVIDER[cause.code];
     if (cause.status !== undefined && cause.status >= 500) return 'Something went wrong on the server. Try again in a moment.';
     // A generic 400 says nothing useful; the caller knows what was being saved.
     if (cause.code === 'bad_request' || cause.code === 'invalid_request') return sentence(fallback);

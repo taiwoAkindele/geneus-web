@@ -27,6 +27,6 @@ export type BillingConnection = { configured: boolean; provider?: string; mode?:
 export type ProviderDescriptor = {
   id: string; name: string; countries: string[]; currencies: string[];
   credentialFields: { key: string; label: string; secret: boolean; pattern?: string; help?: string }[];
-  accountFields: { key: string; label: string; type: 'email' | 'tel' | 'text'; help?: string }[];
+  accountFields: { key: string; label: string; type: 'email' | 'tel' | 'text' | 'select'; pattern?: string; help?: string; sensitive?: boolean; options?: { value: string; label: string }[] }[];
   can: { createAccount: boolean; listAccounts: boolean; verifyByReference: boolean };
 };

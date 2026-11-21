@@ -36,7 +36,10 @@ describe('messages shown to staff', () => {
       .toBe('The provider refused this operation: Dedicated NUBAN not available for this business.');
     expect(userMessage(new ApiError('provider_refused', 'The provider refused this operation: see https://x.test', 502), fallback))
       .toBe("The provider refused this operation. Check the account's access and settings with the provider.");
-    expect(userMessage(new ApiError('provider_unavailable', 'anything', 502), fallback)).toBe('The provider could not be reached. Try again in a moment.');
+    expect(userMessage(new ApiError('provider_unavailable', "The provider couldn't open an account at that bank right now. Choose another bank, or try again later.", 502), fallback))
+      .toBe("The provider couldn't open an account at that bank right now. Choose another bank, or try again later.");
+    expect(userMessage(new ApiError('provider_unavailable', 'connect ECONNREFUSED 10.0.0.1', 502), fallback)).toBe('The provider could not be reached. Try again in a moment.');
+    expect(userMessage(new ApiError('provider_unexpected_reply', 'anything at all', 502), fallback)).toBe("The provider's reply wasn't in the expected form. Try again, or contact support.");
   });
   it('falls back for anything that is not an error message', () => {
     expect(userMessage(undefined, fallback)).toBe(fallback);

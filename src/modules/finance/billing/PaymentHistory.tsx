@@ -105,8 +105,8 @@ export const PaymentHistory = ({ data, bills, onOpenBill, onReceipt, onLink, onC
     </div>
 
     {checking ? <Sheet title="Check a transfer reference" onClose={() => setChecking(false)} closeDisabled={busy}>
-      <p className="mb-3 text-sm text-ink-soft">If a patient's transfer hasn't appeared, enter its Paystack reference. Geneus asks Paystack to confirm it; a typed reference alone is not proof of payment.</p>
-      <TextField label="Paystack reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+      <p className="mb-3 text-sm text-ink-soft">If a patient's transfer hasn't appeared, enter its transaction reference from the payment provider. Geneus asks the provider to confirm it; a typed reference alone is not proof of payment.</p>
+      <TextField label="Transaction reference" value={reference} onChange={(e) => setReference(e.target.value)} />
       <div className="mt-4"><StaffVerification requireServerSession purpose="Checking a bank transfer"><Button loading={busy} disabled={!reference.trim()} onClick={() => void check()}>Check transfer</Button></StaffVerification></div>
       {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
     </Sheet> : null}
