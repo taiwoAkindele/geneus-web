@@ -1,44 +1,92 @@
 import { StaffVerification } from '@/modules/insurance/StaffVerification';
 import { staffSessionToken } from '@/lib/api/staffSession';
 import { useRef, useState } from 'react';
-import type { FeeItem } from '@shared';
+import type { FeeCategory, FeeItem } from '@shared';
 import { useAuthorizationContext } from '@/session';
 import { setFeeItemActive } from '@/data/repos/billing';
-import { Button, DataTable, SelectField, Tag, TextField, useToast } from '@/ui';
+import { ActionMenu, TextField, useToast } from '@/ui';
 import { userMessage } from '@/lib/api/userMessage';
-import { formatMoney } from '@/lib/money';
-import { CATEGORY_LABELS, CHARGE_WHEN_LABELS } from './feeForm';
+import { CATEGORY_LABELS } from './feeForm';
+import { FilterChip, displayMoney } from './billingUi';
 
+/** Short label for when a price is charged. */
+const CHARGED: Record<FeeItem['chargeWhen'], string> = { when_ordered: 'When selected', every_visit: 'Every visit', first_visit: 'First visit' };
+type Status = 'active' | 'retired' | 'all';
+
+/**
+ * Finance → Prices: one line per item, matching the Bills and Payment history tables. Clicking a row edits it
+ * (price managers); the ⋯ menu holds charging rules, copying the Item ID and retiring. Data and permissions are unchanged.
+ */
 export const FeeCatalog = ({ fees, onEdit, onPolicy, onChanged }: { fees: readonly FeeItem[]; onEdit: (fee: FeeItem) => void; onPolicy: (fee: FeeItem) => void; onChanged: () => void }) => {
   const context = useAuthorizationContext(), toast = useToast();
-  const [search, setSearch] = useState(''), [status, setStatus] = useState('active'), [busyId, setBusyId] = useState<string>();
-  const [needsSession, setNeedsSession] = useState(false);
+  const [search, setSearch] = useState(''), [status, setStatus] = useState<Status>('active'), [category, setCategory] = useState<FeeCategory | ''>('');
+  const [busyId, setBusyId] = useState<string>(), [needsSession, setNeedsSession] = useState(false);
   const lock = useRef(false), canManage = context.permissions.includes('fee_item:manage');
-  const rows = [...fees].filter((fee) => `${fee.name} ${CATEGORY_LABELS[fee.category]}`.toLowerCase().includes(search.toLowerCase()) && (status === 'all' || fee.active === (status === 'active'))).sort((a, b) => a.name.localeCompare(b.name));
+
+  const term = search.trim().toLowerCase();
+  const matchesStatus = (fee: FeeItem, s: Status) => s === 'all' || fee.active === (s === 'active');
+  const searched = fees.filter((fee) => !term || `${fee.name} ${fee.description ?? ''} ${CATEGORY_LABELS[fee.category]}`.toLowerCase().includes(term));
+  const inStatus = searched.filter((fee) => matchesStatus(fee, status));
+  const rows = inStatus.filter((fee) => !category || fee.category === category).sort((a, b) => a.name.localeCompare(b.name));
+  const categories = [...new Set(inStatus.map((fee) => fee.category))].sort((a, b) => CATEGORY_LABELS[a].localeCompare(CATEGORY_LABELS[b]));
+
   const toggle = async (fee: FeeItem) => {
     if (!staffSessionToken(context)) { setNeedsSession(true); return; }
     if (lock.current) return;
     lock.current = true; setBusyId(fee.id);
-    try { await setFeeItemActive(fee.id, !fee.active, context); toast(fee.active ? 'Fee retired. Existing patient bills keep their prices.' : 'Fee restored.'); onChanged(); }
+    try { await setFeeItemActive(fee.id, !fee.active, context); toast(fee.active ? `${fee.name} retired. Existing bills keep their prices.` : `${fee.name} restored.`); onChanged(); }
     catch (cause) { toast(userMessage(cause, 'This price could not be changed. Try again.'), { tone: 'error' }); }
     finally { lock.current = false; setBusyId(undefined); }
   };
-  const actions = (fee: FeeItem) => <div className="flex flex-wrap items-start gap-2">
-    {canManage?<Button variant="ghost" fullWidth={false} className="px-3 py-2 text-sm" disabled={Boolean(busyId)} onClick={()=>onEdit(fee)}>Edit</Button>:null}
-    <details><summary className="min-h-[44px] cursor-pointer py-3 text-sm font-bold text-brand">More</summary><div className="space-y-2 rounded-field border border-outline-soft bg-surface p-3 text-sm">
-      <p>{CHARGE_WHEN_LABELS[fee.chargeWhen]}</p><p>Exemptions: {fee.exemptions.map(r=>r.reason).join('; ')||'None'}</p><p className="break-all font-mono text-xs">Item ID: {fee.id}</p>
-      {fee.description?<p>{fee.description}</p>:null}
-      {canManage?<><Button variant="ghost" fullWidth={false} onClick={()=>onPolicy(fee)}>Automatic charging &amp; exemptions</Button><Button variant="ghost" fullWidth={false} disabled={Boolean(busyId)} loading={busyId===fee.id} onClick={()=>void toggle(fee)}>{fee.active?'Retire':'Restore'}</Button></>:null}
-    </div></details>
-  </div>;
-  return <section className="space-y-4" aria-label="Price Catalogue">{needsSession ? <StaffVerification requireServerSession purpose="Retiring or restoring a catalogue item" /> : null}<div><p className="mt-1 text-sm text-ink-soft">The prices this facility charges for services. Add or edit an item here; existing patient bills retain their recorded prices.</p></div>
-    <div className="grid max-w-2xl gap-3 sm:grid-cols-[2fr_1fr]"><TextField label="Find fee by name or category" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /><SelectField label="Show fees" value={status} onChange={(event) => setStatus(event.target.value)} options={[{ value: 'active', label: 'Active fees' }, { value: 'retired', label: 'Retired fees' }, { value: 'all', label: 'All fees' }]} /></div>
-    {!rows.length ? <div className="rounded-card border border-dashed border-outline p-5 text-sm text-ink-soft">{fees.length ? 'No fees match these filters. Change the search or show all fees.' : 'No fees yet. Add a fee when this facility needs to charge for a service. Facilities providing free care can leave this empty.'}</div> : <><div className="hidden lg:block"><DataTable caption="Facility fees" rows={rows} rowKey={(fee) => fee.id} columns={[
-      { key: 'name', label: 'Fee', sortValue: (fee) => fee.name, render: (fee) => canManage ? <button type="button" className="min-h-[44px] text-left font-bold text-brand" onClick={() => onEdit(fee)}>{fee.name}</button> : <strong>{fee.name}</strong> },
-      { key: 'category', label: 'Category', render: (fee) => CATEGORY_LABELS[fee.category] },
-      { key: 'amount', label: 'Price', align: 'right', render: (fee) => formatMoney(fee.amountMinor, fee.currency) },
-      { key: 'active', label: 'Status', render: (fee) => fee.active ? 'Active' : 'Retired' },
-      { key: 'actions', label: 'Actions', render: actions },
-    ]} /></div><div className="space-y-3 lg:hidden">{rows.map((fee) => <article key={fee.id} className="rounded-card border border-outline-soft bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="min-w-0 font-bold">{fee.name}</h3><strong className="font-mono text-brand">{formatMoney(fee.amountMinor, fee.currency)}</strong></div><p className="mt-1 text-xs text-ink-muted">{CATEGORY_LABELS[fee.category]} · {CHARGE_WHEN_LABELS[fee.chargeWhen]}</p>{!fee.active ? <Tag tone="neutral">Retired</Tag> : null}{fee.exemptions.length ? <p className="mt-2 text-sm text-brand">Free when eligible: {fee.exemptions.map((rule) => rule.reason).join(' · ')}</p> : null}<div className="mt-3 border-t border-outline-soft pt-2">{actions(fee)}</div></article>)}</div></>}
+  const copyId = (fee: FeeItem) => {
+    void navigator.clipboard?.writeText(fee.id).then(() => toast('Item ID copied'), () => toast(`Couldn't copy. The Item ID is ${fee.id}`, { tone: 'error' }));
+  };
+  const menu = (fee: FeeItem) => <span onClick={(e) => e.stopPropagation()}><ActionMenu compact label={`More actions for ${fee.name}`} title={fee.name} actions={[
+    ...(canManage ? [{ label: 'Edit', onSelect: () => onEdit(fee) }, { label: 'Charging & exemptions', onSelect: () => onPolicy(fee) }] : []),
+    { label: 'Copy item ID', onSelect: () => copyId(fee) },
+    ...(canManage && !busyId ? [{ label: fee.active ? 'Retire' : 'Restore', onSelect: () => void toggle(fee) }] : []),
+  ]} /></span>;
+  const charged = (fee: FeeItem) => <span className="inline-flex flex-wrap items-center gap-1.5">
+    <span>{CHARGED[fee.chargeWhen]}</span>
+    {fee.exemptions.length ? <span title={`Free when: ${fee.exemptions.map((r) => r.reason).join('; ')}`} className="rounded-full bg-brand-tint px-2 py-0.5 text-xs font-bold text-brand">Exemptions</span> : null}
+  </span>;
+  const retiredTag = (fee: FeeItem) => fee.active ? null : <span className="ml-2 rounded-full border border-outline px-2 py-0.5 text-xs font-bold text-ink-muted">Retired</span>;
+
+  return <section className="space-y-4" aria-label="Prices">
+    {needsSession ? <StaffVerification requireServerSession purpose="Retiring or restoring a price" /> : null}
+    <div className="space-y-3">
+      <div className="max-w-xl"><TextField label="Find an item" type="search" placeholder="Name, description or category" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="flex flex-wrap items-center gap-2">
+        {(['active', 'retired', 'all'] as const).map((s) => <FilterChip key={s} selected={status === s} count={searched.filter((fee) => matchesStatus(fee, s)).length} onClick={() => { setStatus(s); setCategory(''); }}>{s === 'active' ? 'Active' : s === 'retired' ? 'Retired' : 'All'}</FilterChip>)}
+        {categories.length > 1 ? <><span aria-hidden className="mx-1 h-6 w-px bg-outline-soft" />
+          <FilterChip selected={!category} onClick={() => setCategory('')}>All categories</FilterChip>
+          {categories.map((c) => <FilterChip key={c} selected={category === c} count={inStatus.filter((fee) => fee.category === c).length} onClick={() => setCategory(c)}>{CATEGORY_LABELS[c]}</FilterChip>)}</> : null}
+      </div>
+    </div>
+
+    {!rows.length ? <p className="rounded-card border border-dashed border-outline p-5 text-sm text-ink-soft">{fees.length ? 'No items match. Change the search or filters.' : 'No prices yet. Upload a price list or add items one at a time.'}</p> : <>
+      <div className="hidden overflow-x-auto rounded-card border border-outline-soft bg-white lg:block">
+        <table className="w-full text-left text-sm tabular-nums">
+          <thead><tr className="text-xs uppercase tracking-wide text-ink-muted">{['Item', 'Category', 'Price', 'Charged', ''].map((h, i) => <th key={i} className={`px-4 py-3 font-bold ${i === 2 ? 'text-right' : ''}`}>{h}</th>)}</tr></thead>
+          <tbody>{rows.map((fee) => <tr key={fee.id} onClick={canManage ? () => onEdit(fee) : undefined} className={`border-t border-outline-soft align-middle ${canManage ? 'cursor-pointer hover:bg-brand-wash' : ''} ${fee.active ? '' : 'text-ink-muted'}`}>
+            <td className="px-4 py-3">{canManage ? <button type="button" className="text-left font-bold hover:underline" onClick={(e) => { e.stopPropagation(); onEdit(fee); }}>{fee.name}</button> : <span className="font-bold">{fee.name}</span>}{retiredTag(fee)}
+              {fee.description ? <p className="text-xs text-ink-muted">{fee.description}</p> : null}</td>
+            <td className="whitespace-nowrap px-4 py-3">{CATEGORY_LABELS[fee.category]}</td>
+            <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{displayMoney(fee.amountMinor, fee.currency)}</td>
+            <td className="px-4 py-3">{charged(fee)}</td>
+            <td className="w-12 px-2 py-2 text-right">{menu(fee)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <div className="space-y-2 lg:hidden">{rows.map((fee) => <article key={fee.id} onClick={canManage ? () => onEdit(fee) : undefined} className={`flex items-start gap-3 rounded-card border border-outline-soft bg-white p-4 ${canManage ? 'cursor-pointer' : ''} ${fee.active ? '' : 'text-ink-muted'}`}>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-baseline justify-between gap-2"><strong className="min-w-0">{fee.name}{retiredTag(fee)}</strong><span className="font-extrabold tabular-nums">{displayMoney(fee.amountMinor, fee.currency)}</span></div>
+          {fee.description ? <p className="text-xs text-ink-muted">{fee.description}</p> : null}
+          <p className="text-xs text-ink-muted">{CATEGORY_LABELS[fee.category]} · {charged(fee)}</p>
+        </div>
+        {menu(fee)}
+      </article>)}</div>
+      <p className="text-sm text-ink-muted">{rows.length} {rows.length === 1 ? 'item' : 'items'}</p>
+    </>}
   </section>;
 };
