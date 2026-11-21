@@ -97,8 +97,8 @@ describe('module workspaces', () => {
     const available = workspacesFor(context('facility_admin'));
     const frontDesk = available.find((workspace) => workspace.id === 'front-desk')!;
     expect(frontDesk.label).toBe('Front Desk');
-    expect(moduleStart(frontDesk)).toBe('/patients/search');
-    expect(frontDesk.links[0].to).toBe('/patients/search');
+    expect(moduleStart(frontDesk)).toBe('/frontdesk/patients');
+    expect(frontDesk.links[0].to).toBe('/frontdesk/patients');
     for (const workspace of available.filter((item) => item.id !== 'front-desk')) {
       expect(workspace.start).toBeUndefined();
       expect(moduleStart(workspace)).toBe(workspace.links[0].to);
@@ -118,7 +118,7 @@ describe('module workspaces', () => {
       expect(activeWorkspaceLink(frontDesk, '/patients/new', '')).toBe('patients');
       expect(activeWorkspaceLink(frontDesk, '/patients/new/details', '')).toBe('patients');
       expect(activeWorkspaceLink(frontDesk, '/patients/duplicate', '')).toBe('patients');
-      expect(activeWorkspaceLink(frontDesk, '/patients/search', '?q=amaka')).toBe('patients');
+      expect(activeWorkspaceLink(frontDesk, '/frontdesk/patients', '?q=amaka')).toBe('patients');
       expect(activeWorkspaceLink(frontDesk, '/appointments', '')).toBe('appointments');
     }
   });

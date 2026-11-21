@@ -15,7 +15,7 @@ import { VisitSoFar } from '@/modules/clinical/encounter/components/VisitSoFar';
 import { usePatient } from '@/modules/front-desk/search';
 import { useAppointments } from '@/modules/front-desk/appointments';
 import { AllergyAlert } from '@/modules/clinical/clinical';
-import { patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { CLINICAL_PATIENTS, isPatientListReturn, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
 import { ENCOUNTER_FIELD_HELP } from '@/modules/clinical/encounter/fieldHelp';
 import { buildLabSubmission, useLabSetup, type LabSubmission } from '@/modules/clinical/resultTemplates/labEntry';
 import { PublishResultsSheet } from '@/modules/clinical/resultTemplates/PublishResultsSheet';
@@ -35,8 +35,8 @@ const EncounterContent = () => {
   const requestedReturn = params.get('returnTo');
   const task = params.get('task');
   const initialTask = task && task in STEP_DEFS ? task as StepKey : undefined;
-  const returnTo = requestedReturn && (requestedReturn.startsWith('/patients/profile?') || requestedReturn.startsWith('/encounters?') || requestedReturn.startsWith('/patients/search?') || queuePath(requestedReturn)) ? requestedReturn : patientId ? patientChartPath(patientId, 'visits') : '/patients/search';
-  if (!patientId) return <div className="p-6 text-sm"><p>Open a visit from the patient record.</p><Button variant="ghost" onClick={() => navigate('/patients/search')}>Patients</Button></div>;
+  const returnTo = requestedReturn && (requestedReturn.startsWith('/patients/profile?') || requestedReturn.startsWith('/encounters?') || isPatientListReturn(requestedReturn) || queuePath(requestedReturn)) ? requestedReturn : patientId ? patientChartPath(patientId, 'visits') : CLINICAL_PATIENTS;
+  if (!patientId) return <div className="p-6 text-sm"><p>Open a visit from the patient record.</p><Button variant="ghost" onClick={() => navigate(CLINICAL_PATIENTS)}>Patients</Button></div>;
   return <EncounterRecord key={patientId + '|' + (encounterId ?? appointmentId ?? 'new') + '|' + initialTask} initialTask={initialTask} patientId={patientId} encounterId={encounterId} appointmentId={appointmentId} returnTo={returnTo} />;
 };
 

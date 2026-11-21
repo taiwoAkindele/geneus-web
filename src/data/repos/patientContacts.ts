@@ -1,5 +1,5 @@
 import { currentPatientContact, emailAddress, type AuthorizationContext, type PatientContact } from '@shared';
-import { allWhere, envelope, insertRecord, newId, type NewRecord } from '../db';
+import { allOfType, allWhere, envelope, insertRecord, newId, type NewRecord } from '../db';
 import { TABLE_FOR } from '../tables';
 
 /**
@@ -47,4 +47,11 @@ export const saveContactEmail = async (patientId: string, email: string | undefi
 export const stoppedChannelsNote = (contact: PatientContact | undefined): string | undefined => {
   const stopped = [contact?.smsStopped ? 'SMS' : '', contact?.emailStopped ? 'email' : ''].filter(Boolean);
   return stopped.length ? `The patient stopped bills and receipts by ${stopped.join(' and ')}. Only the patient can start them again.` : undefined;
+};
+
+/** Every patient's current contact record, by patient ID, for lists. */
+export const currentContactsByPatient = async (): Promise<Map<string, PatientContact>> => {
+  const byPatient = new Map<string, PatientContact[]>();
+  for (const c of await allOfType<PatientContact>('patient_contact')) byPatient.set(c.patientId, [...(byPatient.get(c.patientId) ?? []), c]);
+  return new Map([...byPatient].flatMap(([id, records]) => { const head = currentPatientContact(records, id); return head ? [[id, head] as const] : []; }));
 };

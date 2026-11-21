@@ -34,7 +34,7 @@ export const IdentityReviewScreen = () => {
   };
   const action: IdentityAction = { patientId: first, otherPatientId: second, outcome };
   return <div className="mx-auto w-full max-w-5xl space-y-5 px-5 py-5 pb-24 md:px-8">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">Patient identity review</h1><Button variant="ghost" fullWidth={false} onClick={() => navigate('/patients/search')}>Back to patients</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold">Patient identity review</h1><Button variant="ghost" fullWidth={false} onClick={() => navigate('/frontdesk/patients')}>Back to patients</Button></div>
     <p className="text-sm text-ink-muted">Review possible duplicates after registration and synchronisation. Similar details are suggestions; confirm with the patient and supporting evidence.</p>
     {data.loading ? <p role="status">Reading patient records…</p> : data.error ? <div role="alert">Identity reviews could not be read.<Button onClick={data.reload}>Try again</Button></div> : <>
       <section className="space-y-3 rounded-card border border-outline-soft bg-white p-4"><h2 className="font-bold">Records needing comparison</h2>

@@ -1,4 +1,5 @@
 import type { AuthorizationContext } from '@shared';
+import { patientListPath } from '@/modules/front-desk/patients/patientRoutes';
 import type { IconName } from '@/ui';
 
 /** Handoffs & unit queue is hidden until a facility needs it; /units still opens by address. */
@@ -23,7 +24,8 @@ export const navigationFor = (context: NavContext): NavItem[] => {
     context.permissions.some((permission) => ['patient:create', 'patient:update', 'appointment:create', 'encounter:record', 'register_entry:create'].includes(permission));
   const items: NavItem[] = [
     { key: 'home', label: 'Home', to: '/home', match: '/home', icon: 'home', bottom: true, group: 'Daily work' },
-    { key: 'patients', label: 'Patients', to: '/patients/search', match: '/patients', icon: 'patients', bottom: true, group: 'Daily work' },
+    // Each person's own patient list (clinicians' or the front desk's); patient records under /patients count as Patients too.
+    { key: 'patients', label: 'Patients', to: patientListPath(context), match: '/patients', icon: 'patients', bottom: true, group: 'Daily work' },
   ];
   if (roles.some((role) => ['facility_admin', 'cashier', 'supervisor'].includes(role)) || context.permissions.some((permission) => ['charge:associate','payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission))) {
     items.push({ key: 'billing', label: 'Billing', to: '/billing', match: '/billing', icon: 'registers', bottom: context.role === 'cashier', group: 'Money' });
@@ -46,5 +48,5 @@ export const navigationFor = (context: NavContext): NavItem[] => {
 
 /** Longest match prevents Settings and Staff being selected together. */
 export const activeNavigationKey = (items: readonly NavItem[], pathname: string): string | undefined =>
-  items.filter((item) => pathname === item.match || pathname.startsWith(item.match + '/'))
+  items.filter((item) => pathname === item.match || pathname.startsWith(item.match + '/') || pathname === item.to)
     .sort((a, b) => b.match.length - a.match.length)[0]?.key;

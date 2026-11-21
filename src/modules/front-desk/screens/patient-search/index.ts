@@ -1,1 +1,1 @@
-export { PatientSearchScreen } from './PatientSearchScreen';
+export { FrontDeskPatientsScreen } from './PatientSearchScreen';

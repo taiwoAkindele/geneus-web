@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { PulseLoader, ToastProvider } from '@/ui';
 import { SessionProvider, useAuthorizationContext } from '@/session';
 import { rememberWorkspace } from '@/app/workspaces';
+import { CLINICAL_PATIENTS, FRONT_DESK_PATIENTS, patientListPath } from '@/modules/front-desk/patients/patientRoutes';
 import { DataProvider } from '@/data';
 import { AppointmentsProvider } from '@/modules/front-desk/appointments';
 import { RegistersProvider } from '@/modules/reports/registers';
@@ -84,9 +85,9 @@ const InvitationScreen = lazy(() =>
 const FacilityHomeScreen = lazy(() =>
   import('@/app/screens/facility-home/FacilityHomeScreen').then((m) => ({ default: m.FacilityHomeScreen })),
 );
-const PatientSearchScreen = lazy(() =>
+const FrontDeskPatientsScreen = lazy(() =>
   import('@/modules/front-desk/screens/patient-search/PatientSearchScreen').then((m) => ({
-    default: m.PatientSearchScreen,
+    default: m.FrontDeskPatientsScreen,
   })),
 );
 const NewPatientStep1Screen = lazy(() =>
@@ -130,8 +131,11 @@ const EncountersScreen = lazy(() =>
 const ServiceQueueScreen = lazy(() => import('@/modules/clinical/screens/service-queue/ServiceQueueScreen').then((m) => ({ default: m.ServiceQueueScreen })));
 const LabRequestScreen = lazy(() => import('@/modules/clinical/screens/service-queue/LabRequestScreen').then((m) => ({ default: m.LabRequestScreen })));
 const DispenseScreen = lazy(() => import('@/modules/clinical/screens/service-queue/DispenseScreen').then((m) => ({ default: m.DispenseScreen })));
-/** The clinical patient list became the shared list; older links keep their search. */
-const ClinicalPatientsRedirect = () => { const context = useAuthorizationContext(); rememberWorkspace(context.facilityId, context.userId, 'clinical'); return <Navigate to={'/patients/search' + useLocation().search} replace />; };
+const ClinicalPatientsScreen = lazy(() => import('@/modules/clinical/screens/clinical-patients/ClinicalPatientsScreen').then((m) => ({ default: m.ClinicalPatientsScreen })));
+/** The former shared list's address (bookmarks, older links): opens the list that matches how this person works, keeping the search. */
+const PatientSearchRedirect = () => <Navigate to={patientListPath(useAuthorizationContext()) + useLocation().search} replace />;
+/** The clinicians' patient list; opening it makes Clinical the remembered module. */
+const ClinicalPatientsRoute = () => { const context = useAuthorizationContext(); rememberWorkspace(context.facilityId, context.userId, 'clinical'); return <ClinicalPatientsScreen />; };
 const InpatientScreen = lazy(() => import('@/modules/clinical/screens/inpatient/InpatientScreen').then((module) => ({ default: module.InpatientScreen })));
 const DocumentsScreen = lazy(()=>import('@/modules/clinical/screens/documents/DocumentsScreen').then(module=>({default:module.DocumentsScreen})));
 const PatientProfileScreen = lazy(() =>
@@ -213,11 +217,12 @@ const App = () => {
           <Route element={<AppShell />}>
             <Route path="/home" element={<FacilityHomeScreen />} />
             <Route path="/workspace/:moduleId" element={<WorkspaceScreen />} />
-            <Route path="/patients/search" element={<PatientSearchScreen />} />
+            <Route path={FRONT_DESK_PATIENTS} element={<FrontDeskPatientsScreen />} />
+            <Route path="/patients/search" element={<PatientSearchRedirect />} />
             <Route path="/patients/identity" element={<RequireCapability permissions={['patient_identity:review', 'patient_identity:resolve']}><IdentityReviewScreen /></RequireCapability>} />
             <Route path="/patients/profile" element={<PatientProfileScreen />} />
             <Route path="/encounters" element={<EncountersScreen />} />
-            <Route path="/clinical/patients" element={<ClinicalPatientsRedirect />} />
+            <Route path={CLINICAL_PATIENTS} element={<ClinicalPatientsRoute />} />
             <Route path="/laboratory" element={<ServiceQueueScreen key="lab" station="lab" />} />
             <Route path="/pharmacy" element={<ServiceQueueScreen key="pharmacy" station="pharmacy" />} />
             <Route path="/laboratory/request" element={<LabRequestScreen />} />
