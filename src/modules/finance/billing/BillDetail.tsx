@@ -36,7 +36,7 @@ export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,
   ...(raisedBy?[{id:'raised',at:raisedBy.createdOn,text:`Bill raised · ${bill.rows.length} ${bill.rows.length===1?'item':'items'}`,by:staff(raisedBy.createdBy)}]:[]),
   ...[...new Map(bill.rows.flatMap(r=>r.receipts).map(p=>[p.id,p])).values()].map(p=>({id:p.id,at:p.createdOn,payment:p,by:staff(p.createdBy),
    amount:(p.reverses?-1:1)*p.allocations.filter(a=>chargeIds.includes(a.chargeId)).reduce((n,a)=>n+a.amountMinor,0),
-   text:p.reverses?'Payment reversed':p.method==='waiver'?'Waived':p.method==='cash'?'Cash received':p.method==='online'?'Paid online':'Bank transfer applied'})),
+   text:p.reverses?'Payment reversed':p.method==='waiver'?'Waived':p.method==='cash'?'Cash received':p.method==='online'?(data.transfers.find(t=>t.id===p.incomingTransferId)?.mode==='test'?'Paid online (TEST, not real money)':'Paid online'):'Bank transfer applied'})),
   ...data.adjustments.filter(a=>chargeIds.includes(a.chargeId)).map(a=>({id:a.id,at:a.createdOn,by:staff(a.createdBy),amount:-a.amountMinor,text:`${a.dispenseEntryId?'Medicine return credit':a.kind==='discount'?'Discount':'Waiver'} · ${a.reason}`})),
   ...data.coverage.refunds.filter(r=>r.allocations.some(a=>chargeIds.includes(a.chargeId))).map(r=>({id:r.id,at:r.createdOn,by:staff(r.createdBy),amount:-r.allocations.filter(a=>chargeIds.includes(a.chargeId)).reduce((n,a)=>n+a.amountMinor,0),text:`Refund handed back · ${r.method}`})),
  ].sort((a,b)=>b.at.localeCompare(a.at));

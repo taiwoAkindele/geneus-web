@@ -12,9 +12,20 @@ const POLL_INTERVAL_MS = 3_000;
 const MAX_POLLS = 20;
 const REFERENCE = /^geneus-co-[a-f0-9-]{36}$/;
 
+/**
+ * The checkout this return is about. Providers add their own query to the return address, sometimes without a
+ * proper separator (Monnify appends "?paymentReference=…" after our "?checkout=…"), so the reference is found
+ * wherever it appears: our `checkout`, Monnify's `paymentReference` or Paystack's `reference`/`trxref`.
+ */
+export const checkoutReference = (search: string): string | undefined => {
+  let decoded = search;
+  try { decoded = decodeURIComponent(search); } catch { /* keep it as it came */ }
+  const found = /geneus-co-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.exec(decoded)?.[0];
+  return found && REFERENCE.test(found) ? found : undefined;
+};
+
 export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) => {
-  const candidate = new URLSearchParams(window.location.search).get('checkout');
-  const reference = candidate && REFERENCE.test(candidate) ? candidate : undefined;
+  const reference = checkoutReference(window.location.search);
   const [payment, setPayment] = useState<CheckoutState>();
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(Boolean(reference));
