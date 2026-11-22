@@ -22,12 +22,15 @@ export const BillingReports = ({
   search: string;
 }) => {
   const allocations = collectionAllocations(data, { currency, from, to, departmentId, search });
+
   const payments = [
     ...new Map(
       allocations.map((allocation) => [allocation.payment.id, allocation.payment]),
     ).values(),
   ];
+
   const money = (n: number) => formatMoney(n, currency);
+
   const received = (filter: (category: string, actor: string, method: string) => boolean) =>
     allocations.reduce(
       (total, allocation) =>
@@ -37,7 +40,9 @@ export const BillingReports = ({
           : 0),
       0,
     );
+
   const tableClass = 'w-full text-left text-sm';
+
   // Refunds are money handed back, dated by when they were made; they never change the payments they refund.
   const refunds = (data.insurance?.refunds ?? []).filter(
     (r) =>
@@ -45,8 +50,10 @@ export const BillingReports = ({
       (!from || calendarDate(r.createdOn) >= from) &&
       (!to || calendarDate(r.createdOn) <= to),
   );
+
   const refundedBy = (id?: string) =>
     refunds.filter((r) => !id || r.createdBy === id).reduce((n, r) => n + r.amountMinor, 0);
+
   return (
     <div className="space-y-4">
       <FinancialSnapshotReport key={currency} currency={currency} />

@@ -53,8 +53,11 @@ export class VerificationRequired extends Error {
   }
 }
 
-/** The sentence an insurance or finance screen shows when one of these online actions fails. */
-export const describeInsuranceError = (cause: unknown, fallback = 'The request failed'): string => {
+/** The sentence a screen shows when an online action that needs the staff member's verified session fails. */
+export const describeStaffActionError = (
+  cause: unknown,
+  fallback = 'The request failed',
+): string => {
   if (cause instanceof VerificationRequired) {
     return 'Your session with the server ended. Confirm your PIN to continue.';
   }
@@ -68,19 +71,24 @@ export const describeInsuranceError = (cause: unknown, fallback = 'The request f
 
 const call = async <T>(context: AuthorizationContext, path: string, body: unknown): Promise<T> => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new Error('This device is not enrolled');
   }
+
   const token = staffSessionToken(context);
+
   try {
     const result = await staffRequest<T>(path, device.credential, token, body, context.userId);
     touchStaffSession();
+
     return result;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
       forgetStaffSession();
       throw new VerificationRequired();
     }
+
     throw cause;
   }
 };
@@ -94,6 +102,7 @@ export type DeviceBlocker = {
   lastReportedOn?: string;
   revokedOn?: string;
 };
+
 export type ConfirmOutcome =
   | {
       chargeId: string;
@@ -103,6 +112,7 @@ export type ConfirmOutcome =
       patientShareMinor: number;
     }
   | { chargeId: string; outcome: 'skipped'; reason: string };
+
 export type PreviewItem = {
   chargeId: string;
   patientId: string;
@@ -120,15 +130,19 @@ export const savePayer = (
   context: AuthorizationContext,
   payer: { id?: string; name: string; kind: Payer['kind']; code: string; active: boolean },
 ) => call<Payer>(context, '/insurance/payers/save', payer);
+
 export const listContracts = (context: AuthorizationContext) =>
   call<{ versions: PayerContractVersion[] }>(context, '/insurance/contracts/list', {});
+
 /** For staff who activate or end contracts without reading their prices. */
 export type ContractSummary = Pick<
   PayerContractVersion,
   'id' | 'contractId' | 'version' | 'status' | 'endedOn' | 'endReason' | 'activatedOn'
 > & { payerId: string; effectiveFrom: string; effectiveTo?: string };
+
 export const listContractSummaries = (context: AuthorizationContext) =>
   call<{ versions: ContractSummary[] }>(context, '/insurance/contracts/summaries', {});
+
 export const saveContractDraft = (
   context: AuthorizationContext,
   terms: PayerContractTerms,
@@ -139,8 +153,10 @@ export const saveContractDraft = (
     '/insurance/contracts/draft',
     { terms, ...(expectedRevision ? { expectedRevision } : {}) },
   );
+
 export const activationReadiness = (context: AuthorizationContext) =>
   call<{ devices: DeviceBlocker[] }>(context, '/insurance/contracts/readiness', {});
+
 export const activateContract = (
   context: AuthorizationContext,
   input: {
@@ -154,6 +170,7 @@ export const activateContract = (
     '/insurance/contracts/activate',
     { ...input, requestKey: key() },
   );
+
 export const endContract = (
   context: AuthorizationContext,
   input: { contractVersionId: string; endsOn: string; reason: string },
@@ -162,8 +179,10 @@ export const endContract = (
     ...input,
     requestKey: key(),
   });
+
 export const previewAllocations = (context: AuthorizationContext, chargeIds: string[]) =>
   call<{ items: PreviewItem[] }>(context, '/insurance/allocations/preview', { chargeIds });
+
 export const confirmAllocations = (
   context: AuthorizationContext,
   input: {
@@ -178,6 +197,7 @@ export const confirmAllocations = (
     ...input,
     requestKey: key(),
   });
+
 export const recordRefund = (
   context: AuthorizationContext,
   input: {
@@ -229,15 +249,18 @@ export const insuranceSetupStatus = (context: AuthorizationContext) =>
       : '/insurance/setup/status/officer',
     {},
   );
+
 /** A hospital administrator enters or leaves setup. Billing is only ever activated by Geneus after readiness. */
 export const setInsuranceSetup = (context: AuthorizationContext, state: 'off' | 'setup') =>
   call<{ state: InsuranceState }>(context, '/insurance/setup', { state });
+
 export const listInsuranceDocuments = (context: AuthorizationContext, payerId?: string) =>
   call<{ documents: InsuranceDocument[] }>(
     context,
     '/insurance/documents/list',
     payerId ? { payerId } : {},
   );
+
 export const verifyInsuranceDocument = (
   context: AuthorizationContext,
   id: string,
@@ -248,8 +271,10 @@ export const verifyInsuranceDocument = (
     verification,
     ...(note?.trim() ? { note: note.trim() } : {}),
   });
+
 export const listSubmissionProfiles = (context: AuthorizationContext) =>
   call<{ profiles: StoredSubmissionProfile[] }>(context, '/insurance/submission/list', {});
+
 export const saveSubmissionProfile = (
   context: AuthorizationContext,
   payerId: string,
@@ -263,6 +288,7 @@ export const saveSubmissionProfile = (
   );
 
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
 const hex = (buffer: ArrayBuffer) =>
   [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -275,12 +301,16 @@ export const uploadInsuranceDocument = async (
   if (file.size > DOCUMENT_MAX_BYTES) {
     throw new Error('Choose a PDF or image up to 10 MB');
   }
+
   const device = getDeviceCredential();
+
   if (!device) {
     throw new Error('This device is not enrolled');
   }
+
   const token = staffSessionToken(context);
   const bytes = await file.arrayBuffer();
+
   try {
     const response = await binaryRequest('/insurance/documents', {
       method: 'POST',
@@ -294,12 +324,14 @@ export const uploadInsuranceDocument = async (
         'x-document-meta': encodeURIComponent(JSON.stringify(meta)),
       },
     });
+
     return (await response.json()) as InsuranceDocument;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
       forgetStaffSession();
       throw new VerificationRequired();
     }
+
     throw cause;
   }
 };
@@ -310,10 +342,13 @@ export const downloadInsuranceDocument = async (
   document_: InsuranceDocument,
 ) => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new Error('This device is not enrolled');
   }
+
   const token = staffSessionToken(context);
+
   const response = await binaryRequest(
     `/insurance/documents/${encodeURIComponent(document_.id)}/file`,
     {
@@ -325,7 +360,9 @@ export const downloadInsuranceDocument = async (
       },
     },
   );
+
   const url = URL.createObjectURL(await response.blob());
+
   try {
     const a = document.createElement('a');
     a.href = url;
@@ -340,8 +377,10 @@ export const downloadInsuranceDocument = async (
 
 export const listImportTemplates = (context: AuthorizationContext, kind: ImportKind) =>
   call<{ templates: ImportTemplate[] }>(context, '/insurance/import-templates/list', { kind });
+
 export const saveImportTemplate = (context: AuthorizationContext, template: ImportTemplateSave) =>
   call<ImportTemplate>(context, '/insurance/import-templates/save', template);
+
 /** Applies confirmed rows to the draft. The request key is kept by the caller so a retry after a lost reply replays instead of applying twice. */
 export const importTariff = (context: AuthorizationContext, input: TariffImport) =>
   call<TariffImportResult>(context, '/insurance/contracts/import-tariff', input);
@@ -357,6 +396,7 @@ export type ClaimBatch = {
   claims: number;
   createdOn: string;
 };
+
 export type ClaimSubmission = {
   id: string;
   payerId: string;
@@ -371,6 +411,7 @@ export type ClaimSubmission = {
   note?: string;
   acknowledgement?: { id: string; reference?: string; acknowledgedOn: string };
 };
+
 export type ClaimExport = {
   exportId: string;
   draft: boolean;
@@ -379,18 +420,21 @@ export type ClaimExport = {
   payloadSha256: string;
   claims: { id: string; claimNumber: string; revision: number }[];
 };
+
 export type ReadyOutcome =
   | { claimId: string; outcome: 'ready' }
   | { claimId: string; outcome: 'skipped'; reason: string; issues?: ClaimIssue[] };
 
 export const saveAuthorization = (context: AuthorizationContext, input: AuthorizationInput) =>
   call<ClaimAuthorization>(context, '/insurance/authorizations/save', input);
+
 export const listAuthorizations = (context: AuthorizationContext, patientId?: string) =>
   call<{ authorizations: ClaimAuthorization[] }>(
     context,
     '/insurance/authorizations/list',
     patientId ? { patientId } : {},
   );
+
 export const generateClaims = (
   context: AuthorizationContext,
   filter: { payerId?: string; from?: string; to?: string } = {},
@@ -400,6 +444,7 @@ export const generateClaims = (
     '/insurance/claims/generate',
     filter,
   );
+
 export const listClaims = (
   context: AuthorizationContext,
   filter: {
@@ -410,14 +455,17 @@ export const listClaims = (
     includeSuperseded?: boolean;
   } = {},
 ) => call<{ claims: ClaimView[] }>(context, '/insurance/claims/list', filter);
+
 export const markClaimsReady = (context: AuthorizationContext, claimIds: string[]) =>
   call<{ outcomes: ReadyOutcome[] }>(context, '/insurance/claims/ready', { claimIds });
+
 export const reviseClaim = (context: AuthorizationContext, claimId: string, reason: string) =>
   call<{ claimId: string; revision: number; lines: number; dropped: number }>(
     context,
     `/insurance/claims/${encodeURIComponent(claimId)}/revise`,
     { reason, requestKey: key() },
   );
+
 export const setClaimAttachment = (
   context: AuthorizationContext,
   claimId: string,
@@ -428,6 +476,7 @@ export const setClaimAttachment = (
     documentId,
     remove,
   });
+
 export const createClaimBatch = (
   context: AuthorizationContext,
   input: { payerId: string; periodFrom: string; periodTo: string; reference?: string },
@@ -437,8 +486,10 @@ export const createClaimBatch = (
     '/insurance/claims/batches/create',
     input,
   );
+
 export const listClaimBatches = (context: AuthorizationContext) =>
   call<{ batches: ClaimBatch[] }>(context, '/insurance/claims/batches/list', {});
+
 /** Rows to write or print. A draft export marks every row and changes no claim; a real one moves ready claims to exported. */
 export const exportClaims = (
   context: AuthorizationContext,
@@ -450,6 +501,7 @@ export const exportClaims = (
     templateId?: string;
   },
 ) => call<ClaimExport>(context, '/insurance/claims/export', { ...input, requestKey: key() });
+
 export const submitClaims = (
   context: AuthorizationContext,
   input: Omit<ClaimSubmissionInput, 'requestKey'>,
@@ -458,6 +510,7 @@ export const submitClaims = (
     ...input,
     requestKey: key(),
   });
+
 export const acknowledgeClaims = (
   context: AuthorizationContext,
   input: Omit<ClaimAcknowledgementInput, 'requestKey'>,
@@ -466,6 +519,7 @@ export const acknowledgeClaims = (
     ...input,
     requestKey: key(),
   });
+
 export const listClaimSubmissions = (context: AuthorizationContext) =>
   call<{ submissions: ClaimSubmission[] }>(context, '/insurance/claims/submissions/list', {});
 
@@ -501,6 +555,7 @@ export const requestInsuranceActivation = (context: AuthorizationContext, note?:
     '/insurance/activation/request',
     note?.trim() ? { note: note.trim() } : {},
   );
+
 export const withdrawInsuranceActivation = (context: AuthorizationContext) =>
   call<InsuranceSetupStatus>(context, '/insurance/activation/withdraw', {});
 
@@ -518,6 +573,7 @@ export const importDiagnosisCatalogue = (
     removed: number;
     codes: number;
   }>(context, '/insurance/diagnosis-catalogue/import', input);
+
 export const listDiagnosisCatalogues = (context: AuthorizationContext) =>
   call<{ catalogues: DiagnosisCatalogueSummary[] }>(
     context,
@@ -543,6 +599,7 @@ export type RemittanceView = {
   recordedBy: string;
   recordedOn: string;
 };
+
 export type OutstandingClaim = Pick<
   ClaimView,
   | 'id'
@@ -557,6 +614,7 @@ export type OutstandingClaim = Pick<
   | 'serviceTo'
   | 'currency'
 > & { settlement: ClaimSettlement };
+
 export type OutstandingTotals = Record<
   string,
   {
@@ -571,6 +629,7 @@ export type OutstandingTotals = Record<
     overdue: number;
   }
 >;
+
 export type DisputeView = {
   id: string;
   claimId: string;
@@ -594,6 +653,7 @@ export const recordPayerDecision = (
     '/insurance/claims/decisions/record',
     { ...input, requestKey: key() },
   );
+
 /** The caller keeps the request key for the whole entry, so a retry after a lost reply never records the payment twice. */
 export const recordRemittance = (
   context: AuthorizationContext,
@@ -604,6 +664,7 @@ export const recordRemittance = (
     '/insurance/remittances/record',
     input,
   );
+
 export const allocateRemittance = (
   context: AuthorizationContext,
   input: { remittanceId: string; allocations: { claimId: string; amountMinor: number }[] },
@@ -613,6 +674,7 @@ export const allocateRemittance = (
     '/insurance/remittances/allocate',
     { ...input, requestKey: key() },
   );
+
 export const reverseRemittance = (
   context: AuthorizationContext,
   remittanceId: string,
@@ -623,29 +685,34 @@ export const reverseRemittance = (
     reason,
     requestKey: key(),
   });
+
 export const listRemittances = (context: AuthorizationContext, payerId?: string) =>
   call<{ remittances: RemittanceView[] }>(
     context,
     '/insurance/remittances/list',
     payerId ? { payerId } : {},
   );
+
 export const matchRemittance = (
   context: AuthorizationContext,
   payerId: string,
   rows: RemittanceRow[],
 ) =>
   call<{ matches: RemittanceMatch[] }>(context, '/insurance/remittances/match', { payerId, rows });
+
 export const outstandingClaims = (context: AuthorizationContext, payerId?: string) =>
   call<{ claims: OutstandingClaim[]; totals: OutstandingTotals }>(
     context,
     '/insurance/outstanding',
     payerId ? { payerId } : {},
   );
+
 export const openDispute = (
   context: AuthorizationContext,
   input: Omit<DisputeOpen, 'requestKey'>,
 ) =>
   call<{ disputeId: string }>(context, '/insurance/disputes/open', { ...input, requestKey: key() });
+
 export const resolveDispute = (
   context: AuthorizationContext,
   input: Omit<DisputeResolve, 'requestKey'>,
@@ -654,8 +721,10 @@ export const resolveDispute = (
     ...input,
     requestKey: key(),
   });
+
 export const listDisputes = (context: AuthorizationContext) =>
   call<{ disputes: DisputeView[] }>(context, '/insurance/disputes/list', {});
+
 export const writeOff = (context: AuthorizationContext, input: Omit<WriteOffInput, 'requestKey'>) =>
   call<{ writeOffId: string }>(context, '/insurance/write-offs', { ...input, requestKey: key() });
 
@@ -670,6 +739,7 @@ export const SETTLEMENT_LABELS: Record<ClaimSettlement['status'], string> = {
   disputed: 'Disputed',
   settled: 'Settled',
 };
+
 export const DIAGNOSIS_VERIFICATION_LABELS: Record<string, string> = {
   catalogue_verified: 'verified in your licensed list',
   format_checked: 'format checked only',

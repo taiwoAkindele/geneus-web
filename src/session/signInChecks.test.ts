@@ -60,6 +60,7 @@ describe('roster signature check', () => {
     expect(
       await checkShiftSignature({ ...signed, endsAt: '2026-10-01T22:00:00Z' }, publicKey),
     ).toBe('invalid');
+
     expect(
       await checkShiftSignature({ ...signed, extendedUntil: '2026-10-01T22:00:00Z' }, publicKey),
     ).toBe('invalid');
@@ -71,6 +72,7 @@ describe('roster signature check', () => {
     expect(
       await checkShiftSignature(await signedBy(utils.randomSecretKey(), shift), publicKey),
     ).toBe('invalid');
+
     expect(
       await checkShiftSignature({ ...shift, signature: 'bm90IGEgc2lnbmF0dXJl' }, publicKey),
     ).toBe('invalid');

@@ -31,11 +31,13 @@ describe('module workspaces', () => {
       'staff',
       'settings',
     ]);
+
     expect(
       workspacesFor(context('facility_admin'))
         .find((w) => w.id === 'staff')
         ?.links.map((l) => l.to),
     ).toEqual(['/admin/staff']);
+
     expect(
       workspacesFor(context('facility_admin'))
         .find((w) => w.id === 'settings')
@@ -57,6 +59,7 @@ describe('module workspaces', () => {
       to: '/settings/scheduling',
       navigation: false,
     });
+
     expect(workspacesFor(nurse).map((workspace) => workspace.id)).not.toContain('settings');
     expect(schedulingPlanner(nurse)).toBe(false);
     expect(schedulingPlanner(context('facility_admin'))).toBe(true);
@@ -80,10 +83,12 @@ describe('module workspaces', () => {
       'Result parts',
       'Answer lists',
     ]);
+
     expect(moduleSettingsFor('insurance', admin).pages.map((p) => p.key)).toEqual([
       'setup',
       'payers',
     ]);
+
     // A section shortcut opens its page: Result parts is a tab of Result templates.
     expect(
       activeSettingsPage(
@@ -91,23 +96,27 @@ describe('module workspaces', () => {
         '/laboratory/settings/templates/abc',
       )?.key,
     ).toBe('templates');
+
     // Billing has no settings menu: Prices is a Finance page and bank collection is Settings → Billing.
     expect(
       workspacesFor(admin)
         .find((w) => w.id === 'finance')
         ?.links.map((l) => l.label),
     ).toEqual(expect.arrayContaining(['Bills', 'Payment history', 'Reports', 'Prices']));
+
     expect(
       workspacesFor(admin)
         .find((w) => w.id === 'settings')
         ?.links.map((l) => l.to),
     ).toContain('/settings/billing');
+
     // A cashier may read prices but not set up bank collection; a nurse has no lab settings.
     expect(
       workspacesFor(context('cashier'))
         .find((w) => w.id === 'finance')
         ?.links.map((l) => l.key),
     ).toContain('prices');
+
     expect(workspacesFor(context('cashier')).map((w) => w.id)).not.toContain('settings');
     expect(moduleSettingsFor('laboratory', context('nurse')).pages).toEqual([]);
   });
@@ -118,9 +127,11 @@ describe('module workspaces', () => {
     expect(
       available.find((workspace) => workspace.id === 'front-desk')?.links.map((item) => item.key),
     ).toEqual(['patients']);
+
     expect(
       available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key),
     ).not.toContain('fees');
+
     expect(workspaceForLocation('/workspace/clinical', '', available)).toBeUndefined();
   });
 
@@ -129,11 +140,13 @@ describe('module workspaces', () => {
     expect(available.map((workspace) => workspace.id)).toEqual(
       expect.arrayContaining(['clinical', 'finance']),
     );
+
     expect(
       available
         .find((workspace) => workspace.id === 'clinical')
         ?.links.every((item) => !item.to.startsWith('/billing')),
     ).toBe(true);
+
     expect(
       available
         .find((workspace) => workspace.id === 'finance')
@@ -145,9 +158,11 @@ describe('module workspaces', () => {
     const lab = workspacesFor(context('laboratory_staff')).find(
       (workspace) => workspace.id === 'clinical',
     )!;
+
     const pharmacy = workspacesFor(context('pharmacy_staff')).find(
       (workspace) => workspace.id === 'clinical',
     )!;
+
     expect(lab.links.map((item) => item.key)).toContain('laboratory');
     expect(lab.links.map((item) => item.key)).not.toContain('pharmacy');
     expect(pharmacy.links.map((item) => item.key)).toContain('pharmacy');
@@ -160,13 +175,16 @@ describe('module workspaces', () => {
       roles: ['cashier' as const],
       permissions: ['payment:receive' as const, 'fee_item:manage' as const],
     };
+
     const available = workspacesFor(cashier);
     expect(
       available.find((workspace) => workspace.id === 'finance')?.links.map((item) => item.key),
     ).toContain('prices');
+
     expect(
       available.find((workspace) => workspace.id === 'settings')?.links.map((item) => item.to),
     ).toEqual(['/settings/billing']);
+
     expect(workspacesFor(context('nurse')).map((workspace) => workspace.id)).not.toContain(
       'settings',
     );
@@ -179,6 +197,7 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/patients/profile', '', available, 'clinical')?.id).toBe(
       'clinical',
     );
+
     expect(workspaceForLocation('/patients/profile', '', available, 'finance')?.id).toBe('finance');
     expect(workspaceForLocation('/admin/staff', '', available)?.id).toBe('staff');
     expect(workspaceForLocation('/admin/staff/staff:1', '', available)?.id).toBe('staff');
@@ -186,6 +205,7 @@ describe('module workspaces', () => {
     expect(workspaceForLocation('/insurance/settings/payers', '?payer=x', available)?.id).toBe(
       'finance',
     );
+
     expect(workspaceForLocation('/billing/prices', '', available)?.id).toBe('finance');
     expect(workspaceForLocation('/settings/billing', '', available)?.id).toBe('settings');
     expect(workspaceForLocation('/laboratory/settings/tests', '', available)?.id).toBe('clinical');
@@ -199,10 +219,12 @@ describe('module workspaces', () => {
     expect(frontDesk.label).toBe('Front Desk');
     expect(moduleStart(frontDesk)).toBe('/frontdesk/patients');
     expect(frontDesk.links[0].to).toBe('/frontdesk/patients');
+
     for (const workspace of available.filter((item) => item.id !== 'front-desk')) {
       expect(workspace.start).toBeUndefined();
       expect(moduleStart(workspace)).toBe(workspace.links[0].to);
     }
+
     // Every role that has Front Desk can open its start page.
     for (const role of [
       'records_officer',
@@ -213,6 +235,7 @@ describe('module workspaces', () => {
       'pharmacy_staff',
     ] as const) {
       const desk = workspacesFor(context(role)).find((workspace) => workspace.id === 'front-desk');
+
       if (desk) {
         expect(desk.links.some((item) => item.to === moduleStart(desk))).toBe(true);
       }
@@ -224,6 +247,7 @@ describe('module workspaces', () => {
       const frontDesk = workspacesFor(context(role)).find(
         (workspace) => workspace.id === 'front-desk',
       )!;
+
       expect(frontDesk.links.map((item) => item.key)).not.toContain('registration');
       expect(frontDesk.links.some((item) => item.to === '/patients/new')).toBe(false);
       expect(activeWorkspaceLink(frontDesk, '/patients/new', '')).toBe('patients');
@@ -243,6 +267,7 @@ describe('module workspaces', () => {
     expect(activeWorkspaceLink(clinical, '/clinical/patients', '?q=amaka')).toBe(
       'clinical-patients',
     );
+
     expect(clinical.links.map((link) => link.key)).toEqual([
       'clinical-patients',
       'admissions',
@@ -251,11 +276,13 @@ describe('module workspaces', () => {
       'referrals',
       'documents',
     ]);
+
     expect(activeWorkspaceLink(finance, '/billing', '?tab=transfers')).toBe('transfers');
     // Module settings pages keep their module's page selected.
     expect(activeWorkspaceLink(clinical, '/laboratory/settings/templates', '?tab=parts')).toBe(
       'laboratory',
     );
+
     expect(activeWorkspaceLink(finance, '/billing/prices', '')).toBe('prices');
     expect(activeWorkspaceLink(finance, '/billing', '?tab=payments')).toBe('transfers');
     expect(activeWorkspaceLink(finance, '/billing', '?tab=bills&bill=x')).toBe('accounts');
@@ -269,6 +296,7 @@ describe('module workspaces', () => {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => values.set(key, value),
     });
+
     rememberWorkspace('facility:one', 'staff:one', 'clinical');
     expect(readLastWorkspace('facility:one', 'staff:one')).toBe('clinical');
     expect(readLastWorkspace('facility:one', 'staff:two')).toBeUndefined();
@@ -284,24 +312,29 @@ describe('module workspaces', () => {
       setItem: (key: string, value: string) => values.set(key, value),
       removeItem: (key: string) => values.delete(key),
     });
+
     const admin = {
       ...context('facility_admin'),
       facilityId: 'facility:one',
       deviceId: 'device:one',
     };
+
     const officer = {
       ...context('insurance_officer'),
       facilityId: 'facility:one',
       deviceId: 'device:one',
     };
+
     const finance = (c: typeof admin) =>
       workspacesFor(c)
         .find((w) => w.id === 'finance')
         ?.links.map((l) => l.key) ?? [];
+
     const settings = (c: typeof admin) =>
       workspacesFor(c)
         .find((w) => w.id === 'settings')
         ?.links.map((l) => l.key) ?? [];
+
     expect(settings(admin)).not.toContain('settings-insurance');
     expect(moduleSettingsFor('insurance', officer).pages.map((p) => p.key)).toContain('payers');
     expect(finance(admin)).not.toContain('contracts');
@@ -319,10 +352,12 @@ describe('module workspaces', () => {
     expect(finance(officer)).toContain('insurance');
     expect(finance(officer)).toContain('claims');
     const nurse = { ...context('nurse'), facilityId: 'facility:one', deviceId: 'device:one' };
+
     const clinical = (c: typeof admin) =>
       workspacesFor(c)
         .find((w) => w.id === 'clinical')
         ?.links.map((l) => l.key) ?? [];
+
     expect(clinical(nurse)).toContain('service-completion');
     expect(clinical(officer)).not.toContain('service-completion');
     values.set('geneus.insuranceSupport:facility:one:device:one', 'setup');
@@ -339,6 +374,7 @@ describe('module workspaces', () => {
         throw new Error('blocked');
       },
     });
+
     expect(readLastWorkspace('facility:one', 'staff:one')).toBeUndefined();
     expect(() => rememberWorkspace('facility:one', 'staff:one', 'clinical')).not.toThrow();
   });

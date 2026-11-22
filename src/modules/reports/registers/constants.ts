@@ -46,6 +46,7 @@ export const CATEGORY_COLORS: Record<string, [string, string]> = {
 
 export const typeDef = (type: FieldType): FieldTypeDef =>
   FIELD_TYPES.find((t) => t.type === type) ?? FIELD_TYPES[0];
+
 export const isChoice = (type: FieldType): boolean => type === 'select' || type === 'multiselect';
 
 /** Field identities survive reloads and cannot collide across offline devices. */

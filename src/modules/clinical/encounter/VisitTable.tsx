@@ -5,6 +5,7 @@ import type { EncounterSummary } from './encounterSummary';
 import { calendarDate } from '@/lib/calendarDate';
 
 export type VisitAction = 'view' | 'continue' | 'print' | 'activity' | 'amend';
+
 const VISIT_STATUS_LABELS: Record<EncounterSummary['status'], string> = {
   Open: 'In progress',
   Closed: 'Completed',
@@ -25,6 +26,7 @@ const careLabel = (visit: Pick<EncounterSummary, 'status'> & { careType?: string
 
   return visitStatusLabel(visit.status);
 };
+
 export const visitDate = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', {
     day: '2-digit',
@@ -53,8 +55,10 @@ export const VisitTable = ({
   serviceQueue?: boolean;
 }) => {
   const [params, setParams] = useSearchParams();
+
   const canContinue = (visitStatus: EncounterSummary['status']) =>
     (visitStatus === 'Open' || serviceQueue) && canRecord;
+
   const continueLabel = (visitStatus: EncounterSummary['status']) => {
     if (!canContinue(visitStatus)) {
       return 'View visit';
@@ -62,6 +66,7 @@ export const VisitTable = ({
 
     return serviceQueue ? 'Open service task' : 'Continue visit';
   };
+
   const query = params.get('visitQuery') ?? '';
   const status = params.get('visitStatus') ?? '';
   const from = params.get('visitFrom') ?? '';
@@ -69,28 +74,35 @@ export const VisitTable = ({
   const pageValue = Number(params.get('visitPage') ?? 0);
   const page = Number.isInteger(pageValue) && pageValue >= 0 ? pageValue : 0;
   const sortKey = params.get('visitSort');
+
   const sort =
     sortKey === 'patient' || sortKey === 'visit' || sortKey === 'status'
       ? { key: sortKey, descending: params.get('visitDescending') === '1' }
       : undefined;
+
   const change = (key: string, value: string) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
+
         if (value) {
           next.set(key, value);
         } else {
           next.delete(key);
         }
+
         if (key !== 'visitPage') {
           next.delete('visitPage');
         }
+
         return next;
       },
       { replace: true },
     );
+
   const name = (id: string) =>
     patients?.find((patient) => patient.patientId === id)?.fullName ?? id;
+
   const shown = visits.filter(
     (visit) =>
       (!status || visit.status === status) &&
@@ -101,6 +113,7 @@ export const VisitTable = ({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+
   return (
     <section className="space-y-4" aria-label="Visit history">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(200px,2fr)_1fr_1fr_1fr]">
@@ -160,6 +173,7 @@ export const VisitTable = ({
                   ['visitQuery', 'visitStatus', 'visitFrom', 'visitTo', 'visitPage'].forEach(
                     (key) => next.delete(key),
                   );
+
                   return next;
                 },
                 { replace: true },
@@ -186,6 +200,7 @@ export const VisitTable = ({
                 next.set('visitSort', value.key);
                 next.set('visitDescending', value.descending ? '1' : '0');
                 next.delete('visitPage');
+
                 return next;
               },
               { replace: true },

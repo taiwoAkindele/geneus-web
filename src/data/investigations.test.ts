@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 // The server and sync are stood in for: an accepted configuration save lands in local SQLite as sync would deliver it.
 vi.mock('./configurationSave', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./configurationSave')>()),
   saveConfiguration: (await import('./configurationSave.localDouble')).saveConfigurationLocally,
 }));
+
 import { FeeItem, Location, ServiceDefinition, ServiceOffering, Staff, Unit } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { memoryStorage } from '@/lib/testing/memoryStorage';
@@ -28,6 +30,7 @@ const base = {
   deviceId: 'device:one',
   createdOn: '2026-11-01T08:00:00Z',
 };
+
 const admin = () =>
   authorizationFor({
     staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
@@ -37,6 +40,7 @@ const admin = () =>
 
 describe('lab test catalogue on the device', () => {
   let store: ReturnType<typeof sqliteTestDatabase>;
+
   /** Catalogue entries arrive from the server by sync; tests seed them the same way. */
   const seedTest = async (name: string, aliases: string[] = [], facilityId = 'TEST') => {
     const id = `service_definition:${name}`;
@@ -55,6 +59,7 @@ describe('lab test catalogue on the device', () => {
         investigation: { specimen: 'Serum', department: 'Chemistry', aliases },
       }),
     );
+
     await store.seed(
       ServiceOffering.parse({
         ...base,
@@ -75,6 +80,7 @@ describe('lab test catalogue on the device', () => {
       }),
     );
   };
+
   beforeEach(async () => {
     vi.stubGlobal('localStorage', memoryStorage());
     resetSecureStorageForTests();
@@ -90,6 +96,7 @@ describe('lab test catalogue on the device', () => {
         name: 'Main laboratory',
       }),
     );
+
     await store.seed(
       Location.parse({
         ...base,
@@ -99,6 +106,7 @@ describe('lab test catalogue on the device', () => {
         kind: 'room',
       }),
     );
+
     await store.seed(
       Staff.parse({
         ...base,
@@ -112,6 +120,7 @@ describe('lab test catalogue on the device', () => {
       }),
     );
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await store.db.close();
@@ -122,6 +131,7 @@ describe('lab test catalogue on the device', () => {
     for (let i = 0; i < 30; i++) {
       await seedTest(`Test ${String(i).padStart(2, '0')}`, i === 7 ? ['Special alias'] : []);
     }
+
     await seedTest('Other facility test', [], 'OTHER');
     const first = await loadCataloguePage(admin(), { pageSize: 25 });
     expect(first.total).toBe(30);
@@ -136,9 +146,11 @@ describe('lab test catalogue on the device', () => {
       'Test 28',
       'Test 29',
     ]);
+
     expect((await loadCataloguePage(admin(), { descending: true })).items[0].definition.name).toBe(
       'Test 29',
     );
+
     const search = await loadCataloguePage(admin(), { query: 'special' });
     expect(search.total).toBe(1);
     expect(search.items[0].definition.name).toBe('Test 07');
@@ -147,6 +159,7 @@ describe('lab test catalogue on the device', () => {
 
   it('links operational details to a centrally priced item without creating or changing a fee', async () => {
     await seedTest('Lipid profile');
+
     const fee = FeeItem.parse({
       ...base,
       id: 'fee:lipids',
@@ -159,38 +172,46 @@ describe('lab test catalogue on the device', () => {
       priceVersion: 'version:one',
       priceEvidenceVersion: 1,
     });
+
     await store.seed(fee);
     const [row] = (await loadCataloguePage(admin(), {})).items;
     await linkInvestigationDefinition(row.definition, fee.id, admin());
     expect(await listFeeItems()).toEqual([fee]);
+
     const item = selectInvestigation({
       fee,
       definition: undefined,
       offering: undefined,
       central: true,
     });
+
     expect(item).toMatchObject({
       feeItemId: fee.id,
       catalogueSource: 'billing',
       priceMinor: 450000,
       feePriceVersion: 'version:one',
     });
+
     expect(item.serviceDefinitionId).toBeUndefined();
   });
 
   it('refuses an operational association from staff who cannot manage services', async () => {
     await seedTest('Widal test');
+
     const nurse = authorizationFor({
       staff: { staffId: 'staff:nurse', role: 'nurse', permission: 'read_write' },
       facilityId: 'TEST',
       deviceId: 'device:one',
     });
+
     const [row] = (await loadCataloguePage(admin(), {})).items;
     await expect(
       linkInvestigationDefinition(row.definition, 'missing:fee', nurse),
     ).rejects.toThrow();
+
     expect(await listFeeItems()).toEqual([]);
   });
+
   it('retains an explicit legacy investigation profile during central discovery', async () => {
     await ensureFacilityWorkspace({
       facilityId: 'TEST',
@@ -198,8 +219,10 @@ describe('lab test catalogue on the device', () => {
       credential: 'device:one.synthetic',
       syncEndpoint: 'http://localhost',
     });
+
     rememberBillingCatalogue(admin(), true);
     await seedTest('Existing profile');
+
     const fee = FeeItem.parse({
       ...base,
       id: 'fee:existing',
@@ -212,15 +235,18 @@ describe('lab test catalogue on the device', () => {
       priceVersion: 'price:current',
       priceEvidenceVersion: 1,
     });
+
     await store.seed(fee);
     const offering = (await loadCataloguePage(admin(), {})).items[0].offering!;
     await store.db.execute('UPDATE service_offerings SET "feeItemId"=? WHERE id=?', [
       fee.id,
       offering.id,
     ]);
+
     const row = (await loadInvestigationCatalogue()).items.find(
       (i) => i.central && i.fee.id === fee.id,
     )!;
+
     expect(selectInvestigation(row)).toMatchObject({
       catalogueSource: 'billing',
       feeItemId: fee.id,
@@ -228,6 +254,7 @@ describe('lab test catalogue on the device', () => {
       serviceDefinitionId: offering.serviceDefinitionId,
       specimen: 'Serum',
     });
+
     expect((await loadCataloguePage(admin(), {})).items).toHaveLength(1);
     expect(await listFeeItems()).toEqual([fee]);
   });

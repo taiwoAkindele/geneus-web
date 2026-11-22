@@ -7,6 +7,7 @@ import { useRequestQueues } from '@/modules/clinical/encounter/useEncounterLists
 import { useAuthorizationContext } from '@/session';
 import { Button } from '@/ui';
 import type { BillingData } from './useBilling';
+
 const readAssociationRefusals = () => allOfType<SyncRejection>('sync_rejection');
 
 /**
@@ -26,6 +27,7 @@ export const BillingReviewList = ({
   const context = useAuthorizationContext();
   const refusals = useLiveQuery(readAssociationRefusals, ['sync_rejection']);
   const name = (id: string) => data.patients.find((p) => p.patientId === id)?.fullName ?? id;
+
   const requests = query.data
     ? Object.entries(query.data).flatMap(([station, queue]) =>
         [...queue.open, ...queue.completed]
@@ -33,12 +35,14 @@ export const BillingReviewList = ({
           .map((request) => ({ station, request })),
       )
     : [];
+
   const openRefusals = (refusals.data ?? []).filter(
     (r) =>
       r.entityType === 'service_charge_allocation' &&
       !r.resolvedOn &&
       (!patientId || r.refusedRecord?.patientId === patientId),
   );
+
   const renderQuestions = () => {
     if (query.loading && !query.data) {
       return <p role="status">Reading billing questions…</p>;

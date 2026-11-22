@@ -38,12 +38,14 @@ export const PatientLinkPanel = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const subject = request.kind === 'bill' ? request.billKey : request.paymentId;
+
   const reach = useLiveQuery(
     useCallback(async () => {
       const [patient, contact] = await Promise.all([
         getPatient(patientId),
         currentContact(patientId),
       ]);
+
       return {
         channels: availableChannels(contact, patient?.phone),
         phone: patient?.phone,
@@ -53,16 +55,19 @@ export const PatientLinkPanel = ({
     }, [patientId]),
     ['patient', 'patient_contact'],
   );
+
   const history = useLiveQuery(
     useCallback(() => messagesFor(subject), [subject]),
     ['patient_message'],
   );
+
   const [chosen, setChosen] = useState<MessageChannel[]>();
   const [link, setLink] = useState<{ url: string; expiresOn: string }>();
   const [busy, setBusy] = useState<'send' | 'make' | 'stop'>();
   const [error, setError] = useState('');
   const channels = reach.data?.channels ?? [];
   const selected = chosen ?? channels;
+
   const fail = (cause: unknown, fallback: string) => {
     const message = userMessage(cause, fallback);
     setError(message);
@@ -73,17 +78,21 @@ export const PatientLinkPanel = ({
     if (!selected.length) {
       return;
     }
+
     setBusy('send');
     setError('');
+
     try {
       const { messages } = await sendToPatient(context, { ...request, channels: selected });
       const queued = messages.filter((m) => m.status === 'queued');
       const refused = messages.filter((m) => m.status === 'refused');
+
       if (queued.length) {
         toast(
           `Sending the ${label} by ${queued.map((m) => LABEL[m.channel].toLowerCase()).join(' and ')}. The result shows below.`,
         );
       }
+
       for (const m of refused) {
         toast(`${LABEL[m.channel]} not sent: ${m.reason ?? 'not available'}`, { tone: 'error' });
       }
@@ -93,9 +102,11 @@ export const PatientLinkPanel = ({
       setBusy(undefined);
     }
   };
+
   const make = async () => {
     setBusy('make');
     setError('');
+
     try {
       setLink(await patientDocumentLink(context, request));
       toast('Patient link ready');
@@ -108,6 +119,7 @@ export const PatientLinkPanel = ({
       setBusy(undefined);
     }
   };
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link!.url);
@@ -116,9 +128,11 @@ export const PatientLinkPanel = ({
       toast('This browser blocked copying. Select the link and copy it.', { tone: 'error' });
     }
   };
+
   const stop = async () => {
     setBusy('stop');
     setError('');
+
     try {
       const { stopped } = await stopPatientDocumentLinks(context, request);
       setLink(undefined);
@@ -133,7 +147,9 @@ export const PatientLinkPanel = ({
       setBusy(undefined);
     }
   };
+
   const destination = (c: MessageChannel) => (c === 'sms' ? reach.data?.phone : reach.data?.email);
+
   const until =
     link &&
     new Date(link.expiresOn).toLocaleDateString('en-GB', {
@@ -217,6 +233,7 @@ export const PatientLinkPanel = ({
           <ol className="divide-y divide-outline-soft border-t border-outline-soft text-sm">
             {history.data.map((m) => {
               const a = messageActivity(m);
+
               return (
                 <li key={m.id} className={`py-2 ${a.failed ? 'text-danger' : ''}`}>
                   {a.text}

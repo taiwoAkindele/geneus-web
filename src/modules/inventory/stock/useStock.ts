@@ -8,6 +8,8 @@ const load = async () => {
     listStockMovements(),
     listStaff(),
   ]);
+
   return { items: stockBalances(items, movements), movements, staff };
 };
+
 export const useStock = () => useLiveQuery(load);

@@ -14,7 +14,9 @@ export type StandardTestOption = {
   aliases: string[];
   added: boolean;
 };
+
 export type OwnTest = { name: string; specimen: string; classification: string; aliases: string[] };
+
 export type AddedTests = { added: string[]; skipped: string[] };
 
 export const listStandardTests = (actorStaffId: string) =>
@@ -22,7 +24,9 @@ export const listStandardTests = (actorStaffId: string) =>
     '/investigations/standard-tests',
     actorStaffId,
   );
+
 export const adoptStandardTests = (actorStaffId: string, keys: string[]) =>
   organizationRequest<AddedTests>('/investigations/standard-tests/adopt', actorStaffId, { keys });
+
 export const addOwnTests = (actorStaffId: string, tests: OwnTest[]) =>
   organizationRequest<AddedTests>('/investigations/tests', actorStaffId, { tests });

@@ -9,6 +9,7 @@ export const UnavailableScreen = ({
   description: string;
 }) => {
   const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-surface">
       <AppBar title={title} onBack={() => navigate('/home')} />

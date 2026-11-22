@@ -36,32 +36,41 @@ export const InviteStaffScreen = () => {
   useEffect(() => {
     document.title = 'Add staff · Geneus Health';
   }, []);
+
   const allowed =
     context.permissions.includes('staff:manage') &&
     context.permissions.includes('staff:permission');
+
   const inviting = email.trim() !== '';
   // Letting the link set up a device is adding a device: offered only to someone who may.
   const mayAddDevices = context.permissions.includes('device:enroll');
   const [allowNewDevice, setAllowNewDevice] = useState(false);
+
   const save = async (details: StaffDetails) => {
     if (inviting && !isEmail(email)) {
       throw new Error(
         'Enter a valid email address, or leave it empty to give them a PIN code in person',
       );
     }
+
     // Checked before anything is saved, so the person is never added with an invitation that cannot go.
     if (inviting && !hasServerSession) {
       throw new Error('Confirm your PIN to send the invitation, or leave the email empty');
     }
+
     const created = await createStaff(details, context);
     const profile = `/admin/staff/${encodeURIComponent(created.staffId)}`;
+
     if (!inviting) {
       toast(
         `${details.fullName} added — give them a PIN code from their profile so they can set their PIN`,
       );
+
       navigate(profile);
+
       return;
     }
+
     try {
       const { invitation } = await sendStaffInvitation(
         context,
@@ -69,6 +78,7 @@ export const InviteStaffScreen = () => {
         email.trim(),
         mayAddDevices && allowNewDevice,
       );
+
       toast(
         invitation.delivery === 'provider_accepted'
           ? `${details.fullName} added — invitation emailed to ${invitation.destination}`
@@ -83,8 +93,10 @@ export const InviteStaffScreen = () => {
         },
       );
     }
+
     navigate(profile);
   };
+
   return (
     <div className="w-full max-w-[1240px] space-y-5 px-5 py-5 md:px-8">
       <header>

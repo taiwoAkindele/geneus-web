@@ -13,10 +13,13 @@ const TREATMENT_CONTEXT: Partial<Record<StepKey, readonly StepKey[]>> = {
  */
 export const visitContextSteps = (visitSteps: readonly StepKey[], current: StepKey): StepKey[] => {
   const fixed = TREATMENT_CONTEXT[current];
+
   if (fixed) {
     return visitSteps.filter((key) => fixed.includes(key));
   }
+
   const before = visitSteps.slice(0, Math.max(0, visitSteps.indexOf(current)));
+
   return before.filter((key) => !(key === 'investigation_review' && before.includes('lab_order')));
 };
 

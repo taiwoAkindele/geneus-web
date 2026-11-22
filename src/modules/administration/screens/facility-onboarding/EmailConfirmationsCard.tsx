@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { StaffEmailRequestView } from '@shared';
 import { decideEmailRequest, listEmailRequests } from '@/lib/api/selfService';
-import { describeInsuranceError } from '@/lib/api/insurance';
+import { describeStaffActionError } from '@/lib/api/insurance';
 import { StaffVerification, useStaffVerification, useAuthorizationContext } from '@/session';
 import { Button, useToast } from '@/ui';
 
@@ -18,21 +18,25 @@ export const usePendingEmailRequests = () => {
   const allowed = context.permissions.includes('staff:manage');
   const [requests, setRequests] = useState<StaffEmailRequestView[]>();
   const [error, setError] = useState('');
+
   const load = useCallback(() => {
     if (!allowed || !hasServerSession) {
       return;
     }
+
     void listEmailRequests(context).then(
       (r) => {
         setRequests(r.requests);
         setError('');
       },
-      (cause) => setError(describeInsuranceError(cause, 'Could not load')),
+      (cause) => setError(describeStaffActionError(cause, 'Could not load')),
     );
   }, [context, allowed, hasServerSession]);
+
   useEffect(() => {
     load();
   }, [load]);
+
   return { allowed, requests, error, reload: load };
 };
 
@@ -44,13 +48,17 @@ export const usePendingEmailRequests = () => {
  */
 export const EmailConfirmationsCard = ({ staffId }: { staffId?: string }) => {
   const pending = usePendingEmailRequests();
+
   if (!pending.allowed) {
     return null;
   }
+
   const mine = staffId ? pending.requests?.filter((r) => r.staffId === staffId) : pending.requests;
+
   if (staffId && !mine?.length) {
     return null;
   }
+
   return (
     <section
       id="email"
@@ -82,6 +90,7 @@ const Requests = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const [error, setError] = useState('');
+
   const decide = (id: string, decision: 'approve' | 'reject') =>
     decideEmailRequest(context, id, decision).then(
       () => {
@@ -90,6 +99,7 @@ const Requests = ({
       },
       (cause) => setError(cause instanceof Error ? cause.message : 'Failed'),
     );
+
   if (error || loadError) {
     return (
       <p role="alert" className="text-sm text-danger">
@@ -97,6 +107,7 @@ const Requests = ({
       </p>
     );
   }
+
   if (!requests) {
     return (
       <p role="status" className="text-sm">
@@ -104,9 +115,11 @@ const Requests = ({
       </p>
     );
   }
+
   if (!requests.length) {
     return <p className="text-sm">Nothing waiting.</p>;
   }
+
   return (
     <ul className="space-y-2">
       {requests.map((r) => (

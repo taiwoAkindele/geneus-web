@@ -31,6 +31,7 @@ export const NotificationList = ({ notifications, onDone, loading, error }: Prop
       </p>
     );
   }
+
   if (error) {
     return (
       <p role="alert" className="px-4 py-6 text-sm text-danger">
@@ -38,6 +39,7 @@ export const NotificationList = ({ notifications, onDone, loading, error }: Prop
       </p>
     );
   }
+
   if (notifications.length === 0) {
     return (
       <div className="px-4 py-8 text-center text-[13px] text-ink-muted">You're all caught up.</div>
@@ -54,6 +56,7 @@ export const NotificationList = ({ notifications, onDone, loading, error }: Prop
               if (n.to) {
                 navigate(n.to);
               }
+
               onDone();
             }}
             className="flex w-full items-start gap-3 px-4 py-3.5 text-left"

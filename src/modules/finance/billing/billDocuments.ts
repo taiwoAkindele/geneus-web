@@ -66,12 +66,15 @@ const historyMethodLabel = (payment: Payment): string => {
 
   return HISTORY_METHOD_LABELS[payment.method] ?? payment.method;
 };
+
 export const billDocuments = (data: BillingData) => {
   const groups = new Map<string, ReturnType<typeof billingRows>>();
+
   for (const row of billingRows(data.charges, data.payments, data.adjustments, data.coverage)) {
     const key = billKey(row.charge);
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
+
   return [...groups]
     .map(([id, rows]) => ({
       id,
@@ -92,6 +95,7 @@ export const billDocuments = (data: BillingData) => {
     }))
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn) || a.id.localeCompare(b.id));
 };
+
 export type BillDocument = ReturnType<typeof billDocuments>[number];
 
 /** An incoming bank source is one row; its patient receipts are evidence beneath it. */
@@ -101,6 +105,7 @@ export const paymentDocuments = (
   refunds: readonly Refund[] = [],
 ) => {
   const sources = new Set(transfers.map((t) => t.id));
+
   return [
     ...transfers.map((transfer) => ({
       id: transfer.id,
@@ -174,6 +179,7 @@ export const historyDocuments = (payments: readonly Payment[], refunds: readonly
       refund,
     })),
   ].sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+
 export type HistoryDocument = ReturnType<typeof historyDocuments>[number];
 
 /** Live verified transfers with money this device has not yet seen applied to a bill. The server rechecks capacity. */

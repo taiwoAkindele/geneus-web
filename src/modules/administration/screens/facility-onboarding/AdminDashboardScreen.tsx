@@ -5,6 +5,7 @@ import { useAuthorizationContext, useSession } from '@/session';
 import { RecoveryEmailCard } from './RecoveryEmailCard';
 
 type Setting = { label: string; description: string; to: string; icon: IconName };
+
 const SettingsGroup = ({ title, items }: { title: string; items: Setting[] }) =>
   items.length ? (
     <section
@@ -39,9 +40,11 @@ export const AdminDashboardScreen = () => {
   useEffect(() => {
     document.title = 'Administration · Geneus Health';
   }, []);
+
   // Readiness links can open a section directly (?section=email).
   useEffect(() => {
     const section = params.get('section');
+
     if (section) {
       window.setTimeout(
         () => document.getElementById(section)?.scrollIntoView({ block: 'start' }),
@@ -49,7 +52,9 @@ export const AdminDashboardScreen = () => {
       );
     }
   }, [params]);
+
   const admin = user.roles.includes('facility_admin');
+
   const staff =
     admin ||
     context.permissions.some((permission) =>
@@ -57,11 +62,13 @@ export const AdminDashboardScreen = () => {
         permission,
       ),
     );
+
   const devices =
     admin ||
     context.permissions.some((permission) =>
       ['device:enroll', 'device:revoke'].includes(permission),
     );
+
   return (
     <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 md:px-7">
       <header>

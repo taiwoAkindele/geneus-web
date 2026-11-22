@@ -20,13 +20,16 @@ export const ClinicalWorkspace = ({
 }) => {
   const context = useAuthorizationContext();
   const canRecord = context.permissions.includes('encounter:record');
+
   const live = useLiveQuery(
     useCallback(
       () => patientClinicalRecord(patientId, context),
       [patientId, context.userId, context.permissions.join('|')],
     ),
   );
+
   const [editor, setEditor] = useState<ClinicalEditor>();
+
   if (live.loading) {
     return (
       <p role="status" className="p-4 text-sm">
@@ -34,6 +37,7 @@ export const ClinicalWorkspace = ({
       </p>
     );
   }
+
   if (live.error) {
     return (
       <div role="alert" className="p-4 text-sm text-danger">
@@ -44,6 +48,7 @@ export const ClinicalWorkspace = ({
       </div>
     );
   }
+
   if (!live.data) {
     return null;
   }
@@ -51,11 +56,14 @@ export const ClinicalWorkspace = ({
   const { current, events, entries, staffNames, patients } = live.data;
   const hasConflicts = new Set(current.map((event) => event.recordId)).size < current.length;
   const problems = current.filter((event) => event.kind === 'problem');
+
   const medications = current.filter(
     (event) => event.kind === 'medication' && event.values.status === 'active',
   );
+
   const allergies = currentAllergies(events, patients);
   const legacyAllergies = unreviewedLegacyAllergies(events, patients);
+
   const plans = current.filter(
     (event) => ['care_plan', 'specialty'].includes(event.kind) && event.values.status === 'active',
   );
@@ -115,6 +123,7 @@ export const ClinicalWorkspace = ({
       </div>
       {ClinicalKind.options.map((kind) => {
         const records = current.filter((event) => event.kind === kind);
+
         const addLabel = {
           problem: 'problem',
           history: 'history / examination',
@@ -123,6 +132,7 @@ export const ClinicalWorkspace = ({
           care_plan: 'care plan',
           specialty: 'specialty assessment',
         }[kind];
+
         return (
           <details
             key={kind}

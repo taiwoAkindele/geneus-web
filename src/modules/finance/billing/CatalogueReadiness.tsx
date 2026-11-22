@@ -3,16 +3,19 @@ import { Link } from 'react-router-dom';
 import { useAuthorizationContext, StaffVerification } from '@/session';
 import { billingRequest } from '@/lib/api/billing';
 import { Button } from '@/ui';
+
 type Status = {
   enabled: boolean;
   legacyTokensUntil: string;
   devices: { id: string; label: string | null; blockers: string[] }[];
 };
+
 const Readiness = () => {
   const context = useAuthorizationContext();
   const [status, setStatus] = useState<Status>();
   const [integrated, setIntegrated] = useState<Status>();
   const [error, setError] = useState('');
+
   const reload = useCallback(
     () =>
       Promise.all([
@@ -31,9 +34,11 @@ const Readiness = () => {
       ),
     [context],
   );
+
   useEffect(() => {
     void reload();
   }, [reload]);
+
   return (
     <section
       className="space-y-2 rounded-card border border-outline-soft p-3"
@@ -112,6 +117,7 @@ const Readiness = () => {
     </section>
   );
 };
+
 export const CatalogueReadiness = () => (
   <StaffVerification requireServerSession purpose="Checking financial client compatibility">
     <Readiness />

@@ -24,10 +24,13 @@ import {
   ownProof,
   failIssues,
 } from './repos/workforce';
+
 const selectionKey = (context: AuthorizationContext) =>
   `geneus.careService:${context.facilityId}:${context.deviceId}:${context.userId}`;
+
 export const selectedCareService = (context: AuthorizationContext): string =>
   JSON.parse(secureGet('geneus.workforce.selections') ?? '{}')[selectionKey(context)] ?? '';
+
 export const selectCareService = (context: AuthorizationContext, id: string) =>
   secureSet(
     'geneus.workforce.selections',
@@ -36,6 +39,7 @@ export const selectCareService = (context: AuthorizationContext, id: string) =>
       [selectionKey(context)]: id,
     }),
   );
+
 const instantFields = new Set([
   'createdOn',
   'updatedOn',
@@ -48,6 +52,7 @@ const instantFields = new Set([
   'performedOn',
   'effectiveOn',
 ]);
+
 const compareKeys = (a: string, b: string): number => {
   if (a < b) {
     return -1;
@@ -82,6 +87,7 @@ const canonical = (value: unknown, root = true): unknown => {
 
   return Object.fromEntries(entries);
 };
+
 export const clinicalPayloadHash = async (record: unknown): Promise<string> =>
   Array.from(
     new Uint8Array(
@@ -92,6 +98,7 @@ export const clinicalPayloadHash = async (record: unknown): Promise<string> =>
     ),
     (b) => b.toString(16).padStart(2, '0'),
   ).join('');
+
 export class ClinicalReviewRequired extends Error {
   constructor(
     readonly record: AnyDocument,
@@ -105,6 +112,7 @@ export class ClinicalReviewRequired extends Error {
     );
   }
 }
+
 /** Every clinical repository uses this boundary, including corrections and longitudinal notes. */
 export const prepareClinical = async (
   input: unknown,
@@ -113,10 +121,13 @@ export const prepareClinical = async (
 ): Promise<unknown> => {
   context = freshAuthorization(context);
   const parsed = parseDocument(input);
+
   if (!parsed.success) {
     throw new Error(parsed.error.issues.map((i) => i.message).join('. '));
   }
+
   const candidate = parsed.data;
+
   if (
     candidate.type !== 'encounter_entry' &&
     candidate.type !== 'clinical_event' &&
@@ -124,32 +135,41 @@ export const prepareClinical = async (
   ) {
     return input;
   }
+
   const facility = await getFacility();
+
   if (!workforceEnforcementActive(facility?.workforcePolicy, Date.now())) {
     return input;
   }
+
   if (candidate.createdBy !== context.userId) {
     throw new Error(
       'Clinical authorship must match the signed-in person. Use independent historical review to resubmit an unchanged original author',
     );
   }
+
   const data = await loadCareContext();
   const worker = data.staff.find((s) => s.staffId === context.userId);
   const proof = await ownProof(context, data);
   const enforced = workforceEnforcementActive(facility?.workforcePolicy, Date.now());
+
   if (!worker || !proof) {
     if (!enforced) {
       return input;
     }
+
     throw new Error(
       'Connect to refresh your accepted clinical approval before signing. Your form remains available',
     );
   }
+
   const original =
     candidate.type === 'encounter_entry' && candidate.amends
       ? await findRecord<EncounterEntry>('encounter_entry', candidate.amends)
       : undefined;
+
   const actions = clinicalRecordActions(candidate, original);
+
   const eligible = data.offerings.filter(
     (o) =>
       o.configuration === 'active' &&
@@ -159,17 +179,23 @@ export const prepareClinical = async (
         ),
       ),
   );
+
   const offeringId = selectedCareService(context) || (eligible.length === 1 ? eligible[0].id : '');
+
   if (!offeringId) {
     if (!enforced) {
       return input;
     }
+
     throw new Error('Choose the service you are recording care for in Care service above');
   }
+
   const assignments = (await clinicalAssignments(context.userId)).filter(
     (a) => a.offeringId === offeringId && a.status === 'active' && intervalContains(a, Date.now()),
   );
+
   const historic = capturedProof ? await acceptedAuthority(capturedProof) : undefined;
+
   if (
     capturedProof &&
     (!historic ||
@@ -180,6 +206,7 @@ export const prepareClinical = async (
       'The original captured authority cannot be verified. Retain the draft for clinical review',
     );
   }
+
   const actorContext: ClinicalActorContext =
     capturedProof && candidate.actorContext
       ? candidate.actorContext
@@ -188,20 +215,26 @@ export const prepareClinical = async (
           authoritySnapshotId: proof.snapshot.id,
           assignmentRevisionId: assignments.length === 1 ? assignments[0].id : undefined,
         };
+
   if (actorContext.offeringId !== offeringId) {
     throw new Error(
       'This draft was captured for a different service. Choose its original service to continue',
     );
   }
+
   const record = { ...candidate, actorContext };
+
   if (capturedProof && Date.parse(capturedProof.expiresOn) <= Date.now()) {
     throw new ClinicalReviewRequired(record, capturedProof, true);
   }
+
   const digest = await clinicalPayloadHash(record);
   const audits = await clinicalWitnesses(record.id);
   let needsReview = false;
+
   for (const action of actions) {
     const qualified: string[] = [];
+
     for (const audit of audits) {
       if (
         audit.type !== 'audit_event' ||
@@ -214,17 +247,22 @@ export const prepareClinical = async (
       ) {
         continue;
       }
+
       const witness = data.staff.find((s) => s.staffId === audit.createdBy);
+
       if (!witness) {
         continue;
       }
+
       const witnessProof = await ownProof({ ...context, userId: witness.staffId }, data);
       const permission = (await import('@shared')).staffPermissions(witness);
+
       const required =
         audit.metadata.attestationKind === 'checker' &&
         ['record_result', 'perform_test'].includes(action)
           ? 'verify_result'
           : action;
+
       if (
         !clinicalActivityIssues(
           witness,
@@ -237,6 +275,7 @@ export const prepareClinical = async (
         qualified.push(witness.staffId);
       }
     }
+
     const issues = clinicalActivityIssues(
       worker,
       context,
@@ -244,6 +283,7 @@ export const prepareClinical = async (
       { action, offeringId, availableQualifiedActorIds: qualified },
       Date.now(),
     );
+
     if (historic) {
       issues.push(
         ...clinicalActivityIssues(
@@ -255,16 +295,21 @@ export const prepareClinical = async (
         ),
       );
     }
+
     const other = issues.filter(
       (message) => !message.includes('Required independent supervisor/checker'),
     );
+
     failIssues(other);
+
     if (issues.length) {
       needsReview = true;
     }
   }
+
   if (needsReview) {
     throw new ClinicalReviewRequired(record, capturedProof || proof.snapshot);
   }
+
   return record;
 };

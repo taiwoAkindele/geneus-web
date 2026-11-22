@@ -9,17 +9,23 @@ const lastSyncedLabel = (at: Date | undefined): string => {
   if (!at) {
     return 'Never synced';
   }
+
   const minutes = Math.round((Date.now() - at.getTime()) / 60_000);
+
   if (minutes < 1) {
     return 'Synced just now';
   }
+
   if (minutes < 60) {
     return `Synced ${minutes} min ago`;
   }
+
   const hours = Math.round(minutes / 60);
+
   if (hours < 48) {
     return `Synced ${hours} h ago`;
   }
+
   return `Synced ${Math.round(hours / 24)} days ago`;
 };
 
@@ -34,8 +40,10 @@ export const SyncCenterScreen = () => {
   useEffect(() => {
     document.title = 'Sync & review · Geneus Health';
   }, []);
+
   const sync = useSyncStatus();
   const indicator = indicatorFor(sync);
+
   // The most urgent state wins: records to review, then sync health, then queued work.
   const headlineFor = () => {
     if (notifications.some((notification) => notification.kind === 'conflict')) {
@@ -64,7 +72,9 @@ export const SyncCenterScreen = () => {
 
     return 'No queued changes';
   };
+
   const headline = headlineFor();
+
   const shiftHeading = () => {
     if (!shift) {
       return accessLabel(access);
@@ -72,6 +82,7 @@ export const SyncCenterScreen = () => {
 
     return shift.ended ? 'Shift ended' : `Shift ends ${shift.endsAtLabel}`;
   };
+
   const renderAccessDescription = () => {
     if (access === 'admin') {
       return 'You can sign in at any time. Administrator sessions still close after 30 minutes without activity.';

@@ -21,6 +21,7 @@ import { FacilityDetailsFields } from '@/modules/administration/screens/facility
 
 const FormDetails = FacilityDetails.extend({ organizationName: z.string().trim().max(200) });
 type Values = FacilityDetails & { organizationName: string };
+
 const empty: Values = {
   name: '',
   code: '',
@@ -29,6 +30,7 @@ const empty: Values = {
   level: 'phc',
   organizationName: '',
 };
+
 const valuesFor = (pending: PendingFacilityCreation | undefined): Values =>
   pending
     ? {
@@ -53,28 +55,36 @@ export const AddFacilityScreen = () => {
   const submitting = useRef(false);
   const [loading, setLoading] = useState(true);
   const [online, setOnline] = useState(navigator.onLine !== false);
+
   const form = useForm<Values>({
     defaultValues: valuesFor(pending),
     resolver: async (input) => {
       const parsed = FormDetails.safeParse(input);
+
       if (parsed.success) {
         return { values: parsed.data, errors: {} };
       }
+
       const errors: FieldErrors<Values> = {};
+
       for (const issue of parsed.error.issues) {
         const field = issue.path[0] as keyof Values;
+
         if (!errors[field]) {
           errors[field] = { type: 'validate', message: issue.message };
         }
       }
+
       return { values: {}, errors };
     },
   });
+
   const values = form.watch();
 
   const loadDefaults = async () => {
     setLoading(true);
     setError('');
+
     try {
       setDefaults(await organizationFacilityDefaults(user.staffId));
     } catch (cause) {
@@ -83,13 +93,16 @@ export const AddFacilityScreen = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     void loadDefaults();
   }, [user.staffId]);
+
   useEffect(() => {
     const changed = () => setOnline(navigator.onLine !== false);
     window.addEventListener('online', changed);
     window.addEventListener('offline', changed);
+
     return () => {
       window.removeEventListener('online', changed);
       window.removeEventListener('offline', changed);
@@ -98,9 +111,11 @@ export const AddFacilityScreen = () => {
 
   const openCreated = async (receipt: PendingFacilityCreation) => {
     const created = receipt.result;
+
     if (!created?.admin.personId) {
       throw new Error('The new administrator membership could not be confirmed');
     }
+
     await switchFacilityWorkspace(created.device.deviceId, created.device, {
       sourceStaffId: user.staffId,
       facilityId: created.facility.id,
@@ -110,18 +125,23 @@ export const AddFacilityScreen = () => {
       createdOn: Date.now(),
     });
   };
+
   const create = form.handleSubmit(async (fields) => {
     if (submitting.current || !defaults || !online) {
       return;
     }
+
     if (!pending && !defaults.organization && !fields.organizationName.trim()) {
       form.setError('organizationName', { message: 'Enter the organization name' });
+
       return;
     }
+
     submitting.current = true;
     setBusy(true);
     setError('');
     let receipt = pending;
+
     try {
       if (!receipt) {
         receipt = {
@@ -140,14 +160,17 @@ export const AddFacilityScreen = () => {
             deviceLabel: 'Additional organization facility',
           },
         };
+
         await saveFacilityCreation(receipt);
         setPending(receipt);
       }
+
       if (!receipt.result) {
         receipt = { ...receipt, result: await createOrganizationFacility(receipt.payload) };
         await saveFacilityCreation(receipt);
         setPending(receipt);
       }
+
       await openCreated(receipt);
     } catch (cause) {
       if (
@@ -164,13 +187,16 @@ export const AddFacilityScreen = () => {
       ) {
         await clearFacilityCreation(sourceId, user.staffId);
         setPending(undefined);
+
         if (cause.code === 'facility_code_taken') {
           form.setError('code', { message: cause.message });
         }
+
         if (cause.code === 'organization_changed') {
           void loadDefaults();
         }
       }
+
       setError(cause instanceof Error ? cause.message : 'Could not create this facility');
     } finally {
       submitting.current = false;
@@ -283,6 +309,7 @@ export const AddFacilityScreen = () => {
                     shouldValidate: form.formState.isSubmitted,
                   });
                 }
+
                 if (patch.name !== undefined && !form.formState.dirtyFields.code) {
                   form.setValue('code', suggestCode(patch.name), {
                     shouldValidate: form.formState.isSubmitted,

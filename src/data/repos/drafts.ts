@@ -12,6 +12,7 @@ export const listWardDrafts = async (
     `SELECT data FROM ${DRAFTS_TABLE} WHERE staffId = ? AND patientId = ? AND step = ?`,
     [owner.staffId, owner.patientId, 'ward_form'],
   );
+
   return rows.flatMap((row) => {
     try {
       const draft = JSON.parse(row.data) as {
@@ -19,6 +20,7 @@ export const listWardDrafts = async (
         step?: StepKey;
         changeOrderId?: string;
       };
+
       return draft.session?.admissionId === admissionId &&
         draft.session.patientId === owner.patientId &&
         draft.step
@@ -63,12 +65,14 @@ export const readDrafts = async (owner: DraftOwner): Promise<StoredDraft[]> => {
     `SELECT "id", "step", "data", "updatedOn" FROM ${DRAFTS_TABLE} WHERE ${OWNER_MATCH}`,
     ownerValues(owner),
   );
+
   return rows.flatMap((row) => {
     try {
       return [{ step: row.step, data: JSON.parse(row.data) as unknown, updatedOn: row.updatedOn }];
     } catch (cause) {
       // A draft that no longer parses is dropped from view, never allowed to break the encounter screen.
       console.warn(`draft ${row.id} could not be read`, cause);
+
       return [];
     }
   });
@@ -79,6 +83,7 @@ export const writeDraft = async (owner: DraftOwner, step: string, data: unknown)
   const db = getDatabase();
   const json = JSON.stringify(data);
   const updatedOn = nowIso();
+
   if (await db.getOptional(`SELECT "id" FROM ${DRAFTS_TABLE} WHERE "id" = ?`, [id])) {
     await db.execute(`UPDATE ${DRAFTS_TABLE} SET "data" = ?, "updatedOn" = ? WHERE "id" = ?`, [
       json,

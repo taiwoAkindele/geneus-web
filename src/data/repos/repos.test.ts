@@ -7,9 +7,11 @@ vi.mock('../configurationSave', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../configurationSave')>()),
   saveConfiguration: async (_context: unknown, writes: ConfigurationWrite[]) => {
     online.writes.push(...writes);
+
     return { arrived: true };
   },
 }));
+
 import { EncounterEntry, type AuthorizationContext, type Staff } from '@shared';
 import { toRow } from '../rows';
 import { authorizationFor, AuthorizationError, nobody } from '@/auth/authorization';
@@ -124,6 +126,7 @@ describe('repositories', () => {
       register_definitions: [publishedRegister],
       patients: [existingPatient],
     });
+
     setDatabaseForTests(db);
   });
 
@@ -137,6 +140,7 @@ describe('repositories', () => {
           contextFor('nurse'),
         ),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -145,9 +149,11 @@ describe('repositories', () => {
       await expect(
         book({ patientId: 'OOE-PHC-000001-K2', reason: 'Review' }, readOnly),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       await expect(
         addEntry({ registerId: 'register:opd', values: {} }, readOnly),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -155,6 +161,7 @@ describe('repositories', () => {
       await expect(
         book({ patientId: 'OOE-PHC-000001-K2', reason: 'Review' }, nobody('OOE-PHC', 'device-1')),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -165,10 +172,12 @@ describe('repositories', () => {
       await expect(setPermission(existingNurse, 'read_only', admin)).rejects.toBeInstanceOf(
         AuthorizationError,
       );
+
       expect(db.statements).toEqual([]);
       await expect(
         book({ patientId: existingPatient.patientId, reason: 'Review' }, admin),
       ).resolves.toBeTruthy();
+
       expect(db.statements).toHaveLength(1);
     });
 
@@ -176,6 +185,7 @@ describe('repositories', () => {
       await expect(
         extendShift(existingShift as never, '2026-09-12T20:00:00Z', contextFor('nurse')),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
 
       await extendShift(existingShift as never, '2026-09-12T20:00:00Z', contextFor('supervisor'));
@@ -188,6 +198,7 @@ describe('repositories', () => {
       await expect(
         registerPatient(newPatient, contextFor('records_officer', 'read_only')),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -195,12 +206,14 @@ describe('repositories', () => {
       await expect(
         book({ patientId: 'not-a-patient-id', reason: 'Review' }, contextFor('nurse')),
       ).rejects.toBeInstanceOf(ContractError);
+
       expect(db.statements).toEqual([]);
     });
   });
 
   describe('encounters', () => {
     const patientId = existingPatient.id;
+
     const tables = () =>
       db.statements.map((statement) => /^INSERT INTO (\w+)/.exec(statement.sql)?.[1]);
 
@@ -255,6 +268,7 @@ describe('repositories', () => {
           }),
         ),
       );
+
       const entry = await saveStep(
         {
           encounterId: 'encounter:1',
@@ -275,6 +289,7 @@ describe('repositories', () => {
       await expect(
         saveStep({ patientId, step: 'vitals', values: {} }, contextFor('nurse')),
       ).rejects.toBeInstanceOf(ContractError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -285,6 +300,7 @@ describe('repositories', () => {
           contextFor('records_officer'),
         ),
       ).rejects.toBeInstanceOf(AuthorizationError);
+
       expect(db.statements).toEqual([]);
     });
 
@@ -293,6 +309,7 @@ describe('repositories', () => {
         { encounterId: 'encounter:1', patientId, step: 'vitals', values: { temperatureC: 38.9 } },
         contextFor('nurse'),
       );
+
       db.statements.length = 0;
 
       const amendment = await amendEntry(vitals, 'Temperature was 37.9', contextFor('nurse'));
@@ -302,6 +319,7 @@ describe('repositories', () => {
         amends: vitals.id,
         encounterId: 'encounter:1',
       });
+
       expect(db.statements.every((statement) => statement.sql.startsWith('INSERT'))).toBe(true);
     });
   });
@@ -328,6 +346,7 @@ describe('repositories', () => {
       await expect(createUnit('Injection Room', contextFor('nurse'))).rejects.toBeInstanceOf(
         AuthorizationError,
       );
+
       expect(db.statements).toEqual([]);
 
       const unit = await createUnit('  Injection Room ', contextFor('facility_admin'));
@@ -345,6 +364,7 @@ describe('repositories', () => {
       await expect(createUnit('consultation', contextFor('facility_admin'))).rejects.toThrow(
         /already a unit/,
       );
+
       expect(db.statements).toEqual([]);
     });
 
@@ -376,6 +396,7 @@ describe('repositories', () => {
         instruction: 'Give TT injection',
         encounterId: 'encounter:1',
       });
+
       expect(db.statements[0].sql).toMatch(/^INSERT INTO handoffs/);
     });
 
@@ -410,6 +431,7 @@ describe('repositories', () => {
           status: 'pending',
         },
       ];
+
       const [pending] = await handoffsTo('unit:injection');
 
       await markHandoff(pending, 'received', contextFor('nurse'));
@@ -417,6 +439,7 @@ describe('repositories', () => {
       expect(db.statements[0].sql).toBe(
         'UPDATE handoffs SET "status" = ?, "updatedBy" = ?, "updatedOn" = ?, _metadata = ? WHERE id = ?',
       );
+
       expect(await handoffsTo('unit:pharmacy')).toEqual([]);
     });
   });
@@ -435,6 +458,7 @@ describe('repositories', () => {
         schemaVersion: 5,
         active: true,
       });
+
       // A new member of staff is configuration: sent online, fully stamped, never queued on the device.
       expect(db.statements).toEqual([]);
       expect(online.writes[online.writes.length - 1]).toMatchObject({
@@ -455,6 +479,7 @@ describe('repositories', () => {
         id: 'staff:nurse',
         changes: { permission: 'read_only', updatedBy: 'staff:facility_admin' },
       });
+
       expect(Object.keys((write as { changes: object }).changes).sort()).toEqual([
         'permission',
         'updatedBy',
@@ -484,6 +509,7 @@ describe('repositories', () => {
         },
         admin,
       );
+
       await assignShift(
         {
           staffId: 'staff:nurse',
@@ -501,6 +527,7 @@ describe('repositories', () => {
         type: 'roster_shift',
         changes: { startsAt: '2026-09-12T09:00:00Z', endsAt: '2026-09-12T17:00:00Z' },
       });
+
       expect(second).toMatchObject({ op: 'put', type: 'roster_shift' });
       expect('signature' in (second as { record: object }).record).toBe(false);
     });

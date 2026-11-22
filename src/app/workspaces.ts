@@ -17,8 +17,10 @@ const DEFAULT_QUERY_VALUES: Record<string, string> = {
 
 export type WorkspaceId =
   'front-desk' | 'clinical' | 'finance' | 'inventory' | 'reports' | 'staff' | 'settings';
+
 export type WorkspaceContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'> &
   Partial<Pick<AuthorizationContext, 'facilityId' | 'deviceId'>>;
+
 /** `also` lists other pages that belong to this link, so it stays highlighted there. */
 export type WorkspaceLink = {
   key: string;
@@ -28,6 +30,7 @@ export type WorkspaceLink = {
   icon: IconName;
   also?: readonly string[];
 };
+
 /** `start` opens the module on that page instead of its Overview, which the module then does not offer. */
 export type Workspace = {
   id: WorkspaceId;
@@ -39,17 +42,21 @@ export type Workspace = {
 };
 
 export const workspacePath = (id: WorkspaceId) => `/workspace/${id}`;
+
 /** Where entering a module lands: its start page, otherwise its first page. Modules have no Overview pages. */
 export const moduleStart = (workspace: Pick<Workspace, 'id' | 'start' | 'links'>) =>
   workspace.start ?? workspace.links[0]?.to ?? '/home';
+
 const has = (context: WorkspaceContext, ...permissions: Permission[]) =>
   permissions.some((permission) => context.permissions.includes(permission));
+
 const roleIn = (context: WorkspaceContext, ...roles: Role[]) =>
   (context.roles ?? [context.role]).some((role) => roles.includes(role));
 
 /** One navigation catalogue; it does not grant read access or authority to perform care. */
 export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const keys = new Set(navigationFor(context).map((item) => item.key));
+
   const link = (
     key: string,
     label: string,
@@ -57,24 +64,31 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
     to: string,
     icon: IconName,
   ): WorkspaceLink => ({ key, label, description, to, icon });
+
   const consultation =
     roleIn(context, 'doctor', 'nurse', 'chew', 'supervisor', 'facility_admin') ||
     has(context, 'clinical:assess', 'clinical:diagnose');
+
   const lab =
     consultation ||
     roleIn(context, 'laboratory_staff') ||
     has(context, 'clinical:perform_test', 'clinical:record_result');
+
   const pharmacy =
     consultation || roleIn(context, 'pharmacy_staff') || has(context, 'clinical:dispense');
+
   const appointments =
     roleIn(context, 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor', 'facility_admin') ||
     has(context, 'appointment:create', 'appointment:update');
+
   const inventory =
     roleIn(context, 'facility_admin', 'doctor', 'nurse', 'chew', 'supervisor') ||
     has(context, 'stock_item:manage', 'stock_movement:create');
+
   const reports =
     roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') ||
     has(context, 'register_entry:create', 'register_definition:publish');
+
   const modules: Workspace[] = [
     // Front desk work starts at the patient list; its Overview only repeated the menu (GEN-6).
     {
@@ -376,6 +390,7 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
         })),
     },
   ];
+
   return modules.filter((workspace) => workspace.links.length > 0);
 };
 
@@ -387,31 +402,40 @@ export const workspaceForLocation = (
   preferred?: WorkspaceId,
 ): Workspace | undefined => {
   const find = (id?: string) => available.find((workspace) => workspace.id === id);
+
   if (pathname.startsWith('/workspace/')) {
     return find(pathname.split('/')[2]);
   }
+
   if (pathname === '/home' || pathname === '/sync') {
     return undefined;
   }
+
   if (pathname.startsWith('/patients')) {
     return find(preferred === 'finance' || preferred === 'clinical' ? preferred : 'front-desk');
   }
+
   if (pathname === '/admin/staff' || pathname.startsWith('/admin/staff/')) {
     return find('staff');
   }
+
   if (pathname.startsWith('/settings') || pathname.startsWith('/admin')) {
     return find('settings');
   }
+
   if (pathname.startsWith('/referrals') || pathname.startsWith('/investigations')) {
     return find('clinical');
   }
+
   if (pathname.startsWith('/organization') || pathname.startsWith('/facility')) {
     return find('settings');
   }
+
   // Insurance work and its settings belong to the Finance module.
   if (pathname === '/insurance' || pathname.startsWith('/insurance/')) {
     return find('finance');
   }
+
   if (
     pathname.startsWith('/documents') ||
     pathname.startsWith('/admissions') ||
@@ -426,18 +450,23 @@ export const workspaceForLocation = (
   ) {
     return find('clinical');
   }
+
   if (pathname.startsWith('/billing') || pathname === '/admin/fees') {
     return find('finance');
   }
+
   if (pathname.startsWith('/stock')) {
     return find('inventory');
   }
+
   if (pathname.startsWith('/registers') || pathname.startsWith('/reports')) {
     return find('reports');
   }
+
   if (pathname.startsWith('/appointments')) {
     return find(preferred === 'clinical' ? 'clinical' : 'front-desk');
   }
+
   return undefined;
 };
 
@@ -447,27 +476,34 @@ export const activeWorkspaceLink = (
   search: string,
 ): string | undefined => {
   const current = new URLSearchParams(search);
+
   if (pathname.startsWith('/billing')) {
     const tab = current.get('tab');
+
     if (tab === 'transfers') {
       current.set('tab', 'payments');
     } else if (!tab || ['collections', 'review', 'categories', 'departments'].includes(tab)) {
       current.set('tab', 'bills');
     }
+
     if (pathname.startsWith('/billing/prices')) {
       return workspace.links.find((l) => l.to === '/billing/prices')?.key;
     }
   }
+
   return [...workspace.links]
     .sort((a, b) => b.to.split('?')[0].length - a.to.split('?')[0].length)
     .find((item) => {
       const [path, query] = item.to.split('?');
+
       if (item.also?.some((page) => pathname === page || pathname.startsWith(page + '/'))) {
         return true;
       }
+
       if (pathname !== path && !pathname.startsWith(path + '/')) {
         return false;
       }
+
       return [...new URLSearchParams(query)].every(
         ([key, value]) => (current.get(key) ?? DEFAULT_QUERY_VALUES[key] ?? '') === value,
       );
@@ -477,6 +513,7 @@ export const activeWorkspaceLink = (
 // Store a module ID only, scoped to the staff member and facility; never a patient or draft.
 const preferenceKey = (facilityId: string, userId: string) =>
   `geneus.workspace:${JSON.stringify([facilityId, userId])}`;
+
 export const readLastWorkspace = (facilityId: string, userId: string): WorkspaceId | undefined => {
   try {
     return (
@@ -486,6 +523,7 @@ export const readLastWorkspace = (facilityId: string, userId: string): Workspace
     return undefined;
   }
 };
+
 export const rememberWorkspace = (facilityId: string, userId: string, id: WorkspaceId): void => {
   try {
     localStorage.setItem(preferenceKey(facilityId, userId), id);

@@ -51,6 +51,7 @@ import { labReportSaveIssues } from './resultTemplates';
  */
 
 export const listEncounters = () => allOfType<Encounter>('encounter');
+
 export const listEncounterEntries = () => allOfType<EncounterEntry>('encounter_entry');
 
 export const encountersForPatient = (patientId: string) =>
@@ -111,14 +112,18 @@ export const saveStep = async (
 ): Promise<EncounterEntry> => {
   if (save.step === 'dispense') {
     const { pharmacySupported } = await import('../pharmacySupport');
+
     if (pharmacySupported(context)) {
       throw new Error('Open Pharmacy to record the actual quantity supplied');
     }
   }
+
   if (save.encounterId) {
     const header = await findRecord<Encounter>('encounter', save.encounterId);
+
     if (header?.inpatientContext) {
       const { saveWardStep } = await import('./wardCare');
+
       return saveWardStep(
         {
           id: header.id,
@@ -133,14 +138,17 @@ export const saveStep = async (
       );
     }
   }
+
   if (save.encounterId) {
     const prior = await entriesForEncounter(save.encounterId);
+
     if (
       prior.some(closesEncounter) &&
       !(POST_CONSULTATION_STEPS as readonly string[]).includes(save.step)
     ) {
       throw new Error('This encounter is closed. Add an amendment instead');
     }
+
     if (
       !(REPEATABLE_STEPS as readonly string[]).includes(save.step) &&
       prior.some((entry) => entry.step === save.step)
@@ -148,35 +156,43 @@ export const saveStep = async (
       throw new Error('This section is already saved. Add an amendment instead');
     }
   }
+
   const savedOn = nowIso();
   const records: NewRecord[] = [];
 
   const encounterId = save.encounterId ?? newId('encounter');
+
   if (!save.encounterId) {
     const ids = await patientIdentityIds(save.patientId);
+
     const [chargeGroups, paymentGroups, adjustmentGroups, appointments] = await Promise.all([
       Promise.all(ids.map(chargesForPatient)),
       Promise.all(ids.map(paymentsForPatient)),
       Promise.all(ids.map(adjustmentsForPatient)),
       listAppointments(),
     ]);
+
     const charges = chargeGroups.flat();
     const payments = paymentGroups.flat();
     const adjustments = adjustmentGroups.flat();
     const appointment = appointments.find((a) => a.id === save.appointmentId);
+
     if (save.appointmentId) {
       if (!appointment || appointment.patientId !== save.patientId) {
         throw new Error('This booking is not available for this patient');
       }
+
       if (appointment.attendance === 'cancelled' || appointment.attendance === 'no_show') {
         throw new Error('Reopen this inactive booking before starting care');
       }
+
       if (
         (await listEncounters()).some((encounter) => encounter.appointmentId === appointment.id)
       ) {
         throw new Error('This booking already has a visit. Continue or review that visit');
       }
     }
+
     const unpaid = save.appointmentId
       ? !isAppointmentConfirmed(
           save.appointmentId,
@@ -187,9 +203,11 @@ export const saveStep = async (
           await balanceCoverage(charges),
         )
       : false;
+
     if (unpaid && !save.collectLaterReason?.trim()) {
       throw new Error('Give a See now — collect later reason to continue care');
     }
+
     records.push({
       permission: 'encounter:record',
       type: 'encounter',
@@ -209,26 +227,35 @@ export const saveStep = async (
   }
 
   let values = { ...save.values };
+
   const prior = save.encounterId
     ? effectiveEncounterEntries(await entriesForEncounter(save.encounterId))
     : [];
+
   if (save.step === 'disposition') {
     if (values.kind === 'referral') {
       const patient = await findRecord<Patient>('patient', save.patientId);
+
       if (!patient) {
         throw new Error('The referring patient is unavailable');
       }
+
       if (!values.toFacilityId || values.toFacilityId === context.facilityId) {
         throw new Error('Choose a different receiving facility');
       }
+
       const events = await allWhere<ClinicalEvent>('clinical_event', 'patientId', save.patientId);
+
       const allergies = currentAllergies(events, [patient]).map((a) =>
         [a.allergen, a.reaction].filter(Boolean).join(': '),
       );
+
       const medications = currentClinicalEvents(events)
         .filter((e) => e.kind === 'medication' && e.values.status === 'active')
         .map((e) => [e.values.drug, e.values.dose, e.values.frequency].filter(Boolean).join(' '));
+
       const referralId = newId('referral');
+
       const referral: Referral = {
         ...envelope(context, savedOn),
         id: referralId,
@@ -251,17 +278,21 @@ export const saveStep = async (
         sentOn: savedOn,
         notYetArrivedFlagged: false,
       };
+
       records.push({ permission: 'referral:create', type: 'referral', record: referral });
       values.referralId = referralId;
     }
   }
+
   const issues = careEntryIssues(
     { step: save.step, values, workflowVersion: save.workflowVersion },
     prior,
   );
+
   if (issues.length) {
     throw new Error(issues.join('. '));
   }
+
   if (save.labReport) {
     const reportIssues = await labReportSaveIssues(
       save.patientId,
@@ -270,27 +301,33 @@ export const saveStep = async (
       values.results as { test: string; result: string }[],
       savedOn,
     );
+
     if (reportIssues.length) {
       throw new Error(reportIssues.join('. '));
     }
   }
+
   if (save.followUp) {
     // A follow-up is booked with the visit's care service when that service records follow-ups.
     const visit = save.encounterId
       ? await findRecord<Encounter>('encounter', save.encounterId)
       : undefined;
+
     const visitService =
       visit?.offeringId ??
       (save.visitType
         ? save.offeringId
         : (await listAppointments()).find((a) => a.id === save.appointmentId)?.offeringId);
+
     const service = visitService
       ? await findRecord<ServiceOffering>('service_offering', visitService)
       : undefined;
+
     const followUpService =
       service?.configuration === 'active' && service.visitTypes.includes('follow_up')
         ? service.id
         : undefined;
+
     const followUp = await bookingRecords(
       {
         ...save.followUp,
@@ -301,6 +338,7 @@ export const saveStep = async (
       context,
       savedOn,
     );
+
     records.push(...followUp);
     const appointment = followUp[0].record as { id: string };
     values = { ...values, appointmentId: appointment.id };
@@ -318,20 +356,27 @@ export const saveStep = async (
     values,
     ...(save.labReport ? { labReport: save.labReport } : {}),
   };
+
   records.push({ permission: 'encounter:record', type: 'encounter_entry', record: entry });
+
   if (save.step === 'lab_order' && Array.isArray(values.items)) {
     const patient = await findRecord<Patient>('patient', save.patientId);
+
     if (!patient) {
       throw new Error('The patient is not available');
     }
+
     for (const item of values.items as InvestigationItem[]) {
       if (!item.feeItemId || item.billingReviewReason) {
         continue;
       }
+
       const fee = await findRecord<FeeItem>('fee_item', item.feeItemId);
+
       if (!fee || fee.facilityId !== context.facilityId || !fee.active) {
         throw new Error('An investigation fee is unavailable. Review the catalogue');
       }
+
       const snapshot = {
         ...fee,
         amountMinor: item.priceMinor!,
@@ -344,6 +389,7 @@ export const saveStep = async (
             }
           : {}),
       };
+
       const charge = {
         ...newCharge(
           snapshot,
@@ -354,8 +400,10 @@ export const saveStep = async (
         orderItemId: item.id,
         orderEntryId: entry.id,
       };
+
       records.push({ permission: 'charge:create', type: 'charge', record: charge });
     }
+
     records.push({
       permission: 'encounter:record',
       type: 'encounter_entry',
@@ -378,6 +426,7 @@ export const saveStep = async (
   }
 
   const written = await insertRecords(context, records);
+
   return written.find(
     (r) => r.type === 'encounter_entry' && r.step === save.step,
   ) as EncounterEntry;
@@ -394,10 +443,12 @@ export const amendEntry = async (
 ) => {
   let previousAmendmentId: string | undefined;
   const createdOn = nowIso();
+
   if (labReport) {
     if (entry.step !== 'lab_results' || !correctedValues) {
       throw new Error('A structured result corrects only a lab result');
     }
+
     const reportIssues = await labReportSaveIssues(
       entry.patientId,
       await entriesForEncounter(entry.encounterId),
@@ -405,10 +456,12 @@ export const amendEntry = async (
       ENCOUNTER_STEP_VALUES.lab_results.parse(correctedValues).results,
       createdOn,
     );
+
     if (reportIssues.length) {
       throw new Error(reportIssues.join('. '));
     }
   }
+
   if (correctedValues) {
     if (
       ![
@@ -423,14 +476,18 @@ export const amendEntry = async (
     ) {
       throw new Error('This section supports explanatory amendments only');
     }
+
     ENCOUNTER_STEP_VALUES[entry.step].parse(correctedValues);
     const entries = await entriesForEncounter(entry.encounterId);
+
     const corrections = entries.filter(
       (e) => e.step === 'amendment' && e.amends === entry.id && e.values.correctedValues,
     );
+
     const replaced = new Set(corrections.map((e) => e.values.previousAmendmentId));
     const latest = corrections.find((e) => !replaced.has(e.id));
     previousAmendmentId = latest?.id;
+
     if (
       expectedCorrectionId !== undefined &&
       expectedCorrectionId !== (previousAmendmentId ?? null)
@@ -439,41 +496,51 @@ export const amendEntry = async (
         'This entry was corrected while you were editing. Reopen it to review the correction',
       );
     }
+
     if (entry.step === 'prescription' && entries.some((e) => e.step === 'dispense')) {
       throw new Error(
         'Medication has been dispensed. Record changes through medication reconciliation',
       );
     }
+
     if (entry.step === 'injection_order' && entries.some((e) => e.step === 'injection')) {
       throw new Error(
         'This injection has been administered. Record a new clinical treatment decision',
       );
     }
+
     if (entry.step === 'lab_results' && entry.workflowVersion === 1) {
       const before = ENCOUNTER_STEP_VALUES.lab_results
         .parse(entry.values)
         .results.map((r) => r.orderItemId ?? r.test)
         .sort();
+
       const after = ENCOUNTER_STEP_VALUES.lab_results
         .parse(correctedValues)
         .results.map((r) => r.orderItemId ?? r.test)
         .sort();
+
       if (JSON.stringify(before) !== JSON.stringify(after)) {
         throw new Error('A result correction cannot change its ordered investigation identity');
       }
     }
+
     if (entry.step === 'diagnosis') {
       const original = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values);
+
       const current = ENCOUNTER_STEP_VALUES.diagnosis.parse(
         latest?.values.correctedValues ?? entry.values,
       );
+
       const corrected = ENCOUNTER_STEP_VALUES.diagnosis.parse(correctedValues);
+
       if (
         corrected.admit !== original.admit ||
         corrected.giveInjection !== original.giveInjection
       ) {
         throw new Error('Correcting a diagnosis cannot change the saved disposition');
       }
+
       if (
         entries.some((e) => e.step === 'dispense') &&
         JSON.stringify(corrected.prescription) !== JSON.stringify(current.prescription)
@@ -484,6 +551,7 @@ export const amendEntry = async (
       }
     }
   }
+
   return insertRecord<EncounterEntry>(context, 'encounter:record', 'encounter_entry', {
     ...envelope(context, createdOn),
     ...(labReport ? { labReport } : {}),

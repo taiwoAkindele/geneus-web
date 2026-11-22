@@ -18,6 +18,7 @@ const cover = (patch: Partial<PatientCover> = {}) =>
     active: true,
     ...patch,
   }) as PatientCover;
+
 const check = (patch: Partial<CoverCheck>) =>
   ({
     id: 'check:1',
@@ -35,6 +36,7 @@ describe('insured registration', () => {
     expect(coverIssue({ ...emptyCover(), payerId: 'payer:s', planCode: 'GOLD' })).toBe(
       'Enter the enrollee number',
     );
+
     expect(
       coverIssue({
         ...emptyCover(),
@@ -44,6 +46,7 @@ describe('insured registration', () => {
         relationship: 'dependant',
       }),
     ).toMatch(/principal/);
+
     expect(
       coverIssue({
         ...emptyCover(),
@@ -54,10 +57,12 @@ describe('insured registration', () => {
         validTo: '2026-01-01',
       }),
     ).toMatch(/end on or after/);
+
     expect(
       coverIssue({ ...emptyCover(), payerId: 'payer:s', planCode: 'GOLD', enrolleeNumber: 'X' }),
     ).toBeUndefined();
   });
+
   it("offers the plans of the payer's current contracts, never an ended one", () => {
     const schedules = [
       { payerId: 'payer:s', planCode: 'GOLD', planName: 'Gold' },
@@ -65,8 +70,10 @@ describe('insured registration', () => {
       { payerId: 'payer:s', planCode: 'OLD', planName: 'Old', endedOn: '2026-01-01' },
       { payerId: 'payer:t', planCode: 'BRONZE', planName: 'Bronze' },
     ] as CoverSchedule[];
+
     expect(plansOf('payer:s', schedules)).toEqual([{ code: 'GOLD', name: 'Gold' }]);
   });
+
   it('never calls cover verified without a check covering today', () => {
     const today = '2026-11-14';
     expect(coverStatus(cover(), undefined, today)).toBe('Not yet verified');
@@ -74,14 +81,17 @@ describe('insured registration', () => {
     expect(
       coverStatus(cover(), check({ coversFrom: '2026-11-01', coversTo: '2026-11-02' }), today),
     ).toMatch(/not checked for today/);
+
     expect(coverStatus(cover(), check({ result: 'pending' }), today)).toMatch(/pending/);
     expect(coverStatus(cover(), check({ result: 'not_eligible' }), today)).toMatch(/Not eligible/);
     expect(coverStatus(cover({ validTo: '2026-10-31' }), check({}), today)).toBe(
       'Expired on 2026-10-31',
     );
+
     expect(coverStatus(cover({ enrolleeNumber: ' ' }), undefined, today)).toBe(
       'Details incomplete',
     );
+
     expect(coverStatus(cover({ active: false }), check({}), today)).toBe('Inactive');
   });
 });
@@ -101,6 +111,7 @@ describe('payment advice rows', () => {
       { sourceRow: 3, values: { claimNumber: '', paidAmount: '' } },
       { sourceRow: 4, values: { enrolleeNumber: 'SYN-9', paidAmount: 'twelve' } },
     ]);
+
     expect(rows).toEqual([
       { sourceRow: 2, claimNumber: 'CLM-000001', approvedMinor: 360_000, paidMinor: 360_000 },
       { sourceRow: 4, enrolleeNumber: 'SYN-9' },

@@ -50,11 +50,14 @@ export class ConfigurationSaveError extends Error {
     this.code = code;
   }
 }
+
 export const CONFIGURATION_SAVE_EVENT = 'geneus:configurationSave';
+
 export type ConfigurationSaveState = {
   phase: 'saving' | 'confirmed' | 'arrived' | 'refused';
   message?: string;
 };
+
 const announce = (state: ConfigurationSaveState) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
@@ -74,6 +77,7 @@ const REVISIONED = [
   'result_part',
   'answer_list',
 ];
+
 let sequence = 0;
 // Far above PowerSync's own numbering, so an online save never collides with a queued write in the server's ledger.
 const nextClientId = () => Date.now() * 1000 + (sequence++ % 1000);
@@ -90,13 +94,16 @@ export type ConfigurationWrite =
 
 /** The same mutation the sync connector would build, so the server applies exactly its usual rules. */
 const importMutations = new WeakMap<ConfigurationWrite, UploadMutation>();
+
 const toMutation = (write: ConfigurationWrite): UploadMutation => {
   if (write.op === 'put') {
     const data = decodeValues(
       write.type,
       toRow(write.type, write.record as unknown as Record<string, unknown>),
     );
+
     const policy = (FACILITY_DOCUMENT_POLICY as Record<string, { change: string }>)[write.type];
+
     return {
       clientId: nextClientId(),
       op: 'put',
@@ -108,13 +115,16 @@ const toMutation = (write: ConfigurationWrite): UploadMutation => {
         : {}),
     } as UploadMutation;
   }
+
   const data = decodeValues(write.type, toRow(write.type, write.changes));
   const current = write.current as unknown as Record<string, unknown>;
+
   const previous = Object.fromEntries(
     Object.keys(data)
       .filter((k) => !['updatedBy', 'updatedOn'].includes(k))
       .map((k) => [k, current[k] ?? null]),
   );
+
   return {
     clientId: nextClientId(),
     op: 'patch',
@@ -132,21 +142,26 @@ const toMutation = (write: ConfigurationWrite): UploadMutation => {
 const arrival = async (writes: readonly ConfigurationWrite[], timeoutMs = 20_000) => {
   const { findRecord } = await import('./db');
   const until = Date.now() + timeoutMs;
+
   while (Date.now() < until) {
     const arrived = await Promise.all(
       writes.map(async (w) => {
         const local = (await findRecord(w.type, w.op === 'put' ? w.record.id : w.id)) as
           Record<string, unknown> | undefined;
+
         return w.op === 'put'
           ? Boolean(local)
           : Boolean(local) && local!.updatedOn === w.changes.updatedOn;
       }),
     );
+
     if (arrived.every(Boolean)) {
       return true;
     }
+
     await new Promise((done) => setTimeout(done, 300));
   }
+
   return false;
 };
 
@@ -161,11 +176,15 @@ export const saveConfiguration = async (
       'Settings are saved on the server and need an internet connection. Connect, then save again.',
     );
   }
+
   const device = getDeviceCredential();
+
   if (!device) {
     throw new ConfigurationSaveError('failed', 'This device is not enrolled');
   }
+
   const token = staffSessionToken(context);
+
   // Only the separate, narrow policy edit opts in. Older full-fee forms cannot do this accidentally.
   const policyOnly =
     writes.length > 0 &&
@@ -178,7 +197,9 @@ export const saveConfiguration = async (
           ['chargeWhen', 'exemptions', 'updatedBy', 'updatedOn'].includes(key),
         ),
     );
+
   announce({ phase: 'saving' });
+
   try {
     await staffRequest<ConfigurationSaveResponse>(
       savePath(Boolean(options?.billingImport), policyOnly),
@@ -191,9 +212,12 @@ export const saveConfiguration = async (
           if (!options?.billingImport) {
             return toMutation(w);
           }
+
           let m = importMutations.get(w);
+
           if (!m) {
             m = toMutation(w);
+
             if (m.op === 'patch' && w.op === 'patch' && w.current.type === 'fee_item') {
               m.previous = {
                 ...m.previous,
@@ -202,13 +226,16 @@ export const saveConfiguration = async (
                 currency: w.current.currency,
               };
             }
+
             importMutations.set(w, m);
           }
+
           return m;
         }),
       },
       context.userId,
     );
+
     touchStaffSession();
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
@@ -216,6 +243,7 @@ export const saveConfiguration = async (
       announce({ phase: 'refused', message: 'Sign in again to save settings.' });
       throw new ConfigurationSaveError('needs_pin', 'Sign in again to save settings.');
     }
+
     if (cause instanceof ApiError && cause.code === 'offline') {
       announce({ phase: 'refused', message: cause.message });
       throw new ConfigurationSaveError(
@@ -223,6 +251,7 @@ export const saveConfiguration = async (
         'The server could not be reached, so nothing was saved. Connect, then save again.',
       );
     }
+
     const message = refusalMessage(cause);
     announce({ phase: 'refused', message });
     throw new ConfigurationSaveError(
@@ -230,6 +259,7 @@ export const saveConfiguration = async (
       message,
     );
   }
+
   announce({ phase: 'confirmed' });
   const arrived = await arrival(writes);
   announce({
@@ -238,5 +268,6 @@ export const saveConfiguration = async (
       ? {}
       : { message: 'Saved on the server. This device will show it after its next sync.' }),
   });
+
   return { arrived };
 };

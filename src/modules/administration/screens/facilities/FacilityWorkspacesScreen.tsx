@@ -9,6 +9,7 @@ import { AppHeader } from '@/app/AppHeader';
 
 const CreationLink = () => {
   const { user } = useSession();
+
   return user.roles.includes('facility_admin') && user.canWrite ? (
     <Link to="/facilities/new" className="inline-flex min-h-11 items-center font-bold text-brand">
       Create another facility
@@ -23,12 +24,15 @@ export const FacilityWorkspacesScreen = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const entries = listFacilityWorkspaces();
+
   const run = async (operation: () => Promise<unknown>) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await operation();
     } catch (cause) {
@@ -37,6 +41,7 @@ export const FacilityWorkspacesScreen = () => {
       setBusy(false);
     }
   };
+
   return (
     <>
       {signedIn ? <AppHeader /> : null}
@@ -108,6 +113,7 @@ export const FacilityWorkspacesScreen = () => {
                   `device:${crypto.randomUUID()}`,
                   'Additional facility workspace',
                 );
+
                 await switchFacilityWorkspace(issued.deviceId, issued);
               })
             }

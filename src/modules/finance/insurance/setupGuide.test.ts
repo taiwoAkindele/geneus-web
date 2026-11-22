@@ -17,6 +17,7 @@ describe('readiness guidance', () => {
       to: '/settings/facility?view=settings',
     });
   });
+
   it('names each payer that still needs a contract, with a link straight to it', () => {
     const g = guideFor(
       {
@@ -28,6 +29,7 @@ describe('readiness guidance', () => {
       },
       viewer(),
     );
+
     expect(g.steps).toEqual([
       {
         text: 'Synthetic HMO has no active contract.',
@@ -38,6 +40,7 @@ describe('readiness guidance', () => {
       },
     ]);
   });
+
   it('names who can confirm insurance work, and says how to add someone when nobody can', () => {
     const ok = guideFor(
       {
@@ -52,7 +55,9 @@ describe('readiness guidance', () => {
       },
       viewer(),
     );
+
     expect(ok.status).toBe('Ada Admin, Ifeoma can confirm insurance work');
+
     const none = guideFor(
       {
         kind: 'officer_with_verified_email',
@@ -63,8 +68,10 @@ describe('readiness guidance', () => {
       },
       viewer(),
     );
+
     expect(none.steps[0].action?.to).toBe('/admin/staff');
   });
+
   it('explains each device that blocks billing and what to do about it', () => {
     const g = guideFor(
       {
@@ -82,6 +89,7 @@ describe('readiness guidance', () => {
       },
       viewer(),
     );
+
     expect(g.status).toBe('1 device is not ready.');
     expect(g.steps.map((s) => s.text)).toEqual([
       expect.stringMatching(/^Front desk tablet is running an older version/),
@@ -89,6 +97,7 @@ describe('readiness guidance', () => {
         /^Front desk tablet has work it has not uploaded yet \(3 changes\)\. Open Geneus/,
       ),
     ]);
+
     expect(g.action?.to).toBe('/settings/devices');
   });
 });

@@ -11,9 +11,11 @@ import {
 export const RegistersListScreen = () => {
   const query = useRegisters();
   const [params, setParams] = useSearchParams();
+
   const canConfigure = useAuthorizationContext().permissions.includes(
     'register_definition:publish',
   );
+
   const view = canConfigure && params.get('view') === 'drafts' ? 'drafts' : 'published';
   const published = query.registers.filter((register) => register.status === 'published');
   const drafts = query.registers.filter((register) => register.hasDraft);
@@ -25,6 +27,7 @@ export const RegistersListScreen = () => {
   useEffect(() => {
     document.title = 'Registers · Geneus Health';
   }, []);
+
   // A hand-made register of the same name is not the ready-made one: it does not fill from visits.
   const added = (ready: ReadyMadeRegister) =>
     query.registers.some(
@@ -32,12 +35,15 @@ export const RegistersListScreen = () => {
         Boolean(register.configuration.visitLink) &&
         register.configuration.name.trim().toLowerCase() === ready.draft.name.toLowerCase(),
     );
+
   const add = async (ready: ReadyMadeRegister) => {
     if (adding) {
       return;
     }
+
     setAdding(ready.key);
     setAddError('');
+
     try {
       const definition = await query.publish(ready.draft, null);
       query.reload();
@@ -49,6 +55,7 @@ export const RegistersListScreen = () => {
       setAdding('');
     }
   };
+
   const renderRegisters = () => {
     if (query.loading) {
       return <p role="status">Reading registers…</p>;
@@ -70,6 +77,7 @@ export const RegistersListScreen = () => {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((register) => {
             const shown = view === 'drafts' ? register.configuration : register;
+
             return (
               <article
                 key={register.id}

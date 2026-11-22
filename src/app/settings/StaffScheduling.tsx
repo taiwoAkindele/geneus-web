@@ -16,6 +16,7 @@ export const StaffScheduling = () => {
   const [params, setParams] = useSearchParams();
   const planner = schedulingPlanner(useAuthorizationContext());
   const view = !planner || params.get('view') === 'coverage' ? 'coverage' : 'sign-in';
+
   return (
     <div className="space-y-4">
       {planner ? (

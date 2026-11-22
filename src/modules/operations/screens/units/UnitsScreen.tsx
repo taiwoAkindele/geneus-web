@@ -27,6 +27,7 @@ export const UnitsScreen = () => {
   useEffect(() => {
     document.title = 'Units & rooms · Geneus Health';
   }, []);
+
   const navigate = useNavigate();
   const toast = useToast();
   const context = useAuthorizationContext();
@@ -35,12 +36,14 @@ export const UnitsScreen = () => {
   const [busy, setBusy] = useState(false);
 
   const all = units.data ?? [];
+
   const activeNames = new Set(
     all.filter((unit) => unit.active).map((unit) => unit.name.toLowerCase()),
   );
 
   const run = async (work: () => Promise<unknown>, done: string) => {
     setBusy(true);
+
     try {
       await work();
       toast(done);
@@ -61,6 +64,7 @@ export const UnitsScreen = () => {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+
     if (name.trim()) {
       void add(name);
     }

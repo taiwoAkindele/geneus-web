@@ -8,9 +8,11 @@ import { activeSettingsPage, moduleSettingsFor, type ModuleSettingsId } from './
 export const ModuleSettingsMenu = ({ module }: { module: ModuleSettingsId }) => {
   const navigate = useNavigate();
   const settings = moduleSettingsFor(module, useAuthorizationContext());
+
   if (!settings.pages.length) {
     return null;
   }
+
   return (
     <ActionMenu
       label="Settings"
@@ -30,6 +32,7 @@ export const ModuleSettingsLayout = ({ module }: { module: ModuleSettingsId }) =
   const settings = moduleSettingsFor(module, useAuthorizationContext());
   const tabs = settings.pages.filter((p) => p.tab);
   const active = activeSettingsPage(settings, pathname);
+
   if (!tabs.length) {
     return (
       <div className="px-4 py-5 md:px-8">
@@ -40,9 +43,11 @@ export const ModuleSettingsLayout = ({ module }: { module: ModuleSettingsId }) =
       </div>
     );
   }
+
   if (!active) {
     return <Navigate to={tabs[0].to} replace />;
   }
+
   return (
     <div>
       <div className="space-y-3 px-4 pt-5 md:px-8">

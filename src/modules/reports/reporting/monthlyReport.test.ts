@@ -15,7 +15,9 @@ const base = {
   createdOn: '2026-10-26T10:00:00Z',
   deviceId: 'device:one',
 };
+
 const patientId = 'TEST-000001-K2';
+
 const empty = (): MonthlyData => ({
   encounters: [],
   entries: [],
@@ -26,9 +28,11 @@ const empty = (): MonthlyData => ({
   items: [],
   movements: [],
 });
+
 describe('monthly operational reporting', () => {
   it('counts visits once and uses corrected diagnosis values without counting amendments as visits', () => {
     const data = empty();
+
     const visit = Encounter.parse({
       ...base,
       type: 'encounter',
@@ -36,6 +40,7 @@ describe('monthly operational reporting', () => {
       patientId,
       openedOn: base.createdOn,
     });
+
     data.encounters = [visit, visit];
     data.entries = [
       EncounterEntry.parse({
@@ -70,14 +75,17 @@ describe('monthly operational reporting', () => {
         values: {},
       }),
     ];
+
     const report = monthlyReport(data, '2026-10');
     expect(report).toMatchObject({ visits: 1, people: 1, completed: 1, inProgress: 0 });
     expect(report.diagnoses).toEqual([{ label: 'Reviewed diagnosis', visits: 1 }]);
     expect(report.trends[report.trends.length - 1]).toEqual({ month: '2026-10', visits: 1 });
     expect(monthlyReport(data, '2026-09').visits).toBe(0);
   });
+
   it('counts a visit closed by its disposition as completed, but not one still under observation', () => {
     const data = empty();
+
     const visit = (id: string) =>
       Encounter.parse({
         ...base,
@@ -87,7 +95,9 @@ describe('monthly operational reporting', () => {
         openedOn: base.createdOn,
         workflowVersion: 1,
       });
+
     data.encounters = [visit('encounter:home'), visit('encounter:observed')];
+
     const disposition = (encounterId: string, values: Record<string, unknown>) =>
       EncounterEntry.parse({
         ...base,
@@ -100,6 +110,7 @@ describe('monthly operational reporting', () => {
         workflowVersion: 1,
         values,
       });
+
     data.entries = [
       disposition('encounter:home', { kind: 'home_care', note: 'Fluids and rest' }),
       disposition('encounter:observed', {
@@ -109,12 +120,14 @@ describe('monthly operational reporting', () => {
         reassessOn: '2026-10-26T14:00:00Z',
       }),
     ];
+
     expect(monthlyReport(data, '2026-10')).toMatchObject({
       visits: 2,
       completed: 1,
       inProgress: 1,
     });
   });
+
   it('calculates commodity balances by movement date and excludes later movements', () => {
     const data = empty();
     data.items = [
@@ -128,6 +141,7 @@ describe('monthly operational reporting', () => {
         unitOfMeasure: 'boxes',
       }),
     ];
+
     data.movements = [
       ['prior', 3, 'received', '2026-09-10'],
       ['received', 5, 'received', '2026-10-10'],
@@ -146,6 +160,7 @@ describe('monthly operational reporting', () => {
         movedOn: day + 'T10:00:00Z',
       }),
     );
+
     expect(monthlyReport(data, '2026-10').commodities[0]).toMatchObject({
       opening: 13,
       received: 5,
@@ -155,17 +170,22 @@ describe('monthly operational reporting', () => {
       closing: 14,
       unit: 'boxes',
     });
+
     expect(() => monthlyReport(data, '2026-13')).toThrow('valid report month');
   });
+
   it("counts the month's visits in a register filled from visits, not the entries completing them", () => {
     const data = empty();
+
     const visit = (id: string, openedOn: string) =>
       Encounter.parse({ ...base, type: 'encounter', id, patientId, openedOn });
+
     data.encounters = [
       visit('encounter:malaria', '2026-10-20T10:00:00Z'),
       visit('encounter:cough', '2026-10-21T10:00:00Z'),
       visit('encounter:earlier', '2026-09-20T10:00:00Z'),
     ];
+
     const order = (id: string, encounterId: string, test: string) =>
       EncounterEntry.parse({
         ...base,
@@ -177,11 +197,13 @@ describe('monthly operational reporting', () => {
         actorRole: 'doctor',
         values: { tests: [test] },
       });
+
     data.entries = [
       order('entry:rdt', 'encounter:malaria', 'Malaria RDT'),
       order('entry:xray', 'encounter:cough', 'Chest X-ray'),
       order('entry:old', 'encounter:earlier', 'Malaria RDT'),
     ];
+
     data.definitions = [
       RegisterDefinition.parse({
         ...base,
@@ -198,6 +220,7 @@ describe('monthly operational reporting', () => {
         ],
       }),
     ];
+
     data.registerEntries = [
       RegisterEntry.parse({
         ...base,
@@ -211,6 +234,7 @@ describe('monthly operational reporting', () => {
         values: { onset: '2026-10-18' },
       }),
     ];
+
     expect(monthlyReport(data, '2026-10').registers).toEqual([
       { id: 'register:malaria', name: 'Malaria register', count: 1 },
     ]);

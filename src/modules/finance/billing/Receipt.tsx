@@ -51,17 +51,23 @@ export const Receipt = ({
 
     return 'Receipt';
   };
+
   const print = () => {
     const popup = window.open('', '_blank', 'width=500,height=650');
+
     if (!popup) {
       const message =
         'The print window was blocked. Allow pop-ups for this app and try again. The payment is already recorded; do not record it again.';
+
       setPrintError(message);
       toast(message, { tone: 'error' });
+
       return;
     }
+
     setPrintError('');
     const root = document.createElement('main');
+
     const lines = [
       facility.name,
       payment.reverses ? 'Payment reversal · not a new collection' : 'Payment receipt',
@@ -78,16 +84,19 @@ export const Receipt = ({
       `Received by: ${staff?.fullName ?? payment.createdBy}`,
       payment.reference ?? '',
     ];
+
     for (const line of lines) {
       const p = document.createElement('p');
       p.textContent = line;
       root.append(p);
     }
+
     popup.document.title = payment.receiptNumber;
     popup.document.body.append(root);
     popup.focus();
     popup.print();
   };
+
   return (
     <Sheet
       placement={fresh ? 'side' : 'center'}

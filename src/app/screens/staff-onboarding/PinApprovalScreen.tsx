@@ -61,9 +61,11 @@ export const PinApprovalScreen = () => {
   const [emailing, setEmailing] = useState(false);
 
   const person = roster.find((entry) => entry.staff.staffId === state.staffId);
+
   if (loading) {
     return null;
   }
+
   if (!state.staffId || !person) {
     return <Navigate to="/login" replace />;
   }
@@ -87,10 +89,13 @@ export const PinApprovalScreen = () => {
     if (!code.trim() || checking) {
       return;
     }
+
     setChecking(true);
     setError(undefined);
+
     try {
       const match = await findMatchingCode(person.staff.staffId, code);
+
       if (!match) {
         // Not a code read aloud that this phone holds: it may be an emailed invitation,
         // which only the server can check and accept — so it needs a connection.
@@ -98,8 +103,10 @@ export const PinApprovalScreen = () => {
           setError(
             'That code isn’t on this phone. If it came in an email, connect to the internet and try again. Codes last 24 hours and only the newest one works.',
           );
+
           return;
         }
+
         try {
           await checkInvitationCode(person.staff.staffId, code);
         } catch (cause) {
@@ -108,16 +115,21 @@ export const PinApprovalScreen = () => {
               ? 'Can’t reach Geneus right now. Check the connection and try again.'
               : 'That code isn’t valid. Codes last 24 hours and only the newest one works. If your admin has just made it, connect this phone so it can sync, then try again.',
           );
+
           return;
         }
+
         rememberSetupCode(person.staff.staffId, code, true);
         approved();
+
         return;
       }
+
       await markCodeUsed(
         match,
         claimingFor({ staff: person.staff, facilityId: facility?.code ?? '', deviceId }),
       );
+
       // The same code later registers the new PIN with the server, proving who chose it.
       rememberSetupCode(person.staff.staffId, code);
       approved();
@@ -133,8 +145,10 @@ export const PinApprovalScreen = () => {
     if (emailing) {
       return;
     }
+
     setEmailing(true);
     setError(undefined);
+
     try {
       const sent = await emailPinSetupCode(person.staff.staffId);
       setEmailedTo(sent.sentTo);
@@ -151,13 +165,17 @@ export const PinApprovalScreen = () => {
     if (!approver) {
       return;
     }
+
     const digits = pinLength(approver.staff.staffId);
+
     if (pin.length >= digits || checking) {
       return;
     }
+
     setError(undefined);
     const next = pin + digit;
     setPin(next);
+
     if (next.length < digits) {
       return;
     }
@@ -165,10 +183,13 @@ export const PinApprovalScreen = () => {
     setChecking(true);
     const result = await checkPin(approver.staff.staffId, next);
     setChecking(false);
+
     if (result.ok) {
       approved();
+
       return;
     }
+
     setPin('');
     setError(
       result.reason === 'locked'
@@ -310,6 +331,7 @@ export const PinApprovalScreen = () => {
             } else {
               navigate('/login', { replace: true });
             }
+
             setError(undefined);
           }}
           className="mx-auto mt-auto min-h-0 pt-6 text-[13px] font-bold text-brand"

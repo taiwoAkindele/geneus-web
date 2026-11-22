@@ -29,10 +29,13 @@ const admin = {
   deviceId: 'device:A',
   facilityId: 'A',
 } as AuthorizationContext;
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
 const lastCall = (fetch: ReturnType<typeof vi.fn>) => {
   const [url, init] = fetch.mock.calls[fetch.mock.calls.length - 1] as [string, RequestInit];
+
   return {
     url,
     headers: init.headers as Record<string, string>,
@@ -50,6 +53,7 @@ beforeEach(async () => {
     syncEndpoint: 'http://sync',
   });
 });
+
 afterEach(() => {
   forgetStaffSession();
   vi.unstubAllGlobals();
@@ -68,15 +72,18 @@ const signInWithServer = async () => {
       }),
     ),
   );
+
   await openStaffSession(admin, '135790');
 };
 
 describe('PIN authority and invitations', () => {
   it('sends the PIN-proven session, and the person it belongs to, when issuing a PIN code', async () => {
     await signInWithServer();
+
     const fetch = vi.fn(async () =>
       json({ code: 'K7M2QX9R', expiresOn: new Date().toISOString() }, 201),
     );
+
     vi.stubGlobal('fetch', fetch);
     await issuePinSetupCode(admin, 'staff:nurse');
     const call = lastCall(fetch);
@@ -92,6 +99,7 @@ describe('PIN authority and invitations', () => {
         json({ error: 'staff_session_required', message: 'Confirm your PIN' }, 403),
       ),
     );
+
     await expect(issuePinSetupCode(admin, 'staff:nurse')).rejects.toBeInstanceOf(
       VerificationRequired,
     );
@@ -99,9 +107,11 @@ describe('PIN authority and invitations', () => {
 
   it('sends an invitation to a typed address, or — leaving it out — to the verified one', async () => {
     await signInWithServer();
+
     const fetch = vi.fn(async () =>
       json({ invitation: { id: 'i', destination: 'a•••@example.org' } }, 201),
     );
+
     vi.stubGlobal('fetch', fetch);
     await sendStaffInvitation(admin, 'staff:nurse', 'nurse@example.org');
     expect(lastCall(fetch).body).toEqual({ channel: 'email', email: 'nurse@example.org' });
@@ -139,15 +149,19 @@ describe('which invitations need an administrator', () => {
     expect(invitationNeedsAttention({ status: 'expired', delivery: 'provider_accepted' })).toBe(
       true,
     );
+
     expect(invitationNeedsAttention({ status: 'locked', delivery: 'provider_accepted' })).toBe(
       true,
     );
+
     expect(invitationNeedsAttention({ status: 'pending', delivery: 'provider_rejected' })).toBe(
       true,
     );
+
     expect(invitationNeedsAttention({ status: 'pending', delivery: 'provider_accepted' })).toBe(
       false,
     );
+
     expect(invitationNeedsAttention({ status: 'accepted', delivery: 'provider_accepted' })).toBe(
       false,
     );

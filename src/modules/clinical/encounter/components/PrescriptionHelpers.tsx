@@ -18,16 +18,20 @@ const lastPrescription = async (
   patientId: string,
 ): Promise<{ lines: RxLine[]; on: string } | undefined> => {
   const ids = await patientIdentityIds(patientId);
+
   const entries = effectiveEncounterEntries((await Promise.all(ids.map(entriesForPatient))).flat())
     .filter((entry) => entry.step === 'prescription' || entry.step === 'diagnosis')
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+
   for (const entry of entries) {
     const data = fromStepValues(
       entry.step === 'prescription' ? 'prescription' : 'diagnosis',
       entry.values,
       { ...EMPTY_ENCOUNTER_DATA, workflowVersion: entry.workflowVersion },
     );
+
     const lines = entry.step === 'prescription' ? data.prescription.rx : data.diagnosis.rx;
+
     if (lines.length) {
       return {
         lines: lines.map((line) => ({ ...line, quantity: undefined })),
@@ -35,15 +39,18 @@ const lastPrescription = async (
       };
     }
   }
+
   return undefined;
 };
 
 /** Medicines confirmed as current on the patient's medication list. */
 const currentMedicines = async (patientId: string): Promise<RxLine[]> => {
   const ids = await patientIdentityIds(patientId);
+
   const events = currentClinicalEvents(
     (await Promise.all(ids.map(clinicalEventsForPatient))).flat(),
   );
+
   return events
     .filter((event) => event.kind === 'medication' && event.values.status === 'active')
     .map((event) => ({
@@ -67,6 +74,7 @@ export const PrescriptionHelpers = ({
   onAdd: (lines: RxLine[]) => void;
 }) => {
   const stock = useLiveQuery(listStockItems);
+
   const known = useLiveQuery(
     useCallback(
       async () =>
@@ -76,11 +84,14 @@ export const PrescriptionHelpers = ({
       [patientId],
     ),
   );
+
   const names = [...new Set((stock.data ?? []).map((item) => item.name))].sort((a, b) =>
     a.localeCompare(b),
   );
+
   const last = known.data?.last;
   const current = known.data?.current ?? [];
+
   return (
     <>
       <datalist id={MEDICINE_LIST_ID}>

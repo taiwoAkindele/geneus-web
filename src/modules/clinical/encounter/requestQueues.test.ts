@@ -4,6 +4,7 @@ import { requestQueues } from './requestQueues';
 import { resultAlerts } from './resultAlerts';
 
 let minute = 0;
+
 const entry = (
   encounterId: string,
   step: EncounterEntry['step'],
@@ -43,9 +44,11 @@ describe('laboratory and pharmacy requests', () => {
         },
       ],
     });
+
   it('keeps financial review separate from completed clinical results, with source attribution', () => {
     const order = reviewOrder('encounter:1');
     const item = (order.values.items as { id: string }[])[0];
+
     const result = entry(
       order.encounterId,
       'lab_results',
@@ -56,6 +59,7 @@ describe('laboratory and pharmacy requests', () => {
       },
       'staff:lab',
     );
+
     const before = JSON.stringify([order, result]);
     const queue = requestQueues([order, result]).lab;
     expect(queue.open).toHaveLength(0);
@@ -72,66 +76,81 @@ describe('laboratory and pharmacy requests', () => {
         },
       ],
     });
+
     expect(JSON.stringify([order, result])).toBe(before);
   });
+
   it('retains an earlier unresolved lab request when a later request becomes current', () => {
     const old = reviewOrder('encounter:1');
+
     const current = entry('encounter:1', 'lab_order', {
       tests: ['Ultrasound request'],
       items: [{ id: 'item:new', name: 'Ultrasound request', custom: true }],
     });
+
     const queue = requestQueues([old, current]).lab;
     expect(queue.open.map((r) => r.id)).toEqual([current.id]);
     expect(queue.completed).toMatchObject([{ id: old.id, superseded: true, billingPending: 1 }]);
   });
+
   it('keeps a test request open until every test has a result, then completes it', () => {
     const order = entry('encounter:1', 'lab_order', { tests: ['Full blood count', 'Malaria RDT'] });
+
     const partial = entry(
       'encounter:1',
       'lab_results',
       { results: [{ test: 'Malaria RDT', result: 'Positive' }] },
       'staff:lab',
     );
+
     let { lab } = requestQueues([order, partial]);
     expect(lab.open).toMatchObject([
       { id: order.id, items: ['Full blood count', 'Malaria RDT'], pending: ['Full blood count'] },
     ]);
+
     const rest = entry(
       'encounter:1',
       'lab_results',
       { results: [{ test: 'Full blood count', result: 'Normal' }] },
       'staff:lab',
     );
+
     ({ lab } = requestQueues([order, partial, rest]));
     expect(lab.open).toEqual([]);
     expect(lab.completed).toMatchObject([
       { id: order.id, pending: [], completedOn: rest.createdOn },
     ]);
   });
+
   it('keeps a prescription open until dispensed, including one carried on a retired-order diagnosis', () => {
     const prescribed = entry('encounter:2', 'prescription', {
       decision: 'prescribed',
       prescription: [{ drug: 'Artemether-lumefantrine', dose: '4 tablets' }],
     });
+
     const legacy = entry('encounter:3', 'diagnosis', {
       diagnosis: 'Malaria',
       prescription: [{ drug: 'Paracetamol', dose: '1 g' }],
     });
+
     const none = entry('encounter:4', 'prescription', {
       decision: 'none_required',
       prescription: [],
     });
+
     let { pharmacy } = requestQueues([prescribed, legacy, none]);
     expect(pharmacy.open.map((r) => r.items)).toEqual([
       ['Artemether-lumefantrine'],
       ['Paracetamol'],
     ]);
+
     const dispensed = entry(
       'encounter:2',
       'dispense',
       { lines: [{ drug: 'Artemether-lumefantrine', dispensed: true }] },
       'staff:pharmacy',
     );
+
     ({ pharmacy } = requestQueues([prescribed, legacy, none, dispensed]));
     expect(pharmacy.open.map((r) => r.encounterId)).toEqual(['encounter:3']);
     expect(pharmacy.completed).toMatchObject([
@@ -148,25 +167,31 @@ describe('result alerts', () => {
       { tests: ['Full blood count'] },
       'staff:ordering',
     );
+
     const result = entry(
       'encounter:5',
       'lab_results',
       { results: [{ test: 'Full blood count', result: 'Normal' }] },
       'staff:lab',
     );
+
     expect(resultAlerts([order, result], 'staff:ordering')).toMatchObject([
       { id: result.id, encounterId: 'encounter:5', tests: ['Full blood count'] },
     ]);
+
     expect(resultAlerts([order, result], 'staff:another-doctor')).toEqual([]);
     expect(resultAlerts([order], 'staff:ordering')).toEqual([]);
+
     const review = entry(
       'encounter:5',
       'result_review',
       { resultEntryIds: [result.id] },
       'staff:ordering',
     );
+
     expect(resultAlerts([order, result, review], 'staff:ordering')).toEqual([]);
   });
+
   it('marks a result critical when the scientist flagged a value critical, including in its latest correction', () => {
     const order = entry(
       'encounter:6',
@@ -174,6 +199,7 @@ describe('result alerts', () => {
       { tests: ['Full blood count'] },
       'staff:ordering',
     );
+
     const report = (flag?: string) => ({
       patient: {},
       items: [
@@ -191,6 +217,7 @@ describe('result alerts', () => {
         },
       ],
     });
+
     const result = {
       ...entry(
         'encounter:6',
@@ -200,7 +227,9 @@ describe('result alerts', () => {
       ),
       labReport: report(),
     } as EncounterEntry;
+
     expect(resultAlerts([order, result], 'staff:ordering')[0].critical).toBe(false);
+
     const correction = {
       ...entry(
         'encounter:6',
@@ -211,6 +240,7 @@ describe('result alerts', () => {
       amends: result.id,
       labReport: report('critically_low'),
     } as EncounterEntry;
+
     expect(resultAlerts([order, result, correction], 'staff:ordering')[0].critical).toBe(true);
   });
 });

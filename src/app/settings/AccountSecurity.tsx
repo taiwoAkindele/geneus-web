@@ -25,17 +25,20 @@ export const AccountSecurity = () => (
 /** An old address of a page that now lives elsewhere: moves there, keeping its query (e.g. ?payer=…). */
 export const MovedTo = ({ to }: { to: string }) => {
   const { search } = useLocation();
+
   return <Navigate to={`${to}${search}`} replace />;
 };
 
 /** Billing and insurance setup moved from global Settings into each module: /settings/insurance/* → /insurance/settings/*. Billing prices are at /billing/prices and bank collection at /settings/billing. */
 export const MovedFromOldSettings = () => {
   const { pathname } = useLocation();
+
   return <MovedTo to={pathname.replace(/^\/settings\/(billing|insurance)/, '/$1/settings')} />;
 };
 
 /** A result template's earlier address, under the old investigation catalogue. */
 export const MovedTemplate = () => {
   const { templateId = '' } = useParams();
+
   return <MovedTo to={`/laboratory/settings/templates/${encodeURIComponent(templateId)}`} />;
 };

@@ -28,6 +28,7 @@ import {
   recordName,
   unitPath,
 } from './presentation';
+
 export const WorkspaceLoading = ({ error, reload }: { error?: Error; reload: () => void }) =>
   error ? (
     <div role="alert" className="m-5 rounded-card border border-danger p-5">
@@ -43,17 +44,20 @@ export const WorkspaceLoading = ({ error, reload }: { error?: Error; reload: () 
       aria-label="Reading facility records"
     />
   );
+
 const Empty = ({ children }: { children: ReactNode }) => (
   <div className="rounded-card border border-dashed border-outline bg-white p-6 text-sm text-ink-muted">
     {children}
   </div>
 );
+
 const panel = 'rounded-card border border-outline-soft bg-white p-4 md:p-5';
 type Edit = {
   kind: EditorKind;
   previous?: AnyDocument;
   preset?: Record<string, unknown>;
 };
+
 const canEdit = (kind: EditorKind, permissions: readonly string[]) =>
   permissions.includes(
     (
@@ -72,6 +76,7 @@ const canEdit = (kind: EditorKind, permissions: readonly string[]) =>
       } as Record<EditorKind, string>
     )[kind],
   );
+
 const lifecycle = (r: AnyDocument): string => {
   if ('active' in r) {
     return r.active ? 'Available' : 'Retired';
@@ -192,6 +197,7 @@ const intakeActions = (previous?: { action: string }): string[] => {
 
   return ['pause', 'close'];
 };
+
 export const RecordList = ({
   records,
   data,
@@ -273,8 +279,10 @@ export const RecordList = ({
       No records match this view. Add the actual service, team or place when you are ready.
     </Empty>
   );
+
 const Readiness = () => {
   const context = useAuthorizationContext();
+
   const [result, setResult] = useState<{
     ready: boolean;
     blockers: {
@@ -282,14 +290,18 @@ const Readiness = () => {
       ids: string[];
     }[];
   }>();
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const check = async () => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       setResult(await workforceReadiness(context));
     } catch (cause) {
@@ -298,6 +310,7 @@ const Readiness = () => {
       setBusy(false);
     }
   };
+
   return (
     <section className={panel}>
       <h2 className="font-bold">Clinical approval rollout</h2>
@@ -332,6 +345,7 @@ const Readiness = () => {
     </section>
   );
 };
+
 export const FacilityWorkspace = () => {
   const query = useWorkforce();
   const context = useAuthorizationContext();
@@ -340,24 +354,30 @@ export const FacilityWorkspace = () => {
   const [editing, setEditing] = useState<Edit>();
   // Keep bookmarked sections working after simplifying the navigation.
   const requested = params.get('view');
+
   const view =
     requested && ['services', 'structure', 'locations', 'finance', 'advanced'].includes(requested)
       ? requested
       : 'details';
+
   useEffect(() => {
     document.title = 'Facility · Geneus Health';
   }, []);
+
   if (query.loading || !query.data) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   if (query.error) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
   const advanced = view === 'advanced' || view === 'finance';
   const recordView = recordViewFor(view);
   const copy = RECORD_VIEW_COPY[recordView];
   const kind = copy.kind;
+
   const collectionFor = () => {
     if (recordView === 'structure') {
       return data.units;
@@ -369,14 +389,18 @@ export const FacilityWorkspace = () => {
 
     return data.departments;
   };
+
   const collection = collectionFor();
+
   const records = collection.filter((r) =>
     recordName(r).toLowerCase().includes(search.toLowerCase()),
   );
+
   const change = (next: string) => {
     setSearch('');
     setParams({ view: next });
   };
+
   const recordSection = (
     <section className={`${panel} min-w-0 space-y-4`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -413,6 +437,7 @@ export const FacilityWorkspace = () => {
       )}
     </section>
   );
+
   const renderView = () => {
     if (view === 'details') {
       return (
@@ -512,6 +537,7 @@ export const FacilityWorkspace = () => {
     </section>
   );
 };
+
 const IntakeEditor = ({
   data,
   offeringId,
@@ -527,12 +553,15 @@ const IntakeEditor = ({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const heads = eventHeads(
     data.events.filter((e) => e.offeringId === offeringId && e.sessionId === session?.sessionId),
   );
+
   const previous = heads[0];
   const available = intakeActions(previous);
   const [action, setAction] = useState(available[0]);
+
   return (
     <Sheet
       title="Change service intake"
@@ -568,6 +597,7 @@ const IntakeEditor = ({
         disabled={busy || heads.length > 1}
         onClick={async () => {
           setBusy(true);
+
           try {
             await saveIntake(
               offeringId,
@@ -577,6 +607,7 @@ const IntakeEditor = ({
               context,
               previous,
             );
+
             onClose();
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'Could not change intake');
@@ -590,6 +621,7 @@ const IntakeEditor = ({
     </Sheet>
   );
 };
+
 export const CoverageWorkspace = ({
   offeringId,
   embedded = false,
@@ -600,16 +632,21 @@ export const CoverageWorkspace = ({
   const query = useWorkforce();
   const context = useAuthorizationContext();
   const [params, setParams] = useSearchParams();
+
   const [date, setDate] = useState(
     params.get('date') || zonedInput(new Date().toISOString(), 'Africa/Lagos').slice(0, 10),
   );
+
   const [service, setService] = useState(offeringId || '');
   const [editing, setEditing] = useState<Edit>();
   const [intake, setIntake] = useState<ServiceSession>();
+
   if (query.loading || !query.data || query.error) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
+
   const sessions = currentFacilityRevisions(data.sessions)
     .filter(
       (s) =>
@@ -619,6 +656,7 @@ export const CoverageWorkspace = ({
           date,
     )
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+
   // Not embedded: Settings → Staff scheduling & coverage, which provides the page heading and sections.
   return (
     <section className={embedded ? 'space-y-4' : 'space-y-5'}>
@@ -630,6 +668,7 @@ export const CoverageWorkspace = ({
             value={date}
             onChange={(e) => {
               setDate(e.target.value);
+
               if (!embedded) {
                 const next = new URLSearchParams(params);
                 next.set('date', e.target.value);
@@ -672,6 +711,7 @@ export const CoverageWorkspace = ({
             const events = data.events.filter(
               (e) => e.offeringId === s.offeringId && e.sessionId === s.sessionId,
             );
+
             return (
               <article key={s.id} className={panel}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -751,6 +791,7 @@ export const CoverageWorkspace = ({
     </section>
   );
 };
+
 export const ServiceWorkspace = () => {
   const { offeringId } = useParams();
   const query = useWorkforce();
@@ -758,12 +799,15 @@ export const ServiceWorkspace = () => {
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Edit>();
   const [intake, setIntake] = useState(false);
+
   if (query.loading || !query.data || query.error) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
   const offering = data.offerings.find((o) => o.id === offeringId);
   const view = params.get('view') || 'overview';
+
   if (!offering) {
     return (
       <Empty>
@@ -775,10 +819,13 @@ export const ServiceWorkspace = () => {
       </Empty>
     );
   }
+
   const assignments = currentFacilityRevisions(data.assignments).filter(
     (a) => a.offeringId === offering.id,
   );
+
   const events = data.events.filter((e) => e.offeringId === offering.id && !e.sessionId);
+
   const renderView = () => {
     if (view === 'overview') {
       return (

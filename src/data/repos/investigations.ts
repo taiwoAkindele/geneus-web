@@ -28,6 +28,7 @@ export const loadInvestigationCatalogue = async () => {
     allOfType<Location>('location'),
     getFacility(),
   ]);
+
   return {
     definitions,
     offerings,
@@ -43,6 +44,7 @@ export const loadInvestigationCatalogue = async () => {
               const direct = definitions.find(
                 (d) => d.active && d.orderable && d.feeItemId === fee.id,
               );
+
               const offering = direct
                 ? undefined
                 : offerings.find(
@@ -58,6 +60,7 @@ export const loadInvestigationCatalogue = async () => {
                           d.investigation,
                       ),
                   );
+
               return {
                 fee,
                 central: true as const,
@@ -72,6 +75,7 @@ export const loadInvestigationCatalogue = async () => {
           (d) =>
             d.id === offering.serviceDefinitionId && d.active && d.orderable && d.investigation,
         );
+
         if (
           !definition ||
           offering.configuration !== 'active' ||
@@ -79,16 +83,21 @@ export const loadInvestigationCatalogue = async () => {
         ) {
           return [];
         }
+
         const fee = fees.find((f) => f.id === offering.feeItemId && f.active);
+
         if (billingCatalogueEnabled() && fee?.category === 'laboratory') {
           return [];
         }
+
         return [{ offering, definition, fee, central: false as const }];
       }),
     ],
   };
 };
+
 export type InvestigationCatalogue = Awaited<ReturnType<typeof loadInvestigationCatalogue>>;
+
 export const selectInvestigation = ({
   definition,
   offering,
@@ -115,7 +124,9 @@ export const selectInvestigation = ({
 });
 
 export type OwnTest = { name: string; specimen: string; classification: string; aliases: string[] };
+
 export type AddedTests = { added: string[]; skipped: string[] };
+
 const isLaboratory = (name: string) => name.trim().toLowerCase() === 'laboratory';
 
 /**
@@ -128,6 +139,7 @@ const laboratoryPlacement = async (context: AuthorizationContext) => {
     allOfType<Unit>('unit'),
     allOfType<Location>('location'),
   ]);
+
   const unit =
     units.find((u) => isLaboratory(u.name) && unitIsRoutable(u)) ??
     ((await saveWorkforce(
@@ -135,6 +147,7 @@ const laboratoryPlacement = async (context: AuthorizationContext) => {
       { name: 'Laboratory', active: true, kind: 'unit' },
       context,
     )) as Unit);
+
   const location =
     locations.find((l) => isLaboratory(l.name) && l.active) ??
     ((await saveWorkforce(
@@ -142,6 +155,7 @@ const laboratoryPlacement = async (context: AuthorizationContext) => {
       { name: 'Laboratory', kind: 'room', active: true, unitId: unit.id },
       context,
     )) as Location);
+
   return { unitId: unit.id, locationId: location.id };
 };
 
@@ -156,16 +170,20 @@ const addTests = async (
 ): Promise<AddedTests> => {
   assertAllowed(context, 'service:manage');
   const facility = await getFacility();
+
   const taken = new Set(
     (await allOfType<ServiceDefinition>('service_definition'))
       .filter((d) => d.active && d.investigation)
       .flatMap((d) => [d.name, ...(d.investigation?.aliases ?? [])].map(labTestKey)),
   );
+
   const added: string[] = [];
   const skipped: string[] = [];
   let placement: Awaited<ReturnType<typeof laboratoryPlacement>> | undefined;
+
   for (const test of tests) {
     const name = test.name.trim().replace(/\s+/g, ' ');
+
     const aliases = [
       ...new Set(
         test.aliases
@@ -173,11 +191,14 @@ const addTests = async (
           .filter((alias) => alias && labTestKey(alias) !== labTestKey(name)),
       ),
     ];
+
     const keys = [name, ...aliases].map(labTestKey);
+
     if (!name || keys.some((key) => taken.has(key))) {
       skipped.push(test.name.trim());
       continue;
     }
+
     keys.forEach((key) => taken.add(key));
     placement ??= await laboratoryPlacement(context);
     const id = `service_definition:${crypto.randomUUID()}`;
@@ -199,6 +220,7 @@ const addTests = async (
       undefined,
       id,
     );
+
     await saveWorkforce(
       'service_offering',
       {
@@ -215,12 +237,16 @@ const addTests = async (
       },
       context,
     );
+
     added.push(name);
   }
+
   return { added, skipped };
 };
+
 export const addOwnTests = (tests: readonly OwnTest[], context: AuthorizationContext) =>
   addTests(tests, context);
+
 /** Standard tests come from this facility's downloaded copy of the server's list, copied exactly. */
 export const adoptStandardTests = async (
   keys: readonly string[],
@@ -229,6 +255,7 @@ export const adoptStandardTests = async (
   const standards = (await allOfType<StandardTest>('standard_test')).filter((s) =>
     keys.includes(s.key),
   );
+
   return addTests(
     standards.map((s) => ({
       name: s.name,
@@ -240,21 +267,25 @@ export const adoptStandardTests = async (
     context,
   );
 };
+
 /** The facility's standard tests, marked when one is already in the catalogue. */
 export const loadStandardTests = async () => {
   const [standards, definitions] = await Promise.all([
     allOfType<StandardTest>('standard_test'),
     allOfType<ServiceDefinition>('service_definition'),
   ]);
+
   const taken = new Set(
     definitions
       .filter((d) => d.active && d.investigation)
       .flatMap((d) => [d.name, ...(d.investigation?.aliases ?? [])].map(labTestKey)),
   );
+
   return standards
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((s) => ({ ...s, added: [s.name, ...s.aliases].some((n) => taken.has(labTestKey(n))) }));
 };
+
 export type StandardTestOption = Awaited<ReturnType<typeof loadStandardTests>>[number];
 
 /** Tests are added on any device and checked by the server when they sync. */
@@ -264,6 +295,7 @@ export type CatalogueRow = {
   fee?: FeeItem;
   template?: { name: string; parts: number };
 };
+
 /**
  * One page of this facility's lab tests, read with LIMIT/OFFSET from the local
  * replica so long catalogues stay fast offline. Search covers names, other names,
@@ -282,6 +314,7 @@ export const loadCataloguePage = async (
   const like = `%${query.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const where = `WHERE "facilityId" = ? AND "category" = 'laboratory' AND "active" = 1 AND "investigation" IS NOT NULL AND ("name" LIKE ? ESCAPE '\\' OR "investigation" LIKE ? ESCAPE '\\')`;
   const parameters = [context.facilityId, like, like];
+
   const [count, rows] = await Promise.all([
     db.getOptional<{ total: number }>(
       `SELECT COUNT(*) AS total FROM ${TABLE_FOR.service_definition} ${where}`,
@@ -292,9 +325,11 @@ export const loadCataloguePage = async (
       [...parameters, pageSize, Math.max(0, page) * pageSize],
     ),
   ]);
+
   const definitions = rows.map((row) => fromRow<ServiceDefinition>('service_definition', row));
   const ids = definitions.map((d) => d.id);
   const marks = ids.map(() => '?').join(',');
+
   const offerings = ids.length
     ? (
         await db.getAll<Row>(
@@ -303,9 +338,11 @@ export const loadCataloguePage = async (
         )
       ).map((row) => fromRow<ServiceOffering>('service_offering', row))
     : [];
+
   const feeIds = [
     ...new Set([...definitions, ...offerings].flatMap((o) => (o.feeItemId ? [o.feeItemId] : []))),
   ];
+
   const fees = feeIds.length
     ? (
         await db.getAll<Row>(
@@ -314,6 +351,7 @@ export const loadCataloguePage = async (
         )
       ).map((row) => fromRow<FeeItem>('fee_item', row))
     : [];
+
   // The result template in use for each test on this page; a test has at most one.
   const templates = ids.length
     ? await db.getAll<{ test: string; name: string; parts: number }>(
@@ -321,10 +359,12 @@ export const loadCataloguePage = async (
         ids,
       )
     : [];
+
   const items: CatalogueRow[] = definitions.map((definition) => {
     const own = offerings.filter((o) => o.serviceDefinitionId === definition.id);
     const offering = own.find((o) => o.configuration === 'active') ?? own[0];
     const template = templates.find((t) => t.test === definition.id);
+
     return {
       definition,
       offering,
@@ -332,6 +372,7 @@ export const loadCataloguePage = async (
       ...(template ? { template: { name: template.name, parts: Number(template.parts) } } : {}),
     };
   });
+
   return { items, total: Number(count?.total ?? 0) };
 };
 
@@ -342,6 +383,7 @@ export const linkInvestigationFee = async (
   context: AuthorizationContext,
 ) => {
   const catalogue = await loadInvestigationCatalogue();
+
   if (
     !catalogue.fees.some(
       (fee) =>
@@ -353,8 +395,10 @@ export const linkInvestigationFee = async (
   ) {
     throw new Error('Choose an active central Laboratory item');
   }
+
   return saveWorkforce('service_offering', { feeItemId }, context, offering);
 };
+
 export const linkInvestigationDefinition = async (
   definition: ServiceDefinition,
   feeItemId: string,
@@ -367,16 +411,20 @@ export const linkInvestigationDefinition = async (
       f.active &&
       f.category === 'laboratory',
   );
+
   if (!fee) {
     throw new Error('Choose an active central Laboratory item');
   }
+
   const offerings = (await allOfType<ServiceOffering>('service_offering')).filter(
     (o) => o.serviceDefinitionId === definition.id,
   );
+
   if ([definition, ...offerings].some((o) => o.feeItemId && o.feeItemId !== feeItemId)) {
     throw new Error(
       'This clinical definition already references a different fee. Review its existing association before changing it.',
     );
   }
+
   return saveWorkforce('service_definition', { feeItemId }, context, definition);
 };

@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 export type FieldExplanation = { purpose: string; example?: string };
 
 type HelpProps = { label: string; help: FieldExplanation };
+
 /** Hover/focus help on desktop; an explicit toggle also works on touch devices. */
 const HelpButton = ({ label, help }: HelpProps) => {
   const tooltipId = useId();
@@ -14,6 +15,7 @@ const HelpButton = ({ label, help }: HelpProps) => {
   const [focused, setFocused] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number; width: number }>();
   const open = pinned || hovered || focused;
+
   const close = () => {
     setPinned(false);
     setHovered(false);
@@ -24,22 +26,29 @@ const HelpButton = ({ label, help }: HelpProps) => {
     if (!open) {
       return;
     }
+
     const place = () => {
       const anchor = button.current?.getBoundingClientRect();
+
       if (!anchor) {
         return;
       }
+
       const width = Math.min(288, window.innerWidth - 32);
       const height = tooltip.current?.offsetHeight ?? 140;
       const left = Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16));
       const below = anchor.bottom + 8;
+
       const top =
         below + height < window.innerHeight - 16 ? below : Math.max(16, anchor.top - height - 8);
+
       setPosition({ left, top, width });
     };
+
     place();
     window.addEventListener('resize', place);
     document.addEventListener('scroll', place, true);
+
     return () => {
       window.removeEventListener('resize', place);
       document.removeEventListener('scroll', place, true);
@@ -50,21 +59,26 @@ const HelpButton = ({ label, help }: HelpProps) => {
     if (!open) {
       return;
     }
+
     const outside = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) {
         close();
       }
     };
+
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') {
         return;
       }
+
       event.preventDefault();
       event.stopPropagation();
       close();
     };
+
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', escape, true);
+
     return () => {
       document.removeEventListener('pointerdown', outside);
       document.removeEventListener('keydown', escape, true);
@@ -126,6 +140,7 @@ type LabelProps = {
   descriptionId?: string;
   required?: boolean;
 };
+
 export const FieldLabel = ({ label, htmlFor, id, help, descriptionId, required }: LabelProps) => (
   <div className="mb-1.5 flex min-h-5 items-center gap-1 text-[13px] font-semibold text-ink-soft">
     {htmlFor ? (

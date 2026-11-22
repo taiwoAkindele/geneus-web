@@ -24,6 +24,7 @@ describe('facility diagnosis suggestions', () => {
       ['Malaria', 2, 'B54'],
     ]);
   });
+
   it('fills a code only for an exact known diagnosis', () => {
     expect(knownCode(known, ' MALARIA ')?.code).toBe('B54');
     expect(knownCode(known, 'Malaria, severe')).toBeUndefined();

@@ -12,18 +12,23 @@ export const EncountersScreen = () => {
   const context = useAuthorizationContext();
   const station = params.get('queue') ?? readDeviceStation();
   const search = params.get('q') ? `?q=${encodeURIComponent(params.get('q')!)}` : '';
+
   if (station === 'lab') {
     return <Navigate to={'/laboratory' + search} replace />;
   }
+
   if (station === 'pharmacy') {
     return <Navigate to={'/pharmacy' + search} replace />;
   }
+
   // Results now arrive in the visit itself and alert the ordering clinician.
   if (station === 'results') {
     return <Navigate to="/laboratory?tab=completed" replace />;
   }
+
   const next = new URLSearchParams(params);
   next.delete('queue');
+
   // Clinical staff land on their patient list; front desk staff on theirs.
   return (
     <Navigate

@@ -8,7 +8,7 @@ import {
   requestInsuranceActivation,
   setInsuranceSetup,
   withdrawInsuranceActivation,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { useAuthorizationContext, StaffVerification } from '@/session';
 import { Button, TextAreaField, useToast } from '@/ui';
@@ -33,6 +33,7 @@ export const InsuranceSettings = () => {
   useEffect(() => {
     document.title = 'Insurance settings · Geneus Health';
   }, []);
+
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-4">
       <header>
@@ -51,10 +52,12 @@ export const InsuranceSettings = () => {
 
 export const SetupChecklist = ({ status }: { status: InsuranceSetupStatus }) => {
   const context = useAuthorizationContext();
+
   return (
     <ul aria-label="Setup checklist" className="space-y-3">
       {status.items.map((item) => {
         const guide = guideFor(item, context);
+
         return (
           <li
             key={item.kind}
@@ -131,35 +134,43 @@ const SettingsBody = () => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+
   const load = useCallback(async () => {
     try {
       setStatus(await insuranceSetupStatus(context));
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const canSwitch = context.permissions.includes('insurance_contract:activate');
+
   const act = async (work: () => Promise<unknown>, done: string, resync = false) => {
     setBusy(true);
     setError('');
+
     try {
       await work();
+
       if (resync) {
         // The change is saved on the server; sync reconnects by itself if this nudge fails.
         await reconnectSync().catch(() => undefined);
       }
+
       toast(done);
       await load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   if (!status) {
     return error ? (
       <p role="alert" className="text-sm text-danger">
@@ -169,8 +180,10 @@ const SettingsBody = () => {
       <p role="status">Loading…</p>
     );
   }
+
   const blocking = status.items.filter((i) => i.requiredFor === 'billing' && !i.ok);
   const request = status.activation;
+
   const renderStatusLabel = () => {
     if (status.state === 'off') {
       return 'Off';

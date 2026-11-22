@@ -59,21 +59,27 @@ export const ChargeCoverage = ({
   const estimate = row.coverage;
   const line = coverageLine(estimate);
   const money = (n: number) => formatMoney(n, row.charge.currency);
+
   const refunds = insurance.refunds.filter((r) =>
     r.allocations.some((a) => a.chargeId === row.charge.id),
   );
+
   const cover = estimate && 'cover' in estimate ? estimate.cover : undefined;
+
   const notEligible =
     estimate?.state === 'undetermined' && estimate.reason === 'not_eligible'
       ? estimate.check
       : undefined;
+
   const offerSelfPay = Boolean(
     cover &&
     (estimate?.state === 'undetermined' || estimate?.state === 'estimated') &&
     context.permissions.includes('coverage:elect_self_pay') &&
     selfPayOffered(row.charge, cover!, insurance, notEligible),
   );
+
   const age = coverageDataAge(insurance);
+
   return (
     <>
       {line ? (
@@ -149,13 +155,16 @@ export const SelfPaySheet = ({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       if (!agreed) {
         throw new Error('Confirm that the patient agreed to pay without insurance');
       }
+
       await electSelfPay(
         {
           patientId: row.charge.patientId,
@@ -167,6 +176,7 @@ export const SelfPaySheet = ({
         },
         context,
       );
+
       onSaved();
     } catch (cause) {
       const message = userMessage(cause, 'The choice was not recorded. Try again.');
@@ -176,6 +186,7 @@ export const SelfPaySheet = ({
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title="Pay without insurance"
@@ -241,17 +252,22 @@ export const RefundSheet = ({
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const [id] = useState(() => `refund:${crypto.randomUUID()}`);
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       const amountMinor = parseAmount(amount, row.charge.currency);
+
       if (amountMinor <= 0 || amountMinor > credit) {
         throw new Error(`Refund up to ${formatMoney(credit, row.charge.currency)}`);
       }
+
       if (!reason.trim()) {
         throw new Error('Give the reason for the refund');
       }
+
       onDone(
         await recordRefund(context, {
           id,
@@ -268,12 +284,14 @@ export const RefundSheet = ({
         cause instanceof VerificationRequired
           ? 'Your session with the server ended. Confirm your PIN, then refund.'
           : userMessage(cause, 'The refund was not recorded. Try again.');
+
       setError(message);
       toast(message, { tone: 'error' });
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title="Refund credit"

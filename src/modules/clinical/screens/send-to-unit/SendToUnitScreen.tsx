@@ -86,12 +86,15 @@ export const SendToUnitScreen = () => {
     if (!patientId || !from || !to) {
       return;
     }
+
     setSending(true);
+
     try {
       await sendHandoff(
         { patientId, encounterId, fromUnitId: from.id, toUnitId: to.id, instruction },
         context,
       );
+
       toast(`Sent to ${to.name}`);
       navigate(-1);
     } catch (cause) {
@@ -101,6 +104,7 @@ export const SendToUnitScreen = () => {
           : 'Could not send the patient — please try again',
         { tone: 'error' },
       );
+
       setSending(false);
     }
   };
@@ -215,9 +219,11 @@ export const SendToUnitScreen = () => {
                   const id = e.target.value;
                   setServiceId(id);
                   const offering = workforce.data?.offerings.find((o) => o.id === id);
+
                   const destination = active.find((u) =>
                     [u.id, u.unitId].includes(offering?.unitId || ''),
                   );
+
                   setToUnitId(destination?.id);
                 }}
                 options={[

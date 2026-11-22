@@ -14,6 +14,7 @@ export type NavItem = {
   bottom?: boolean;
   group?: 'Daily work' | 'Money' | 'Facility';
 };
+
 type NavContext = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
 export const hasAdminWorkspace = (context: NavContext): boolean =>
@@ -36,19 +37,23 @@ export const hasAdminWorkspace = (context: NavContext): boolean =>
 export const navigationFor = (context: NavContext): NavItem[] => {
   const roles = context.roles ?? [context.role];
   const admin = roles.includes('facility_admin');
+
   const clinical =
     roles.some((role) =>
       ['chew', 'nurse', 'doctor', 'supervisor', 'laboratory_staff', 'pharmacy_staff'].includes(
         role,
       ),
     ) || context.permissions.includes('encounter:record');
+
   // Extra duties expand destinations; they do not replace the primary duty's shortcut.
   const clinicalShortcut =
     ['chew', 'nurse', 'doctor', 'supervisor', 'laboratory_staff', 'pharmacy_staff'].includes(
       context.role,
     ) ||
     (context.role === 'facility_admin' && clinical);
+
   const frontDesk = !clinicalShortcut && context.role !== 'cashier';
+
   const dailyWork =
     roles.some((role) => role !== 'cashier') ||
     context.permissions.some((permission) =>
@@ -60,6 +65,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
         'register_entry:create',
       ].includes(permission),
     );
+
   const items: NavItem[] = [
     {
       key: 'home',
@@ -81,6 +87,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       group: 'Daily work',
     },
   ];
+
   if (
     roles.some((role) => ['facility_admin', 'cashier', 'supervisor'].includes(role)) ||
     context.permissions.some((permission) =>
@@ -99,6 +106,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       group: 'Money',
     });
   }
+
   if (dailyWork) {
     items.push(
       {
@@ -142,6 +150,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
         : []),
     );
   }
+
   if (dailyWork) {
     items.push(
       {
@@ -162,6 +171,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       },
     );
   }
+
   if (
     roles.includes('facility_admin') ||
     context.permissions.some((permission) =>
@@ -186,6 +196,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       group: 'Facility',
     });
   }
+
   if (
     context.permissions.some((p) =>
       [
@@ -206,6 +217,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       group: 'Facility',
     });
   }
+
   if (hasAdminWorkspace(context)) {
     items.push({
       key: 'admin',
@@ -216,6 +228,7 @@ export const navigationFor = (context: NavContext): NavItem[] => {
       group: 'Facility',
     });
   }
+
   return items;
 };
 

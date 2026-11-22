@@ -39,6 +39,7 @@ const emptyDraft = (): RegisterDraft => ({
   description: '',
   fields: [],
 });
+
 const toDraft = (value: RegisterDraft): RegisterDraft => ({
   name: value.name,
   category: value.category,
@@ -46,7 +47,9 @@ const toDraft = (value: RegisterDraft): RegisterDraft => ({
   fields: value.fields,
   ...(value.visitLink ? { visitLink: value.visitLink } : {}),
 });
+
 const lines = (text: string) => text.split('\n');
+
 const SOURCES = [
   { value: 'staff', label: 'Staff fill it in' },
   ...VisitFact.options.map((fact) => ({
@@ -54,6 +57,7 @@ const SOURCES = [
     label: `From the visit: ${VISIT_FACT_LABELS[fact]}`,
   })),
 ];
+
 const newField = (type: FieldType, label = ''): Field => ({
   id: uid('field'),
   type,
@@ -96,15 +100,18 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
   useEffect(() => {
     document.title = 'Register configuration · Geneus Health';
     alive.current = true;
+
     return () => {
       alive.current = false;
     };
   }, []);
+
   useEffect(() => {
     if (error) {
       errorHeading.current?.focus();
     }
   }, [error]);
+
   useEffect(() => {
     if (
       !canConfigure ||
@@ -115,17 +122,22 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
     ) {
       return;
     }
+
     let cancelled = false;
+
     const load = async () => {
       try {
         const initial = register ? toDraft(register.configuration) : emptyDraft();
         const version = register?.configuration.version ?? 0;
         const recovery = await readRegisterRecovery(context, key);
+
         if (cancelled) {
           return;
         }
+
         baseline.current = JSON.stringify(initial);
         baseVersion.current = version;
+
         if (recovery && recovery.baseVersion !== version) {
           setCompeting(recovery);
           setDraft(initial);
@@ -133,6 +145,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
           setDraft(recovery ? toDraft(recovery) : initial);
           setRecovered(Boolean(recovery));
         }
+
         initialized.current = true;
         setLoaded(true);
       } catch (cause) {
@@ -141,15 +154,19 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
         }
       }
     };
+
     void load();
+
     return () => {
       cancelled = true;
     };
   }, [canConfigure, context, key, query.loading, query.error, register, registerId]);
+
   useEffect(() => {
     if (!loaded || !dirty || suppressRecovery.current || competing) {
       return;
     }
+
     const snapshot = draft;
     const signature = encoded;
     const version = baseVersion.current;
@@ -157,6 +174,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
     writes.current = writes.current
       .catch(() => {})
       .then(() => writeRegisterRecovery(context, key, snapshot, version));
+
     void writes.current
       .then(() => {
         if (alive.current) {
@@ -172,25 +190,33 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
         }
       });
   }, [context, key, loaded, dirty, encoded, competing]);
+
   useEffect(() => {
     if (!dirty || (recoverySaved === encoded && !saving)) {
       return;
     }
+
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
+
     window.addEventListener('beforeunload', warn);
+
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty, encoded, recoverySaved, saving]);
+
   const fieldKeys = useRef(new Map<string, string>());
+
   const updateField = (id: string, patch: Partial<Field>) => {
     const field = draft.fields.find((candidate) => candidate.id === id);
     const changedType = Boolean(patch.type && field && patch.type !== field.type);
     const replacementId = changedType ? uid('field') : id;
+
     if (changedType) {
       fieldKeys.current.set(replacementId, fieldKeys.current.get(id) ?? id);
     }
+
     setDraft((current) => ({
       ...current,
       fields: current.fields.map((candidate) =>
@@ -209,6 +235,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       ),
     }));
   };
+
   // Turning the link off hands every visit-filled field back to staff.
   const setVisits = (visits: RegisterVisitLink['visits'] | 'none') =>
     setDraft((current) =>
@@ -228,9 +255,11 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
             },
           },
     );
+
   const toggleVisitType = (type: VisitType) =>
     setDraft((current) => {
       const chosen = current.visitLink?.visitTypes ?? [];
+
       return current.visitLink
         ? {
             ...current,
@@ -243,6 +272,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
           }
         : current;
     });
+
   const setSource = (field: Field, source: string) =>
     updateField(
       field.id,
@@ -255,48 +285,62 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
             options: undefined,
           },
     );
+
   const move = (index: number, direction: number) =>
     setDraft((current) => {
       const fields = [...current.fields];
       const target = index + direction;
+
       if (target < 0 || target >= fields.length) {
         return current;
       }
+
       [fields[index], fields[target]] = [fields[target], fields[index]];
+
       return { ...current, fields };
     });
+
   const review = () => {
     const issues = registerDefinitionIssues(
       { ...draft, status: 'published' },
       register ? [register.configuration] : [],
     );
+
     if (issues.length) {
       setError(issues.join(' '));
       setTab('fields');
+
       return;
     }
+
     setError('');
     setPublishing(true);
   };
+
   const save = async (publish: boolean) => {
     if (lock.current || competing) {
       return;
     }
+
     lock.current = true;
     setSaving(true);
     setError('');
+
     try {
       // Wait for the pending recovery write; its failure was already shown to the user.
       await writes.current.catch(() => {});
+
       const definition = await (publish ? query.publish : query.saveDraft)(
         draft,
         registerId ?? null,
         baseVersion.current,
       );
+
       suppressRecovery.current = true;
       await discardRegisterRecovery(context, key).catch(() =>
         setRecoveryError('The shared draft was saved, but private recovery could not be cleared.'),
       );
+
       baseline.current = encoded;
       baseVersion.current = definition.version;
       setSavedVersion(definition.version);
@@ -307,6 +351,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
           ? 'Register published on this device. Staff can record entries.'
           : 'Register draft saved on this device. It will sync when connected.',
       );
+
       if (publish) {
         navigate('/registers');
       } else if (!registerId) {
@@ -326,6 +371,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       suppressRecovery.current = false;
     }
   };
+
   const template = () =>
     setDraft((current) => ({
       ...current,
@@ -340,10 +386,12 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
         newField('textarea', 'Notes'),
       ],
     }));
+
   const resolveRecovery = async (resume: boolean) => {
     if (!competing) {
       return;
     }
+
     if (resume) {
       setDraft(toDraft(competing));
       setRecovered(true);
@@ -351,8 +399,10 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       await discardRegisterRecovery(context, key);
       setRecoverySaved(encoded);
     }
+
     setCompeting(undefined);
   };
+
   if (!canConfigure) {
     return (
       <div className="p-5">
@@ -367,6 +417,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       </div>
     );
   }
+
   if (query.error || (!loaded && error)) {
     return (
       <div role="alert" className="p-5">
@@ -382,6 +433,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       </div>
     );
   }
+
   if (!loaded) {
     return (
       <div className="p-5">
@@ -401,6 +453,7 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
       </div>
     );
   }
+
   const renderVisitFilter = () => {
     if (draft.visitLink?.visits === 'matching') {
       return (
@@ -702,8 +755,10 @@ export const RegisterBuilder = ({ registerId }: { registerId?: string }) => {
                   setDraft((current) => {
                     const fields = [...current.fields];
                     fields.splice(removed.index, 0, removed.field);
+
                     return { ...current, fields };
                   });
+
                   setRemoved(undefined);
                 }}
               >

@@ -23,21 +23,25 @@ const a = {
   credential: 'device:A.synthetic',
   syncEndpoint: 'http://sync',
 };
+
 const b = {
   deviceId: 'device:B',
   facilityId: 'B',
   credential: 'device:B.synthetic',
   syncEndpoint: 'http://sync',
 };
+
 beforeEach(() => {
   resetSecureStorageForTests();
   vi.stubGlobal('localStorage', memoryStorage());
 });
+
 afterEach(() => {
   setDatabaseForTests(undefined);
   vi.unstubAllGlobals();
   resetSecureStorageForTests();
 });
+
 describe('separate facility workspaces', () => {
   it('adopts the original database without renaming or clearing it', async () => {
     await saveDeviceCredential(a);
@@ -47,9 +51,11 @@ describe('separate facility workspaces', () => {
       databaseName: 'geneus-encrypted.sqlite',
       legacy: true,
     });
+
     await ensureFacilityWorkspace(a);
     expect(listFacilityWorkspaces()).toHaveLength(1);
   });
+
   it('recovers interrupted activation into B without inheriting A’s credentials, PINs or database key', async () => {
     await saveDeviceCredential(a);
     await secureSet('geneus.dbKey', 'key:A');
@@ -83,6 +89,7 @@ describe('separate facility workspaces', () => {
         ],
       }),
     );
+
     await recoverWorkspaceActivation();
     expect(getDeviceCredential()).toEqual(b);
     expect(secureGet('geneus.dbKey')).toBe('key:B');
@@ -97,10 +104,12 @@ describe('separate facility workspaces', () => {
       JSON.parse(secureGet('geneus.facilityWorkspaces')!).entries[0].values['geneus.dbKey'],
     ).toBe('key:A');
   });
+
   it('binds an existing sync connector to A even if active credential slots change to B', async () => {
     await saveDeviceCredential(a);
     const connector = createConnector({ onDeenrolled: vi.fn() });
     await saveDeviceCredential(b);
+
     const fetcher = vi.fn(
       async (_url: unknown, _request: unknown) =>
         new Response(
@@ -114,13 +123,16 @@ describe('separate facility workspaces', () => {
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
     );
+
     vi.stubGlobal('fetch', fetcher);
     await connector.fetchCredentials();
     expect((fetcher.mock.calls[0][1] as RequestInit).headers).toMatchObject({
       authorization: `Bearer ${a.credential}`,
     });
+
     expect(secureGet('geneus.lastServerContactOn')).toBeNull();
   });
+
   it('refuses a switch while another tab holds the workspace without closing or clearing the current database', async () => {
     await saveDeviceCredential(a);
     await ensureFacilityWorkspace(a);
@@ -138,12 +150,14 @@ describe('separate facility workspaces', () => {
         ) => Promise.resolve(callback(options.mode === 'exclusive' ? null : {})),
       },
     });
+
     await expect(switchFacilityWorkspace(b.deviceId)).rejects.toThrow(/Close other Geneus tabs/);
     expect(db.close).not.toHaveBeenCalled();
     expect(db.disconnectAndClear).not.toHaveBeenCalled();
     expect(getDeviceCredential()).toEqual(a);
     expect(activeWorkspace()?.facilityId).toBe('A');
   });
+
   it('journals the destination identity and only its own PIN while preserving the source queue and keys', async () => {
     await saveDeviceCredential(a);
     await ensureFacilityWorkspace(a);
@@ -153,6 +167,7 @@ describe('separate facility workspaces', () => {
       'geneus.credentials',
       JSON.stringify({ 'staff:A': pin, 'staff:otherA': { hash: 'synthetic-other' } }),
     );
+
     localStorage.setItem('geneus.signedInStaffId', 'staff:A');
     localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
     const db = fakeDatabase({ ps_crud: [{ n: 3 }] });
@@ -168,13 +183,16 @@ describe('separate facility workspaces', () => {
           Promise.resolve(callback({})),
       },
     });
+
     const proof = enrollmentProof();
+
     const device = {
       deviceId: proof.deviceId,
       facilityId: 'B-PHC',
       credential: `${proof.deviceId}.${proof.deviceSecret}`,
       syncEndpoint: 'http://sync',
     };
+
     const envelope = {
       facilityId: device.facilityId,
       deviceId: device.deviceId,
@@ -182,6 +200,7 @@ describe('separate facility workspaces', () => {
       createdBy: 'system',
       createdOn: new Date().toISOString(),
     };
+
     const facility = Facility.parse({
       ...envelope,
       id: device.facilityId,
@@ -192,6 +211,7 @@ describe('separate facility workspaces', () => {
       lga: 'Eti-Osa',
       level: 'phc',
     });
+
     const admin = Staff.parse({
       ...envelope,
       id: 'staff:B',
@@ -202,6 +222,7 @@ describe('separate facility workspaces', () => {
       active: true,
       personId: 'person:shared',
     });
+
     await saveFacilityCreation({
       sourceFacilityId: 'A',
       payload: {
@@ -222,6 +243,7 @@ describe('separate facility workspaces', () => {
         organization: { id: 'org:synthetic', name: 'Synthetic group' },
       },
     });
+
     const identity = {
       sourceStaffId: 'staff:A',
       facilityId: device.facilityId,
@@ -230,6 +252,7 @@ describe('separate facility workspaces', () => {
       personId: 'person:shared',
       createdOn: Date.now(),
     };
+
     await switchFacilityWorkspace(device.deviceId, device, identity);
     expect(getDeviceCredential()).toEqual(device);
     expect(secureGet('geneus.dbKey')).toBeNull();
@@ -242,9 +265,11 @@ describe('separate facility workspaces', () => {
       pending: 3,
       values: { 'geneus.dbKey': 'synthetic-key:A' },
     });
+
     expect(JSON.parse(directory.entries[0].values['geneus.credentials'])).toHaveProperty(
       'staff:otherA',
     );
+
     expect(db.close).toHaveBeenCalledOnce();
     expect(db.disconnectAndClear).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledWith('/home');

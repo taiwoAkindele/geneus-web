@@ -26,6 +26,7 @@ const CATEGORIES = {
   consumable: 'Consumable',
   other: 'Other',
 };
+
 const REASONS = {
   received: 'Received',
   dispensed: 'Dispensed / used',
@@ -33,7 +34,9 @@ const REASONS = {
   adjustment: 'Physical count adjustment',
   transfer: 'Transfer',
 };
+
 type StockBalance = ReturnType<typeof stockBalances>[number];
+
 const level = (item: StockBalance) => {
   if (item.balance < 0) {
     return 'Count discrepancy';
@@ -73,46 +76,63 @@ const StockForm = ({
   const [error, setError] = useState('');
   const saving = useRef(false);
   const amount = Number(quantity);
+
   const negative =
     reason === 'dispensed' ||
     reason === 'expired' ||
     ((reason === 'adjustment' || reason === 'transfer') && direction === 'decrease');
+
   const change = (negative ? -1 : 1) * amount;
+
   const check = () => {
     setError('');
+
     if (!quantity.trim() || !Number.isFinite(amount) || amount < 0 || (item && amount === 0)) {
       setError('Enter a valid quantity' + (item ? ' greater than zero.' : '.'));
+
       return;
     }
+
     if (!item && (!name.trim() || !unit.trim())) {
       setError('Enter the item name and unit of measure.');
+
       return;
     }
+
     if (
       !item &&
       threshold.trim() &&
       (!Number.isFinite(Number(threshold)) || Number(threshold) < 0)
     ) {
       setError('Enter a reorder level of zero or more.');
+
       return;
     }
+
     if (item && ['adjustment', 'transfer'].includes(reason) && !note.trim()) {
       setError('Give a reason for the adjustment or transfer.');
+
       return;
     }
+
     if (item && item.balance + change < 0) {
       setError('The quantity exceeds recorded stock. Check the physical count first.');
+
       return;
     }
+
     setReview(true);
   };
+
   const save = async () => {
     if (saving.current || !review) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       if (item) {
         await recordStockMovement({ itemId: item.id, change, reason, note }, context);
@@ -128,6 +148,7 @@ const StockForm = ({
           context,
         );
       }
+
       onSaved();
       onClose();
     } catch (cause) {
@@ -137,7 +158,9 @@ const StockForm = ({
       setBusy(false);
     }
   };
+
   const dirty = Boolean(name || unit || quantity || threshold || note);
+
   const sheetTitle = () => {
     if (review) {
       return 'Review stock entry';
@@ -145,6 +168,7 @@ const StockForm = ({
 
     return item ? `Record movement · ${item.name}` : 'Add stock item';
   };
+
   return (
     <Sheet title={sheetTitle()} onClose={onClose} hasUnsavedChanges={dirty} closeDisabled={busy}>
       {review ? (
@@ -282,10 +306,12 @@ export const StockWorkspace = () => {
   useEffect(() => {
     document.title = 'Medicine & stock · Geneus Health';
   }, []);
+
   const [pricing, setPricing] = useState(false);
   const search = params.get('q') ?? '';
   const filter = params.get('level') ?? '';
   const item = query.data?.items.find((candidate) => candidate.id === params.get('item'));
+
   const shown = (query.data?.items ?? [])
     .filter(
       (candidate) =>
@@ -296,19 +322,24 @@ export const StockWorkspace = () => {
             : candidate.balance < 0)),
     )
     .sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
+
   const movements = (query.data?.movements ?? [])
     .filter((movement) => movement.itemId === item?.id)
     .sort((a, b) => b.movedOn.localeCompare(a.movedOn));
+
   const change = (key: string, value: string) =>
     setParams((current) => {
       const next = new URLSearchParams(current);
+
       if (value) {
         next.set(key, value);
       } else {
         next.delete(key);
       }
+
       return next;
     });
+
   const renderStock = () => {
     if (query.loading) {
       return <p role="status">Reading stock records…</p>;

@@ -72,6 +72,7 @@ import { acceptedAuthority } from '../workforceAuthority';
 import { privateCredentials } from '@/lib/api/workforce';
 import { listWorkforceReceipts } from './workforceReceipts';
 import { WORKFORCE_RECEIPTS_TABLE } from '../tables';
+
 /** A configuration revision counts up from 1; records saved before revisions existed count as 1. */
 const nextRevision = (previous?: AnyDocument): number => {
   if (previous && 'revision' in previous) {
@@ -102,8 +103,10 @@ export const pendingWorkforceIds = async (): Promise<Set<string>> => {
   const rows = await getDatabase().getAll<{
     id: string;
   }>("SELECT json_extract(data, '$.id') AS id FROM ps_crud");
+
   return new Set(rows.map((row) => row.id));
 };
+
 export const loadWorkforce = async () => {
   const [
     units,
@@ -146,6 +149,7 @@ export const loadWorkforce = async () => {
     pendingWorkforceIds(),
     allOfType('sync_rejection'),
   ]);
+
   return {
     units,
     locations,
@@ -170,12 +174,15 @@ export const loadWorkforce = async () => {
     credentials: [],
   };
 };
+
 export type WorkforceData = Awaited<ReturnType<typeof loadWorkforce>>;
+
 export const failIssues = (issues: readonly string[]): void => {
   if (issues.length) {
     throw new Error([...new Set(issues)].join('. '));
   }
 };
+
 export const eventHeads = <
   T extends {
     id: string;
@@ -184,6 +191,7 @@ export const eventHeads = <
 >(
   items: readonly T[],
 ): T[] => items.filter((item) => !items.some((next) => next.previousId === item.id));
+
 export const ownProof = async (
   context: AuthorizationContext,
   data: Pick<WorkforceData, 'snapshots'>,
@@ -193,6 +201,7 @@ export const ownProof = async (
       .filter((s) => s.staffId === context.userId && s.facilityId === context.facilityId)
       .sort((a, b) => b.revision - a.revision)[0],
   );
+
 /** Care signing does not scan appointment, handoff or audit history. */
 export const loadCareContext = async () => {
   const [offerings, definitions, staff, snapshots, facility] = await Promise.all([
@@ -202,14 +211,18 @@ export const loadCareContext = async () => {
     allOfType<AuthoritySnapshot>('authority_snapshot'),
     getFacility(),
   ]);
+
   return { offerings, definitions, staff, snapshots, facility };
 };
+
 export const clinicalAssignments = async (staffId: string): Promise<StaffAssignment[]> => {
   const records = await allWhere<StaffAssignment>('staff_assignment', 'staffId', staffId);
   const unaccepted = new Set<string>();
+
   for (let offset = 0; offset < records.length; offset += 500) {
     const ids = records.slice(offset, offset + 500).map((r) => r.id);
     const slots = ids.map(() => '?').join(',');
+
     const [pending, refused] = await Promise.all([
       getDatabase().getAll<{ id: string }>(
         `SELECT json_extract(data,'$.id') AS id FROM ps_crud WHERE json_extract(data,'$.id') IN (${slots})`,
@@ -220,17 +233,21 @@ export const clinicalAssignments = async (staffId: string): Promise<StaffAssignm
         ids,
       ),
     ]);
+
     for (const row of [...pending, ...refused]) {
       unaccepted.add(row.id);
     }
   }
+
   return effectiveFacilityRevisions(
     records.filter((r) => !unaccepted.has(r.id)),
     Date.now(),
   );
 };
+
 export const clinicalWitnesses = (recordId: string) =>
   allWhere<import('@shared').AuditEvent>('audit_event', 'entityId', recordId);
+
 /** Shared invariants run against the local replica; the server repeats them under its locks. */
 export const validateWorkforce = async (
   record: AnyDocument,
@@ -238,42 +255,54 @@ export const validateWorkforce = async (
   current?: AnyDocument,
 ): Promise<AuthorizationContext> => {
   context = freshAuthorization(context);
+
   if (
     record.facilityId !== context.facilityId ||
     (!current && record.createdBy !== context.userId)
   ) {
     throw new Error('This record must belong to the signed-in person and facility');
   }
+
   const data = await loadWorkforce();
   const now = Date.now();
+
   if (record.type === 'capability_decision') {
     data.credentials = privateCredentials(context) as never[];
   }
+
   const worker = data.staff.find((s) => s.staffId === context.userId && s.active);
+
   if (!worker || worker.permission !== 'read_write') {
     throw new Error('An active writable staff account is required');
   }
+
   let trusted = context;
+
   if (record.type === 'credential' && record.verification !== 'unverified') {
     trusted = withReviewerAuthority(context, worker, await ownProof(context, data), now);
   }
+
   if (record.type === 'capability_decision' || record.type === 'reviewer_delegation') {
     const proof = await ownProof(context, data);
     failIssues(reviewerDecisionIssues(worker, context, proof, record, now));
     trusted = withReviewerAuthority(context, worker, proof, now);
   }
+
   const policy = FACILITY_DOCUMENT_TYPES.includes(record.type as never)
     ? FACILITY_DOCUMENT_POLICY[record.type as keyof typeof FACILITY_DOCUMENT_POLICY]
     : undefined;
+
   if (
     policy?.writer === 'server' ||
     ('externalReviewerId' in record && record.externalReviewerId)
   ) {
     throw new Error('This record can only be established by authorized server governance');
   }
+
   if (record.type === 'credential' && record.verification !== 'unverified') {
     assertAllowed(trusted, 'clinical_capability:review');
   }
+
   const requiredPermission = () => {
     if (record.type === 'unit') {
       return 'unit:manage';
@@ -289,7 +318,9 @@ export const validateWorkforce = async (
 
     return 'unit:manage';
   };
+
   assertAllowed(trusted, requiredPermission());
+
   if (record.type === 'unit') {
     failIssues(unitHierarchyIssues(record, data.units));
   } else if (record.type === 'billing_department') {
@@ -297,9 +328,11 @@ export const validateWorkforce = async (
   } else if (policy) {
     failIssues(facilityReferenceIssues(record as never, data));
   }
+
   if (record.type === 'location') {
     failIssues(hierarchyIssues(record, data.locations));
   }
+
   // The same catalogue and template checks the server runs when this change syncs.
   if (record.type === 'service_definition' && record.investigation) {
     failIssues(
@@ -310,6 +343,7 @@ export const validateWorkforce = async (
       ),
     );
   }
+
   if (record.type === 'result_template') {
     const [templates, parts, lists, standards] = await Promise.all([
       allOfType<ResultTemplate>('result_template'),
@@ -317,6 +351,7 @@ export const validateWorkforce = async (
       allOfType<AnswerList>('answer_list'),
       allOfType<StandardTemplate>('standard_template'),
     ]);
+
     failIssues(
       resultTemplateIssues(record, {
         templates,
@@ -326,6 +361,7 @@ export const validateWorkforce = async (
       }),
     );
   }
+
   if (
     record.type === 'practitioner_profile' &&
     current?.type === 'practitioner_profile' &&
@@ -335,12 +371,15 @@ export const validateWorkforce = async (
       'A professional profile belongs to its original staff identity. Update that person without moving their history',
     );
   }
+
   if (policy && ['versioned', 'append_only'].includes(policy.change)) {
     const history = await allOfType(record.type);
+
     if ('version' in record) {
       failIssues(facilityHeadIssues(record as never, currentFacilityRevisions(history as never)));
     }
   }
+
   if (
     record.type === 'staff_assignment' &&
     record.status === 'active' &&
@@ -348,15 +387,18 @@ export const validateWorkforce = async (
   ) {
     const person = data.staff.find((s) => s.staffId === record.staffId)!;
     const proof = await acceptedAuthority(data.snapshots.find((s) => s.staffId === person.staffId));
+
     const personContext = {
       ...context,
       userId: person.staffId,
       role: person.role,
       permissions: staffPermissions(person),
     };
+
     const actions = record.requiredActions.length
       ? record.requiredActions
       : data.offerings.find((o) => o.id === record.offeringId)?.requiredActions || [];
+
     failIssues(
       assignmentEligibilityIssues(
         record,
@@ -372,14 +414,18 @@ export const validateWorkforce = async (
         now,
       ),
     );
+
     if (record.supervisorId) {
       const supervisor = data.staff.find((s) => s.staffId === record.supervisorId);
+
       if (!supervisor) {
         throw new Error('Choose an active qualified supervisor');
       }
+
       const supervisorProof = await acceptedAuthority(
         data.snapshots.find((s) => s.staffId === supervisor.staffId),
       );
+
       for (const action of actions) {
         failIssues(
           clinicalActivityIssues(
@@ -398,19 +444,24 @@ export const validateWorkforce = async (
       }
     }
   }
+
   if (record.type === 'service_session') {
     failIssues(sessionConflictIssues(record, data.sessions, data.locations, data.appointments));
     failIssues(sessionRosterIssues(record, data.roster));
     failIssues(sessionBookingIssues(record, data.appointments, data.locations, now));
+
     if (record.status === 'published') {
       const offering = data.offerings.find((o) => o.id === record.offeringId)!;
+
       const participants = await Promise.all(
         record.participants.map(async (p) => {
           const staff = data.staff.find((s) => s.staffId === p.staffId)!;
+
           const assignment = effectiveFacilityRevisions(
             data.assignments,
             Date.parse(record.startsAt),
           ).find((a) => a.assignmentId === p.assignmentId && a.staffId === p.staffId)!;
+
           return {
             staff,
             assignment,
@@ -424,13 +475,16 @@ export const validateWorkforce = async (
           };
         }),
       );
+
       failIssues(sessionClinicalCoverageIssues(offering, record, participants, now));
     }
   }
+
   if (record.type === 'session_event') {
     const history = data.events.filter(
       (e) => e.offeringId === record.offeringId && e.sessionId === record.sessionId,
     );
+
     const heads = eventHeads(history);
     failIssues(sessionEventHeadIssues(record, heads));
     failIssues(
@@ -440,6 +494,7 @@ export const validateWorkforce = async (
       ),
     );
   }
+
   if (record.type === 'work_ownership_event') {
     const source = data.handoffs.find((h) => h.id === record.sourceId)!;
     failIssues(workOwnershipHeadIssues(record, eventHeads(data.ownership)));
@@ -451,8 +506,10 @@ export const validateWorkforce = async (
         context.permissions.includes('work_ownership:manage'),
       ),
     );
+
     failIssues(workOwnershipReferenceIssues(record, source, data, now));
   }
+
   if (
     current &&
     (((record.type === 'unit' || record.type === 'location') && !record.active) ||
@@ -468,11 +525,15 @@ export const validateWorkforce = async (
       },
       now,
     );
+
     failIssues(impact.map((item) => item.reason));
   }
+
   return trusted;
 };
+
 const TEMPLATE_SETTINGS: readonly string[] = ['result_template', 'result_part', 'answer_list'];
+
 /** The editor passes a canonical shape, never SQL or server-owned provenance. */
 export const saveWorkforce = async (
   type: AnyDocument['type'],
@@ -482,6 +543,7 @@ export const saveWorkforce = async (
   operationId?: string,
 ): Promise<AnyDocument> => {
   fields = { ...fields };
+
   for (const key of [
     'id',
     'type',
@@ -498,13 +560,16 @@ export const saveWorkforce = async (
   ]) {
     delete fields[key];
   }
+
   const policy =
     type === 'unit' || type === 'billing_department'
       ? { change: 'revision', permission: type === 'unit' ? 'unit:manage' : 'fee_item:manage' }
       : FACILITY_DOCUMENT_POLICY[type as keyof typeof FACILITY_DOCUMENT_POLICY];
+
   if (!policy || !('permission' in policy)) {
     throw new Error('This record is managed by the server');
   }
+
   // Result templates may be edited again while an earlier edit waits to sync; the server applies revisions in order.
   if (
     previous &&
@@ -515,10 +580,12 @@ export const saveWorkforce = async (
       'This proposal is still syncing. Wait for acceptance or resolve its refusal before editing it again',
     );
   }
+
   const schemaVersion = TEMPLATE_SETTINGS.includes(type) ? 5 : 4;
   const configuration = policy.change === 'revision';
   const id = configuration && previous ? previous.id : operationId || newId(type);
   const versioned = policy.change === 'versioned';
+
   const streamKey = (
     {
       credential: 'credentialId',
@@ -528,6 +595,7 @@ export const saveWorkforce = async (
       service_session: 'sessionId',
     } as Record<string, string>
   )[type];
+
   const record = parseDocument({
     ...(configuration && previous ? previous : envelope(context)),
     ...fields,
@@ -550,10 +618,13 @@ export const saveWorkforce = async (
         }
       : {}),
   });
+
   if (!record.success) {
     throw new Error(record.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('. '));
   }
+
   const trusted = await validateWorkforce(record.data, context, previous);
+
   if (configuration && previous) {
     return updateRecord(trusted, policy.permission as Permission, type, previous.id, {
       ...fields,
@@ -565,8 +636,10 @@ export const saveWorkforce = async (
       ).revision,
     } as Partial<AnyDocument>);
   }
+
   return insertRecord(trusted, policy.permission as Permission, type, record.data);
 };
+
 /** Stable occurrence IDs make interrupted finite-series saves resumable, not duplicate sessions. */
 export const saveWeeklyOccurrence = async (
   fields: Record<string, unknown>,
@@ -576,9 +649,11 @@ export const saveWeeklyOccurrence = async (
 ): Promise<AnyDocument> => {
   const id = `service_session:${seriesId}:${index + 1}`;
   const current = await findRecord<ServiceSession>('service_session', id);
+
   if (current) {
     const parsed = parseDocument({ ...current, ...fields, id, type: 'service_session' });
     const hash = (await import('../workforceClinical')).clinicalPayloadHash;
+
     if (
       !parsed.success ||
       current.createdBy !== context.userId ||
@@ -588,10 +663,13 @@ export const saveWeeklyOccurrence = async (
         `Occurrence ${index + 1} was already saved with different details. Review its existing coverage before continuing`,
       );
     }
+
     return current;
   }
+
   return saveWorkforce('service_session', fields, context, undefined, id);
 };
+
 /** One place of a batch ("Bed 1" … "Bed N"). Its id is fixed by the batch and position, so retrying an interrupted batch keeps what was saved. */
 export const saveBatchPlace = async (
   fields: Record<string, unknown>,
@@ -600,11 +678,13 @@ export const saveBatchPlace = async (
   index: number,
 ): Promise<AnyDocument> => {
   const id = `location:${batchId}:${index + 1}`;
+
   return (
     (await findRecord<AnyDocument>('location', id)) ??
     saveWorkforce('location', fields, context, undefined, id)
   );
 };
+
 export const validateAllocation = async (appointment: Appointment): Promise<void> => {
   if (appointment.allocation) {
     const data = await loadWorkforce();
@@ -624,6 +704,7 @@ export const validateAllocation = async (appointment: Appointment): Promise<void
     );
   }
 };
+
 export const saveIntake = (
   offeringId: string,
   sessionId: string | undefined,
@@ -644,6 +725,7 @@ export const saveIntake = (
     },
     context,
   );
+
 export const saveOwnership = (
   source: Handoff,
   offeringId: string,
@@ -668,4 +750,5 @@ export const saveOwnership = (
     },
     context,
   );
+
 export type { FacilityRecords, CapabilityDecision, ReviewerDelegation };

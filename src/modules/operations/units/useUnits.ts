@@ -10,11 +10,13 @@ const byName = (a: Unit, b: Unit) => a.name.localeCompare(b.name);
 export const useUnits = (): LiveQuery<Unit[]> => {
   const load = useCallback(async () => {
     const units = await listUnits();
+
     return [
       ...units.filter((unit) => unit.active).sort(byName),
       ...units.filter((unit) => !unit.active).sort(byName),
     ];
   }, []);
+
   return useLiveQuery(load);
 };
 
@@ -24,10 +26,13 @@ export const useIncomingHandoffs = (unitId: string | undefined): LiveQuery<Hando
     if (!unitId) {
       return [];
     }
+
     const handoffs = await handoffsTo(unitId);
+
     return handoffs
       .filter((handoff) => handoff.status !== 'done')
       .sort((a, b) => a.createdOn.localeCompare(b.createdOn));
   }, [unitId]);
+
   return useLiveQuery(load);
 };

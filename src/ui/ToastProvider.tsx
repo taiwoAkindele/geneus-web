@@ -54,16 +54,20 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const el = layer.current as
       (HTMLDivElement & { showPopover?: () => void; hidePopover?: () => void }) | null;
+
     if (!el?.showPopover || !el.hidePopover) {
       return;
     }
+
     if (!el.hasAttribute('popover')) {
       el.setAttribute('popover', 'manual');
     }
+
     try {
       if (el.matches(':popover-open')) {
         el.hidePopover();
       }
+
       if (toasts.length) {
         el.showPopover();
       }
@@ -109,8 +113,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
 export const useToast = (): ToastFn => {
   const ctx = useContext(ToastContext);
+
   if (!ctx) {
     throw new Error('useToast must be used within a ToastProvider');
   }
+
   return ctx;
 };

@@ -14,13 +14,18 @@ const TABLES = [
   'encounter',
   'patient',
 ] as const;
+
 const pad = (n: number) => String(n).padStart(2, '0');
+
 const localNow = () => {
   const d = new Date();
+
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+
 const describe = (item: CompletionItem) => {
   const f = item.fulfillment;
+
   switch (f.kind) {
     case 'missing':
       return f.ordered ? 'Ordered — no result or supply recorded' : 'Not yet recorded as done';
@@ -53,10 +58,12 @@ export const ServiceCompletionWorkspace = () => {
   useEffect(() => {
     document.title = 'Service completion · Geneus Health';
   }, []);
+
   const work = useLiveQuery(
     useCallback(() => completionWork(), []),
     TABLES,
   );
+
   if (!supported) {
     return (
       <main className="p-4">
@@ -65,9 +72,11 @@ export const ServiceCompletionWorkspace = () => {
       </main>
     );
   }
+
   const canRecord =
     (COMPLETION_ROLES as readonly string[]).includes(context.role) &&
     context.permissions.includes('encounter:record');
+
   const items = (work.data ?? []).filter(
     (i) =>
       all ||
@@ -75,7 +84,9 @@ export const ServiceCompletionWorkspace = () => {
       i.fulfillment.kind === 'not_done' ||
       i.fulfillment.kind === 'completion',
   );
+
   const open = items.filter((i) => i.fulfillment.kind === 'missing').length;
+
   const renderWorkItems = () => {
     if (!work.data) {
       return <p role="status">Loading…</p>;
@@ -133,22 +144,30 @@ const CompletionRow = ({ item, canRecord }: { item: CompletionItem; canRecord: b
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const recordable =
     item.fulfillment.kind === 'missing' ||
     item.fulfillment.kind === 'not_done' ||
     item.fulfillment.kind === 'completion';
+
   const save = async () => {
     if (mode === 'not_done' && !note.trim()) {
       setError('Say why it was not done');
+
       return;
     }
+
     const at = new Date(when);
+
     if (Number.isNaN(at.getTime()) || at.getTime() > Date.now() + 60_000) {
       setError('Choose when it was done — not in the future');
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await recordCompletion(
         {
@@ -161,6 +180,7 @@ const CompletionRow = ({ item, canRecord }: { item: CompletionItem; canRecord: b
         },
         context,
       );
+
       toast(mode === 'completed' ? 'Recorded as done.' : 'Recorded as not done.');
       setMode(undefined);
       setNote('');
@@ -170,6 +190,7 @@ const CompletionRow = ({ item, canRecord }: { item: CompletionItem; canRecord: b
       setBusy(false);
     }
   };
+
   return (
     <li
       data-charge={item.charge.id}

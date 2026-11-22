@@ -23,6 +23,7 @@ export const VisitProgrammeDetails = ({
   const { registers } = useRegisters();
   const context = useAuthorizationContext();
   const [open, setOpen] = useState<RegisterDef>();
+
   const shown = registers.filter(
     (register) =>
       register.status === 'published' &&
@@ -30,15 +31,19 @@ export const VisitProgrammeDetails = ({
       register.visitLink.visitTypes.includes(visitType) &&
       register.fields.some((field) => field.type !== 'section' && !field.fromVisit),
   );
+
   if (!shown.length) {
     return null;
   }
+
   const canRecord = context.permissions.includes('register_entry:create');
+
   const latest = (register: RegisterDef) =>
     register.completions
       .filter((entry) => entry.encounterId === encounterId)
       .sort((a, b) => a.createdOn.localeCompare(b.createdOn))
       .pop();
+
   return (
     <section
       aria-labelledby="programme-details-heading"
@@ -56,6 +61,7 @@ export const VisitProgrammeDetails = ({
       <ul className="divide-y divide-outline-soft">
         {shown.map((register) => {
           const saved = latest(register);
+
           return (
             <li
               key={register.id}

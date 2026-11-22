@@ -15,11 +15,13 @@ export type BillingQuestion = {
   encounterId?: string;
   name: string;
 };
+
 const readRefusals = () => allOfType<SyncRejection>('sync_rejection');
 
 export const useBillingQuestions = () => {
   const queues = useRequestQueues();
   const refusals = useLiveQuery(readRefusals, ['sync_rejection']);
+
   const questions: BillingQuestion[] = [
     ...Object.values(queues.data ?? {})
       .flatMap((queue) => [...queue.open, ...queue.completed])
@@ -54,6 +56,7 @@ export const useBillingQuestions = () => {
         name: 'A charge link was refused',
       })),
   ];
+
   return { questions, loading: queues.loading && !queues.data, reload: queues.reload };
 };
 
@@ -72,23 +75,31 @@ export const placeQuestions = (
 ) => {
   const byBill = new Map<string, BillingQuestion[]>();
   const unplaced: BillingQuestion[] = [];
+
   for (const q of questions) {
     const own = bills.filter((b) => b.patientId === q.patientId);
+
     const sameVisit = (b: BillDocument) =>
       !q.encounterId ||
       b.rows.some((r) => !r.charge.encounterId || r.charge.encounterId === q.encounterId);
+
     const targets = own.filter((b) => b.rows.some(manualCharge) && sameVisit(b));
+
     const fallback = own.filter(
       (b) => q.encounterId && b.rows.some((r) => r.charge.encounterId === q.encounterId),
     );
+
     const chosen = targets.length ? targets : fallback;
+
     if (!chosen.length) {
       unplaced.push(q);
       continue;
     }
+
     for (const b of chosen) {
       byBill.set(b.id, [...(byBill.get(b.id) ?? []), q]);
     }
   }
+
   return { byBill, unplaced };
 };

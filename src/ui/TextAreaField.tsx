@@ -6,6 +6,7 @@ type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   help?: FieldExplanation;
   error?: string;
 };
+
 export const TextAreaField = forwardRef<HTMLTextAreaElement, Props>(function TextAreaField(
   { label, help, error, id, className = '', 'aria-describedby': describedBy, rows = 3, ...props },
   ref,
@@ -14,6 +15,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, Props>(function Tex
   const inputId = id ?? props.name ?? generatedId;
   const helpId = `${inputId}-help`;
   const errorId = `${inputId}-error`;
+
   return (
     <div className="block">
       <FieldLabel

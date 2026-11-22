@@ -39,15 +39,19 @@ export const useWorkspace = () => {
   useEffect(() => {
     const refresh = () => refreshMenu((n) => n + 1);
     window.addEventListener(INSURANCE_SUPPORT_EVENT, refresh);
+
     return () => window.removeEventListener(INSURANCE_SUPPORT_EVENT, refresh);
   }, []);
+
   const available = workspacesFor(context);
   const last = readLastWorkspace(context.facilityId, context.userId);
   const owner = JSON.stringify([context.facilityId, context.userId]);
   const history = useRef({ owner, pages: new Map<string, typeof last>() });
+
   if (history.current.owner !== owner) {
     history.current = { owner, pages: new Map() };
   }
+
   // Browser Back restores a shared record's original module, even after switching modules.
   const current = workspaceForLocation(
     pathname,
@@ -55,14 +59,17 @@ export const useWorkspace = () => {
     available,
     history.current.pages.get(key) ?? last,
   );
+
   useEffect(() => {
     if (current) {
       history.current.pages.set(key, current.id);
       rememberWorkspace(context.facilityId, context.userId, current.id);
     }
   }, [context.facilityId, context.userId, current?.id, key]);
+
   const resume =
     available.find((workspace) => workspace.id === last) ??
     available.find((workspace) => workspace.id === defaultWorkspaceFor(context.role));
+
   return { available, current, resume };
 };

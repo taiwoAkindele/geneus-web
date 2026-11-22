@@ -28,6 +28,7 @@ type Props = {
   canRecord: boolean;
   onEdit: () => void;
 };
+
 export const ClinicalRecordCard = ({
   event,
   versions,
@@ -40,6 +41,7 @@ export const ClinicalRecordCard = ({
   const fields = CLINICAL_FIELDS[event.kind];
   const author = (version: ClinicalEvent) => staffNames.get(version.createdBy) ?? version.createdBy;
   const problem = problems.find((item) => item.recordId === event.values.problemId);
+
   return (
     <article className="rounded-field border border-outline-soft p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -17,6 +17,7 @@ import { pharmacySupported } from '@/data/pharmacySupport';
 import { QuantityDispense } from '@/modules/clinical/pharmacy';
 
 const QUEUE = '/pharmacy';
+
 export const dispensePath = (patientId: string, encounterId: string, prescriptionId?: string) =>
   `/pharmacy/request?${new URLSearchParams({ patient: patientId, visit: encounterId, ...(prescriptionId ? { prescription: prescriptionId } : {}) })}`;
 
@@ -26,8 +27,10 @@ export const DispenseScreen = () => {
   useEffect(() => {
     const refresh = () => setSupported(pharmacySupported(context));
     window.addEventListener('geneus:pharmacySupport', refresh);
+
     return () => window.removeEventListener('geneus:pharmacySupport', refresh);
   }, [context.facilityId, context.deviceId]);
+
   return <PatientChartAccess>{supported ? <QuantityDispense /> : <Dispense />}</PatientChartAccess>;
 };
 
@@ -57,6 +60,7 @@ const Dispense = () => {
   if (!patientId || !encounterId) {
     return <p className="p-6">Open a prescription from the Pharmacy.</p>;
   }
+
   if (patient.loading || (ctl.loading && !ctl.enc.id)) {
     return (
       <p role="status" className="p-6">
@@ -64,6 +68,7 @@ const Dispense = () => {
       </p>
     );
   }
+
   if (!patient.data || ctl.error) {
     return (
       <div role="alert" className="space-y-3 p-6">
@@ -74,6 +79,7 @@ const Dispense = () => {
       </div>
     );
   }
+
   const enc = ctl.enc;
   const done = enc.sig.dispense;
   const canRecord = context.permissions.includes('encounter:record');
@@ -81,6 +87,7 @@ const Dispense = () => {
 
   const review = () => {
     const problems = ctl.problems('dispense');
+
     if (problems.length) {
       setError(problems.join(' · '));
     } else {
@@ -88,13 +95,16 @@ const Dispense = () => {
       setReviewing(true);
     }
   };
+
   const save = async () => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await ctl.lockStep('dispense');
       toast('Dispensing signed and saved on this device');
@@ -103,9 +113,11 @@ const Dispense = () => {
       if (!(cause instanceof AuthorizationError)) {
         console.error('Dispense failed', cause);
       }
+
       setError(
         cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.',
       );
+
       setReviewing(false);
     } finally {
       busy.current = false;

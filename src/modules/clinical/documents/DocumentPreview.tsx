@@ -3,13 +3,16 @@ import type { DocumentFile } from '@shared';
 import { Button, Sheet } from '@/ui';
 import { useAuthorizationContext } from '@/session';
 import { readDocumentFile } from '@/data/repos/clinicalDocuments';
+
 export type DocumentPreviewTarget = { file: DocumentFile; title: string; download?: boolean };
+
 const download = (url: string, fileName: string) => {
   const link = document.createElement('a');
   link.href = url;
   link.download = fileName;
   link.click();
 };
+
 export const DocumentPreview = ({
   target,
   onClose,
@@ -31,8 +34,10 @@ export const DocumentPreview = ({
         if (controller.signal.aborted) {
           return;
         }
+
         localUrl = URL.createObjectURL(blob);
         setUrl(localUrl);
+
         if (target.download) {
           download(localUrl, target.file.fileName);
         }
@@ -42,27 +47,35 @@ export const DocumentPreview = ({
           setError(cause instanceof Error ? cause.message : 'The document could not be opened');
         }
       });
+
     return () => {
       controller.abort();
+
       if (localUrl) {
         URL.revokeObjectURL(localUrl);
       }
     };
   }, [target.file.id, context.userId, context.facilityId, context.deviceId, attempt]);
+
   const print = () => {
     if (!url) {
       return;
     }
+
     // The browser PDF viewer supplies its own print command. Images get a clean printable page.
     const popup = window.open(
       target.file.mimeType === 'application/pdf' ? url : 'about:blank',
       '_blank',
     );
+
     if (!popup) {
       setError('Allow a new tab to open this document for printing');
+
       return;
     }
+
     popup.opener = null;
+
     if (target.file.mimeType !== 'application/pdf') {
       popup.document.title = target.title;
       const image = popup.document.createElement('img');
@@ -73,6 +86,7 @@ export const DocumentPreview = ({
       popup.document.body.append(image);
     }
   };
+
   return (
     <Sheet title={target.title} eyebrow={target.file.fileName} onClose={onClose} placement="side">
       {!url && !error ? <p role="status">Opening document…</p> : null}

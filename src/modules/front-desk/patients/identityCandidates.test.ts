@@ -17,9 +17,11 @@ const patient = (n: number, name = 'Amaka Okoro', phone = '08035550147') =>
     ageYears: 30,
     phone,
   });
+
 const first = patient(1);
 const second = patient(2);
 const family = patient(3, 'Chioma Okoro');
+
 const event = (outcome: PatientIdentityEvent['outcome']): PatientIdentityEvent => ({
   id: 'review',
   type: 'patient_identity_event',
@@ -41,9 +43,11 @@ describe('identity review candidates after synchronisation', () => {
     expect(
       unreviewedIdentityMatches(first, first.id, [first, second], [event('distinct')]),
     ).toEqual([]);
+
     expect(unreviewedIdentityMatches(first, first.id, [first, second], [event('linked')])).toEqual(
       [],
     );
+
     expect(
       unreviewedIdentityMatches(
         first,
@@ -52,6 +56,7 @@ describe('identity review candidates after synchronisation', () => {
         [{ ...event('distinct'), revision: undefined }],
       ),
     ).toHaveLength(1);
+
     expect(
       unreviewedIdentityMatches(
         first,
@@ -61,16 +66,19 @@ describe('identity review candidates after synchronisation', () => {
       ),
     ).toHaveLength(1);
   });
+
   it('finds a duplicate created on another offline desk, without treating the shared family phone as proof', () => {
     const pairs = identityCandidates([first, second, family], []);
     expect(pairs).toHaveLength(1);
     expect([pairs[0].patient.id, pairs[0].other.id].sort()).toEqual([first.id, second.id]);
   });
+
   it('removes confirmed links and different-person decisions from suggestions', () => {
     expect(identityCandidates([first, second], [event('linked')])).toEqual([]);
     expect(identityCandidates([first, second], [event('distinct')])).toEqual([]);
     expect(identityCandidates([first, second], [event('registration_distinct')])).toEqual([]);
   });
+
   it('retains explicit uncertain cases even when fuzzy demographics no longer match', () => {
     const changed = {
       ...second,
@@ -78,6 +86,7 @@ describe('identity review candidates after synchronisation', () => {
       phone: '08012223344',
       ageYears: 60,
     };
+
     expect(identityCandidates([first, changed], [event('review_requested')])[0].reason).toContain(
       'Flagged for review',
     );

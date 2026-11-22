@@ -27,13 +27,16 @@ export const NewBill = ({
   const [error, setError] = useState('');
   const saving = useRef(false);
   const patient = data.patients.find((p) => p.patientId === patientId);
+
   const save = async () => {
     if (!patient || saving.current) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       const charges = await createBill(
         items.map((i) => ({
@@ -46,6 +49,7 @@ export const NewBill = ({
         { patientId, facts: patientBillingFacts(patient) },
         context,
       );
+
       toast('Bill created');
       onCreated(billKey(charges[0]));
     } catch (e) {
@@ -57,6 +61,7 @@ export const NewBill = ({
       saving.current = false;
     }
   };
+
   return (
     <Sheet
       title="New bill"

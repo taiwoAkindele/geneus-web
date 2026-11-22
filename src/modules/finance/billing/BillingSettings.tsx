@@ -112,18 +112,23 @@ const fieldValue = (
   options?: { value: string }[],
 ) => {
   const v = value.trim();
+
   if (!v) {
     return undefined;
   }
+
   if (type === 'select') {
     return options?.some((o) => o.value === v) ? v : undefined;
   }
+
   if (type === 'tel') {
     return internationalPhone(v);
   }
+
   if (type === 'email') {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : undefined;
   }
+
   return !pattern || new RegExp(pattern).test(v) ? v : undefined;
 };
 
@@ -149,23 +154,29 @@ export const BillingSettings = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const allowed = context.permissions.includes('fee_item:manage');
+
   const refresh = async () => {
     const [status, list] = await Promise.all([
       billingRequest<BillingConnection>(context, 'connection/status', {}),
       billingRequest<{ providers: ProviderDescriptor[] }>(context, 'providers', {}),
     ]);
+
     setConnection(status);
     setProviders(list.providers);
   };
+
   /** Runs one change: success and failure are both toasted, and a failure also stays on the page until the next attempt. */
   const perform = async (action: () => Promise<string | undefined | void>, fallback: string) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       const done = await action();
+
       if (done) {
         toast(done);
       }
@@ -177,21 +188,27 @@ export const BillingSettings = () => {
       setBusy(false);
     }
   };
+
   const reload = () => perform(refresh, 'Billing settings could not be read. Try again.');
   useEffect(() => {
     document.title = 'Billing settings · Geneus Health';
+
     if (allowed && hasServerSession) {
       void reload();
     }
   }, [allowed, hasServerSession, context.userId]);
+
   /** The connected provider (step 2 and the status line), and the one chosen in the step-1 form (may differ while switching). */
   const provider = providers.find((p) => p.id === connection?.provider);
+
   const target =
     providers.find((p) => p.id === (choice || connection?.provider)) ??
     (providers.length === 1 ? providers[0] : undefined);
+
   const switching = Boolean(
     connection?.configured && provider && target && target.id !== provider.id,
   );
+
   const keyValues = target
     ? Object.fromEntries(
         target.credentialFields.map((f) => [
@@ -200,13 +217,16 @@ export const BillingSettings = () => {
         ]),
       )
     : {};
+
   const keysReady = Boolean(target) && Object.values(keyValues).every(Boolean);
+
   const closeForm = () => {
     setChangeKey(false);
     setChoice('');
     setCredentials({});
     setTouched({});
   };
+
   const detailValues = provider
     ? Object.fromEntries(
         provider.accountFields.map((f) => [
@@ -215,10 +235,12 @@ export const BillingSettings = () => {
         ]),
       )
     : {};
+
   const detailsReady = Boolean(provider) && Object.values(detailValues).every(Boolean);
   const general = connection?.accounts.find((a) => a.id === connection.receivingAccountId);
   const others = connection?.accounts.filter((a) => a.id !== connection.receivingAccountId) ?? [];
   const name = provider?.name ?? 'your payment provider';
+
   const renderSettings = () => {
     if (!allowed) {
       return <p>Your account can't change billing settings.</p>;
@@ -312,9 +334,11 @@ export const BillingSettings = () => {
                           provider: target!.id,
                           credentials: keyValues,
                         });
+
                         await refresh();
                         setAccounts([]);
                         closeForm();
+
                         return switching
                           ? `Switched to ${target!.name}. Set up the hospital's account next.`
                           : `${target!.name} connected.`;
@@ -425,6 +449,7 @@ export const BillingSettings = () => {
                     await billingRequest(context, 'accounts/create', { details: detailValues });
                     await refresh();
                     setDetails({});
+
                     return "The hospital's account is ready.";
                   }, 'The account could not be created. Check the details and try again.')
                 }
@@ -452,7 +477,9 @@ export const BillingSettings = () => {
                           'accounts/discover',
                           {},
                         );
+
                         setAccounts(found);
+
                         return found.length
                           ? `${found.length} ${found.length === 1 ? 'account' : 'accounts'} found. Choose one below.`
                           : `No active accounts were found with ${name}.`;
@@ -487,8 +514,10 @@ export const BillingSettings = () => {
                         await billingRequest(context, 'accounts/link', {
                           providerAccountId: existing,
                         });
+
                         await refresh();
                         setExisting('');
+
                         return 'Account linked.';
                       }, 'The account could not be linked. Try again.')
                     }
@@ -523,7 +552,9 @@ export const BillingSettings = () => {
                             await billingRequest(context, 'accounts/general', {
                               accountId: a.id,
                             });
+
                             await refresh();
+
                             return "The hospital's account was changed. Earlier transfers keep their original account.";
                           }, 'The account could not be changed. Try again.')
                         }

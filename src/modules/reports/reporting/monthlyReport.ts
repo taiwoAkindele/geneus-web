@@ -29,13 +29,16 @@ export type MonthlyData = {
   appointments?: Appointment[];
   offerings?: ServiceOffering[];
 };
+
 export const validMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+
 const inMonth = (iso: string, month: string) => calendarDate(iso).slice(0, 7) === month;
 
 export const monthlyReport = (data: MonthlyData, month: string) => {
   if (!validMonth(month)) {
     throw new Error('Choose a valid report month.');
   }
+
   const encounters = [
     ...new Map(
       data.encounters
@@ -43,29 +46,38 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
         .map((encounter) => [encounter.id, encounter]),
     ).values(),
   ];
+
   const visits = encounters.filter((encounter) => inMonth(encounter.openedOn, month));
   const ids = new Set(visits.map((encounter) => encounter.id));
+
   const entries = effectiveEncounterEntries(data.entries).filter((entry) =>
     ids.has(entry.encounterId),
   );
+
   // Closed by a disposition (other than observation), or by the retired follow-up and admission steps.
   const closed = new Set(entries.filter(closesEncounter).map((entry) => entry.encounterId));
   const diagnoses = new Map<string, { label: string; visits: Set<string> }>();
+
   for (const entry of entries.filter((entry) => entry.step === 'diagnosis')) {
     const label = ENCOUNTER_STEP_VALUES.diagnosis.parse(entry.values).diagnosis.trim();
+
     if (!label) {
       continue;
     }
+
     const key = label.toLowerCase();
     const row = diagnoses.get(key) ?? { label, visits: new Set<string>() };
     row.visits.add(entry.encounterId);
     diagnoses.set(key, row);
   }
+
   // Visits by the care service they were for; visits recorded before care services are counted apart.
   const byService = new Map<string, number>();
+
   for (const visit of visits) {
     byService.set(visit.offeringId ?? '', (byService.get(visit.offeringId ?? '') ?? 0) + 1);
   }
+
   const careServices =
     byService.size === 1 && byService.has('')
       ? []
@@ -82,17 +94,22 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
             (a, b) =>
               Number(!a.id) - Number(!b.id) || b.visits - a.visits || a.name.localeCompare(b.name),
           );
+
   const names = new Map(
     data.definitions.map((definition) => [definition.registerId, definition.name]),
   );
+
   const registerCounts = new Map<string, number>();
+
   for (const entry of data.registerEntries) {
     if (!entry.encounterId && entry.entryDate.slice(0, 7) === month) {
       registerCounts.set(entry.registerId, (registerCounts.get(entry.registerId) ?? 0) + 1);
     }
   }
+
   // A register filled from visits counts the month's visits in it; its staff entries only complete those rows.
   const linked = new Map<string, RegisterDefinition>();
+
   for (const definition of data.definitions) {
     if (
       definition.status === 'published' &&
@@ -101,10 +118,12 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
       linked.set(definition.registerId, definition);
     }
   }
+
   for (const definition of linked.values()) {
     if (!definition.visitLink) {
       continue;
     }
+
     const rows = visitRegisterRows(definition, {
       encounters: visits,
       entries: data.entries.filter((entry) => ids.has(entry.encounterId)),
@@ -112,31 +131,40 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
       appointments: data.appointments,
       localDate: calendarDate,
     });
+
     registerCounts.set(
       definition.registerId,
       rows.filter((row) => row.visitedOn.slice(0, 7) === month).length,
     );
   }
+
   const movementsByItem = new Map<string, StockMovement[]>();
+
   for (const movement of data.movements) {
     const group = movementsByItem.get(movement.itemId) ?? [];
     group.push(movement);
     movementsByItem.set(movement.itemId, group);
   }
+
   const commodities = data.items
     .filter((item) => calendarDate(item.createdOn).slice(0, 7) <= month)
     .map((item) => {
       const movements = movementsByItem.get(item.id) ?? [];
+
       const before = movements.filter(
         (movement) => calendarDate(movement.movedOn).slice(0, 7) < month,
       );
+
       const within = movements.filter((movement) => inMonth(movement.movedOn, month));
+
       const opening =
         item.quantityOnHand + before.reduce((sum, movement) => sum + movement.change, 0);
+
       const sum = (reason: StockMovement['reason']) =>
         within
           .filter((movement) => movement.reason === reason)
           .reduce((total, movement) => total + movement.change, 0);
+
       return {
         id: item.id,
         name: item.name,
@@ -150,16 +178,20 @@ export const monthlyReport = (data: MonthlyData, month: string) => {
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+
   const monthDate = new Date(month + '-01T12:00:00');
+
   const trends = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(monthDate);
     date.setMonth(date.getMonth() - 5 + index);
     const key = calendarDate(date).slice(0, 7);
+
     return {
       month: key,
       visits: encounters.filter((encounter) => inMonth(encounter.openedOn, key)).length,
     };
   });
+
   return {
     visits: visits.length,
     completed: closed.size,

@@ -46,19 +46,24 @@ export const StaffWorkspace = () => {
   const query = useWorkforce();
   const context = useAuthorizationContext();
   const [params, setParams] = useSearchParams();
+
   const [editing, setEditing] = useState<{
     kind: EditorKind;
     previous?: AnyDocument;
   }>();
+
   const [canReview, setCanReview] = useState(false);
   const [verifiedSnapshotId, setVerifiedSnapshotId] = useState('');
   useEffect(() => {
     document.title = 'Staff profile · Geneus Health';
   }, []);
+
   useEffect(() => {
     let alive = true;
+
     if (query.data) {
       const worker = query.data.staff.find((s) => s.staffId === context.userId);
+
       if (worker) {
         void ownProof(context, query.data).then((proof) => {
           if (alive) {
@@ -71,13 +76,16 @@ export const StaffWorkspace = () => {
         });
       }
     }
+
     return () => {
       alive = false;
     };
   }, [query.data, context]);
+
   useEffect(() => {
     let alive = true;
     setVerifiedSnapshotId('');
+
     if (query.data && staffId) {
       void ownProof({ ...context, userId: staffId }, query.data).then((proof) => {
         if (alive) {
@@ -85,16 +93,20 @@ export const StaffWorkspace = () => {
         }
       });
     }
+
     return () => {
       alive = false;
     };
   }, [query.data, staffId, context.lastServerContactOn]);
+
   if (query.loading || !query.data || query.error) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
   const staff = data.staff.find((s) => s.staffId === staffId);
   const view = params.get('view') || 'profile';
+
   if (!staff) {
     return (
       <div className="p-5">
@@ -105,22 +117,27 @@ export const StaffWorkspace = () => {
       </div>
     );
   }
+
   const profile = data.profiles.find((p) => p.staffId === staff.staffId);
   const proof = data.snapshots.find((p) => p.staffId === staff.staffId);
+
   const assignments = currentFacilityRevisions(data.assignments).filter(
     (a) => a.staffId === staff.staffId,
   );
+
   const zone = data.facility?.timeZone || 'Africa/Lagos';
   const can = (permission: string) => context.permissions.includes(permission as never);
   const self = staff.staffId === context.userId;
   const actor = roster.find((entry) => entry.staff.staffId === user.staffId);
   const access = accessFor(staff);
+
   const windows = data.roster
     .filter(
       (s) => s.staffId === staff.staffId && Date.parse(s.extendedUntil ?? s.endsAt) > Date.now(),
     )
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
     .slice(0, 14);
+
   const more = [
     ...(can('roster:assign') && staff.active && access === 'shift'
       ? [
@@ -144,10 +161,12 @@ export const StaffWorkspace = () => {
       ? [{ label: 'Remove access at this facility', onSelect: () => setSheet({ kind: 'remove' }) }]
       : []),
   ];
+
   const closeSheet = () => {
     setSheet(undefined);
     query.reload();
   };
+
   const signInAccess = (
     <section className={panel}>
       <h2 className="font-bold">Sign-in access</h2>
@@ -213,6 +232,7 @@ export const StaffWorkspace = () => {
       ) : null}
     </section>
   );
+
   const renderView = () => {
     if (view === 'profile') {
       return (

@@ -19,6 +19,7 @@ export const careContextOptions = (
   const byName = (a: ServiceOffering, b: ServiceOffering) => a.name.localeCompare(b.name);
   const care = careServiceOfferings(active, definitions).sort(byName);
   const tests = active.filter((o) => isLabTestOffering(o, definitions)).sort(byName);
+
   return [
     ...care.map((o) => ({ value: o.id, label: o.name })),
     ...tests.map((o) => ({ value: o.id, label: `Lab test · ${o.name}` })),

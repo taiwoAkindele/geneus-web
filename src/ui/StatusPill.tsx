@@ -30,6 +30,7 @@ type Props = {
  */
 export const StatusPill = ({ status, children, className = '' }: Props) => {
   const s = MAP[status];
+
   return (
     <span
       className={`inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${s.cls} ${className}`}

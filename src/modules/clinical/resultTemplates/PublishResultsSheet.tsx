@@ -30,6 +30,7 @@ export const PublishResultsSheet = ({
 }) => {
   const { values, flagged } = reportCounts(report);
   const tests = report.items.map((item) => item.test).join(', ');
+
   return (
     <Sheet
       title={correcting ? 'Preview corrected report' : 'Preview report'}

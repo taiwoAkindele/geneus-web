@@ -24,12 +24,15 @@ const loadBilling = async () => {
       listStaff(),
       listBillingDepartments(),
     ]);
+
   // Insurance and refunds: empty for a hospital without insurance, so every charge stays a cash bill.
   const insurance: CoverageData = await loadCoverage(charges);
+
   const coverage: BalanceCoverage = {
     estimates: estimatesFor(charges, insurance),
     refunds: insurance.refunds,
   };
+
   return {
     charges,
     payments,
@@ -43,5 +46,7 @@ const loadBilling = async () => {
     coverage,
   };
 };
+
 export const useBilling = () => useLiveQuery(loadBilling);
+
 export type BillingData = Awaited<ReturnType<typeof loadBilling>>;

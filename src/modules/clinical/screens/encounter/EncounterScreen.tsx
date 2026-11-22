@@ -72,12 +72,15 @@ const returnPathFor = (requestedReturn: string | null, patientId: string | undef
 
   return CLINICAL_PATIENTS;
 };
+
 const SERVICE_TASKS: readonly StepKey[] = ['lab_results', 'dispense', 'injection'];
+
 export const EncounterScreen = () => (
   <PatientChartAccess>
     <EncounterContent />
   </PatientChartAccess>
 );
+
 const EncounterContent = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -89,6 +92,7 @@ const EncounterContent = () => {
   const task = params.get('task');
   const initialTask = task && task in STEP_DEFS ? (task as StepKey) : undefined;
   const returnTo = returnPathFor(requestedReturn, patientId);
+
   if (!patientId) {
     return (
       <div className="p-6 text-sm">
@@ -99,6 +103,7 @@ const EncounterContent = () => {
       </div>
     );
   }
+
   return (
     <EncounterRecord
       key={patientId + '|' + (encounterId ?? appointmentId ?? 'new') + '|' + initialTask}
@@ -140,6 +145,7 @@ const EncounterRecord = ({
     if (chosen?.key !== 'dispense' || !enc.id) {
       return;
     }
+
     let active = true;
     import('@/data/pharmacySupport').then(({ pharmacySupported }) => {
       if (active && pharmacySupported(context)) {
@@ -149,15 +155,19 @@ const EncounterRecord = ({
         );
       }
     });
+
     return () => {
       active = false;
     };
   }, [chosen?.key, enc.id, patientId, context.facilityId, context.deviceId, navigate]);
+
   const [reviewKey, setReviewKey] = useState<StepKey>();
+
   const [batch, setBatch] = useState<{
     keys: StepKey[];
     stoppedAt?: { key: StepKey; problems: string[] };
   }>();
+
   const [amendKey, setAmendKey] = useState<StepKey>();
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -167,34 +177,43 @@ const EncounterRecord = ({
   const labSetup = useLabSetup(patientId);
   const [labPreview, setLabPreview] = useState<LabSubmission>();
   const heading = useRef<HTMLHeadingElement>(null);
+
   const awaitingPayment =
     !enc.id &&
     appointments.appointments.find((a) => a.id === appointmentId)?.paymentStatus ===
       'Awaiting payment';
+
   // A visit keeps the type it started with; a new one takes its appointment's type until staff choose another.
   const booked = appointments.appointments.find(
     (a) => a.id === (ctl.encounter?.appointmentId ?? appointmentId),
   );
+
   const bookedType = booked?.visitType;
   // The care service: the visit's own once it exists; before that the choice, defaulting to the booking's.
   const careRecords = useLiveQuery(loadCareServices, CARE_SERVICE_WATCH).data;
+
   const careChoice: CareVisitChoice = ctl.chosenCare ?? {
     offeringId: booked?.offeringId,
     visitType: bookedType ?? 'general',
   };
+
   const bookedService = careRecords?.offerings.find((o) => o.id === booked?.offeringId);
+
   const careName = careServiceName(
     careRecords,
     enc.id ? ctl.encounter?.offeringId : careChoice.offeringId,
   );
+
   const visitType =
     ctl.encounter?.visitType ??
     (enc.id ? bookedType : (ctl.chosenVisitType ?? bookedType)) ??
     'general';
+
   useEffect(() => {
     document.title = 'Record visit · Geneus Health';
     heading.current?.focus({ preventScroll: true });
   }, [chosen?.key, ctl.loading]);
+
   useEffect(() => {
     // A closed visit opens on its record, unless arriving for work still allowed after closure (a late result, its review, dispensing).
     if (
@@ -209,6 +228,7 @@ const EncounterRecord = ({
       const next = new URLSearchParams(
         returnTo.startsWith('/patients/profile?') ? returnTo.split('?')[1] : { patient: patientId },
       );
+
       next.set('tab', 'history');
       next.set('show', 'visits');
       next.set('visit', enc.id);
@@ -225,6 +245,7 @@ const EncounterRecord = ({
       </p>
     );
   }
+
   if (patient.error || ctl.error) {
     return (
       <div role="alert" className="p-6">
@@ -244,9 +265,11 @@ const EncounterRecord = ({
       </div>
     );
   }
+
   if (!patient.data) {
     return <p className="p-6">This patient is not on this device.</p>;
   }
+
   const record = patient.data;
   const locked = Boolean(enc.sig[chosen.key]);
   const current = steps[enc.activeIndex]?.key;
@@ -254,13 +277,16 @@ const EncounterRecord = ({
   const serviceTask = ['lab_results', 'result_review', 'dispense', 'injection'].includes(
     chosen.key,
   );
+
   const editable = canRecord && (!enc.closed || serviceTask) && !locked;
   const signature = enc.sig[chosen.key];
+
   const choose = (key: StepKey) => {
     ctl.flushDraft();
     setError('');
     setSelected(key);
   };
+
   // A service task finished from its queue returns there; otherwise it stays on the task just signed.
   const afterServiceTask = (key: StepKey) => {
     if (queuePath(returnTo)) {
@@ -269,6 +295,7 @@ const EncounterRecord = ({
       setSelected(key);
     }
   };
+
   // Lab results are previewed as the report the doctor will see, then published.
   const previewResults = () => {
     const submission = buildLabSubmission(
@@ -276,21 +303,27 @@ const EncounterRecord = ({
       { templates: labSetup.data?.templates ?? [], patient: labSetup.data?.patient },
       new Date().toISOString(),
     );
+
     if (submission.problems.length) {
       setError(submission.problems.join(' · '));
       heading.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+
       return;
     }
+
     setError('');
     setLabPreview(submission);
   };
+
   const publishResults = async () => {
     if (!labPreview || busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await ctl.lockStep('lab_results', collectLaterReason, labPreview);
       toast('Results published on this device. The requesting clinician is alerted once it syncs');
@@ -300,21 +333,27 @@ const EncounterRecord = ({
       if (!(cause instanceof AuthorizationError)) {
         console.error('Result publish failed', cause);
       }
+
       setError(
         cause instanceof Error ? cause.message : 'Could not publish. Your entries are still here.',
       );
+
       setLabPreview(undefined);
     } finally {
       busy.current = false;
       setSaving(false);
     }
   };
+
   const review = () => {
     if (chosen.key === 'lab_results') {
       previewResults();
+
       return;
     }
+
     const problems = ctl.problems(chosen.key);
+
     if (problems.length) {
       setError(problems.join(' · '));
       heading.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -323,13 +362,16 @@ const EncounterRecord = ({
       setReviewKey(chosen.key);
     }
   };
+
   const confirmSave = async () => {
     if (!reviewKey || busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await ctl.lockStep(reviewKey, collectLaterReason);
       toast(
@@ -338,11 +380,15 @@ const EncounterRecord = ({
           ? 'Visit completed and signed on this device'
           : STEP_DEFS[reviewKey].short + ' signed and saved on this device',
       );
+
       setReviewKey(undefined);
+
       if (SERVICE_TASKS.includes(reviewKey)) {
         afterServiceTask(reviewKey);
+
         return;
       }
+
       setSelected(undefined);
       requestAnimationFrame(() =>
         heading.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
@@ -351,18 +397,22 @@ const EncounterRecord = ({
       if (!(cause instanceof AuthorizationError)) {
         console.error('Visit save failed', cause);
       }
+
       setError(
         cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.',
       );
+
       setReviewKey(undefined);
     } finally {
       busy.current = false;
       setSaving(false);
     }
   };
+
   // One review for every consultation section that is ready, in clinical order.
   const batchNow = ctl.signable();
   const together = batchNow.keys.length > 1 && batchNow.keys.includes(chosen.key);
+
   const isObservationPlan = (key: StepKey) =>
     key === 'disposition' && enc.data.disposition.kind === 'observation';
 
@@ -397,32 +447,41 @@ const EncounterRecord = ({
 
     return 'Confirm & lock';
   };
+
   const batchCloses =
     batchNow.keys.some(isClosingStep) && enc.data.disposition.kind !== 'observation';
+
   const nextStep = steps
     .slice(steps.findIndex((step) => step.key === chosen.key) + 1)
     .find((step) => !enc.sig[step.key]);
+
   const reviewBatch = () => {
     ctl.flushDraft();
     const ready = ctl.signable();
+
     if (!ready.keys.length) {
       setError(
         ready.stoppedAt
           ? `${STEP_DEFS[ready.stoppedAt.key].short}: ${ready.stoppedAt.problems.join(' · ')}`
           : 'Nothing is ready to sign.',
       );
+
       return;
     }
+
     setError('');
     setBatch(ready);
   };
+
   const confirmBatch = async () => {
     if (!batch || busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       const signed = await ctl.lockSteps(batch.keys, collectLaterReason);
       toast(
@@ -430,6 +489,7 @@ const EncounterRecord = ({
           ? 'Visit completed and signed on this device'
           : `${signed.length} section${signed.length === 1 ? '' : 's'} signed and saved on this device`,
       );
+
       setBatch(undefined);
       setSelected(undefined);
       requestAnimationFrame(() =>
@@ -439,37 +499,48 @@ const EncounterRecord = ({
       if (!(cause instanceof AuthorizationError)) {
         console.error('Visit save failed', cause);
       }
+
       setError(
         cause instanceof Error ? cause.message : 'Could not save. Your entries are still here.',
       );
+
       setBatch(undefined);
     } finally {
       busy.current = false;
       setSaving(false);
     }
   };
+
   // Results the diagnosis is waiting for: tests without a result, and results not yet reviewed.
   const outstanding = outstandingResults(effectiveEncounterEntries(ctl.rawEntries));
+
   const resultsOutstanding =
     !enc.sig.diagnosis &&
     !enc.closed &&
     (outstanding.pending.length > 0 || outstanding.unreviewed.length > 0);
+
   // Results that arrived and are not yet reviewed, named by test, for the banner at the top of the visit.
   const readyEntries = ctl.rawEntries.filter((entry) => outstanding.unreviewed.includes(entry.id));
+
   const readyTests = readyEntries.flatMap((entry) =>
     (entry.values.results as { test: string }[]).map((result) => result.test),
   );
+
   const criticalReady = readyEntries.some((entry) => isCriticalResult(entry, ctl.rawEntries));
+
   const continueWithoutResults = () => {
     if (!enc.data.diagnosis.pendingResultsReason?.trim()) {
       setError('Record why you are continuing without the results');
+
       return;
     }
+
     ctl.skip('lab_results');
     ctl.skip('result_review');
     setError('');
     setSelected('diagnosis');
   };
+
   const pendingResultsPanel =
     resultsOutstanding &&
     canRecord &&
@@ -511,8 +582,10 @@ const EncounterRecord = ({
         )}
       </section>
     ) : null;
+
   const viewSaved = () =>
     enc.id && navigate(patientChartPath(patientId, 'visits', { visit: enc.id }));
+
   const renderBackLabel = () => {
     if (returnTo.startsWith('/laboratory')) {
       return 'Back to Laboratory';
@@ -826,6 +899,7 @@ const EncounterRecord = ({
             const saved = Boolean(enc.sig[step.key]);
             const skipped = enc.skipped.includes(step.key);
             const active = step.key === current;
+
             const renderStepStatus = () => {
               if (saved) {
                 return 'Signed';

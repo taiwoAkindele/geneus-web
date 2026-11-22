@@ -23,6 +23,7 @@ export const RegisterEntriesScreen = () => {
   useEffect(() => {
     document.title = `${register?.name ?? 'Register'} · Geneus Health`;
   }, [register?.name]);
+
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -70,6 +71,7 @@ export const RegisterEntriesScreen = () => {
   const fieldMap = new Map(
     register.fields.filter((field) => field.type !== 'section').map((field) => [field.id, field]),
   );
+
   for (const row of register.rows) {
     for (const field of row.fields) {
       if (field.type !== 'section' && !fieldMap.has(field.id)) {
@@ -77,7 +79,9 @@ export const RegisterEntriesScreen = () => {
       }
     }
   }
+
   const columns = [...fieldMap.values()];
+
   const shown = register.rows.filter(
     (row) =>
       (!from || row.entryDate >= from) &&
@@ -86,6 +90,7 @@ export const RegisterEntriesScreen = () => {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+
   const exportEntries = () =>
     downloadCsv('register-' + register.id.replace(/[^a-z0-9-]/gi, '-') + '.csv', [
       ['Entry ID', 'Entry date', 'Version', 'Recorded by', 'Field', 'Value'],
@@ -325,22 +330,28 @@ const VisitRegister = ({ register }: { register: RegisterDef }) => {
   const fields = register.fields.filter((field) => field.type !== 'section');
   const asked = fields.filter((field) => !field.fromVisit);
   const canComplete = context.permissions.includes('register_entry:create');
+
   const inMonth = useMemo(
     () => visits.rows.filter((row) => !month || row.visitedOn.startsWith(month)),
     [visits.rows, month],
   );
+
   // Numbered like the book: the month's first visit is number 1.
   const serial = useMemo(
     () => new Map(inMonth.map((row, index) => [row.encounterId, inMonth.length - index])),
     [inMonth],
   );
+
   const query = search.trim().toLowerCase();
+
   const shown = inMonth.filter(
     (row) =>
       !query || Object.values(row.values).map(fmtCell).join(' ').toLowerCase().includes(query),
   );
+
   const open = inMonth.filter((row) => !row.complete).length;
   const link = register.visitLink!;
+
   const columns: TableColumn<VisitRegisterRow>[] = [
     {
       key: 'serial',
@@ -387,6 +398,7 @@ const VisitRegister = ({ register }: { register: RegisterDef }) => {
       ),
     })),
   ];
+
   const exportRows = () =>
     downloadCsv(
       'register-' + register.id.replace(/[^a-z0-9-]/gi, '-') + '-' + (month || 'all') + '.csv',
@@ -398,7 +410,9 @@ const VisitRegister = ({ register }: { register: RegisterDef }) => {
         ]),
       ],
     );
+
   const matching = [...link.words, ...link.codes.map((code) => 'code ' + code)].join(', ');
+
   const renderVisitRule = () => {
     if (link.visits === 'every') {
       return 'Every visit adds a row.';

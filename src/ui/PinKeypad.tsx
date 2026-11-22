@@ -29,10 +29,13 @@ export const PinKeypad = ({ onDigit, action, tone = 'light' }: Props) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
+
       const target = event.target as HTMLElement | null;
+
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
         return;
       }
+
       if (/^\d$/.test(event.key)) {
         event.preventDefault();
         handlers.current.onDigit(event.key);
@@ -41,7 +44,9 @@ export const PinKeypad = ({ onDigit, action, tone = 'light' }: Props) => {
         handlers.current.action?.onPress();
       }
     };
+
     window.addEventListener('keydown', onKeyDown);
+
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 

@@ -12,11 +12,13 @@ import { ApiError, post, postAsDevice } from './client';
 /** As the enrolled device, for `issuedBy`, who must hold `device:enroll` (checked by the server). */
 export const issueEnrollmentCode = (issuedBy: string): Promise<EnrollmentCode> => {
   const device = getDeviceCredential();
+
   if (!device) {
     return Promise.reject(
       new ApiError('not_enrolled', 'This device is not enrolled with a facility'),
     );
   }
+
   return postAsDevice<EnrollmentCode>('/devices/codes', device.credential, { issuedBy });
 };
 
@@ -44,9 +46,11 @@ export const revokeFacilityDevice = async (
   acceptUnsentWork = false,
 ): Promise<Device> => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
   }
+
   return Device.parse(
     await postAsDevice(`/devices/${encodeURIComponent(id)}/revoke`, device.credential, {
       revokedBy,

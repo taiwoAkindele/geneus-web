@@ -41,6 +41,7 @@ export const DevicesScreen = () => {
   useEffect(() => {
     document.title = 'Facility devices · Geneus Health';
   }, []);
+
   // The server's view of each device: its app version, unsent work and last report — what readiness checks use.
   const [reports, setReports] = useState<Map<string, DeviceStatus>>();
   const [reportError, setReportError] = useState('');
@@ -48,6 +49,7 @@ export const DevicesScreen = () => {
     if (!sync.connected) {
       return;
     }
+
     deviceStatus(context).then(
       (r) => {
         setReports(new Map(r.devices.map((d) => [d.id, d])));
@@ -56,23 +58,30 @@ export const DevicesScreen = () => {
       (cause) => setReportError(cause instanceof Error ? cause.message : 'Sync status unavailable'),
     );
   }, [context, sync.connected, notice]);
+
   const denial = decide(context, 'device:revoke');
+
   const allowed =
     context.permissions.includes('device:enroll') ||
     context.permissions.includes('device:revoke') ||
     context.roles?.includes('facility_admin') ||
     context.role === 'facility_admin';
+
   const revoke = async () => {
     if (!selected || working.current || !acknowledged || denial || !sync.connected) {
       return;
     }
+
     if (selected.id === deviceId && (sync.pending > 0 || sync.pendingKnown === false)) {
       setError('Upload and review this device’s pending work before revoking it.');
+
       return;
     }
+
     working.current = true;
     setBusy(true);
     setError('');
+
     try {
       await revokeFacilityDevice(selected.id, context.userId, wipe, acceptUnsent);
       setNotice('The server revoked access. Device status updates here after sync.');
@@ -82,12 +91,14 @@ export const DevicesScreen = () => {
       if (cause instanceof ApiError && cause.code === 'unsent_work') {
         setUnsent((cause.details as { unsentChanges?: number } | undefined)?.unsentChanges ?? 1);
       }
+
       setError(cause instanceof Error ? cause.message : 'Device access could not be changed.');
     } finally {
       working.current = false;
       setBusy(false);
     }
   };
+
   const renderDeviceList = () => {
     if (!allowed) {
       return <p>Your account has not been assigned device administration.</p>;
@@ -151,6 +162,7 @@ export const DevicesScreen = () => {
               label: 'Sync status',
               render: (row) => {
                 const r = reports?.get(row.id);
+
                 if (!r) {
                   return (
                     <span className="text-xs text-ink-muted">
@@ -158,6 +170,7 @@ export const DevicesScreen = () => {
                     </span>
                   );
                 }
+
                 const renderPendingChanges = () => {
                   if (r.pendingChanges === undefined) {
                     return 'unsent work unknown';

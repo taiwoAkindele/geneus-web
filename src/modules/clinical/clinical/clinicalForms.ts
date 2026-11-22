@@ -7,6 +7,7 @@ export type ClinicalField = {
   options?: readonly string[];
   required?: boolean;
 };
+
 export const CLINICAL_LABELS: Record<ClinicalKind, string> = {
   problem: 'Problem list',
   history: 'Clinical history & examination',
@@ -15,6 +16,7 @@ export const CLINICAL_LABELS: Record<ClinicalKind, string> = {
   care_plan: 'Care plans',
   specialty: 'Specialty care',
 };
+
 export const CLINICAL_FIELDS: Record<ClinicalKind, ClinicalField[]> = {
   problem: [
     { key: 'label', label: 'Condition / problem', required: true },
@@ -80,21 +82,25 @@ export const CLINICAL_FIELDS: Record<ClinicalKind, ClinicalField[]> = {
     { key: 'status', label: 'Status', options: ['active', 'completed'] },
   ],
 };
+
 export const clinicalFormDefaults = (
   kind: ClinicalKind,
   event?: ClinicalEvent,
   initial?: Record<string, unknown>,
 ): Record<string, string> => {
   const values = { ...event?.values, ...initial };
+
   const defaults = Object.fromEntries(
     CLINICAL_FIELDS[kind].map((field) => [
       field.key,
       String(values[field.key] ?? field.options?.[0] ?? ''),
     ]),
   );
+
   if (values.problemId) {
     defaults.problemId = String(values.problemId);
   }
+
   if (kind === 'specialty') {
     for (const fields of Object.values(SPECIALTY_FIELDS)) {
       for (const label of fields) {
@@ -104,21 +110,26 @@ export const clinicalFormDefaults = (
       }
     }
   }
+
   return defaults;
 };
+
 export const clinicalFormValues = (
   kind: ClinicalKind,
   form: Record<string, string>,
 ): Record<string, unknown> => {
   const values: Record<string, unknown> = {};
+
   for (const field of CLINICAL_FIELDS[kind]) {
     if (form[field.key]?.trim()) {
       values[field.key] = form[field.key].trim();
     }
   }
+
   if ((kind === 'medication' || kind === 'care_plan') && form.problemId) {
     values.problemId = form.problemId;
   }
+
   if (kind === 'specialty') {
     const specialty = form.specialty as keyof typeof SPECIALTY_FIELDS;
     values.measurements = Object.fromEntries(
@@ -127,5 +138,6 @@ export const clinicalFormValues = (
       ),
     );
   }
+
   return values;
 };

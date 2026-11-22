@@ -55,6 +55,7 @@ export const AdjustBill = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const identities = useLiveQuery(listIdentityEvents);
+
   const summaries = useLiveQuery(
     useCallback(
       () =>
@@ -63,17 +64,22 @@ export const AdjustBill = ({
     ),
     ['coverage_financial_summary'],
   );
+
   const servicePoints = useLiveQuery(loadServicePoints, ['location']);
+
   const rows = billingRows(
     data.charges.filter((c) => c.patientId === patientId && chargeIds.includes(c.id)),
     data.payments,
     data.adjustments,
     data.coverage,
   );
+
   const patient = data.patients.find((p) => p.patientId === patientId);
+
   const linkedIds = linkedPatientIds(patientId, identities.data ?? []).filter(
     (id) => id !== patientId,
   );
+
   const [adjusting, setAdjusting] = useState('');
   const [kind, setKind] = useState<'discount' | 'waiver'>('discount');
   const [reduction, setReduction] = useState('');
@@ -83,11 +89,13 @@ export const AdjustBill = ({
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('');
   const [servicePoint, setServicePoint] = useState('');
+
   const [selfPay, setSelfPay] = useState<{
     row: ChargeBalance;
     cover: PatientCover;
     check?: CoverCheck;
   }>();
+
   const [refunding, setRefunding] = useState<ChargeBalance>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -98,9 +106,11 @@ export const AdjustBill = ({
     if (saving.current) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       await action();
       toast(done);
@@ -114,22 +124,29 @@ export const AdjustBill = ({
       setBusy(false);
     }
   };
+
   const reduce = () =>
     perform(
       async () => {
         const row = rows.find((r) => r.charge.id === adjusting);
+
         if (!row) {
           throw new Error('Choose the item to discount or waive');
         }
+
         let amount =
           kind === 'waiver' ? row.balanceMinor : parseAmount(reduction, row.charge.currency);
+
         if (kind === 'discount' && percent) {
           const value = Number(reduction);
+
           if (!Number.isFinite(value) || value <= 0 || value > 100) {
             throw new Error('Enter a percentage from 0 to 100');
           }
+
           amount = Math.round((row.balanceMinor * value) / 100);
         }
+
         await adjustCharge(adjusting, kind, amount, reason, context);
         setAdjusting('');
         setReason('');
@@ -137,11 +154,13 @@ export const AdjustBill = ({
       },
       kind === 'waiver' ? 'Balance waived' : 'Discount saved',
     );
+
   const addFee = () =>
     perform(async () => {
       if (!patient || !feeId) {
         throw new Error('Choose an item');
       }
+
       await createCharge(
         feeId,
         {
@@ -154,6 +173,7 @@ export const AdjustBill = ({
         },
         context,
       );
+
       setFeeId('');
       setQuantity('1');
       setUnit('');
@@ -161,10 +181,13 @@ export const AdjustBill = ({
 
   const insurance = (row: ChargeBalance) => {
     const estimate = row.coverage;
+
     if (!estimate || !('allocation' in estimate)) {
       return null;
     }
+
     const s = summaries.data?.find((x) => x.allocationId === estimate.allocation.id);
+
     return s ? (
       <p className="text-xs text-ink-muted">
         Insurer pays {displayMoney(s.payerShareMinor, s.currency)} · contract adjustment{' '}
@@ -177,6 +200,7 @@ export const AdjustBill = ({
       <p className="text-xs text-ink-muted">Insurance amounts are still syncing.</p>
     );
   };
+
   const mayWaive = context.permissions.includes('payment:waive');
   const mayAdd = context.permissions.includes('charge:create') && Boolean(rows[0]?.charge.billId);
 
@@ -192,6 +216,7 @@ export const AdjustBill = ({
       <fieldset disabled={busy} className="space-y-4">
         {rows.map((r) => {
           const money = (n: number) => displayMoney(n, r.charge.currency);
+
           return (
             <article
               key={r.charge.id}

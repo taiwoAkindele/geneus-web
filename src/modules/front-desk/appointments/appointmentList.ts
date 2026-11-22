@@ -27,6 +27,7 @@ export const APPOINTMENT_GROUP_LABELS: Record<AppointmentGroup, string> = {
 
 export const bookingIsInactive = (booking: Pick<BookedAppointment, 'attendance'>) =>
   booking.attendance === 'cancelled' || booking.attendance === 'no_show';
+
 const ATTENDANCE_LABELS = {
   booked: 'Not arrived',
   arrived: 'Arrived',
@@ -63,35 +64,43 @@ export const projectAppointments = (
 ): BookedAppointment[] => {
   const today = calendarDate(now);
   const patientById = new Map(patients.map((patient) => [patient.patientId, patient]));
+
   const closedIds = new Set(
     closingEntries
       .filter((entry) => (CLOSING_STEPS as readonly string[]).includes(entry.step))
       .map((entry) => entry.encounterId),
   );
+
   const byAppointment = new Map(
     encounters
       .filter((encounter) => encounter.appointmentId)
       .map((encounter) => [encounter.appointmentId!, encounter]),
   );
+
   const clinicalByPatient = new Map<string, ClinicalEvent[]>();
+
   for (const event of clinicalEvents) {
     clinicalByPatient.set(event.patientId, [
       ...(clinicalByPatient.get(event.patientId) ?? []),
       event,
     ]);
   }
+
   return appointments
     .map((appointment): BookedAppointment => {
       const patient = patientById.get(appointment.patientId);
       const ids = linkedPatientIds(appointment.patientId, identityEvents);
       const allergyEvents = ids.flatMap((id) => clinicalByPatient.get(id) ?? []);
+
       const allergyPatients = ids.flatMap((id) =>
         patientById.get(id) ? [patientById.get(id)!] : [],
       );
+
       const allergies = currentAllergies(allergyEvents, allergyPatients);
       const at = appointment.scheduledFor ?? appointment.createdOn;
       const day = calendarDate(at);
       const encounter = byAppointment.get(appointment.id);
+
       // A closed visit completes a booking; otherwise attendance decides, then the date.
       const groupFor = (): AppointmentGroup => {
         if (encounter && closedIds.has(encounter.id)) {
@@ -108,7 +117,9 @@ export const projectAppointments = (
 
         return day > today ? 'upcoming' : 'today';
       };
+
       const group = groupFor();
+
       return {
         id: appointment.id,
         patient: {
@@ -160,6 +171,7 @@ export const projectAppointments = (
 
 /** The one inline action a worklist row offers, so routine front-desk work needs no detail sheet. */
 export type QuickAction = 'arrive' | 'rebook';
+
 export const quickActionFor = (
   booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>,
 ): QuickAction | undefined => {
@@ -167,13 +179,16 @@ export const quickActionFor = (
   if (booking.encounterId || bookingIsInactive(booking)) {
     return undefined;
   }
+
   // The booking contract cannot reverse an arrival; a mistaken one is rescheduled or cancelled from the booking details.
   if (booking.group === 'today') {
     return booking.attendance === 'arrived' ? undefined : 'arrive';
   }
+
   if (booking.group === 'overdue' && booking.attendance !== 'arrived') {
     return 'rebook';
   }
+
   return undefined;
 };
 
@@ -195,6 +210,7 @@ export const BOOKING_SLOTS: readonly string[] = Array.from(
 
 const localTime = (at: string) => {
   const date = new Date(at);
+
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
@@ -204,6 +220,7 @@ export const slotLoad = (
   day: string,
 ): Map<string, number> => {
   const load = new Map<string, number>();
+
   for (const booking of bookings) {
     if (
       !booking.scheduledFor ||
@@ -212,19 +229,23 @@ export const slotLoad = (
     ) {
       continue;
     }
+
     const time = localTime(booking.scheduledFor);
     load.set(time, (load.get(time) ?? 0) + 1);
   }
+
   return load;
 };
 
 /** What a row's action menu offers, most useful first. Permissions are checked again when each action saves. */
 export type RowAction = 'arrive' | 'rebook' | 'visit' | 'booking' | 'patient';
+
 export const rowActionsFor = (
   booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>,
   access: { canUpdate: boolean; canRecord: boolean },
 ): RowAction[] => {
   const quick = access.canUpdate ? quickActionFor(booking) : undefined;
+
   return [
     ...(quick ? [quick] : []),
     ...(access.canRecord && booking.group !== 'completed' && !bookingIsInactive(booking)
@@ -240,11 +261,14 @@ export const bookingStatus = (
   booking: Pick<BookedAppointment, 'group' | 'attendance' | 'encounterId'>,
 ): { label: string; tone: 'green' | 'amber' | 'neutral' } => {
   const label = bookingAttendanceLabel(booking);
+
   if (booking.group === 'completed' || booking.encounterId || booking.attendance === 'arrived') {
     return { label, tone: 'green' };
   }
+
   if (booking.group === 'overdue' && !bookingIsInactive(booking)) {
     return { label, tone: 'amber' };
   }
+
   return { label, tone: 'neutral' };
 };

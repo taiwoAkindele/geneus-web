@@ -24,6 +24,7 @@ describe('basic Price Catalogue form', () => {
       });
     }
   });
+
   it('has three required fields, an optional description, and preserves zero prices', () => {
     expect(Object.keys(feeFormValues()).sort()).toEqual([
       'amount',
@@ -31,14 +32,17 @@ describe('basic Price Catalogue form', () => {
       'description',
       'name',
     ]);
+
     expect(
       feeDraftFromForm({ name: 'Free item', category: 'other', amount: '0' }).amountMinor,
     ).toBe(0);
   });
+
   it('inherits the supplied currency and rejects invalid money or an empty name', () => {
     expect(feeDraftFromForm({ name: 'Item', category: 'other', amount: '5' }, 'USD').currency).toBe(
       'USD',
     );
+
     expect(() => feeDraftFromForm({ name: '', category: 'other', amount: '5' })).toThrow();
     expect(() => feeDraftFromForm({ name: 'Item', category: 'other', amount: '-1' })).toThrow();
   });

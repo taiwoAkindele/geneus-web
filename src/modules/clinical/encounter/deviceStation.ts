@@ -18,6 +18,7 @@ export const readDeviceStation = (): StationView => {
       localStorage.getItem(
         getDeviceCredential() ? BASE_KEY + ':' + getDeviceCredential()!.facilityId : BASE_KEY,
       ) ?? (activeWorkspace()?.legacy ? localStorage.getItem(BASE_KEY) : null);
+
     return stored && (STATION_QUEUES as readonly string[]).includes(stored)
       ? (stored as StationQueue)
       : 'all';

@@ -22,6 +22,7 @@ const entry = (fields: Partial<CrudEntry> & Pick<CrudEntry, 'op' | 'table' | 'id
 const transactionOf = (crud: CrudEntry[]) => {
   const complete = vi.fn(async () => undefined);
   const transaction = { transactionId: 3, crud, complete } as unknown as CrudTransaction;
+
   return { transaction, complete };
 };
 
@@ -58,6 +59,7 @@ describe('connector', () => {
           }),
         ).expectedRevision,
       ).toBe(2);
+
       expect(
         toMutation(
           entry({
@@ -68,12 +70,14 @@ describe('connector', () => {
           }),
         ).expectedPreviousId,
       ).toBe('session:v1');
+
       expect(
         toMutation(
           entry({ op: 'PUT' as CrudEntry['op'], table: 'session_events', id: 'intake:first' }),
         ).expectedPreviousId,
       ).toBeNull();
     });
+
     it('carries explicit patient clears and null base values through the upload boundary', () => {
       const clear = toMutation(
         entry({
@@ -84,10 +88,12 @@ describe('connector', () => {
           previousValues: { phone: '0801', dateOfBirth: null },
         }),
       );
+
       expect(clear.data.phone).toBeNull();
       expect(clear.data.dateOfBirth).toBeNull();
       expect(clear.previous?.dateOfBirth).toBeNull();
     });
+
     it('maps an insert to a put with contract values', () => {
       const mutation = toMutation(
         entry({
@@ -166,6 +172,7 @@ describe('connector', () => {
         serverTime: '2026-09-12T12:00:00Z',
         keys: [],
       });
+
       vi.stubGlobal('fetch', fetch);
 
       const credentials = await createConnector({ onDeenrolled: vi.fn() }).fetchCredentials();
@@ -175,10 +182,12 @@ describe('connector', () => {
         token: 'jwt',
         expiresAt: new Date('2026-09-12T13:00:00Z'),
       });
+
       const init = fetch.mock.calls[0]?.[1] as RequestInit;
       expect(init).toMatchObject({
         headers: expect.objectContaining({ authorization: 'Bearer device-1.secret' }),
       });
+
       expect(JSON.parse(String(init.body))).toEqual({
         integratedBillingVersion: 1,
         billingCatalogueVersion: 1,
@@ -195,6 +204,7 @@ describe('connector', () => {
         policyVersion: 17,
         pendingMutationCount: 1,
       });
+
       expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
       expect(lastServerContactOn()).toBe('2026-09-12T12:00:00Z');
     });
@@ -208,12 +218,15 @@ describe('connector', () => {
           serverTime: '2026-09-12T12:00:00Z',
           keys: [],
         });
+
         vi.stubGlobal('fetch', fetch);
         await createConnector({ onDeenrolled: vi.fn(), pendingUploads }).fetchCredentials();
+
         return JSON.parse(String((fetch.mock.calls[0]?.[1] as RequestInit).body)) as {
           pendingMutationCount: number;
         };
       };
+
       expect((await body(async () => 0)).pendingMutationCount).toBe(0);
       expect((await body(async () => 3)).pendingMutationCount).toBe(3);
       expect(
@@ -223,8 +236,10 @@ describe('connector', () => {
           })
         ).pendingMutationCount,
       ).toBe(1);
+
       expect((await body()).pendingMutationCount).toBe(1);
     });
+
     it('returns nothing on an unenrolled device', async () => {
       clearDeviceCredential();
       expect(await createConnector({ onDeenrolled: vi.fn() }).fetchCredentials()).toBeNull();
@@ -247,8 +262,10 @@ describe('connector', () => {
         rejected: [],
         serverTime: '2026-09-12T12:05:00Z',
       });
+
       vi.stubGlobal('fetch', fetch);
       const db = fakeDatabase();
+
       const { transaction, complete } = transactionOf([
         entry({
           op: 'PUT' as CrudEntry['op'],
@@ -257,6 +274,7 @@ describe('connector', () => {
           opData: { fullName: 'Amaka' },
         }),
       ]);
+
       db.transactions.push(transaction);
 
       await createConnector({ onDeenrolled: vi.fn() }).uploadData(db as never);
@@ -286,6 +304,7 @@ describe('connector', () => {
           },
         ],
       });
+
       expect(complete).toHaveBeenCalledOnce();
       expect(lastServerContactOn()).toBe('2026-09-12T12:05:00Z');
     });
@@ -302,11 +321,14 @@ describe('connector', () => {
           serverTime: '2026-09-12T12:05:00Z',
         }),
       );
+
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const db = fakeDatabase();
+
       const { transaction, complete } = transactionOf([
         entry({ op: 'PUT' as CrudEntry['op'], table: 'patients', id: 'x' }),
       ]);
+
       db.transactions.push(transaction);
 
       await createConnector({ onDeenrolled: vi.fn() }).uploadData(db as never);
@@ -319,14 +341,17 @@ describe('connector', () => {
     it('leaves the transaction queued when the server fails, so PowerSync retries it', async () => {
       vi.stubGlobal('fetch', respond(503, { error: 'down', message: 'later' }));
       const db = fakeDatabase();
+
       const { transaction, complete } = transactionOf([
         entry({ op: 'PUT' as CrudEntry['op'], table: 'patients', id: 'x' }),
       ]);
+
       db.transactions.push(transaction);
 
       await expect(
         createConnector({ onDeenrolled: vi.fn() }).uploadData(db as never),
       ).rejects.toThrow();
+
       expect(complete).not.toHaveBeenCalled();
     });
 
@@ -334,24 +359,30 @@ describe('connector', () => {
       vi.stubGlobal('fetch', respond(401, { error: 'unauthorized', message: 'no' }));
       const onDeenrolled = vi.fn(async () => undefined);
       const db = fakeDatabase();
+
       const { transaction, complete } = transactionOf([
         entry({ op: 'PUT' as CrudEntry['op'], table: 'patients', id: 'x' }),
       ]);
+
       db.transactions.push(transaction);
 
       await expect(createConnector({ onDeenrolled }).uploadData(db as never)).rejects.toThrow();
       expect(onDeenrolled).toHaveBeenCalledOnce();
       expect(complete).not.toHaveBeenCalled();
     });
+
     it('retains the SDK transaction on incompatible versions without de-enrolling the device', async () => {
       vi.stubGlobal(
         'fetch',
         respond(409, { error: 'upgrade_required', message: 'Upgrade required' }),
       );
+
       const db = fakeDatabase();
+
       const { transaction, complete } = transactionOf([
         entry({ op: 'PUT' as CrudEntry['op'], table: 'patients', id: 'x' }),
       ]);
+
       const onDeenrolled = vi.fn();
       db.transactions.push(transaction);
       await expect(createConnector({ onDeenrolled }).uploadData(db as never)).rejects.toThrow();

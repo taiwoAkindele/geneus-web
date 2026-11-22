@@ -29,6 +29,7 @@ const base = { facilityId: 'QA', deviceId: 'device:one', schemaVersion: 5, creat
 const at = (time: string) => `2026-11-12T${time}.000Z`;
 const PATIENT = 'QA-000001-K2';
 const TZ = 'Africa/Lagos';
+
 const terms = (selfPayElection?: 'allowed' | 'not_allowed') =>
   PayerContractTerms.parse({
     payerId: 'payer:a',
@@ -50,6 +51,7 @@ const terms = (selfPayElection?: 'allowed' | 'not_allowed') =>
       },
     ],
   });
+
 const schedule = (t = terms()) =>
   CoverSchedule.parse({
     ...base,
@@ -68,6 +70,7 @@ const schedule = (t = terms()) =>
     calculationVersion: 1,
     ...buildScheduleLines(t, t.plans[0], () => 'consultation' as FeeCategory),
   });
+
 const charge = (id = 'charge:one', listPriceMinor = 5_000) =>
   Charge.parse({
     ...base,
@@ -83,6 +86,7 @@ const charge = (id = 'charge:one', listPriceMinor = 5_000) =>
     currency: 'NGN',
     appointmentId: 'appointment:one',
   });
+
 const cover = PatientCover.parse({
   ...base,
   type: 'patient_cover',
@@ -95,6 +99,7 @@ const cover = PatientCover.parse({
   relationship: 'principal',
   active: true,
 });
+
 const check = (result: CoverCheck['result'] = 'verified') =>
   CoverCheck.parse({
     ...base,
@@ -108,6 +113,7 @@ const check = (result: CoverCheck['result'] = 'verified') =>
     coversFrom: '2026-11-12',
     coversTo: '2026-11-12',
   });
+
 const pay = (id: string, amountMinor: number, chargeId = 'charge:one') =>
   Payment.parse({
     ...base,
@@ -121,6 +127,7 @@ const pay = (id: string, amountMinor: number, chargeId = 'charge:one') =>
     currency: 'NGN',
     allocations: [{ chargeId, amountMinor }],
   });
+
 const data = (extra: Partial<CoverageData> = {}): CoverageData => ({
   covers: [],
   checks: [],
@@ -134,6 +141,7 @@ const data = (extra: Partial<CoverageData> = {}): CoverageData => ({
   billingPeriods: [{ from: '2000-01-01T00:00:00.000Z' }],
   ...extra,
 });
+
 const coverage = (charges: Charge[], d: CoverageData): BalanceCoverage => ({
   estimates: estimatesFor(charges, d),
   refunds: d.refunds,
@@ -148,6 +156,7 @@ describe('patient balances with insurance', () => {
     expect(withEmpty.balanceMinor).toBe(4_000);
     expect(withEmpty.coverage).toBeUndefined();
   });
+
   it('keeps undecided cover out of the amount due and never blocks the booking', () => {
     const c = charge();
     const d = data({ covers: [cover], schedules: [schedule()] });
@@ -156,11 +165,14 @@ describe('patient balances with insurance', () => {
     expect(isAppointmentConfirmed('appointment:one', [c], [], [], [c.id], coverage([c], d))).toBe(
       true,
     );
+
     expect(isAppointmentConfirmed('appointment:one', [c], [], [], [c.id])).toBe(false);
   });
+
   it('during setup, verified cover is recorded but the patient is billed exactly as before', () => {
     const c = charge();
     const [plain] = chargeBalances([c], [pay('p1', 1_000)]);
+
     const [row] = chargeBalances(
       [c],
       [pay('p1', 1_000)],
@@ -170,15 +182,19 @@ describe('patient balances with insurance', () => {
         data({ covers: [cover], checks: [check()], schedules: [schedule()], billingPeriods: [] }),
       ),
     );
+
     expect([row.balanceMinor, row.dueMinor, row.undeterminedMinor]).toEqual([
       plain.balanceMinor,
       plain.dueMinor,
       0,
     ]);
+
     expect(row.estimated).toBeFalsy();
   });
+
   it('a confirmed split still decides the balance after billing is turned off', () => {
     const c = charge();
+
     const allocation = CoverageAllocation.parse({
       ...base,
       type: 'coverage_allocation',
@@ -193,6 +209,7 @@ describe('patient balances with insurance', () => {
       currency: 'NGN',
       basis: 'exception',
     });
+
     const [row] = chargeBalances(
       [c],
       [],
@@ -208,16 +225,20 @@ describe('patient balances with insurance', () => {
         }),
       ),
     );
+
     expect(row.balanceMinor).toBe(400);
   });
+
   it('asks the patient only for their estimated share once cover is verified', () => {
     const c = charge();
+
     const [row] = chargeBalances(
       [c],
       [],
       [],
       coverage([c], data({ covers: [cover], checks: [check()], schedules: [schedule()] })),
     );
+
     expect([row.dueMinor, row.balanceMinor, row.estimated, row.final]).toEqual([
       400,
       400,
@@ -225,8 +246,10 @@ describe('patient balances with insurance', () => {
       false,
     ]);
   });
+
   it('turns an overpayment into a credit, and a refund settles it without touching the payment', () => {
     const c = charge();
+
     const allocation = CoverageAllocation.parse({
       ...base,
       type: 'coverage_allocation',
@@ -241,6 +264,7 @@ describe('patient balances with insurance', () => {
       currency: 'NGN',
       basis: 'exception',
     });
+
     const refund = Refund.parse({
       ...base,
       type: 'refund',
@@ -254,20 +278,24 @@ describe('patient balances with insurance', () => {
       allocations: [{ chargeId: c.id, amountMinor: 600 }],
       reason: 'Synthetic',
     });
+
     const d = data({
       covers: [cover],
       checks: [check()],
       schedules: [schedule()],
       allocations: [allocation],
     });
+
     const [credit] = chargeBalances([c], [pay('p1', 1_000)], [], coverage([c], d));
     expect([credit.balanceMinor, credit.final]).toEqual([-600, true]);
+
     const [settled] = chargeBalances(
       [c],
       [pay('p1', 1_000)],
       [],
       coverage([c], { ...d, refunds: [refund] }),
     );
+
     expect([settled.balanceMinor, settled.settledMinor, settled.refundedMinor]).toEqual([
       0, 1_000, 600,
     ]);
@@ -280,6 +308,7 @@ describe('the till and the desk', () => {
     expect(selfPayOffered(c, cover, data({ covers: [cover], schedules: [schedule()] }))).toBe(
       false,
     );
+
     expect(
       selfPayOffered(
         c,
@@ -287,9 +316,11 @@ describe('the till and the desk', () => {
         data({ covers: [cover], schedules: [schedule(terms('not_allowed'))] }),
       ),
     ).toBe(false);
+
     expect(
       selfPayOffered(c, cover, data({ covers: [cover], schedules: [schedule(terms('allowed'))] })),
     ).toBe(true);
+
     const notEligible = check('not_eligible');
     expect(
       selfPayOffered(
@@ -299,6 +330,7 @@ describe('the till and the desk', () => {
         notEligible,
       ),
     ).toBe(true);
+
     expect(
       selfPayOffered(
         c,
@@ -307,12 +339,14 @@ describe('the till and the desk', () => {
       ),
     ).toBe(false);
   });
+
   it('prompts at check-in when an active cover is not checked for today', () => {
     const now = at('09:00:00');
     expect(coverNeedsCheck(PATIENT, data({ covers: [cover] }), now)?.id).toBe('cover:one');
     expect(
       coverNeedsCheck(PATIENT, data({ covers: [cover], checks: [check('pending')] }), now),
     ).toBeUndefined();
+
     expect(
       coverNeedsCheck(PATIENT, data({ covers: [cover], timeZone: undefined }), now),
     ).toBeUndefined();
@@ -327,6 +361,7 @@ describe('insurance menu', () => {
     facilityId: 'QA',
     deviceId: 'device:one',
   } as unknown as AuthorizationContext;
+
   // Unit tests run in Node: a small in-memory stand-in for the browser storage the flag lives in.
   beforeEach(() => {
     const store = new Map<string, string>();
@@ -339,6 +374,7 @@ describe('insurance menu', () => {
       },
     });
   });
+
   it('stays hidden until the server grants this device insurance', () => {
     const links = () => workspacesFor(officer).flatMap((w) => w.links.map((l) => l.to));
     expect(links()).not.toContain('/insurance');
@@ -347,17 +383,21 @@ describe('insurance menu', () => {
     rememberInsuranceSupport(officer, undefined);
     expect(links()).not.toContain('/insurance');
   });
+
   it('never shows contracts to a cashier', () => {
     rememberInsuranceSupport(officer, 1);
+
     const cashier = {
       ...officer,
       role: 'cashier',
       roles: ['cashier'],
       permissions: ['payment:receive', 'coverage:elect_self_pay'],
     } as unknown as AuthorizationContext;
+
     expect(workspacesFor(cashier).flatMap((w) => w.links.map((l) => l.to))).not.toContain(
       '/insurance',
     );
+
     expect(moduleSettingsFor('insurance', cashier).pages).toEqual([]);
     expect(moduleSettingsFor('insurance', officer).pages.map((p) => p.key)).toEqual([
       'setup',
@@ -370,8 +410,10 @@ describe('one charge reconciled on the device, matching the server', () => {
   it('charge → cover → check → estimate → overpayment → confirmed split → refund', () => {
     const c = charge('charge:recon');
     const t = terms();
+
     const steps = (d: CoverageData, payments: Payment[]) =>
       chargeBalances([c], payments, [], coverage([c], d))[0];
+
     let row = steps(data(), []);
     expect([row.balanceMinor, row.coverage]).toEqual([5_000, undefined]);
     row = steps(data({ covers: [cover], schedules: [schedule(t)] }), []);
@@ -391,6 +433,7 @@ describe('one charge reconciled on the device, matching the server', () => {
       capitationCoveredMinor: 0,
       tariffTotalMinor: 4_000,
     });
+
     const allocation = CoverageAllocation.parse({
       ...base,
       type: 'coverage_allocation',
@@ -405,14 +448,17 @@ describe('one charge reconciled on the device, matching the server', () => {
       currency: 'NGN',
       basis: 'exception',
     });
+
     const confirmed = data({
       covers: [cover],
       checks: [check()],
       schedules: [schedule(t)],
       allocations: [allocation],
     });
+
     row = steps(confirmed, payments);
     expect([row.balanceMinor, row.final]).toEqual([-1_600, true]);
+
     const refund = Refund.parse({
       ...base,
       type: 'refund',
@@ -426,8 +472,10 @@ describe('one charge reconciled on the device, matching the server', () => {
       allocations: [{ chargeId: c.id, amountMinor: 1_600 }],
       reason: 'Synthetic',
     });
+
     row = steps({ ...confirmed, refunds: [refund] }, payments);
     expect([row.balanceMinor, row.settledMinor - row.refundedMinor]).toEqual([0, 400]);
+
     // Patient kept 400 + HMO owes 3,600 + contract adjustment 1,000 = the 5,000 list price.
     if (split.ok) {
       expect(

@@ -35,10 +35,12 @@ type Draft = {
   tests: string[];
 };
 type Panel = { part?: number } | 'library' | 'tests' | 'discard';
+
 const STATUSES = (['active', 'draft', 'archived'] as const).map((value) => ({
   value,
   label: STATUS_LABELS[value],
 }));
+
 /** Saving needs the server; say so plainly instead of a transport error. */
 export const templateErrorText = (cause: unknown) =>
   cause instanceof Error ? cause.message : 'Could not save';
@@ -55,9 +57,11 @@ export const ResultTemplateEditorScreen = () => {
   const context = useAuthorizationContext();
   const navigate = useNavigate();
   const toast = useToast();
+
   const settings = useLiveQuery(
     useCallback(() => loadResultTemplateSettings(), [context.facilityId]),
   );
+
   const existing = settings.data?.templates.find((t) => t.id === templateId);
   const [draft, setDraft] = useState<Draft>();
   const [initial, setInitial] = useState('');
@@ -69,10 +73,13 @@ export const ResultTemplateEditorScreen = () => {
     if (draft || !settings.data) {
       return;
     }
+
     const source = existing ?? settings.data.templates.find((t) => t.id === copyId);
+
     if (templateId && !existing) {
       return;
     }
+
     // Editing opens the template itself; "copy" starts a draft from another one; otherwise blank.
     const startingDraft = (): Draft => {
       if (existing) {
@@ -90,22 +97,28 @@ export const ResultTemplateEditorScreen = () => {
 
       return { name: '', status: 'draft', parts: [], tests: [] };
     };
+
     const start = startingDraft();
     setDraft(start);
     setInitial(JSON.stringify(start));
   }, [settings.data, existing, copyId, templateId, draft]);
+
   const dirty = Boolean(draft) && JSON.stringify(draft) !== initial;
   useEffect(() => {
     if (!dirty) {
       return;
     }
+
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
+
     window.addEventListener('beforeunload', warn);
+
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+
   useEffect(() => {
     document.title = `${existing?.name ?? 'New result template'} · Geneus Health`;
   }, [existing?.name]);
@@ -120,6 +133,7 @@ export const ResultTemplateEditorScreen = () => {
       ),
     [settings.data, templateId],
   );
+
   if (settings.loading && !settings.data) {
     return (
       <p role="status" className="p-6">
@@ -127,6 +141,7 @@ export const ResultTemplateEditorScreen = () => {
       </p>
     );
   }
+
   if (templateId && settings.data && !existing) {
     return (
       <div className="space-y-3 p-6">
@@ -137,18 +152,23 @@ export const ResultTemplateEditorScreen = () => {
       </div>
     );
   }
+
   if (!draft || !settings.data) {
     return null;
   }
+
   const { lists, tests, parts: library } = settings.data;
   const update = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
+
   const setPart = (index: number, part: ResultPart) =>
     update({ parts: draft.parts.map((p, i) => (i === index ? part : p)) });
+
   const move = (index: number, by: number) => {
     const parts = [...draft.parts];
     [parts[index], parts[index + by]] = [parts[index + by], parts[index]];
     update({ parts });
   };
+
   const editing = typeof panel === 'object' ? panel : undefined;
 
   const save = async () => {
@@ -158,12 +178,16 @@ export const ResultTemplateEditorScreen = () => {
       parts: draft.parts,
       serviceDefinitionIds: draft.status === 'active' ? draft.tests : [],
     });
+
     if (!candidate.success) {
       setError(candidate.error.issues[0]?.message ?? 'Check the template and try again');
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await saveResultTemplate(candidate.data, context, existing);
       setInitial(JSON.stringify(draft));
@@ -186,6 +210,7 @@ export const ResultTemplateEditorScreen = () => {
         <ul className="flex flex-wrap gap-2">
           {draft.tests.map((id) => {
             const test = tests.find((t) => t.id === id);
+
             return (
               <li
                 key={id}
@@ -497,6 +522,7 @@ export const ResultTemplateEditorScreen = () => {
                   ? [...draft.parts, part]
                   : draft.parts.map((p, i) => (i === editing.part ? part : p)),
             });
+
             setPanel(undefined);
           }}
         />
@@ -512,6 +538,7 @@ export const ResultTemplateEditorScreen = () => {
                 .filter((p) => p.active)
                 .map((shared) => {
                   const added = draft.parts.some((p) => p.libraryPartId === shared.id);
+
                   return (
                     <li key={shared.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="text-sm">
@@ -540,6 +567,7 @@ export const ResultTemplateEditorScreen = () => {
                               },
                             ],
                           });
+
                           setPanel(undefined);
                         }}
                       >
@@ -604,19 +632,24 @@ const TestsSheet = ({
 }) => {
   const [picked, setPicked] = useState(new Set(chosen));
   const [query, setQuery] = useState('');
+
   const shown = tests.filter((test) =>
     test.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
+
   const toggle = (id: string) =>
     setPicked((current) => {
       const next = new Set(current);
+
       if (next.has(id)) {
         next.delete(id);
       } else {
         next.add(id);
       }
+
       return next;
     });
+
   return (
     <Sheet
       title="Tests that use this template"
@@ -634,6 +667,7 @@ const TestsSheet = ({
         <div className="space-y-1">
           {shown.map((test) => {
             const other = claimed.get(test.id);
+
             return (
               <label
                 key={test.id}

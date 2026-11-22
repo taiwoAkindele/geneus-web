@@ -1,5 +1,6 @@
 import type { DocumentFile } from '@shared';
 import { ApiError, binaryRequest, readJsonBody } from './client';
+
 export const uploadDocumentBytes = async (
   credential: string,
   actorId: string,
@@ -18,7 +19,9 @@ export const uploadDocumentBytes = async (
     },
     body: bytes.slice().buffer,
   });
+
   const receipt = (await readJsonBody(response)) as Partial<DocumentFile> | undefined;
+
   if (
     !receipt ||
     receipt.id !== file.id ||
@@ -33,6 +36,7 @@ export const uploadDocumentBytes = async (
     );
   }
 };
+
 export const downloadDocumentBytes = async (
   credential: string,
   actorId: string,

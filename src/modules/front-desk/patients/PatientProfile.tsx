@@ -63,6 +63,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
   const canBook = context.permissions.includes('appointment:create');
   const canChart = canReadPatientChart(context);
   const patient = usePatient(patientId);
+
   const chart = useLiveQuery(
     useCallback(
       () => (patientId ? patientClinicalRecord(patientId, context) : Promise.resolve(undefined)),
@@ -77,12 +78,14 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       'patient_identity_event',
     ],
   );
+
   const rejections = useLiveQuery(listOpenRejections);
   const admissions = useInpatient();
   const bookings = useAppointments();
   const [booking, setBooking] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+
   const history = useMemo(
     () =>
       chart.data
@@ -101,17 +104,22 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         : [],
     [chart.data, admissions.data],
   );
+
   const currentAdmission = admissions.data?.active.find((event) =>
     history.some((visit) => visit.id === event.encounterId),
   );
+
   const admissionParam = params.get('admission');
+
   const hasStays =
     Boolean(admissionParam) ||
     history.some((visit) => visit.careType === 'inpatient' || visit.careType === 'past_inpatient');
+
   // Tabs this person can use. Without chart access only details and bookings are offered.
   const tabs: PatientTab[] = canChart
     ? ['now', 'history', 'clinical', 'details']
     : ['history', 'details'];
+
   const views: HistoryView[] = canChart
     ? [
         'visits',
@@ -121,12 +129,16 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         'chart',
       ]
     : ['appointments'];
+
   const resolved = resolvePatientTab(params.get('tab'));
   const showValue = params.get('show') ?? resolved?.show;
+
   const show: HistoryView =
     showValue && views.includes(showValue as HistoryView) ? (showValue as HistoryView) : views[0];
+
   const requested: PatientTab =
     resolved && tabs.includes(resolved.tab) ? resolved.tab : defaultTab(context);
+
   // A link to the current stay opens it on Now; a departed stay is read under Hospital stays.
   const tab: PatientTab =
     requested === 'history' &&
@@ -136,18 +148,25 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
     tabs.includes('now')
       ? 'now'
       : requested;
+
   const periodValue = params.get('period');
+
   const period: HistoryPeriod =
     periodValue && periodValue in HISTORY_PERIODS ? (periodValue as HistoryPeriod) : 'all';
+
   const categoryValue = params.get('category') ?? 'problem';
+
   const kind = ClinicalKind.safeParse(categoryValue).success
     ? (categoryValue as ClinicalKind)
     : 'problem';
+
   useEffect(() => {
     document.title = PATIENT_TABS[tab] + ' · Patient record · Geneus Health';
   }, [tab]);
+
   useEffect(() => {
     const heading = document.querySelector<HTMLElement>('#patient-section-heading h2');
+
     if (heading) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
@@ -164,9 +183,11 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       </Message>
     );
   }
+
   if (patient.loading) {
     return <Message>Opening the patient record…</Message>;
   }
+
   if (patient.error) {
     return (
       <Message>
@@ -177,6 +198,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       </Message>
     );
   }
+
   if (!patient.data) {
     return (
       <Message>
@@ -187,6 +209,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       </Message>
     );
   }
+
   const record = patient.data;
   const appointments = bookings.forPatient(patientId);
   const openVisits = history.filter((visit) => visit.status === 'Open');
@@ -194,13 +217,17 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
   const selected = chart.data?.encounters.find((encounter) => encounter.id === params.get('visit'));
   const selectedSummary = history.find((visit) => visit.id === selected?.id);
   const reading = tab === 'history' && show === 'visits' && Boolean(params.get('visit'));
+
   const currentParams = () => {
     const next = new URLSearchParams(params);
     next.set('patient', patientId);
     next.set('tab', tab);
+
     return next;
   };
+
   const returnPath = '/patients/profile?' + currentParams();
+
   const changeTab = (value: PatientTab, category?: ClinicalKind) =>
     setParams(() => {
       const next = currentParams();
@@ -208,41 +235,53 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       ['visit', 'panel', 'visitSection', 'booking', 'show', 'period'].forEach((key) =>
         next.delete(key),
       );
+
       if (category) {
         next.set('category', category);
       }
+
       return next;
     });
+
   const showHistory = (view: HistoryView) =>
     setParams(() => {
       const next = currentParams();
       next.set('tab', 'history');
       next.set('show', view);
       ['panel', 'visitSection', 'booking'].forEach((key) => next.delete(key));
+
       if (view !== 'documents') {
         next.delete('visit');
       }
+
       if (view !== 'stays') {
         next.delete('admission');
       }
+
       return next;
     });
+
   const setPeriod = (value: HistoryPeriod) =>
     setParams(
       () => {
         const next = currentParams();
+
         if (value === 'all') {
           next.delete('period');
         } else {
           next.set('period', value);
         }
+
         return next;
       },
       { replace: true },
     );
+
   const onClinical = (category: ClinicalKind) => changeTab('clinical', category);
+
   const viewVisit = (id: string, continueVisit = false) => {
     const visit = history.find((candidate) => candidate.id === id);
+
     if (continueVisit && canRecord && visit?.status === 'Open') {
       navigate(visitRecordPath(visit.patientId, visit.id, returnPath));
     } else {
@@ -252,14 +291,17 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         next.set('show', 'visits');
         next.set('visit', id);
         ['panel', 'visitSection', 'booking'].forEach((key) => next.delete(key));
+
         return next;
       });
     }
   };
+
   const visitAction = (visit: EncounterSummary, action: VisitAction) => {
     if (action === 'continue') {
       return viewVisit(visit.id, true);
     }
+
     setParams(() => {
       const next = currentParams();
       next.set('tab', 'history');
@@ -267,28 +309,34 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       next.set('visit', visit.id);
       next.delete('visitSection');
       next.delete('booking');
+
       if (['print', 'activity', 'amend'].includes(action)) {
         next.set('panel', action);
       } else {
         next.delete('panel');
       }
+
       return next;
     });
   };
+
   // One primary action: several open visits are chosen between on Now; an inpatient's care is on Now.
   const start = () => {
     if (openVisits.length > 1) {
       changeTab('now');
+
       return;
     }
 
     if (active) {
       viewVisit(active.id, canRecord);
+
       return;
     }
 
     navigate(visitRecordPath(patientId, '', returnPath));
   };
+
   const startAppointment = (appointment: BookedAppointment) =>
     navigate(
       visitRecordPath(
@@ -298,6 +346,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         appointment.id,
       ),
     );
+
   const reference: AppointmentPatient = {
     id: record.patientId,
     name: record.fullName,
@@ -308,9 +357,11 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       .join(''),
     allergy: 'Review recorded allergies before care',
   };
+
   const canBill = context.permissions.some((permission) =>
     ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission),
   );
+
   const actions = context.permissions.includes('handoff:create')
     ? [
         {
@@ -322,7 +373,9 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         },
       ]
     : [];
+
   const relatedIds = new Set(chart.data?.patients.map((item) => item.patientId) ?? [patientId]);
+
   const needsAttention = rejections.data?.some(
     (rejection) =>
       relatedIds.has(String(rejection.refusedRecord?.patientId ?? '')) ||
@@ -330,6 +383,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
       history.some((visit) => visit.id === rejection.entityId) ||
       chart.data?.entries.some((entry) => entry.id === rejection.entityId),
   );
+
   const stayPlace =
     currentAdmission && admissions.data
       ? [
@@ -341,6 +395,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
           .filter(Boolean)
           .join(' · ') || 'Awaiting bed'
       : '';
+
   const admissionCard =
     currentAdmission && admissions.data ? (
       <section
@@ -371,6 +426,7 @@ export const PatientProfile = ({ patientId }: { patientId?: string }) => {
         ) : null}
       </section>
     ) : undefined;
+
   const chartUnavailable = chart.loading ? (
     <p role="status">Reading the medical chart…</p>
   ) : (

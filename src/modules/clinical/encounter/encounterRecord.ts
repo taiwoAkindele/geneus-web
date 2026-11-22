@@ -65,6 +65,7 @@ export const encounterLabel = (encounterId: string | undefined): string =>
 
 export const stamp = (iso: string) => {
   const at = new Date(iso);
+
   return {
     time: at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     date: at.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -100,6 +101,7 @@ export const projectEncounter = ({
   const nameOf = (staffId: string) => staffNames.get(staffId) ?? staffId;
 
   const saved: Partial<Record<StepKey, EncounterEntry>> = {};
+
   for (const entry of effectiveEncounterEntries(byTime)) {
     if (entry.step !== 'amendment') {
       saved[entry.step] = entry;
@@ -108,6 +110,7 @@ export const projectEncounter = ({
 
   // Every visit continues in the current order, including one begun in the retired order.
   let data: EncounterData = { ...draft, workflowVersion: 1 };
+
   for (const entry of effectiveEncounterEntries(byTime)) {
     if (entry.step !== 'amendment') {
       data = fromStepValues(entry.step, entry.values, data);
@@ -115,17 +118,21 @@ export const projectEncounter = ({
   }
 
   const dispositions = dispositionHeads(entries);
+
   if (dispositions.length === 1) {
     saved.disposition = dispositions[0];
     data = fromStepValues('disposition', dispositions[0].values, data);
   }
+
   if (!saved.result_review) {
     data.result_review = {
       ...data.result_review,
       resultEntryIds: byTime.filter((e) => e.step === 'lab_results').map((e) => e.id),
     };
   }
+
   const sig: Partial<Record<StepKey, Signature>> = {};
+
   for (const [key, entry] of Object.entries(saved) as [StepKey, EncounterEntry][]) {
     sig[key] = {
       actor: nameOf(entry.createdBy),
@@ -136,6 +143,7 @@ export const projectEncounter = ({
 
   const stepOfEntry = new Map(byTime.map((entry) => [entry.id, entry.step]));
   const amend: Partial<Record<StepKey, Amendment[]>> = {};
+
   const audit: AuditRow[] = encounter
     ? [
         {
@@ -146,20 +154,24 @@ export const projectEncounter = ({
         },
       ]
     : [];
+
   for (const entry of byTime) {
     const who = {
       actor: nameOf(entry.createdBy),
       role: ROLE_LABEL[entry.actorRole],
       ...stamp(entry.createdOn),
     };
+
     if (entry.step === 'amendment') {
       const target = stepOfEntry.get(entry.amends ?? '');
       const note = typeof entry.values.note === 'string' ? entry.values.note : '';
+
       if (target && target !== 'amendment') {
         amend[target] = [
           ...(amend[target] ?? []),
           { by: who.actor, role: who.role, time: who.time, date: who.date, note },
         ];
+
         audit.push({ ...who, action: `Amendment added to ${STEP_DEFS[target].title}` });
       }
     } else if (saved[entry.step]?.id === entry.id) {
@@ -172,9 +184,11 @@ export const projectEncounter = ({
   const steps = stepsFor(data);
   const closed = entries.some(closesEncounter);
   const lastSaved = steps.reduce((last, step, index) => (saved[step.key] ? index : last), -1);
+
   const activeIndex = closed
     ? -1
     : steps.findIndex((step, index) => index > lastSaved && !skippedNow.includes(step.key));
+
   const skipped = steps
     .filter(
       (step, index) =>

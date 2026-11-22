@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { mayApprovePin, type Staff } from '@shared';
 import { useSyncStatus } from '@/data';
-import { describeInsuranceError } from '@/lib/api/insurance';
+import { describeStaffActionError } from '@/lib/api/insurance';
 import {
   invitationNeedsAttention,
   revokeStaffInvitation,
@@ -29,6 +29,7 @@ const when = (iso: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
 const isEmail = (value: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim());
 
 /** One plain sentence for where an invitation stands. Delivery is what the email service said, never more. */
@@ -56,6 +57,7 @@ const invitationSummary = (
             ? 'Replaced by a PIN code given in person.'
             : `Withdrawn ${when(invitation.revokedOn!)}.`,
       };
+
     case 'pending':
       switch (invitation.delivery) {
         case 'provider_rejected':
@@ -94,14 +96,18 @@ export const ContactActivationSection = ({ staff }: { staff: Staff }) => {
   const { roster } = useAuth();
   const sync = useSyncStatus();
   const online = sync.connected || (typeof navigator !== 'undefined' && navigator.onLine);
+
   if (!context.permissions.includes('staff:manage')) {
     return null;
   }
+
   const actor = roster.find((entry) => entry.staff.staffId === context.userId)?.staff;
+
   const canInvite =
     staff.active &&
     staff.staffId !== context.userId &&
     Boolean(actor && mayApprovePin(actor, staff));
+
   return (
     <section
       aria-label="Contact and activation"
@@ -134,12 +140,14 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState<'send' | 'revoke'>();
+
   const load = useCallback(() => {
     setError('');
     void staffContactActivation(context, staff.staffId).then(setState, (cause) =>
-      setError(describeInsuranceError(cause)),
+      setError(describeStaffActionError(cause)),
     );
   }, [context, staff.staffId]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -154,6 +162,7 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
       </div>
     );
   }
+
   if (!state) {
     return (
       <div
@@ -169,24 +178,29 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
   const activated = state.activation.serverPinDevices > 0;
   // A verified address is the only place an invitation may go; the administrator sees it masked and need not type it.
   const needsAddress = !state.email;
+
   const coolingDown =
     state.nextSendAllowedOn !== undefined && Date.parse(state.nextSendAllowedOn) > Date.now();
+
   const run = async (kind: 'send' | 'revoke', action: () => Promise<string>) => {
     if (busy) {
       return;
     }
+
     setBusy(kind);
     setError('');
+
     try {
       toast(await action());
       setEmail('');
       load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(undefined);
     }
   };
+
   const send = () =>
     run('send', async () => {
       const { invitation: sent } = await sendStaffInvitation(
@@ -194,15 +208,19 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
         staff.staffId,
         needsAddress ? email.trim() : undefined,
       );
+
       return sent.delivery === 'provider_accepted'
         ? `Invitation emailed to ${sent.destination}`
         : invitationSummary(sent).text;
     });
+
   const revoke = () =>
     run('revoke', async () => {
       await revokeStaffInvitation(context, staff.staffId);
+
       return 'Invitation withdrawn';
     });
+
   const summary = invitation ? invitationSummary(invitation) : undefined;
 
   return (
@@ -318,8 +336,10 @@ export const useOnboardingSummaries = () => {
   useEffect(() => {
     if (!allowed) {
       setSummaries(undefined);
+
       return;
     }
+
     let alive = true;
     void staffOnboardingSummaries(context).then(
       (r) => {
@@ -333,10 +353,12 @@ export const useOnboardingSummaries = () => {
         }
       },
     );
+
     return () => {
       alive = false;
     };
   }, [context, allowed]);
+
   return summaries;
 };
 
@@ -352,6 +374,7 @@ export const onboardingTag = (
   ) {
     return undefined;
   }
+
   return invitationNeedsAttention(summary.invitation)
     ? { tone: 'amber', label: 'Invitation needs attention' }
     : { tone: 'neutral', label: 'Invited' };

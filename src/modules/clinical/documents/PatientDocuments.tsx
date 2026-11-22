@@ -15,6 +15,7 @@ import { DocumentPreview, type DocumentPreviewTarget } from './DocumentPreview';
 import { DocumentHistory } from './DocumentHistory';
 import { WardTable } from '@/modules/clinical/inpatient';
 import { documentsSupported } from '@/data/documentSupport';
+
 export const PatientDocuments = ({
   patient,
   encounters,
@@ -25,14 +26,18 @@ export const PatientDocuments = ({
   const context = useAuthorizationContext();
   const query = useClinicalDocuments();
   const [params, setParams] = useSearchParams();
+
   const [task, setTask] = useState<
     VisitDocumentTask & { admission: InpatientEvent; visit: Encounter }
   >();
+
   const [preview, setPreview] = useState<DocumentPreviewTarget>();
   const [history, setHistory] = useState<VisitDocument[]>();
+
   if (query.loading) {
     return <p role="status">Reading visit documents…</p>;
   }
+
   if (query.error || !query.data) {
     return (
       <div role="alert">
@@ -43,23 +48,31 @@ export const PatientDocuments = ({
       </div>
     );
   }
+
   const data = query.data;
+
   const defaultVisit =
     data.inpatient.active.find((event) =>
       encounters.some((visit) => visit.id === event.encounterId),
     )?.encounterId ?? encounters[0]?.id;
+
   const selectedId = params.get('visit') ?? defaultVisit;
   const selected = encounters.find((visit) => visit.id === selectedId);
+
   const admission = data.inpatient.active.find(
     (event) => event.encounterId === selected?.id && event.patientId === selected.patientId,
   );
+
   const rows = data.visitHeads.filter((record) => record.encounterId === selected?.id);
+
   const canWrite =
     Boolean(admission && selected) &&
     context.permissions.includes('encounter:record') &&
     documentsSupported(context);
+
   const open = (record: VisitDocument, download = false) =>
     setPreview({ file: record.file, title: record.title, download });
+
   return (
     <section className="space-y-5" aria-label="Patient visit documents">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -85,6 +98,7 @@ export const PatientDocuments = ({
           setParams((current) => {
             const next = new URLSearchParams(current);
             next.set('visit', event.target.value);
+
             return next;
           })
         }

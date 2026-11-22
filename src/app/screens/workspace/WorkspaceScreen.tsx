@@ -13,9 +13,12 @@ export const WorkspaceScreen = () => {
   const { available } = useWorkspace();
   const context = useAuthorizationContext();
   const workspace = available.find((item) => item.id === moduleId);
+
   if (!workspace) {
     return <Navigate to="/home" replace />;
   }
+
   rememberWorkspace(context.facilityId, context.userId, workspace.id);
+
   return <Navigate to={moduleStart(workspace)} replace />;
 };

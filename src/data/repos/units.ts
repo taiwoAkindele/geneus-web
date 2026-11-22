@@ -8,10 +8,13 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 
 export const createUnit = async (name: string, context: AuthorizationContext): Promise<Unit> => {
   const existing = await listUnits();
+
   if (existing.some((unit) => unit.active && sameName(unit.name, name))) {
     throw new Error(`There is already a unit called ${name.trim()}`);
   }
+
   const unitId = newId('unit');
+
   return insertRecord<Unit>(context, 'unit:manage', 'unit', {
     ...envelope(context),
     id: unitId,

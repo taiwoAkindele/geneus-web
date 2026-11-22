@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+
 const sessionStorageStub = {
   getItem: (k: string) => store.get(k) ?? null,
   setItem: (k: string, v: string) => void store.set(k, v),
   removeItem: (k: string) => void store.delete(k),
 };
+
 const requests: { path: string; session?: string }[] = [];
 vi.mock('@/data/deviceCredential', () => ({
   getDeviceCredential: () => ({ credential: 'device-credential' }),
 }));
+
 vi.mock('./client', () => ({
   ApiError: class extends Error {
     constructor(
@@ -21,6 +24,7 @@ vi.mock('./client', () => ({
   },
   staffRequest: vi.fn(async (path: string, _credential: string, session?: string) => {
     requests.push({ path, session });
+
     return path === '/staff/session'
       ? {
           token: 'server-token',
@@ -33,9 +37,11 @@ vi.mock('./client', () => ({
 }));
 
 const ada = { userId: 'staff:ada', deviceId: 'device:1' };
+
 /** A page reload: the module starts again and finds only what this tab kept. */
 const reload = async () => {
   vi.resetModules();
+
   return import('./staffSession');
 };
 
@@ -46,6 +52,7 @@ describe('staff session lifecycle', () => {
     vi.stubGlobal('sessionStorage', sessionStorageStub);
     vi.stubGlobal('window', { dispatchEvent: () => true });
   });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -65,6 +72,7 @@ describe('staff session lifecycle', () => {
     expect(
       session.staffSessionToken({ userId: 'staff:bola', deviceId: 'device:1' }),
     ).toBeUndefined();
+
     expect(
       session.staffSessionToken({ userId: 'staff:ada', deviceId: 'device:2' }),
     ).toBeUndefined();
@@ -78,6 +86,7 @@ describe('staff session lifecycle', () => {
       path: '/staff/session/end',
       session: 'server-token',
     });
+
     expect((await reload()).staffSessionToken(ada)).toBeUndefined();
     const again = await reload();
     await again.openStaffSession(ada, '123456');

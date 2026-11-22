@@ -22,6 +22,7 @@ const allergy = ClinicalEvent.parse({
     status: 'active',
   },
 });
+
 describe('clinical record presentation', () => {
   it('removes a refuted allergy from alerts while keeping the history', () => {
     const refuted = {
@@ -30,11 +31,14 @@ describe('clinical record presentation', () => {
       previousId: allergy.id,
       values: { ...allergy.values, verification: 'refuted' },
     };
+
     expect(activeAllergies([allergy])).toHaveLength(1);
     expect(activeAllergies([allergy, refuted])).toEqual([]);
   });
+
   it('keeps a new assessment blank and only saves measurements for the selected specialty', () => {
     expect(clinicalFormDefaults('specialty').assessment).toBe('');
+
     const values = clinicalFormValues('specialty', {
       specialty: 'hypertension',
       assessment: 'Review',
@@ -43,8 +47,10 @@ describe('clinical record presentation', () => {
       measurement_Adherence: 'Discussed',
       'measurement_HbA1c (%)': '7',
     });
+
     expect(values.measurements).toEqual({ Adherence: 'Discussed' });
   });
+
   it('preserves separate medication fields through editing', () => {
     const form = clinicalFormDefaults('medication', undefined, {
       drug: 'Medicine',
@@ -54,6 +60,7 @@ describe('clinical record presentation', () => {
       route: 'oral',
       status: 'active',
     });
+
     expect(clinicalFormValues('medication', form)).toMatchObject({
       dose: '1 tablet',
       frequency: 'daily',
@@ -61,6 +68,7 @@ describe('clinical record presentation', () => {
       route: 'oral',
     });
   });
+
   it('prefills a reconciled prescription over an existing medication while retaining its problem link', () => {
     const medication = {
       ...allergy,
@@ -73,6 +81,7 @@ describe('clinical record presentation', () => {
         problemId: 'problem:one',
       },
     };
+
     const form = clinicalFormDefaults('medication', medication, { dose: '2 tablets' });
     expect(clinicalFormValues('medication', form)).toMatchObject({
       dose: '2 tablets',
@@ -80,6 +89,7 @@ describe('clinical record presentation', () => {
       problemId: 'problem:one',
     });
   });
+
   it('shows every observation, with corrected readings and derived BMI', () => {
     const original: EncounterEntry = {
       ...allergy,
@@ -89,12 +99,14 @@ describe('clinical record presentation', () => {
       step: 'vitals',
       values: { weightKg: 80, heightCm: 200 },
     };
+
     const repeat: EncounterEntry = {
       ...original,
       id: 'vitals:2',
       createdOn: '2026-10-25T10:00:00Z',
       values: { weightKg: 82 },
     };
+
     const correction: EncounterEntry = {
       ...original,
       id: 'amend:1',
@@ -102,6 +114,7 @@ describe('clinical record presentation', () => {
       amends: original.id,
       values: { note: 'Correct weight', correctedValues: { weightKg: 84, heightCm: 200 } },
     };
+
     const rows = observationHistory([original, repeat, correction]);
     expect(rows).toHaveLength(2);
     expect(rows[0].id).toBe(repeat.id);

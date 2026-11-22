@@ -92,12 +92,14 @@ describe('PIN setup codes on the device', () => {
     expect(db.statements[0]?.sql).toMatch(
       /^UPDATE pin_setup_codes SET "usedOn" = \?, "usedOnDevice" = \?, "updatedBy" = \?, "updatedOn" = \?/,
     );
+
     expect(db.statements[0]?.parameters).toContain('staff:nurse');
   });
 
   it('cannot be marked used through a signed-in session — not even an admin holds the claim', async () => {
     await seed(await codeRow());
     const code = await findMatchingCode('staff:nurse', 'K7QM2XPA');
+
     const admin = authorizationFor({
       staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
       facilityId: 'OOE-PHC',
@@ -107,6 +109,7 @@ describe('PIN setup codes on the device', () => {
     await expect(markCodeUsed(code as PinSetupCode, admin)).rejects.toBeInstanceOf(
       AuthorizationError,
     );
+
     expect(db.statements).toEqual([]);
   });
 });

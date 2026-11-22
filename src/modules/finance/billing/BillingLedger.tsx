@@ -19,6 +19,7 @@ export const BillingLedger = ({
   const visible = rows.slice(current * 40, current * 40 + 40);
   const name = (id: string) => data.patients.find((p) => p.patientId === id)?.fullName ?? id;
   const money = (row: (typeof rows)[number], n: number) => formatMoney(n, row.charge.currency);
+
   const detail = (r: (typeof rows)[number]) => (
     <div>
       {r.charge.description}
@@ -28,6 +29,7 @@ export const BillingLedger = ({
       </p>
     </div>
   );
+
   return (
     <>
       <div className="hidden lg:block">

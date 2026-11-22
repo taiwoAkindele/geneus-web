@@ -48,16 +48,20 @@ export type ConnectorOptions = {
 /** One queued write as the contract describes it (SCHEMA.md §12). */
 export const toMutation = (entry: CrudEntry): UploadMutation => {
   const table = TYPE_FOR[entry.table];
+
   if (!table) {
     throw new Error(`queued write for unknown table ${entry.table}`);
   }
+
   const data = decodeValues(table, entry.opData ?? {});
+
   // PowerSync omits unchanged columns from a PATCH, so a second edit by the same
   // person arrives without `updatedBy`; db.ts put the actor in the write's
   // metadata for exactly this case, and the server insists on knowing who.
   if (entry.op === 'PATCH' && data.updatedBy === undefined && entry.metadata) {
     data.updatedBy = entry.metadata;
   }
+
   return {
     clientId: entry.clientId,
     op: entry.op.toLowerCase() as UploadMutation['op'],
@@ -95,17 +99,22 @@ export const createConnector = ({
 }: ConnectorOptions): PowerSyncBackendConnector => {
   const enrolledDevice = getDeviceCredential();
   const fileScope = enrolledDevice ? documentScope(enrolledDevice) : undefined;
+
   return {
     fetchCredentials: async (): Promise<PowerSyncCredentials | null> => {
       const device = enrolledDevice;
+
       if (!device) {
         return null;
       }
+
       try {
         let pending = 1;
+
         try {
           if (pendingUploads) {
             const n = await pendingUploads();
+
             if (Number.isSafeInteger(n) && n >= 0) {
               pending = n;
             }
@@ -113,6 +122,7 @@ export const createConnector = ({
         } catch {
           /* Unknown queue: keep reporting 1. */
         }
+
         const minted = await fetchSyncToken(device.credential, pending);
         rememberBillingCatalogue(device, minted.billingCatalogueEnabled);
         rememberIntegratedBilling(device, minted.integratedBillingEnabled);
@@ -126,8 +136,10 @@ export const createConnector = ({
           minted.insuranceBillingActive,
           minted.insuranceBillingPeriods,
         );
+
         recordServerContact(minted.serverTime, device.deviceId);
         await refreshWorkforceKeys();
+
         return {
           endpoint: minted.syncEndpoint,
           token: minted.token,
@@ -136,21 +148,26 @@ export const createConnector = ({
       } catch (cause) {
         if (isUnauthorized(cause)) {
           await onDeenrolled();
+
           return null;
         }
+
         throw cause;
       }
     },
 
     uploadData: async (database): Promise<void> => {
       const device = enrolledDevice;
+
       if (!device) {
         return;
       }
+
       const db = database as unknown as Pick<LocalDatabase, 'getNextCrudTransaction'>;
 
       for (;;) {
         const transaction = await db.getNextCrudTransaction();
+
         if (!transaction) {
           try {
             const handshake = await fetchSyncToken(device.credential, 0);
@@ -171,8 +188,10 @@ export const createConnector = ({
             if (isUnauthorized(cause)) {
               await onDeenrolled();
             }
+
             throw cause;
           }
+
           return;
         }
 
@@ -181,6 +200,7 @@ export const createConnector = ({
           transactionId: transaction.transactionId ?? null,
           mutations: transaction.crud.map(toMutation),
         };
+
         try {
           if (
             fileScope &&
@@ -193,6 +213,7 @@ export const createConnector = ({
             const { transferDocumentFiles } = await import('./documentTransfer');
             await transferDocumentFiles(device.credential, fileScope, request.mutations);
           }
+
           const response = await uploadMutations(device.credential, request);
           await confirmWorkforceReceipts(
             device.credential,
@@ -212,7 +233,9 @@ export const createConnector = ({
                 ].includes(mutation.table),
             ),
           );
+
           recordServerContact(response.serverTime, device.deviceId);
+
           if (response.rejected.length > 0) {
             console.warn(
               'server rejected queued writes — see the reconcile queue',
@@ -223,8 +246,10 @@ export const createConnector = ({
           if (isUnauthorized(cause)) {
             await onDeenrolled();
           }
+
           throw cause;
         }
+
         await transaction.complete();
       }
     },

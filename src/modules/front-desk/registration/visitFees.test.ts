@@ -29,6 +29,7 @@ const registration = fee({
   chargeWhen: 'first_visit',
   exemptions: [{ reason: 'Under-5 policy', ageUnderYears: 5 }],
 });
+
 const consultation = fee({
   id: 'fee:consult',
   name: 'Consultation',
@@ -36,6 +37,7 @@ const consultation = fee({
   amountMinor: 200000,
   exemptions: [{ reason: 'Antenatal policy', visitTypes: ['antenatal'] }],
 });
+
 const antenatalCard = fee({
   id: 'fee:anc-card',
   name: 'ANC card',
@@ -43,6 +45,7 @@ const antenatalCard = fee({
   amountMinor: 50000,
   exemptions: [{ reason: 'Free ANC', visitTypes: ['antenatal'] }],
 });
+
 const retired = fee({ id: 'fee:old', name: 'Old fee', active: false });
 const lab = fee({ id: 'fee:lab', name: 'Malaria RDT', chargeWhen: 'when_ordered' });
 const all = [registration, consultation, antenatalCard, retired, lab];
@@ -67,6 +70,7 @@ describe('fees previewed for a new patient', () => {
       'Antenatal policy',
       'Free ANC',
     ]);
+
     expect(lines[0].listPriceMinor).toBe(100000);
     expect(amountsDue(lines)).toEqual([]);
   });
@@ -77,6 +81,7 @@ describe('fees previewed for a new patient', () => {
       factsFromForm({ sex: 'F', age: '', dateOfBirth: '' }),
       false,
     );
+
     expect(lines[0].amountMinor).toBe(100000);
   });
 
@@ -84,9 +89,11 @@ describe('fees previewed for a new patient', () => {
     expect(
       factsFromForm({ sex: 'M', age: '', dateOfBirth: '2023-05-18' }, undefined, '2026-11-09'),
     ).toEqual({ ageYears: 3, sex: 'male', visitType: undefined });
+
     expect(factsFromForm({ sex: '', age: '41', dateOfBirth: '' }, 'general', '2026-11-09')).toEqual(
       { ageYears: 41, sex: undefined, visitType: 'general' },
     );
+
     expect(factsFromForm({ sex: 'F', age: '4.5', dateOfBirth: '' }).ageYears).toBeUndefined();
   });
 

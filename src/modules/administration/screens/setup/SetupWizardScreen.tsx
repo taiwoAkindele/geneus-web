@@ -29,17 +29,20 @@ import {
 } from '@/modules/administration/setup';
 
 const panel = 'rounded-card border border-outline-soft bg-white p-4 md:p-5';
+
 const STATUS: Record<SetupStep['status'], { label: string; dot: string }> = {
   done: { label: 'Done', dot: 'bg-brand text-white' },
   started: { label: 'Started', dot: 'bg-amber-bg text-amber-text' },
   todo: { label: 'To do', dot: 'bg-surface-high text-ink-soft' },
   not_needed: { label: 'Not needed', dot: 'bg-surface-high text-ink-muted' },
 };
+
 const EDITORS: Partial<Record<SetupStepId, { kind: EditorKind; add: string; permission: string }>> =
   {
     teams: { kind: 'unit', add: 'Add team', permission: 'unit:manage' },
     places: { kind: 'location', add: 'Add place', permission: 'location:manage' },
   };
+
 const HELP: Record<SetupStepId, string> = {
   facility: 'The time zone dates every service: bills, insurance cover checks, claims and reports.',
   teams:
@@ -53,6 +56,7 @@ const HELP: Record<SetupStepId, string> = {
   staff:
     'Add the people who work here, give them their duties and plan their shifts so they can sign in.',
 };
+
 const LATER = [
   {
     label: 'Bank transfers',
@@ -86,12 +90,15 @@ const StepEditor = ({ step }: { step: SetupStepId }) => {
   const query = useWorkforce();
   const [editing, setEditing] = useState<{ previous?: AnyDocument }>();
   const editor = EDITORS[step]!;
+
   if (query.loading || query.error || !query.data) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
   const records = step === 'teams' ? data.units : data.locations;
   const allowed = context.permissions.includes(editor.permission as never);
+
   return (
     <div className="space-y-3">
       {allowed ? <StaffVerification purpose="Changing hospital setup" /> : null}
@@ -153,6 +160,7 @@ const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
   if (step === 'facility') {
     return <FacilityDetailsStep />;
   }
+
   if (step === 'prices') {
     return (
       <Links
@@ -163,6 +171,7 @@ const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
       />
     );
   }
+
   if (step === 'staff') {
     return (
       <Links
@@ -173,9 +182,11 @@ const StepBody = ({ step }: { step: SetupStepId }): ReactNode => {
       />
     );
   }
+
   if (step === 'services') {
     return <CareServicesStep />;
   }
+
   return <StepEditor step={step} />;
 };
 
@@ -192,13 +203,16 @@ export const SetupWizardScreen = () => {
   useEffect(() => {
     document.title = 'Set up your hospital · Geneus Health';
   }, []);
+
   const steps = facts.data ? setupSteps(facts.data, notNeeded) : undefined;
   const progress = steps ? setupProgress(steps) : undefined;
   const requested = params.get('step') as SetupStepId | null;
+
   const current: SetupStepId =
     requested && SETUP_STEP_IDS.includes(requested)
       ? requested
       : (progress?.next?.id ?? 'facility');
+
   const go = useCallback(
     (id: SetupStepId) => {
       setParams({ step: id });
@@ -206,6 +220,7 @@ export const SetupWizardScreen = () => {
     },
     [setParams],
   );
+
   // On a phone the step bar scrolls sideways: keep the open step in view.
   const loaded = Boolean(facts.data);
   useEffect(() => {
@@ -213,20 +228,26 @@ export const SetupWizardScreen = () => {
       .querySelector('nav[aria-label="Setup steps"] [aria-current="step"]')
       ?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [current, loaded]);
+
   const toggleNotNeeded = (id: SetupStepId) =>
     setNotNeeded((before) => {
       const next = new Set(before);
+
       if (next.has(id)) {
         next.delete(id);
       } else {
         next.add(id);
       }
+
       writeNotNeeded(context.facilityId, next);
+
       return next;
     });
+
   if (facts.loading || facts.error || !steps || !progress) {
     return <WorkspaceLoading error={facts.error} reload={facts.reload} />;
   }
+
   const index = SETUP_STEP_IDS.indexOf(current);
   const step = steps[index];
   const previous = steps[index - 1];

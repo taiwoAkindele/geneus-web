@@ -29,6 +29,7 @@ const availableActions = (event: InpatientEvent): [InpatientAction, string][] =>
       ['cancel', 'Cancel admission'],
     ];
   }
+
   if (event.action === 'reserve') {
     return [
       ['arrive', 'Confirm arrival'],
@@ -36,12 +37,14 @@ const availableActions = (event: InpatientEvent): [InpatientAction, string][] =>
       ['cancel', 'Cancel admission'],
     ];
   }
+
   if (event.action === 'ready_for_discharge') {
     return [
       ['discharge', 'Confirm departure'],
       ['continue_care', 'Continue ward care'],
     ];
   }
+
   if (['arrive', 'transfer', 'continue_care'].includes(event.action)) {
     return [
       ['transfer', 'Transfer bed'],
@@ -49,8 +52,10 @@ const availableActions = (event: InpatientEvent): [InpatientAction, string][] =>
       ['discharge', 'Record unexpected departure'],
     ];
   }
+
   return [];
 };
+
 /** Per ward: free beds, beds with a patient, and beds not usable yet (reserved, awaiting cleaning or needing review). */
 const wardBedCounts = (
   beds: readonly { ward?: { id: string; name: string }; state: BedState }[],
@@ -59,8 +64,10 @@ const wardBedCounts = (
     string,
     { id: string; name: string; available: number; occupied: number; unavailable: number }
   >();
+
   for (const { ward, state } of beds) {
     const id = ward?.id ?? '';
+
     const counts = wards.get(id) ?? {
       id,
       name: ward?.name ?? 'Ward not configured',
@@ -68,6 +75,7 @@ const wardBedCounts = (
       occupied: 0,
       unavailable: 0,
     };
+
     if (state.status === 'Available') {
       counts.available++;
     } else if (state.status === 'Occupied') {
@@ -75,10 +83,13 @@ const wardBedCounts = (
     } else {
       counts.unavailable++;
     }
+
     wards.set(id, counts);
   }
+
   return [...wards.values()].sort((a, b) => a.name.localeCompare(b.name));
 };
+
 export const InpatientScreen = () => {
   const query = useInpatient();
   const patients = usePatients();
@@ -95,6 +106,7 @@ export const InpatientScreen = () => {
   useEffect(() => {
     document.title = 'Wards & admissions · Geneus Health';
   }, []);
+
   if (query.loading || patients.loading) {
     return (
       <p role="status" className="p-6">
@@ -102,6 +114,7 @@ export const InpatientScreen = () => {
       </p>
     );
   }
+
   if (!query.data || query.error || patients.error) {
     return (
       <div role="alert" className="p-6">
@@ -118,16 +131,23 @@ export const InpatientScreen = () => {
       </div>
     );
   }
+
   const data = query.data;
+
   const name = (id: string) =>
     patients.data?.find((patient) => patient.patientId === id)?.fullName ?? id;
+
   const locationName = (id?: string) =>
     data.locations.find((location) => location.id === id)?.name ?? '';
+
   const teamName = (id: string) => data.units.find((unit) => unit.id === id)?.name ?? id;
+
   const matches = (id: string) =>
     (!params.get('patient') || params.get('patient') === id) &&
     `${name(id)} ${id}`.toLowerCase().includes(search.toLowerCase());
+
   const supported = inpatientSupported(context);
+
   const patientLink = (id: string, encounterId: string) => (
     <Link
       className="inline-flex min-h-[52px] items-center font-bold text-brand underline"
@@ -142,9 +162,11 @@ export const InpatientScreen = () => {
       Open patient chart
     </Link>
   );
+
   const requests = data.requests.filter((request) => matches(request.patientId));
   const stays = (history ? data.heads : data.active).filter((event) => matches(event.patientId));
   const bedStates = inpatientBedStates(data.events, data.ready);
+
   const beds = data.locations
     .filter((location) => location.kind === 'bed' && location.active)
     .map((bed) => ({
@@ -152,18 +174,23 @@ export const InpatientScreen = () => {
       ward: wardForBed(bed, data.locations),
       state: bedStates.get(bed.id) ?? ({ status: 'Available' } as BedState),
     }));
+
   const activityEvents: InpatientEvent[] = [];
   let cursor = data.heads.find((stay) => stay.admissionId === activity);
+
   while (cursor && !activityEvents.some((event) => event.id === cursor!.id)) {
     activityEvents.unshift(cursor);
     cursor = data.events.find((event) => event.id === cursor!.previousId);
   }
+
   const saveCleaning = async () => {
     if (!cleaning) {
       return;
     }
+
     setSaving(true);
     setError('');
+
     try {
       await confirmBedReady(cleaning.bedId, cleaning.releaseId, context);
       setCleaning(undefined);
@@ -174,6 +201,7 @@ export const InpatientScreen = () => {
       setSaving(false);
     }
   };
+
   return (
     <div className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 md:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -207,6 +235,7 @@ export const InpatientScreen = () => {
           setParams((current) => {
             const next = new URLSearchParams(current);
             next.set('tab', value);
+
             return next;
           })
         }

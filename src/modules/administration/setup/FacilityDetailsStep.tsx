@@ -24,6 +24,7 @@ export const COUNTRIES = [
   { code: 'KE', name: 'Kenya', timeZone: 'Africa/Nairobi', currency: 'KES' },
   { code: 'ZA', name: 'South Africa', timeZone: 'Africa/Johannesburg', currency: 'ZAR' },
 ] as const;
+
 export const countryDefaults = (code: string) =>
   COUNTRIES.find((c) => c.code === code) ?? COUNTRIES[0];
 
@@ -35,10 +36,12 @@ type Form = FacilityDetails & {
   email: string;
   timeZone: string;
 };
+
 /** What registration already captured, with Nigeria and its zone and currency where nothing was said. */
 export const facilityForm = (facility: Facility): Form => {
   const country = facility.country ?? 'NG';
   const defaults = countryDefaults(country);
+
   return {
     code: facility.code,
     name: facility.name,
@@ -66,6 +69,7 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
   const correcting = Boolean(facility.timeZone) && timeZoneChanged;
   const needsZoneConfirmation = correcting && (!zoneConfirmed || zoneReason.trim().length < 5);
   const patch = (next: Partial<Form>) => setForm((before) => ({ ...before, ...next }));
+
   const chooseCountry = (code: string) => {
     const was = countryDefaults(form.country);
     const next = countryDefaults(code);
@@ -76,10 +80,12 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
       ...(!facility.timeZone && form.timeZone === was.timeZone ? { timeZone: next.timeZone } : {}),
     });
   };
+
   const save = async () => {
     if (busy || needsZoneConfirmation) {
       return;
     }
+
     const details = FacilityDetailsUpdate.safeParse({
       name: form.name,
       level: form.level,
@@ -91,19 +97,25 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
       ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
       email: form.email.trim(),
     });
+
     if (!details.success) {
       setError(details.error.issues.map((i) => i.message).join('. '));
+
       return;
     }
+
     setBusy(true);
     setError('');
     let detailsSaved = false;
+
     try {
       await saveFacilityDetails(context, details.data);
       detailsSaved = true;
+
       if (timeZoneChanged) {
         await saveTimeZone(context, form.timeZone, correcting ? zoneReason : undefined);
       }
+
       toast('Facility details saved. They reach every device with the next sync.');
       onClose?.();
     } catch (cause) {
@@ -114,6 +126,7 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
       setBusy(false);
     }
   };
+
   const content = (
     <form
       noValidate
@@ -230,6 +243,7 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
       </StaffVerification>
     </form>
   );
+
   return onClose ? (
     <Sheet
       title="Edit facility details"
@@ -253,10 +267,13 @@ export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'sett
   const facility = useLiveQuery(getFacility, ['facility']).data;
   const context = useAuthorizationContext();
   const [editing, setEditing] = useState(false);
+
   if (!facility) {
     return <p className="text-sm text-ink-muted">Reading facility details…</p>;
   }
+
   const values = facilityForm(facility);
+
   const levelNames = {
     chc: 'Community health centre',
     phc: 'Primary',
@@ -264,6 +281,7 @@ export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'sett
     teaching_hospital: 'Tertiary',
     specialist: 'Specialist',
   };
+
   const summary = (
     <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
       {[
@@ -286,6 +304,7 @@ export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'sett
       ))}
     </dl>
   );
+
   // The server lets only a writable facility administrator change these.
   if (
     !(context.role === 'facility_admin' || context.roles?.includes('facility_admin')) ||
@@ -293,6 +312,7 @@ export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'sett
   ) {
     return summary;
   }
+
   return (
     <div className="space-y-5">
       {mode === 'settings' ? (

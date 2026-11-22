@@ -14,9 +14,13 @@ import type {
 } from '@shared';
 
 export type FieldType = RegisterFieldType;
+
 export type RegisterField = RegisterFieldDef;
+
 export type EntryValue = RegisterEntryValue;
+
 export type EntryValues = Record<string, EntryValue>;
+
 export type { RegisterDefinition, RegisterEntry, RegisterStatus };
 
 /** One entry projected for display — derived from a `register_entry` document. */

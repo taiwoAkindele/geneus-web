@@ -6,9 +6,11 @@ const saved: { type: string; fields: Record<string, unknown> }[] = [];
 vi.mock('@/data/repos/workforce', () => ({
   saveWorkforce: vi.fn(async (type: string, fields: Record<string, unknown>) => {
     saved.push({ type, fields });
+
     return { id: `${type}:new`, type, ...fields };
   }),
 }));
+
 const {
   addCareService,
   CARE_CONCEPT_SYSTEM,
@@ -22,6 +24,7 @@ const context = {
   userId: 'admin',
   permissions: ['service:manage'],
 } as unknown as AuthorizationContext;
+
 const lab = {
   id: 'd-hb',
   name: 'Haemoglobin',
@@ -30,6 +33,7 @@ const lab = {
   concept: { system: 'http://loinc.org', code: '718-7', label: 'Haemoglobin' },
   investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] },
 };
+
 const base = (patch: Partial<Record<keyof WorkforceData, unknown>> = {}) =>
   ({
     units: [
@@ -87,12 +91,14 @@ describe('care services in hospital setup', () => {
       base(),
       context,
     );
+
     expect(saved.map((s) => s.type)).toEqual(['service_definition', 'service_offering']);
     expect(saved[0].fields).toMatchObject({
       category: 'consultation',
       orderable: false,
       concept: { system: CARE_CONCEPT_SYSTEM, code: 'general-outpatient' },
     });
+
     expect(saved[1].fields).toMatchObject({
       serviceDefinitionId: 'service_definition:new',
       configuration: 'active',
@@ -112,6 +118,7 @@ describe('care services in hospital setup', () => {
       active: true,
       concept: { system: 'urn:geneus:local-service', code: 'x', label: 'antenatal care' },
     };
+
     await addCareService(
       {
         key: 'antenatal',
@@ -125,6 +132,7 @@ describe('care services in hospital setup', () => {
       base({ definitions: [lab, own] }),
       context,
     );
+
     expect(saved.map((s) => s.type)).toEqual(['service_offering']);
     expect(saved[0].fields.serviceDefinitionId).toBe('d-anc');
   });
@@ -145,12 +153,14 @@ describe('care services in hospital setup', () => {
         { id: 'o-opd', name: 'OPD', serviceDefinitionId: 'd-opd', configuration: 'active' },
       ],
     });
+
     expect(
       existingCareService(
         { key: 'general-outpatient', name: 'General outpatient consultation' },
         data,
       )?.id,
     ).toBe('o-opd');
+
     await expect(
       addCareService(
         {
@@ -166,6 +176,7 @@ describe('care services in hospital setup', () => {
         context,
       ),
     ).rejects.toThrow('already one of');
+
     await expect(
       addCareService(
         {
@@ -180,6 +191,7 @@ describe('care services in hospital setup', () => {
         context,
       ),
     ).rejects.toThrow('already one of');
+
     expect(saved).toEqual([]);
   });
 
@@ -197,6 +209,7 @@ describe('care services in hospital setup', () => {
       base(),
       context,
     );
+
     expect(saved[0].type).toBe('service_definition');
   });
 
@@ -215,6 +228,7 @@ describe('care services in hospital setup', () => {
         context,
       ),
     ).rejects.toThrow('team');
+
     await expect(
       addCareService(
         {
@@ -229,6 +243,7 @@ describe('care services in hospital setup', () => {
         context,
       ),
     ).rejects.toThrow('where');
+
     expect(saved).toEqual([]);
   });
 
@@ -238,6 +253,7 @@ describe('care services in hospital setup', () => {
     expect(careServiceStatus({ id: 'o1', configuration: 'draft' } as never, base()).label).toBe(
       'Draft',
     );
+
     expect(careServiceStatus(offering, base({ pending: new Set(['o1']) })).label).toBe('Saving');
     expect(
       careServiceStatus(

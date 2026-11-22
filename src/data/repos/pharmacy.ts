@@ -34,11 +34,14 @@ import { listWorkforceReceipts } from './workforceReceipts';
 
 type Reader = Pick<LocalDatabase, 'getOptional'>;
 type LocalPharmacyRecords = PharmacyRecords & { refusedSupplies: EncounterEntry[] };
+
 const refusedSupply = (data: LocalPharmacyRecords, details: DispensingDetails) =>
   data.refusedSupplies.some((entry) => {
     const d = dispensingDetails(entry);
+
     return d?.prescriptionEntryId === details.prescriptionEntryId && d.lineId === details.lineId;
   });
+
 export const readPharmacy = async (
   patientId: string,
   encounterId: string,
@@ -52,13 +55,17 @@ export const readPharmacy = async (
     if (!reader) {
       return field ? allWhere<T>(type, field, value!) : allOfType<T>(type);
     }
+
     const fields = Object.keys(fieldKindsFor(type));
+
     const row = await reader.getOptional<{ records: string }>(
       `SELECT json_group_array(json_object(${fields.map((field) => `'${field}', "${field}"`).join(',')})) AS records FROM ${TABLE_FOR[type]}${field ? ` WHERE "${field}"=?` : ''}`,
       field ? [value] : [],
     );
+
     return (JSON.parse(row?.records ?? '[]') as Row[]).map((r) => fromRow<T>(type, r));
   };
+
   const [
     entries,
     items,
@@ -88,18 +95,22 @@ export const readPharmacy = async (
           .then((r) => JSON.parse(r?.records ?? '[]') as { id: string; outcome: string }[])
       : listWorkforceReceipts(),
   ]);
+
   const headerRow = reader
     ? await reader.getOptional<Row>('SELECT * FROM encounters WHERE id=?', [encounterId])
     : undefined;
+
   const header = reader
     ? headerRow && fromRow<Encounter>('encounter', headerRow)
     : await findRecord<Encounter>('encounter', encounterId);
+
   const bookingRow =
     reader && header?.appointmentId
       ? await reader.getOptional<Row>('SELECT * FROM appointments WHERE id=?', [
           header.appointmentId,
         ])
       : undefined;
+
   // Inside a transaction the booking was read with the same reader; otherwise read it now.
   const readBooking = async () => {
     if (reader) {
@@ -112,15 +123,20 @@ export const readPharmacy = async (
 
     return undefined;
   };
+
   const booking = await readBooking();
   const accepted = new Set(receipts.filter((r) => r.outcome === 'applied').map((r) => r.id));
+
   const blocked = new Set([
     ...refused.filter((r) => !accepted.has(r.entityId)).map((r) => r.entityId),
     ...receipts.filter((r) => r.outcome === 'rejected' && !accepted.has(r.id)).map((r) => r.id),
   ]);
+
   let changed = true;
+
   while (changed) {
     changed = false;
+
     for (const e of wardEvents) {
       if (
         !blocked.has(e.id) &&
@@ -132,8 +148,10 @@ export const readPharmacy = async (
         changed = true;
       }
     }
+
     for (const e of entries) {
       const d = dispensingDetails(e);
+
       if (
         !blocked.has(e.id) &&
         (blocked.has(e.encounterId) ||
@@ -146,13 +164,16 @@ export const readPharmacy = async (
       }
     }
   }
+
   const effects = <T extends { dispenseEntryId?: string }>(records: T[]) =>
     records.filter((r) => !r.dispenseEntryId || !blocked.has(r.dispenseEntryId));
+
   const serviceAllocations = await read<ServiceChargeAllocation>(
     'service_charge_allocation',
     'patientId',
     patientId,
   );
+
   return {
     integratedBilling: integratedBillingEnabled(),
     serviceAllocations,
@@ -170,6 +191,7 @@ export const readPharmacy = async (
     wardEvents: wardEvents.filter((e) => e.patientId === patientId && !blocked.has(e.id)),
   };
 };
+
 export const loadPharmacy = async (
   patientId: string,
   encounterId: string,
@@ -177,18 +199,23 @@ export const loadPharmacy = async (
 ) => {
   assertAllowed(context, 'patient_chart:read');
   const workspace = activeWorkspace();
+
   if (
     workspace &&
     (workspace.facilityId !== context.facilityId || workspace.deviceId !== context.deviceId)
   ) {
     throw new Error('Open Pharmacy in the current hospital workspace');
   }
+
   const data = await readPharmacy(patientId, encounterId);
+
   if (data.patient?.facilityId !== context.facilityId) {
     throw new Error('This patient is unavailable in the current hospital');
   }
+
   return data;
 };
+
 export const saveDispensing = async (
   patientId: string,
   encounterId: string,
@@ -199,16 +226,21 @@ export const saveDispensing = async (
   assertAllowed(context, 'encounter:record');
   assertAllowed(context, 'clinical:dispense');
   details = DispensingDetails.parse(details);
+
   if (!pharmacySupported(context)) {
     throw new Error('Connect once to confirm this server supports quantity-based dispensing');
   }
+
   const data = await loadPharmacy(patientId, encounterId, context);
+
   if (refusedSupply(data, details)) {
     throw new Error(
       'Review this medicine’s refused supply in Sync & review before recording another update',
     );
   }
+
   const existing = data.entries.find((e) => e.id === requestId);
+
   if (existing) {
     if (
       JSON.stringify(dispensingDetails(existing)) !== JSON.stringify(details) ||
@@ -216,17 +248,22 @@ export const saveDispensing = async (
     ) {
       throw new Error('This save identity already records different dispensing');
     }
+
     return existing;
   }
+
   const source =
     data.entries.find((e) => e.id === details.prescriptionEntryId) ??
     data.wardEvents?.find(
       (e) => e.id === details.prescriptionEntryId && e.values.kind === 'discharge',
     );
+
   if (!source) {
     throw new Error('This signed prescription is unavailable');
   }
+
   const at = new Date().toISOString();
+
   const candidate = EncounterEntry.parse({
     ...envelope(context, at),
     id: requestId,
@@ -241,12 +278,16 @@ export const saveDispensing = async (
     values: { supply: details, lines: dispensingSummary(source, data.entries) },
     step: 'dispense',
   });
+
   candidate.values.lines = dispensingSummary(source, data.entries, candidate);
   const issues = pharmacyIssues(candidate, data);
+
   if (issues.length) {
     throw new Error(issues.join('. '));
   }
+
   const effects = pharmacyEffects(candidate, data);
+
   const records: NewRecord[] = [
     { permission: 'encounter:record', type: 'encounter_entry', record: candidate },
     ...effects.map((record): NewRecord => ({
@@ -255,28 +296,36 @@ export const saveDispensing = async (
       record,
     })),
   ];
+
   await insertRecords(context, records, async (transaction) => {
     const locked = await readPharmacy(patientId, encounterId, transaction);
+
     if (refusedSupply(locked, details)) {
       throw new Error(
         'Review this medicine’s refused supply in Sync & review before recording another update',
       );
     }
+
     const issues = pharmacyIssues(candidate, locked);
+
     if (details.action === 'supply' && details.stockItemId) {
       const item = locked.items.find((i) => i.id === details.stockItemId)!;
+
       const balance =
         item.quantityOnHand +
         locked.movements.filter((m) => m.itemId === item.id).reduce((n, m) => n + m.change, 0);
+
       if (balance + 1e-6 < details.quantity!) {
         issues.push(
           'Giving this quantity exceeds recorded stock. Check the stock item and physical count',
         );
       }
     }
+
     if (issues.length) {
       throw new Error(issues.join('. '));
     }
   });
+
   return candidate;
 };

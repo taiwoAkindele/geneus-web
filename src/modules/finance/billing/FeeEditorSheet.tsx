@@ -28,14 +28,18 @@ export const FeeEditorSheet = ({
     setError,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<FeeForm>({ defaultValues: feeFormValues(fee) });
+
   const saving = useRef(false);
   const toast = useToast();
   const currency = fee?.currency ?? defaultCurrency;
+
   const save = handleSubmit(async (values) => {
     if (saving.current) {
       return;
     }
+
     saving.current = true;
+
     try {
       await onSave(
         feeDraftFromForm({ ...values, category: fee?.category ?? values.category }, currency),
@@ -48,6 +52,7 @@ export const FeeEditorSheet = ({
       saving.current = false;
     }
   });
+
   return (
     <Sheet
       title={fee ? 'Edit item' : 'Add item'}

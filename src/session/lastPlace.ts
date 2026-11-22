@@ -14,6 +14,7 @@ export const rememberPlace = (staffId: string, facilityId: string, path: string)
   if (NOT_A_PLACE.test(path)) {
     return;
   }
+
   last = { staffId, facilityId, path };
 };
 
@@ -24,6 +25,7 @@ export const takePlace = (
 ): string | undefined => {
   const place = last;
   last = undefined;
+
   return place && staffId && place.staffId === staffId && place.facilityId === facilityId
     ? place.path
     : undefined;

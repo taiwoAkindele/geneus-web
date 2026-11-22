@@ -17,6 +17,7 @@ type Props = {
 };
 
 const Req = ({ on }: { on?: boolean }) => (on ? <span className="text-danger"> *</span> : null);
+
 /** Contract values may be numbers (e.g. from synced docs); inputs need text. */
 const asText = (v: EntryValue | undefined): string => {
   if (typeof v === 'string') {
@@ -25,6 +26,7 @@ const asText = (v: EntryValue | undefined): string => {
 
   return typeof v === 'number' ? String(v) : '';
 };
+
 const Help = ({ text }: { text?: string }) =>
   text && text.trim() ? <div className="mt-1.5 text-[12px] text-ink-muted">{text}</div> : null;
 
@@ -43,20 +45,24 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
   if (isChoice(field.type)) {
     const options =
       field.options && field.options.length ? field.options : ['Option 1', 'Option 2'];
+
     const multi = field.type === 'multiselect';
     const arr = Array.isArray(value) ? value : [];
     const single = typeof value === 'string' ? value : '';
     const radius = multi ? 'rounded-[8px]' : 'rounded-full';
+
     const pick = (o: string) => {
       if (!onChange) {
         return;
       }
+
       if (multi) {
         onChange(arr.includes(o) ? arr.filter((x) => x !== o) : [...arr, o]);
       } else {
         onChange(o);
       }
     };
+
     return (
       <fieldset
         aria-invalid={error ? true : undefined}
@@ -69,6 +75,7 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
         <div className="flex flex-wrap gap-2">
           {options.map((o) => {
             const on = multi ? arr.includes(o) : single === o;
+
             return (
               <button
                 key={o}
@@ -156,6 +163,7 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
       </div>
     );
   }
+
   return (
     <TextField
       label={label}

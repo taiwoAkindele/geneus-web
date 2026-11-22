@@ -31,20 +31,26 @@ export const FeePoliciesSheet = ({
     watch,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<FeePolicyForm>({ defaultValues: feePolicyValues(fee) });
+
   const { fields, append, remove } = useFieldArray({ control, name: 'exemptions' });
   const saving = useRef(false);
   const toast = useToast();
   const [confirmed, setConfirmed] = useState(false);
   const enabling = watch('chargeWhen') !== 'when_ordered' && watch('chargeWhen') !== fee.chargeWhen;
+
   const save = handleSubmit(async (values) => {
     if (saving.current) {
       return;
     }
+
     if (enabling && !confirmed) {
       setError('root', { message: 'Confirm the automatic charging change before saving.' });
+
       return;
     }
+
     saving.current = true;
+
     try {
       await onSave(feePolicyFromForm(values));
     } catch (cause) {
@@ -55,6 +61,7 @@ export const FeePoliciesSheet = ({
       saving.current = false;
     }
   });
+
   return (
     <Sheet
       title="Automatic charging & exemptions"

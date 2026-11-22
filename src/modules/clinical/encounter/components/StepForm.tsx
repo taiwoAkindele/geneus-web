@@ -30,6 +30,7 @@ import { CERTAINTY_LABEL, INJECTION_ROUTES } from '../steps';
 import type { EncounterController } from '../useEncounter';
 import type { StepKey } from '../types';
 import { ApprovalWarning, PlanApprovalSummary } from '@/modules/finance/insurance/InsuranceAtCare';
+
 export type StepFormController = Pick<
   EncounterController,
   | 'setField'
@@ -233,6 +234,7 @@ export const StepForm = ({
         ) : (
           d.lab_order.tests.map((test, index) => {
             const value = d.lab_results[d.lab_order.items?.[index]?.id ?? test];
+
             return value ? (
               <p key={index}>
                 <strong>{test}:</strong> {value}
@@ -248,6 +250,7 @@ export const StepForm = ({
       </div>
     );
   }
+
   if (stepKey === 'investigation_review') {
     return (
       <div className="space-y-3">
@@ -266,6 +269,7 @@ export const StepForm = ({
               'decision',
               e.target.value as typeof d.investigation_review.decision,
             );
+
             if (e.target.value === 'none_required') {
               setField('lab_order', 'items', []);
               setField('lab_order', 'tests', []);
@@ -286,6 +290,7 @@ export const StepForm = ({
       </div>
     );
   }
+
   if (stepKey === 'lab_order') {
     return (
       <div className="space-y-3">
@@ -315,6 +320,7 @@ export const StepForm = ({
       </div>
     );
   }
+
   if (stepKey === 'injection_order') {
     return (
       <div className="space-y-3">
@@ -327,6 +333,7 @@ export const StepForm = ({
           ]}
           onChange={(e) => {
             setField('injection_order', 'required', e.target.value === 'yes');
+
             if (e.target.value === 'no') {
               for (const field of ['drug', 'dose', 'route', 'instructions'] as const) {
                 setField('injection_order', field, '');
@@ -366,6 +373,7 @@ export const StepForm = ({
       </div>
     );
   }
+
   if (stepKey === 'disposition') {
     return (
       <div className="space-y-3">
@@ -446,6 +454,7 @@ export const StepForm = ({
       />
     );
   }
+
   if (stepKey === 'lab_results') {
     if (d.lab_order.tests.length === 0) {
       return (
@@ -454,6 +463,7 @@ export const StepForm = ({
         </div>
       );
     }
+
     return (
       <div className="space-y-3">
         {d.lab_order.tests.map((t, index) => (
@@ -491,6 +501,7 @@ export const StepForm = ({
           onChange={(e) => {
             setField('diagnosis', 'dx', e.target.value);
             const match = knownCode(knownDiagnoses, e.target.value);
+
             if (match && !d.diagnosis.code?.trim()) {
               setField('diagnosis', 'code', match.code);
               setField('diagnosis', 'codingSystem', match.codingSystem);
@@ -649,6 +660,7 @@ export const StepForm = ({
       </>
     );
   }
+
   if (stepKey === 'prescription') {
     return (
       <>
@@ -662,6 +674,7 @@ export const StepForm = ({
           ]}
           onChange={(e) => {
             setField('prescription', 'decision', e.target.value as typeof d.prescription.decision);
+
             if (e.target.value === 'none_required') {
               setField('prescription', 'rx', []);
             }
@@ -836,6 +849,7 @@ export const StepForm = ({
         <div className="space-y-2">
           {rx.map((m, idx) => {
             const done = Boolean(d.dispense.done[idx]);
+
             return (
               <div key={idx} className="space-y-2">
                 <FieldLabel label={`${m.name || 'Medication'} supplied`} help={H.dispensing} />

@@ -19,6 +19,7 @@ type Filter = 'due' | 'Unpaid' | 'Part paid' | 'Awaiting insurance' | 'Credit' |
 /** The patient's items in a few words: "Full blood count, Ceftriaxone +1". */
 const itemSummary = (bill: BillDocument) => {
   const names = [...new Set(bill.rows.map((r) => r.charge.description))];
+
   return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
 };
 
@@ -72,6 +73,7 @@ export const BillsList = ({
   const currencies = [...new Set(bills.map((b) => b.currency))].sort();
   const currency = currencies.includes(currencyChoice) ? currencyChoice : (currencies[0] ?? 'NGN');
   const term = search.trim().toLowerCase();
+
   const scoped = bills.filter(
     (b) =>
       b.currency === currency &&
@@ -79,7 +81,9 @@ export const BillsList = ({
       (!from || calendarDate(b.createdOn) >= from) &&
       (!to || calendarDate(b.createdOn) <= to),
   );
+
   const open = (b: BillDocument) => b.due > 0 || b.pending > 0 || b.credit > 0;
+
   const matches: Record<Filter, (b: BillDocument) => boolean> = {
     due: (b) => b.due > 0 || b.pending > 0,
     Unpaid: (b) => b.status === 'Unpaid',
@@ -88,8 +92,10 @@ export const BillsList = ({
     Credit: (b) => b.status === 'Credit',
     questions: (b) => questions.has(b.id),
   };
+
   const count = (f: Filter) =>
     scoped.filter((b) => (f === 'questions' || open(b)) && matches[f](b)).length;
+
   const visible = term
     ? scoped.filter((b) =>
         `${b.reference} ${name(b.patientId)} ${b.patientId} ${b.rows.map((r) => r.charge.description).join(' ')}`
@@ -97,8 +103,10 @@ export const BillsList = ({
           .includes(term),
       )
     : scoped.filter((b) => matches[filter](b));
+
   const totalDue = visible.reduce((n, b) => n + b.due, 0);
   const activeFees = data.fees.filter((f) => f.active).length;
+
   const chips: { value: Filter; label: string; always?: boolean }[] = [
     { value: 'due', label: 'All due', always: true },
     { value: 'Unpaid', label: 'Unpaid', always: true },

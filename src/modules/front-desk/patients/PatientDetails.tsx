@@ -21,19 +21,23 @@ export const PatientDetails = ({ patientId }: { patientId?: string }) => {
   const [params] = useSearchParams();
   // Set once by registration: where the patient was sent. Not kept in the address, so a reload does not repeat it.
   const outcome = (useLocation().state as { outcome?: RegistrationOutcome } | null)?.outcome;
+
   const query = useLiveQuery(
     useCallback(
       () => loadPatientDirectory(context),
       [context.userId, context.facilityId, context.deviceId],
     ),
   );
+
   const [editing, setEditing] = useState(false);
   const [card, setCard] = useState(false);
   const [booking, setBooking] = useState(false);
   useEffect(() => {
     document.title = 'Patient details · Geneus Health';
   }, []);
+
   const row = query.data?.find((item) => item.ids.includes(patientId ?? ''));
+
   if (query.loading) {
     return (
       <p role="status" className="p-6">
@@ -41,6 +45,7 @@ export const PatientDetails = ({ patientId }: { patientId?: string }) => {
       </p>
     );
   }
+
   if (query.error) {
     return (
       <div role="alert" className="p-6">
@@ -49,6 +54,7 @@ export const PatientDetails = ({ patientId }: { patientId?: string }) => {
       </div>
     );
   }
+
   if (!row) {
     return (
       <div className="p-6">
@@ -57,17 +63,23 @@ export const PatientDetails = ({ patientId }: { patientId?: string }) => {
       </div>
     );
   }
+
   const patient = row.patient;
   const stay = row.stay;
   const canEdit = context.permissions.includes('patient:update');
+
   const returnTo = isPatientListReturn(params.get('from'))
     ? params.get('from')!
     : patientListPath(context);
+
   const canBook = context.permissions.includes('appointment:create');
+
   const canBill = context.permissions.some((permission) =>
     ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission),
   );
+
   const shownOutcome = outcome && row.ids.includes(outcome.patientId) ? outcome : undefined;
+
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 md:px-8">
       <Link to={returnTo} className="inline-flex min-h-[44px] items-center font-bold text-brand">

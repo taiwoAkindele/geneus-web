@@ -23,6 +23,7 @@ export const MyProfileScreen = () => {
   useEffect(() => {
     document.title = 'My profile · Geneus Health';
   }, []);
+
   return (
     <main className="mx-auto max-w-2xl space-y-5 p-4">
       <header>
@@ -46,6 +47,7 @@ export const MyEmailCard = () => {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const load = useCallback(
     () =>
       ownEmailStatus(context).then(setStatus, (cause) =>
@@ -53,12 +55,15 @@ export const MyEmailCard = () => {
       ),
     [context],
   );
+
   useEffect(() => {
     void load();
   }, [load, sessionVerified]);
+
   const run = async (step: () => Promise<void>) => {
     setBusy(true);
     setError('');
+
     try {
       await step();
     } catch (cause) {
@@ -67,6 +72,7 @@ export const MyEmailCard = () => {
       setBusy(false);
     }
   };
+
   return (
     <section
       aria-label="My email"

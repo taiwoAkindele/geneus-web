@@ -3,6 +3,7 @@ import { Charge, Encounter, EncounterEntry, Patient, Payment, staffPermissions }
 import { billingSnapshot, careSnapshot, dashboardAccess } from './dashboardModel';
 
 const at = '2026-10-26T09:00:00.000Z';
+
 const base = {
   facilityId: 'QA-PHC',
   createdBy: 'qa-doctor',
@@ -10,7 +11,9 @@ const base = {
   updatedOn: at,
   deviceId: 'qa-device',
 };
+
 const patientId = 'QA-PHC-000001-K2';
+
 const patient = Patient.parse({
   ...base,
   id: patientId,
@@ -21,6 +24,7 @@ const patient = Patient.parse({
   ageYears: 30,
   address: 'Synthetic address',
 });
+
 const charge = (id: string, currency = 'NGN') =>
   Charge.parse({
     ...base,
@@ -34,6 +38,7 @@ const charge = (id: string, currency = 'NGN') =>
     listPriceMinor: 200000,
     amountMinor: 200000,
   });
+
 const receipt = (id: string, fields = {}) =>
   Payment.parse({
     ...base,
@@ -57,11 +62,13 @@ describe('combined dashboard', () => {
       billing: true,
       facility: false,
     });
+
     const staff = {
       role: 'doctor' as const,
       additionalRoles: ['facility_admin' as const],
       permission: 'read_write' as const,
     };
+
     expect(
       dashboardAccess({
         role: staff.role,
@@ -70,6 +77,7 @@ describe('combined dashboard', () => {
       }),
     ).toMatchObject({ care: true, appointments: true, billing: true, facility: true });
   });
+
   it('counts visits once by local start date and keeps earlier unfinished work', () => {
     const encounters = ['open', 'closed', 'earlier'].map((key) =>
       Encounter.parse({
@@ -80,6 +88,7 @@ describe('combined dashboard', () => {
         openedOn: key === 'earlier' ? '2026-10-25T09:00:00.000Z' : at,
       }),
     );
+
     const entries = [
       EncounterEntry.parse({
         ...base,
@@ -92,13 +101,16 @@ describe('combined dashboard', () => {
         values: {},
       }),
     ];
+
     const snapshot = careSnapshot(encounters, entries, [patient], '2026-10-26');
     expect(snapshot.today).toBe(2);
     expect(snapshot.open.map((visit) => visit.id)).toEqual(['encounter:earlier', 'encounter:open']);
     expect(snapshot.open[0].patientName).toBe('Synthetic Patient');
   });
+
   it('keeps currencies separate, groups accounts and deducts today’s reversals', () => {
     const charges = [charge('charge:one'), charge('charge:two'), charge('charge:usd', 'USD')];
+
     const payments = [
       receipt('payment:one'),
       receipt('payment:reverse', { reverses: 'payment:one' }),
@@ -108,14 +120,17 @@ describe('combined dashboard', () => {
         allocations: [{ chargeId: 'charge:two', amountMinor: 50000 }],
       }),
     ];
+
     const snapshot = billingSnapshot(charges, payments, [], [patient], '2026-10-26');
     expect(snapshot.accounts).toHaveLength(2);
     expect(snapshot.accounts.find((account) => account.currency === 'NGN')?.outstanding).toBe(
       350000,
     );
+
     expect(snapshot.accounts.find((account) => account.currency === 'USD')?.outstanding).toBe(
       200000,
     );
+
     expect(snapshot.collected).toEqual([['NGN', 0]]);
     expect(billingSnapshot(charges, payments, [], [patient], '2026-10-27').collected).toEqual([]);
   });

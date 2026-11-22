@@ -35,23 +35,31 @@ export const PatientAppointments = ({
   const [params, setParams] = useSearchParams();
   const group = params.get('bookingGroup') ?? '';
   const selected = appointments.find((a) => a.id === params.get('booking'));
+
   const select = (id?: string) =>
     setParams((current) => {
       const next = new URLSearchParams(current);
+
       if (id) {
         next.set('booking', id);
       } else {
         next.delete('booking');
       }
+
       return next;
     });
+
   const shown = appointments.filter((a) => !group || a.group === group);
+
   const existing = selected?.encounterId
     ? history.find((visit) => visit.id === selected.encounterId)
     : undefined;
+
   const currentVisit = history.find((visit) => visit.status === 'Open');
+
   const canContinueVisit = (encounterId: string) =>
     canRecord && history.some((visit) => visit.id === encounterId && visit.status === 'Open');
+
   const bookingActionLabel = (encounterId?: string) => {
     if (!encounterId) {
       return 'View booking';
@@ -59,6 +67,7 @@ export const PatientAppointments = ({
 
     return canContinueVisit(encounterId) ? 'Continue visit' : 'View visit';
   };
+
   const renderAppointments = () => {
     if (loading) {
       return <p role="status">Reading appointments…</p>;
@@ -85,11 +94,13 @@ export const PatientAppointments = ({
               setParams(
                 (current) => {
                   const next = new URLSearchParams(current);
+
                   if (event.target.value) {
                     next.set('bookingGroup', event.target.value);
                   } else {
                     next.delete('bookingGroup');
                   }
+
                   return next;
                 },
                 { replace: true },

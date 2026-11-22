@@ -9,6 +9,7 @@ import { clearPrivateWorkforce } from '@/lib/api/workforce';
 import { useLiveQuery } from '@/data';
 import { loadCareContext } from '@/data/repos/workforce';
 import { refreshWorkforceKeys } from '@/data/workforceAuthority';
+
 export const CareContext = () => {
   const context = useAuthorizationContext();
   const query = useLiveQuery(loadCareContext);
@@ -17,16 +18,21 @@ export const CareContext = () => {
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
     setSelected(selectedCareService(context));
+
     return () => clearPrivateWorkforce();
   }, [context.userId]);
+
   if (!context.permissions.includes('encounter:record') || !query.data) {
     return null;
   }
+
   const enforcing = workforceEnforcementActive(query.data.facility?.workforcePolicy, Date.now());
   const proof = query.data.snapshots.find((s) => s.staffId === context.userId);
+
   if (!enforcing && !proof?.reviewScopes.length) {
     return null;
   }
+
   return (
     <aside
       className="border-b border-outline-soft bg-white px-4 py-3 md:px-8"
@@ -70,6 +76,7 @@ export const CareContext = () => {
           onClick={async () => {
             setRefreshing(true);
             setError('');
+
             try {
               await refreshWorkforceKeys();
               query.reload();

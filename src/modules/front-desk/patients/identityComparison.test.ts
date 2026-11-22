@@ -3,6 +3,7 @@ import { Patient } from '@shared';
 import { compareIdentities } from './identityComparison';
 
 const now = Date.parse('2026-11-09T10:00:00Z');
+
 const base = {
   type: 'patient',
   facilityId: 'OOE-PHC',
@@ -12,6 +13,7 @@ const base = {
   deviceId: 'device-1',
   ageObservedOn: '2026-06-20',
 };
+
 const patient = (id: string, over: Record<string, unknown>) =>
   Patient.parse({
     ...base,
@@ -31,6 +33,7 @@ const bisi = patient('OOE-PHC-000048-AB', {
   ageYears: 33,
   address: 'Bodija, Ibadan',
 });
+
 const bisola = patient('OOE-PHC-000049-C5', {
   fullName: 'Bisi Adeyemi',
   phone: '+234 706 228 9013',
@@ -38,6 +41,7 @@ const bisola = patient('OOE-PHC-000049-C5', {
   ageYears: 33,
   address: 'Bodija Market Rd',
 });
+
 const agreement = (rows: ReturnType<typeof compareIdentities>) =>
   Object.fromEntries(rows.map((row) => [row.label, row.agreement]));
 
@@ -57,6 +61,7 @@ describe('identity comparison', () => {
     const rows = agreement(
       compareIdentities(bisi, patient('OOE-PHC-000050-M3', { fullName: 'Bisi Adeyemi' }), now),
     );
+
     expect(rows).toMatchObject({
       Phone: 'unknown',
       'Birth date': 'unknown',
@@ -74,6 +79,7 @@ describe('identity comparison', () => {
         now,
       ),
     );
+
     expect(rows).toMatchObject({ Name: 'match', Age: 'match' });
     expect(
       agreement(
@@ -92,6 +98,7 @@ describe('identity comparison', () => {
       patient('OOE-PHC-000002-K2', {}),
       now,
     ).filter((row) => row.label === 'NIN');
+
     expect(nin.first).toBe('•••••••8901');
     expect(nin.second).toBe('Not recorded');
   });

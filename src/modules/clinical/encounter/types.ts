@@ -23,6 +23,7 @@ export type RxLine = {
   quantity?: string;
   unitOfMeasure?: string;
 };
+
 /** One template part as the lab scientist is filling it in — strings as typed. */
 export type LabPartDraft = {
   value?: string;
@@ -35,8 +36,10 @@ export type LabPartDraft = {
   }[];
   files?: DocumentFile[];
 };
+
 /** A test entered with a result template: its parts by key, and a comment for the doctor. */
 export type LabItemDraft = { values: Record<string, LabPartDraft>; comment: string };
+
 export type DiagnosisLine = {
   label: string;
   code?: string;

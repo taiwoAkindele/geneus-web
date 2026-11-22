@@ -47,15 +47,19 @@ export const WardSessionSheet = ({
   const { facility } = useDeviceContext();
   const heads = wardAdmission(records, session.admissionId);
   const late = heads.length === 1 && !activeAdmission(heads[0]);
+
   const entries = effectiveEncounterEntries(
     records.entries.filter((e) => e.encounterId === session.id),
   );
+
   const initial = entries.reduce(
     (d, e) => (e.step === 'amendment' ? d : fromStepValues(e.step, e.values, d)),
     structuredClone(EMPTY_ENCOUNTER_DATA),
   );
+
   if (changeOrder) {
     const line = orderLine(changeOrder, records.entries);
+
     if (line) {
       initial.prescription = {
         decision: 'prescribed',
@@ -71,6 +75,7 @@ export const WardSessionSheet = ({
       };
     }
   }
+
   const { data, setData, ctl } = useWardForm(initial);
   const [step, setStep] = useState(initialStep);
   const [reviewing, setReviewing] = useState(false);
@@ -81,6 +86,7 @@ export const WardSessionSheet = ({
   const [ready, setReady] = useState(false);
   const [edited, setEdited] = useState(false);
   const busy = useRef(false);
+
   const latest = useRef({
     data,
     step,
@@ -89,17 +95,22 @@ export const WardSessionSheet = ({
     session,
     changeOrderId: changeOrder?.id,
   });
+
   latest.current = { data, step, performedOn, lateReason, session, changeOrderId: changeOrder?.id };
+
   const owner = {
     staffId: context.userId!,
     patientId: session.patientId,
     encounterKey: `ward:${session.admissionId}:${session.id}`,
   };
+
   const saved = entries.find((e) => e.step === step);
+
   const allowed: StepKey[] =
     session.purpose === 'nursing'
       ? ['vitals', 'complaint']
       : ['complaint', 'vitals', 'diagnosis', 'lab_order', 'prescription', 'injection_order'];
+
   useEffect(() => {
     let active = true;
     readDrafts(owner)
@@ -107,15 +118,19 @@ export const WardSessionSheet = ({
         const draft = drafts.find((d) => d.step === 'ward_form')?.data as
           | { data?: EncounterData; step?: StepKey; performedOn?: string; lateReason?: string }
           | undefined;
+
         if (active && draft?.data) {
           setData(draft.data);
+
           if (draft.step && allowed.includes(draft.step)) {
             setStep(draft.step);
           }
+
           setPerformedOn(draft.performedOn ?? '');
           setLateReason(draft.lateReason ?? '');
           setEdited(true);
         }
+
         if (active) {
           setReady(true);
         }
@@ -125,53 +140,70 @@ export const WardSessionSheet = ({
           setError('The private draft could not be restored. Retry before continuing.');
         }
       });
+
     return () => {
       active = false;
     };
   }, [session.id]);
+
   useEffect(() => {
     if (!ready) {
       return;
     }
+
     const timer = window.setTimeout(() => {
       void writeDraft(owner, 'ward_form', latest.current).catch(() =>
         setError('The draft could not be saved. Keep this form open and retry.'),
       );
     }, 250);
+
     return () => window.clearTimeout(timer);
   }, [data, step, performedOn, lateReason, ready]);
+
   const close = async () => {
     try {
       if (ready) {
         await writeDraft(owner, 'ward_form', latest.current);
       }
+
       onClose();
     } catch {
       setError('The private draft could not be saved. Keep this form open.');
     }
   };
+
   const save = async () => {
     if (busy.current || !ready) {
       return;
     }
+
     setError('');
+
     if (late && (!performedOn || lateReason.trim().length < 3)) {
       setError(
         'Late documentation needs the actual care time and an explanation. It will be held for independent review.',
       );
+
       return;
     }
+
     const problems = stepProblems(step, data);
+
     if (problems.length) {
       setError(problems.join('. '));
+
       return;
     }
+
     if (!reviewing) {
       setReviewing(true);
+
       return;
     }
+
     busy.current = true;
     setSaving(true);
+
     try {
       await saveWardStep(session, step, toStepValues(step, data), context, {
         performedOn: performedOn
@@ -180,10 +212,12 @@ export const WardSessionSheet = ({
         lateReason: lateReason || undefined,
         changeOrder: step === 'prescription' ? changeOrder : undefined,
       });
+
       await discardDraft(owner, 'ward_form');
       setReviewing(false);
       setEdited(false);
       onSaved();
+
       if (session.purpose === 'nursing') {
         onClose();
       }
@@ -196,12 +230,15 @@ export const WardSessionSheet = ({
       setSaving(false);
     }
   };
+
   const complete = async () => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
+
     try {
       await saveWardEvent(session, { kind: 'complete' }, context);
       await discardDraft(owner, 'ward_form');
@@ -214,6 +251,7 @@ export const WardSessionSheet = ({
       setSaving(false);
     }
   };
+
   const renderSheetBody = () => {
     if (!ready) {
       return <p role="status">Restoring private draft…</p>;

@@ -46,30 +46,37 @@ export const DateRangeField = ({
 
   const close = (restoreFocus = true) => {
     setOpen(false);
+
     if (restoreFocus) {
       trigger.current?.focus();
     }
   };
+
   const apply = (nextFrom: string, nextTo: string) => {
     onChange(nextFrom, nextTo);
     close();
   };
+
   useEffect(() => {
     if (open) {
       setDraftFrom(from);
       setDraftTo(to);
     }
   }, [open, from, to]);
+
   useEffect(() => {
     if (!open) {
       return;
     }
+
     const outside = (event: PointerEvent) => {
       if (!wrapper.current?.contains(event.target as Node)) {
         close(false);
       }
     };
+
     document.addEventListener('pointerdown', outside);
+
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
 

@@ -18,6 +18,7 @@ export const sendHandoff = (draft: HandoffDraft, context: AuthorizationContext) 
   if (draft.fromUnitId === draft.toUnitId) {
     throw new Error('A patient is sent to a different unit');
   }
+
   return insertRecord<Handoff>(context, 'handoff:create', 'handoff', {
     ...envelope(context),
     id: newId('handoff'),
@@ -38,11 +39,14 @@ export const markHandoff = async (
   context: AuthorizationContext,
 ) => {
   const current = await findRecord<Handoff>('handoff', handoff.id);
+
   if (!current) {
     throw new Error('This handoff is not available on this device.');
   }
+
   if (current.status === 'done' && status !== 'done') {
     throw new Error('This handoff is already complete. Review the visit instead of reopening it.');
   }
+
   return updateRecord<Handoff>(context, 'handoff:update', 'handoff', handoff.id, { status });
 };

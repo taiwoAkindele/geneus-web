@@ -225,6 +225,7 @@ export const PRESCRIPTION_FREQUENCIES = [
   { value: 'four times daily', label: 'Four times daily' },
   { value: 'once only', label: 'Once only' },
 ];
+
 export const PRESCRIPTION_DURATIONS = [
   '3 days',
   '5 days',
@@ -233,6 +234,7 @@ export const PRESCRIPTION_DURATIONS = [
   '14 days',
   '28 days',
 ].map((value) => ({ value, label: value }));
+
 export const PRESCRIPTION_ROUTES = [
   { value: 'oral', label: 'Oral (by mouth)' },
   { value: 'topical', label: 'Topical (on the skin)' },

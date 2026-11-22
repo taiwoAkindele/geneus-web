@@ -23,6 +23,7 @@ export type RegisterDraft = {
 };
 
 export const listDefinitions = () => allOfType<RegisterDefinition>('register_definition');
+
 export const listEntries = () => allOfType<RegisterEntry>('register_entry');
 
 const highestVersion = (definitions: RegisterDefinition[], registerId: string): number =>
@@ -62,13 +63,16 @@ const saveDefinition = async (
   const definitions = await listDefinitions();
   const id = registerId ?? newId('register_definition');
   const version = highestVersion(definitions, id) + 1;
+
   if (expectedVersion !== undefined && version !== expectedVersion + 1) {
     throw new Error(
       'A newer register version is available. Reopen its configuration before saving your changes. Your private recovery is kept.',
     );
   }
+
   const words = (list: readonly string[]) => list.map((word) => word.trim()).filter(Boolean);
   const { visitLink, ...rest } = draft;
+
   const values = {
     ...rest,
     name: draft.name.trim(),
@@ -100,13 +104,16 @@ const saveDefinition = async (
         : {}),
     })),
   };
+
   const issues = registerDefinitionIssues(
     values,
     definitions.filter((definition) => definition.registerId === id),
   );
+
   if (issues.length) {
     throw new Error(issues.join(' '));
   }
+
   return insertRecord<RegisterDefinition>(
     context,
     'register_definition:publish',
@@ -129,6 +136,7 @@ export const saveDraftDefinition = (
   context: AuthorizationContext,
   expectedVersion?: number,
 ) => saveDefinition(draft, registerId, context, 'draft', expectedVersion);
+
 export const publishDefinition = (
   draft: RegisterDraft,
   registerId: string | null,
@@ -154,6 +162,7 @@ export const addEntry = async (
   context: AuthorizationContext,
 ): Promise<AddEntryResult> => {
   const definition = currentPublished(await listDefinitions(), draft.registerId);
+
   if (!definition) {
     return { saved: false, issues: ['Publish this register before recording entries'] };
   }
@@ -163,9 +172,11 @@ export const addEntry = async (
   const issues = validateRegisterEntry(asked, draft.values);
   issues.push(...registerEntryLinkIssues(definition, { ...draft.visit, values: draft.values }));
   const known = new Set(asked.map((field) => field.id));
+
   if (Object.keys(draft.values).some((field) => !known.has(field))) {
     issues.push('The entry includes a field outside this register version');
   }
+
   if (issues.length > 0) {
     return { saved: false, issues };
   }
@@ -183,6 +194,7 @@ export const addEntry = async (
       : {}),
     values: draft.values,
   });
+
   return { saved: true };
 };
 

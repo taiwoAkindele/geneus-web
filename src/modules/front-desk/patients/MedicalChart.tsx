@@ -30,6 +30,7 @@ const Section = ({
     {children}
   </section>
 );
+
 const TextAction = ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
   <button
     type="button"
@@ -40,6 +41,7 @@ const TextAction = ({ children, onClick }: { children: ReactNode; onClick: () =>
     <span className="sr-only"> in patient record</span>
   </button>
 );
+
 const Empty = ({ children }: { children: ReactNode }) => (
   <p className="text-sm leading-relaxed text-ink-soft">{children}</p>
 );
@@ -68,17 +70,22 @@ export const MedicalChart = ({
   const allergies = currentAllergies(data.events, data.patients);
   const histories = data.current.filter((event) => event.kind === 'history');
   const plans = data.current.filter((event) => ['care_plan', 'specialty'].includes(event.kind));
+
   const investigations = effective
     .filter((entry) => ['lab_order', 'lab_results'].includes(entry.step))
     .reverse();
+
   const diagnoses = effective.filter((entry) => entry.step === 'diagnosis').reverse();
   const notes = effective.filter((entry) => entry.step === 'complaint').reverse();
+
   const treatment = effective
     .filter((entry) => ['diagnosis', 'injection', 'dispense'].includes(entry.step))
     .reverse();
+
   const nextBookings = appointments
     .filter((a) => a.group !== 'completed')
     .sort((a, b) => a.at.localeCompare(b.at));
+
   const source = (on: string, by: string, visitId?: string, sourcePatientId?: string) => (
     <p className="mt-1 text-xs leading-relaxed text-ink-soft">
       {visitDate(on)} · {data.staffNames.get(by) ?? by}
@@ -96,9 +103,11 @@ export const MedicalChart = ({
       ) : null}
     </p>
   );
+
   const clinicalAction = (kind: ClinicalKind, label: string) => (
     <TextAction onClick={() => onClinical(kind)}>{label}</TextAction>
   );
+
   const renderUpcomingBookings = () => {
     if (appointmentsUnavailable) {
       return (

@@ -51,11 +51,13 @@ export const stationQueues = (
   wardEvents: readonly WardCareEvent[] = [],
 ): Record<StationQueue, QueuedPatient[]> => {
   const byEncounter = new Map<string, EncounterEntry[]>();
+
   for (const entry of effectiveEncounterEntries(entries)) {
     byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
   }
 
   const queues: Record<StationQueue, QueuedPatient[]> = { lab: [], results: [], pharmacy: [] };
+
   for (const [encounterId, saved] of byEncounter) {
     const order = firstAt(saved, 'lab_order');
     const results = firstAt(saved, 'lab_results');
@@ -63,6 +65,7 @@ export const stationQueues = (
 
     if (order) {
       const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values);
+
       const completed = saved
         .filter((e) => e.step === 'lab_results')
         .flatMap((e) =>
@@ -70,7 +73,9 @@ export const stationQueues = (
             .parse(e.values)
             .results.map((r) => r.orderItemId ?? r.test),
         );
+
       const pending = tests.filter((t, index) => !completed.includes(items?.[index]?.id ?? t));
+
       if (pending.length) {
         queues.lab.push({
           encounterId,
@@ -80,11 +85,13 @@ export const stationQueues = (
         });
       }
     }
+
     const reviewedIds = new Set(
       saved
         .filter((e) => e.step === 'result_review')
         .flatMap((e) => e.values.resultEntryIds as string[]),
     );
+
     if (results && saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id))) {
       queues.results.push({
         encounterId,
@@ -94,14 +101,17 @@ export const stationQueues = (
       });
     }
   }
+
   queues.pharmacy = requestQueues(entries, wardEvents).pharmacy.open.map((request) => ({
     encounterId: request.encounterId,
     patientId: request.patientId,
     waitingSince: request.requestedOn,
     detail: request.items.join(', '),
   }));
+
   for (const queue of STATION_QUEUES) {
     queues[queue].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince));
   }
+
   return queues;
 };

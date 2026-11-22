@@ -23,6 +23,7 @@ export const LabResultsForm = ({
   setReport: (key: string, draft: LabItemDraft) => void;
 }) => {
   const setup = useLabSetup(patientId);
+
   if (data.lab_order.tests.length === 0) {
     return (
       <div className="text-[13px] text-ink-muted">
@@ -30,17 +31,21 @@ export const LabResultsForm = ({
       </div>
     );
   }
+
   if (setup.loading && !setup.data) {
     return <p role="status">Reading result templates…</p>;
   }
+
   const templates = setup.data?.templates ?? [];
   const patient = setup.data?.patient;
   const facts = patient ? labPatientFacts(patient, new Date().toISOString()) : {};
+
   return (
     <div className="space-y-4">
       {data.lab_order.tests.map((test, index) => {
         const key = orderKey(data, index);
         const template = templateForOrder(data, index, templates);
+
         return template ? (
           <ResultEntryForm
             key={key}

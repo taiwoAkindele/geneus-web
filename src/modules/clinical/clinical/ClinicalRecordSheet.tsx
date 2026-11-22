@@ -21,6 +21,27 @@ import {
 } from './clinicalForms';
 import { clinicalFieldHelp, SPECIALTY_MEASUREMENT_HELP } from './fieldHelp';
 
+/** A related problem shows its name; grouped measurements read "label: value; …". */
+const recordValueText = (
+  key: string,
+  value: unknown,
+  problems: readonly ClinicalEvent[],
+): string => {
+  if (key === 'problemId') {
+    const problem = problems.find((candidate) => candidate.recordId === value);
+
+    return String(problem?.values.label ?? value);
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return Object.entries(value)
+      .map(([label, measurement]) => label + ': ' + String(measurement))
+      .join('; ');
+  }
+
+  return String(value);
+};
+
 type Props = {
   patientId: string;
   kind: ClinicalKind;
@@ -30,6 +51,7 @@ type Props = {
   problems: ClinicalEvent[];
   onClose: () => void;
 };
+
 export const ClinicalRecordSheet = ({
   patientId,
   kind,
@@ -46,6 +68,7 @@ export const ClinicalRecordSheet = ({
   const busy = useRef(false);
   const [error, setError] = useState('');
   const [review, setReview] = useState<Record<string, string>>();
+
   const {
     register,
     handleSubmit,
@@ -54,35 +77,47 @@ export const ClinicalRecordSheet = ({
   } = useForm<Record<string, string>>({
     defaultValues: clinicalFormDefaults(kind, previous, initial),
   });
+
   const specialty = watch('specialty') as keyof typeof SPECIALTY_FIELDS;
   const extraProblemFields = ['code', 'codingSystem', 'resolvedOn'];
+
   const renderField = (field: ClinicalField) => {
     const bind = register(field.key, {
       required: field.required ? 'Enter ' + field.label.toLowerCase() : false,
     });
+
     const feedback = errors[field.key]?.message;
-    return field.options ? (
-      <SelectField
-        key={field.key}
-        label={field.label}
-        help={clinicalFieldHelp(kind, field.key)}
-        {...bind}
-        error={feedback}
-        options={field.options.map((value) => ({
-          value,
-          label: value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Not recorded',
-        }))}
-      />
-    ) : field.type === 'textarea' ? (
-      <TextAreaField
-        key={field.key}
-        label={field.label}
-        help={clinicalFieldHelp(kind, field.key)}
-        {...bind}
-        required={field.required}
-        error={feedback}
-      />
-    ) : (
+
+    if (field.options) {
+      return (
+        <SelectField
+          key={field.key}
+          label={field.label}
+          help={clinicalFieldHelp(kind, field.key)}
+          {...bind}
+          error={feedback}
+          options={field.options.map((value) => ({
+            value,
+            label: value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Not recorded',
+          }))}
+        />
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <TextAreaField
+          key={field.key}
+          label={field.label}
+          help={clinicalFieldHelp(kind, field.key)}
+          {...bind}
+          required={field.required}
+          error={feedback}
+        />
+      );
+    }
+
+    return (
       <TextField
         key={field.key}
         label={field.label}
@@ -94,22 +129,29 @@ export const ClinicalRecordSheet = ({
       />
     );
   };
+
   const prepare = handleSubmit((form) => {
     const result = CLINICAL_VALUES[kind].safeParse(clinicalFormValues(kind, form));
+
     if (!result.success) {
       setError(result.error.issues.map((issue) => issue.message).join(' · '));
+
       return;
     }
+
     setError('');
     setReview({ ...form });
   });
+
   const save = async () => {
     if (busy.current || !review) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await saveClinicalRecord(
         previous?.patientId ?? patientId,
@@ -119,11 +161,13 @@ export const ClinicalRecordSheet = ({
         previous,
         encounterId,
       );
+
       toast(
         previous
           ? 'Clinical revision signed and saved on this device'
           : 'Clinical record signed and saved on this device',
       );
+
       onClose();
     } catch (cause) {
       setError(
@@ -134,6 +178,7 @@ export const ClinicalRecordSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title={review ? 'Review clinical entry' : CLINICAL_LABELS[kind]}
@@ -159,16 +204,7 @@ export const ClinicalRecordSheet = ({
                     (key === 'problemId' ? 'Related problem' : 'Measurements')}
                 </dt>
                 <dd className="mt-1 whitespace-pre-wrap break-words">
-                  {key === 'problemId'
-                    ? String(
-                        problems.find((problem) => problem.recordId === value)?.values.label ??
-                          value,
-                      )
-                    : typeof value === 'object' && value !== null
-                      ? Object.entries(value)
-                          .map(([label, measurement]) => label + ': ' + String(measurement))
-                          .join('; ')
-                      : String(value)}
+                  {recordValueText(key, value, problems)}
                 </dd>
               </div>
             ))}

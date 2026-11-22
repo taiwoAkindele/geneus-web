@@ -48,15 +48,19 @@ const lastSyncedLabel = (iso: string): string =>
 
 const shiftLabel = (entry: RosterEntry): string => {
   const access = accessFor(entry.staff);
+
   if (access === 'admin') {
     return 'Any time · admin';
   }
+
   if (access === 'always') {
     return '24-hour access';
   }
+
   if (!entry.shift) {
     return 'No shift today';
   }
+
   return shiftRangeLabel(entry.shift);
 };
 
@@ -105,8 +109,10 @@ export const ShiftLoginScreen = () => {
   const choose = (entry: RosterEntry) => {
     if (hasPin(entry.staff.staffId)) {
       setStaffId(entry.staff.staffId);
+
       return;
     }
+
     askForApproval(entry, false);
   };
 
@@ -114,15 +120,18 @@ export const ShiftLoginScreen = () => {
     if (!staffId || pin.length >= digits || checking) {
       return;
     }
+
     setFailure(undefined);
     const next = pin + digit;
     setPin(next);
+
     if (next.length < digits) {
       return;
     }
 
     setChecking(true);
     const result = await signIn(staffId, next);
+
     if (result?.reason === 'pin-upgrade' && selected) {
       navigate('/onboarding/accept', {
         state: {
@@ -132,12 +141,15 @@ export const ShiftLoginScreen = () => {
           upgrade: true,
         },
       });
+
       return;
     }
+
     if (result) {
       setFailure(result);
       setPin('');
     }
+
     setChecking(false);
   };
 

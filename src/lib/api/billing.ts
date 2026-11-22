@@ -18,13 +18,16 @@ export const billingRequest = async <T>(
   body: Record<string, unknown>,
 ): Promise<T> => {
   const credential = getDeviceCredential();
+
   if (!credential) {
     throw new Error('This device is not enrolled');
   }
+
   try {
     // Who is acting travels only in the x-actor-staff-id header, beside the PIN-verified session; the server checks they match.
     // A caller can't name a different actor in the body: any such field is dropped.
     const { actorStaffId: _dropped, ...fields } = body;
+
     const result = await staffRequest<T>(
       `/billing/${path}`,
       credential.credential,
@@ -32,15 +35,19 @@ export const billingRequest = async <T>(
       fields,
       context.userId,
     );
+
     touchStaffSession();
+
     return result;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
       forgetStaffSession();
     }
+
     throw cause;
   }
 };
+
 export const matchTransfer = (
   context: AuthorizationContext,
   id: string,
@@ -63,6 +70,7 @@ export type ReceivingAccount = {
   mode: string;
   general?: boolean;
 };
+
 export type BillingConnection = {
   configured: boolean;
   provider?: string;
@@ -72,6 +80,7 @@ export type BillingConnection = {
   webhookPath: string;
   encryptionReady: boolean;
 };
+
 /** A payment provider as the server describes it; the setup screen is drawn from this. Never contains secrets. */
 export type ProviderDescriptor = {
   id: string;
@@ -100,11 +109,13 @@ export type ProviderDescriptor = {
 /** A link the patient opens without signing in: their bill or a receipt. Bill links last 30 days, receipts a year. */
 export const patientDocumentLink = (context: AuthorizationContext, request: DocumentLinkRequest) =>
   billingRequest<DocumentLinkResponse>(context, 'documents/link', request);
+
 /** Stops every open patient link to this bill or receipt. */
 export const stopPatientDocumentLinks = (
   context: AuthorizationContext,
   request: DocumentLinkRequest,
 ) => billingRequest<DocumentLinkStopResponse>(context, 'documents/stop', request);
+
 /** Sends a bill or receipt to the patient by SMS and/or email; each send then appears as a synced patient message. */
 export const sendToPatient = (context: AuthorizationContext, request: SendToPatientRequest) =>
   billingRequest<SendToPatientResponse>(context, 'documents/send', request);

@@ -10,7 +10,7 @@ import {
   importTariff,
   listImportTemplates,
   saveImportTemplate,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { formatMoney, amountInput } from '@/lib/money';
 import {
@@ -37,12 +37,14 @@ import {
 } from './tariffRows';
 
 const PAGE = 50;
+
 const STATUS_LABELS = {
   ready: 'Ready',
   needs_match: 'Needs a match',
   error: 'Problem',
   skipped: 'Skipped',
 } as const;
+
 type Filter = 'all' | 'attention' | 'ready' | 'skipped';
 
 /**
@@ -89,10 +91,12 @@ export const TariffImport = ({
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const sheet = file?.sheets[sheetIndex];
   const headers = sheet?.rows[headerRow] ?? [];
+
   const activeFees = useMemo(
     () => fees.filter((f) => f.active).sort((a, b) => a.name.localeCompare(b.name)),
     [fees],
   );
+
   const feeName = useMemo(() => new Map(fees.map((f) => [f.id, f.name])), [fees]);
 
   useEffect(() => {
@@ -112,53 +116,65 @@ export const TariffImport = ({
     setTemplate(undefined);
     setRequestKey(crypto.randomUUID());
   };
+
   const layout = (parsed: TableFile, index: number) => {
     const target = parsed.sheets[index];
+
     const fitting = templates
       .filter((t) => !t.payerId || t.payerId === payer.id)
       .find((t) => templateFits(t, target.rows));
+
     if (fitting) {
       setHeaderRow(fitting.headerRow);
       setMapping(fitting.mapping);
       setTemplate(fitting);
       setTemplateName(fitting.name);
+
       return;
     }
+
     const header = detectHeaderRow(target.rows, TARIFF_FIELDS);
     setHeaderRow(header);
     setMapping(suggestMapping(target.rows[header] ?? [], TARIFF_FIELDS));
     setTemplate(undefined);
     setTemplateName(`${payer.name} tariff`);
   };
+
   const choose = async (chosen?: File) => {
     if (!chosen) {
       return;
     }
+
     reset();
     setReading(true);
+
     try {
       const parsed = await readTableFile(chosen);
       setFile(parsed);
       setSheetIndex(0);
       layout(parsed, 0);
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setReading(false);
     }
   };
+
   const review = () => {
     if (!sheet) {
       return;
     }
+
     setRows(buildTariffRows(mappedRows(sheet.rows, headerRow, mapping), activeFees, tariff));
     setPage(0);
     setFilter('all');
   };
+
   const checked = useMemo(
     () => (rows ? checkTariffRows(rows, fees, currency, tariff) : []),
     [rows, fees, currency, tariff],
   );
+
   const counts = useMemo(
     () => ({
       ready: checked.filter((r) => r.status === 'ready').length,
@@ -170,12 +186,14 @@ export const TariffImport = ({
     }),
     [checked],
   );
+
   const filterLabels = {
     all: `All (${checked.length})`,
     attention: `Needs attention (${counts.attention})`,
     ready: `Ready (${counts.ready})`,
     skipped: `Skipped (${counts.skipped})`,
   };
+
   const visible = checked.filter(
     (r) =>
       filter === 'all' ||
@@ -183,7 +201,9 @@ export const TariffImport = ({
         ? r.status === 'needs_match' || r.status === 'error'
         : r.status === filter),
   );
+
   const pages = Math.max(1, Math.ceil(visible.length / PAGE));
+
   const update = (sourceRow: number, change: Partial<TariffRow>) =>
     setRows((current) =>
       current?.map((r) => (r.sourceRow === sourceRow ? { ...r, ...change } : r)),
@@ -193,6 +213,7 @@ export const TariffImport = ({
     if (!templateName.trim()) {
       return;
     }
+
     try {
       const saved = await saveImportTemplate(context, {
         kind: 'contract_tariff',
@@ -205,19 +226,23 @@ export const TariffImport = ({
           ? { expectedRevision: template.revision }
           : {}),
       });
+
       setTemplate(saved);
       setTemplates((all) => [saved, ...all.filter((t) => t.id !== saved.id)]);
       toast(`Mapping "${saved.name}" saved for next time.`);
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   };
+
   const apply = async () => {
     if (!file) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       const done = await importTariff(context, {
         payerId: payer.id,
@@ -233,15 +258,17 @@ export const TariffImport = ({
           ...(template ? { templateId: template.id } : {}),
         },
       });
+
       setResult(done);
       toast(`Draft version ${done.version} updated from the sheet.`);
       onImported();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   const downloadTemplate = () =>
     downloadTable(`${payer.code}-tariff.xlsx`, 'Tariff', [
       [
@@ -262,7 +289,7 @@ export const TariffImport = ({
           tariff[f.id] ? amountInput(tariff[f.id].unitMinor, currency) : '',
           tariff[f.id]?.payerCode ?? '',
         ]),
-    ]).catch((cause) => setError(describeInsuranceError(cause)));
+    ]).catch((cause) => setError(describeStaffActionError(cause)));
 
   if (!terms) {
     return (
@@ -271,6 +298,7 @@ export const TariffImport = ({
       </p>
     );
   }
+
   if (!open) {
     return (
       <div className="flex flex-wrap gap-2">
@@ -384,11 +412,13 @@ export const TariffImport = ({
                 onChange={(e) =>
                   setMapping((m) => {
                     const next = { ...m };
+
                     if (e.target.value === '') {
                       delete next[field.key];
                     } else {
                       next[field.key] = Number(e.target.value);
                     }
+
                     return next;
                   })
                 }
@@ -517,6 +547,7 @@ export const TariffImport = ({
               setRows((current) =>
                 current?.map((r) => {
                   const c = checked.find((x) => x.sourceRow === r.sourceRow);
+
                   return c && (c.status === 'needs_match' || c.status === 'error')
                     ? { ...r, include: false }
                     : r;
@@ -639,6 +670,7 @@ const ReviewRow = ({
   onChange: (change: Partial<TariffRow>) => void;
 }) => {
   const suggestions = row.match.kind === 'suggested' ? row.match.options.map((o) => o.id) : [];
+
   const options = [
     {
       value: '',
@@ -647,7 +679,9 @@ const ReviewRow = ({
     ...suggestions.map((id) => ({ value: id, label: `Suggested: ${feeName.get(id) ?? id}` })),
     ...fees.filter((f) => !suggestions.includes(f.id)).map((f) => ({ value: f.id, label: f.name })),
   ];
+
   const tone = ROW_TONES[row.status] ?? 'text-danger';
+
   return (
     <tr
       data-row={row.sourceRow}

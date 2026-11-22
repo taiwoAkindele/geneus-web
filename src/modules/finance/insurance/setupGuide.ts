@@ -5,6 +5,7 @@ import type { InsuranceSetupItem, DeviceBlockReason } from '@shared';
  * what is missing, why it matters, who can resolve it, where, and how.
  */
 export type GuideAction = { label: string; to: string };
+
 export type Guide = {
   title: string;
   status: string;
@@ -13,6 +14,7 @@ export type Guide = {
   steps: { text: string; action?: GuideAction }[];
   action?: GuideAction;
 };
+
 type Viewer = { userId: string; permissions: readonly string[] };
 
 export const DEVICE_REASONS: Record<DeviceBlockReason, { problem: string; fix: string }> = {
@@ -95,8 +97,10 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
           to: '/insurance/settings/payers',
         },
       };
+
     case 'active_contract': {
       const missing = item.payers ?? [];
+
       return {
         title: 'Active contracts',
         status: item.ok
@@ -112,9 +116,11 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
           : { action: { label: 'Payers & contracts', to: '/insurance/settings/payers' } }),
       };
     }
+
     case 'officer_with_verified_email': {
       // Who can confirm insurance work: administrators always can; the server knows who they are from their PIN.
       const people = item.people ?? [];
+
       return {
         title: 'Someone who can confirm insurance work',
         status: item.ok
@@ -132,8 +138,10 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
             ],
       };
     }
+
     case 'devices_ready': {
       const devices = item.devices ?? [];
+
       return {
         title: 'Devices updated and synced',
         status: item.ok
@@ -149,8 +157,10 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
         action: { label: 'Open Facility devices', to: '/settings/devices' },
       };
     }
+
     case 'submission_method_per_payer': {
       const missing = item.payers ?? [];
+
       return {
         title: 'Claim submission method',
         status: everyPayerStatus(
@@ -166,8 +176,10 @@ export const guideFor = (item: InsuranceSetupItem, _viewer: Viewer): Guide => {
         ),
       };
     }
+
     case 'contract_document_verified': {
       const missing = item.payers ?? [];
+
       return {
         title: 'Signed contract on file (recommended)',
         status: everyPayerStatus(

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { clinicalDocumentAccess } from '@shared';
 import { useAuthorizationContext } from '@/session';
 import { UnavailableScreen } from '@/app/UnavailableScreen';
+
 export const ClinicalDocumentsAccess = ({ children }: { children: ReactNode }) =>
   clinicalDocumentAccess(useAuthorizationContext()) ? (
     children

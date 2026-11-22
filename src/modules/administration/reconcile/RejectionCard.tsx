@@ -86,6 +86,7 @@ export const RejectionCard = ({
   const [chosen, setChosen] = useState<string[]>([]);
   const [intent, setIntent] = useState<'discard' | 'retry'>();
   const refused = rejection.refusedRecord;
+
   const patientIdFor = () => {
     if (rejection.entityType === 'patient') {
       return rejection.entityId;
@@ -93,15 +94,20 @@ export const RejectionCard = ({
 
     return typeof refused?.patientId === 'string' ? refused.patientId : undefined;
   };
+
   const patientId = patientIdFor();
+
   const patientName =
     patientId && kind !== 'held' && kind !== 'patient_id_clash'
       ? patientNameOf(patientId)
       : undefined;
+
   const confirmDiscard = () => setIntent('discard');
   const confirmRetry = () => setIntent('retry');
+
   const toggle = (column: string) =>
     setChosen((now) => (now.includes(column) ? now.filter((c) => c !== column) : [...now, column]));
+
   const what = OPERATION_WORDS[rejection.operation] ?? 'new record';
 
   if (
@@ -125,6 +131,7 @@ export const RejectionCard = ({
       </div>
     );
   }
+
   const renderResolution = () => {
     if (kind === 'held') {
       return (
@@ -377,6 +384,7 @@ export const RejectionCard = ({
               onClick={() => {
                 const action = intent;
                 setIntent(undefined);
+
                 if (action === 'discard') {
                   onDiscard();
                 } else {

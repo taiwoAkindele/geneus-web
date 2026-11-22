@@ -25,8 +25,10 @@ export const SelectAllCheckbox = ({
       box.current.indeterminate = some;
     }
   }, [some]);
+
   const toggle = () => {
     const next = new Set(picked);
+
     for (const key of keys) {
       if (all) {
         next.delete(key);
@@ -34,8 +36,10 @@ export const SelectAllCheckbox = ({
         next.add(key);
       }
     }
+
     onChange(next);
   };
+
   return (
     <label
       className={`flex min-h-[44px] items-center gap-3 rounded-field px-2 py-2 text-sm font-bold ${keys.length ? 'hover:bg-surface' : 'text-ink-muted'}`}

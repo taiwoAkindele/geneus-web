@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/money';
 import { userMessage } from '@/lib/api/userMessage';
 import { downloadCsv } from '@/lib/csv';
 import { CATEGORY_LABELS } from './feeForm';
+
 export const FinancialSnapshotReport = ({ currency }: { currency: string }) => {
   const context = useAuthorizationContext();
   const [statements, setStatements] = useState<PatientStatement[]>();
@@ -14,14 +15,17 @@ export const FinancialSnapshotReport = ({ currency }: { currency: string }) => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [payerMoney, setPayerMoney] = useState({ received: 0, unallocated: 0 });
+
   const load = async () => {
     setBusy(true);
     setError('');
     setStatements(undefined);
+
     try {
       let after: string | undefined;
       let at: string | undefined;
       const all: PatientStatement[] = [];
+
       do {
         const page: {
           cutoff: string;
@@ -34,16 +38,19 @@ export const FinancialSnapshotReport = ({ currency }: { currency: string }) => {
           ...(at ? { cutoff: at } : {}),
           ...(after ? { after } : {}),
         });
+
         if (!at) {
           setPayerMoney({
             received: page.payerReceiptsMinor,
             unallocated: page.unallocatedPayerReceiptsMinor,
           });
         }
+
         at = page.cutoff;
         all.push(...page.statements);
         after = page.nextAfter;
       } while (after);
+
       setStatements(all);
       setCutoff(at!);
     } catch (e) {
@@ -52,15 +59,19 @@ export const FinancialSnapshotReport = ({ currency }: { currency: string }) => {
       setBusy(false);
     }
   };
+
   const total = (key: keyof PatientStatement['totals']) =>
     (statements ?? []).reduce((n, s) => n + s.totals[key], 0);
+
   const money = (n: number) => formatMoney(n, currency);
+
   const groups = FeeCategory.options.map((category) => ({
     category,
     totals: sumStatementLines(
       (statements ?? []).flatMap((s) => s.lines).filter((l) => l.category === category),
     ),
   }));
+
   return (
     <section
       aria-label="Hospital financial snapshot"

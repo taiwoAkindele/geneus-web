@@ -55,13 +55,17 @@ export const PaymentHistory = ({
   const name = (id: string) => data.patients.find((p) => p.patientId === id)?.fullName ?? id;
   const staff = (id: string) => data.staff.find((s) => s.staffId === id)?.fullName ?? id;
   const all = historyDocuments(data.payments, data.coverage.refunds);
+
   const currencies = [
     ...new Set([...all.map((p) => p.currency), ...data.transfers.map((t) => t.currency)]),
   ].sort();
+
   const currency = currencies.includes(currencyChoice) ? currencyChoice : (currencies[0] ?? 'NGN');
   const term = search.trim().toLowerCase();
+
   const billFor = (row: HistoryDocument) =>
     bills.find((b) => b.rows.some((r) => row.chargeIds.includes(r.charge.id)));
+
   const scoped = all.filter(
     (p) =>
       p.currency === currency &&
@@ -72,16 +76,19 @@ export const PaymentHistory = ({
           .toLowerCase()
           .includes(term)),
   );
+
   const count = (k: Kind) => scoped.filter((p) => k === 'all' || p.kind === k).length;
   const visible = scoped.filter((p) => kind === 'all' || p.kind === kind);
 
   const waiting = unlinkedTransfers(data.transfers, data.payments).filter(
     (t) => t.transfer.currency === currency,
   );
+
   const capacity = useReceiptCapacity(
     waiting.map((t) => t.transfer.id),
     data.payments.length,
   );
+
   const toLink = waiting
     .map((t) => ({
       ...t,
@@ -95,8 +102,10 @@ export const PaymentHistory = ({
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await billingRequest(context, 'transfers/import', { reference: reference.trim() });
       setReference('');
@@ -108,12 +117,14 @@ export const PaymentHistory = ({
         e,
         'That transfer could not be confirmed. Check the reference and try again.',
       );
+
       setError(message);
       toast(message, { tone: 'error' });
     } finally {
       setBusy(false);
     }
   };
+
   const action = (p: HistoryDocument) =>
     p.payment ? (
       <Button
@@ -135,8 +146,10 @@ export const PaymentHistory = ({
         Details
       </Button>
     );
+
   const billLink = (p: HistoryDocument) => {
     const b = billFor(p);
+
     return b ? (
       <button
         type="button"
@@ -149,6 +162,7 @@ export const PaymentHistory = ({
       <span className="text-xs text-ink-muted">—</span>
     );
   };
+
   const refundDetails = (p: HistoryDocument) =>
     p.refund ? (
       <p className="text-xs text-ink-muted">

@@ -101,6 +101,7 @@ const heldEntry = (
   });
 
 const vitals = heldEntry('encounter_entry:vitals', 'vitals', { temperatureC: 38.9 });
+
 const amendment = heldEntry(
   'encounter_entry:amend',
   'amendment',
@@ -110,6 +111,7 @@ const amendment = heldEntry(
     createdOn: '2026-10-02T09:10:00.000Z',
   },
 );
+
 const unrelated = rejection({
   deviceId: 'device-9',
   entityType: 'encounter',
@@ -129,6 +131,7 @@ describe('the reconcile queue', () => {
         }),
       ),
     ).toBe('column_conflict');
+
     expect(
       kindOf(
         rejection({
@@ -138,6 +141,7 @@ describe('the reconcile queue', () => {
         }),
       ),
     ).toBe('refused_write');
+
     expect(
       kindOf(
         rejection({ category: 'authorization', operation: 'delete', refusedRecord: undefined }),
@@ -178,6 +182,7 @@ describe('restoring a patient who lost their ID', () => {
         values: { label: 'Condition', certainty: 'unknown', status: 'active' },
       },
     });
+
     const revision = rejection({
       entityType: 'clinical_event',
       entityId: 'clinical:revision',
@@ -188,6 +193,7 @@ describe('restoring a patient who lost their ID', () => {
         createdOn: '2026-10-02T09:00:00Z',
       },
     });
+
     const plan = planRestore(
       refusedPatient,
       [revision, root],
@@ -195,6 +201,7 @@ describe('restoring a patient who lost their ID', () => {
       'device-3',
       mint as never,
     );
+
     const restoredRoot = plan[1].record;
     const restoredRevision = plan[2].record;
     expect(restoredRoot.recordId).toBe(restoredRoot.id);
@@ -205,6 +212,7 @@ describe('restoring a patient who lost their ID', () => {
 
   it('gives everything new ids, follows every link, and keeps who recorded it and when', () => {
     counter = 0;
+
     const plan = planRestore(
       refusedPatient,
       [amendment, vitals, heldEncounter],
@@ -219,20 +227,24 @@ describe('restoring a patient who lost their ID', () => {
       'encounter_entry',
       'encounter_entry',
     ]);
+
     const [patient, encounter, restoredVitals, restoredAmendment] = plan.map(
       ({ record }) => record,
     );
+
     expect(patient).toMatchObject({
       id: 'OOE-PHC-000048-AB',
       patientId: 'OOE-PHC-000048-AB',
       deviceId: 'device-3',
       fullName: 'Bisi Adeyemi',
     });
+
     expect(encounter).toMatchObject({
       patientId: 'OOE-PHC-000048-AB',
       createdBy: 'staff:nurse',
       createdOn: '2026-10-02T09:05:00.000Z',
     });
+
     expect(restoredVitals.encounterId).toBe(encounter.id);
     expect(restoredAmendment.amends).toBe(restoredVitals.id);
     expect(plan.every(({ record }) => record.deviceId === 'device-3')).toBe(true);
@@ -240,6 +252,7 @@ describe('restoring a patient who lost their ID', () => {
 
   it('points a restored follow-up at its restored appointment', () => {
     counter = 0;
+
     const appointment = rejection({
       entityType: 'appointment',
       entityId: 'appointment:old',
@@ -256,6 +269,7 @@ describe('restoring a patient who lost their ID', () => {
         scheduledFor: '2026-10-09T08:00:00.000Z',
       },
     });
+
     const followUp = heldEntry(
       'encounter_entry:close',
       'follow_up',
@@ -295,6 +309,7 @@ describe('resolving', () => {
       ],
       sync_rejections: [refusedPatient, heldEncounter, vitals],
     });
+
     setDatabaseForTests(db);
   });
 
@@ -304,6 +319,7 @@ describe('resolving', () => {
     await expect(
       resolveRejection(refusedPatient, 'Reviewed', contextFor('nurse')),
     ).rejects.toBeInstanceOf(AuthorizationError);
+
     expect(db.statements).toEqual([]);
 
     await resolveRejection(refusedPatient, 'Reviewed', contextFor('records_officer'));
@@ -339,11 +355,13 @@ describe('resolving', () => {
         { column: 'address', deviceValue: 'Ring Road', serverValue: 'Odo-Ona' },
       ],
     });
+
     db.rows.sync_rejections.push(conflict);
 
     await expect(
       applyDeviceValues(conflict, ['phone'], contextFor('nurse')),
     ).rejects.toBeInstanceOf(AuthorizationError);
+
     expect(db.statements).toEqual([]);
     await applyDeviceValues(conflict, ['phone'], contextFor('facility_admin'));
 
@@ -364,6 +382,7 @@ describe('resolving', () => {
       reason: 'staff:chew is deactivated',
       refusedChanges: { phone: '0809' },
     });
+
     db.rows.sync_rejections.push(refusedEdit);
 
     await applyAgain(refusedEdit, contextFor('records_officer'));
@@ -382,6 +401,7 @@ describe('resolving', () => {
       reason: 'staff:nurse is deactivated',
       refusedRecord: { ...vitals.refusedRecord, id: 'encounter_entry:refused' },
     });
+
     db.rows.sync_rejections.push(refusedStep);
 
     await applyAgain(refusedStep, contextFor('facility_admin'));
@@ -406,6 +426,7 @@ describe('resolving', () => {
     expect(applyAgainBlocker(clinical, contextFor('nurse'))).toMatch(
       /records officer or facility admin/,
     );
+
     expect(applyAgainBlocker(clinical, contextFor('facility_admin'))).toBeUndefined();
     expect(
       applyAgainBlocker(
@@ -422,6 +443,7 @@ describe('resolving', () => {
     expect(update.sql).toMatch(
       /^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/,
     );
+
     expect(update.parameters.slice(1, 3)).toEqual(['staff:records_officer', 'Discarded']);
   });
 

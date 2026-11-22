@@ -25,6 +25,7 @@ export const PatientIdToken = ({ id, parts, variant = 'card', className = '' }: 
       </span>
     );
   }
+
   return (
     <div
       className={`rounded-field border border-dashed border-outline bg-surface-muted px-4 py-4 ${className}`}

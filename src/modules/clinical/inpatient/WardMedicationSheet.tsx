@@ -39,24 +39,31 @@ export const WardMedicationSheet = ({
   const [error, setError] = useState('');
   const busy = useRef(false);
   const requestId = useRef(`ward_care_event:${crypto.randomUUID()}`);
+
   const save = async () => {
     if (busy.current) {
       return;
     }
+
     if (!reviewing) {
       setReviewing(true);
+
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       if (order.values.kind !== 'medication') {
         throw new Error('Select a medication order');
       }
+
       if ((outcome === 'not_given' || previous || action !== 'administration') && !reason.trim()) {
         throw new Error('Record the reason for this decision or correction');
       }
+
       if (action === 'administration') {
         await saveWardEvent(
           session,
@@ -83,6 +90,7 @@ export const WardMedicationSheet = ({
           { requestId: requestId.current },
         );
       }
+
       onSaved();
       onClose();
     } catch (cause) {
@@ -92,7 +100,9 @@ export const WardMedicationSheet = ({
       setSaving(false);
     }
   };
+
   let actualTime = Date.now();
+
   try {
     if (at) {
       actualTime = Date.parse(zonedInstant(at, zone));
@@ -100,6 +110,7 @@ export const WardMedicationSheet = ({
   } catch {
     actualTime = NaN;
   }
+
   const possible = records.events.some(
     (e) =>
       e.values.kind === 'administration' &&
@@ -107,6 +118,7 @@ export const WardMedicationSheet = ({
       Math.abs(Date.parse(e.occurredOn) - actualTime) < 300000 &&
       e.id !== previous?.id,
   );
+
   const dirty = Boolean(
     reason ||
     reviewing ||
@@ -115,6 +127,7 @@ export const WardMedicationSheet = ({
     dose !== (prior?.dose ?? line?.dose ?? '') ||
     route !== (prior?.route ?? line?.route ?? ''),
   );
+
   const renderSubmitLabel = () => {
     if (saving) {
       return 'Saving…';
@@ -127,15 +140,21 @@ export const WardMedicationSheet = ({
     return 'Review medication record';
   };
 
+  const sheetTitle = () => {
+    if (previous) {
+      return 'Correct administration record';
+    }
+
+    if (action === 'administration') {
+      return 'Record medication administration';
+    }
+
+    return `${action === 'stop' ? 'Stop' : 'Continue'} medication order`;
+  };
+
   return (
     <Sheet
-      title={
-        previous
-          ? 'Correct administration record'
-          : action === 'administration'
-            ? 'Record medication administration'
-            : `${action === 'stop' ? 'Stop' : 'Continue'} medication order`
-      }
+      title={sheetTitle()}
       eyebrow={line?.drug ?? 'Medication'}
       onClose={onClose}
       closeDisabled={saving}

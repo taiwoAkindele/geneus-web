@@ -11,6 +11,7 @@ import { useAuthorizationContext } from '@/session';
 export const ModuleGrid = () => {
   const { available, resume } = useWorkspace();
   const context = useAuthorizationContext();
+
   // On desktop the sidebar lists every module, so these cards are for phones.
   return (
     <section

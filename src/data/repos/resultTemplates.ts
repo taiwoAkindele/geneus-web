@@ -41,6 +41,7 @@ export const loadResultTemplateSettings = async () => {
     allOfType<AnswerList>('answer_list'),
     allOfType<ServiceDefinition>('service_definition'),
   ]);
+
   return {
     templates: templates.sort(byName),
     parts: parts.sort((a, b) => a.part.label.localeCompare(b.part.label)),
@@ -48,6 +49,7 @@ export const loadResultTemplateSettings = async () => {
     tests: definitions.filter((d) => d.active && d.investigation).sort(byName),
   };
 };
+
 export type ResultTemplateSettings = Awaited<ReturnType<typeof loadResultTemplateSettings>>;
 
 /**
@@ -66,11 +68,14 @@ export const labReportSaveIssues = async (
     allOfType<ResultTemplate>('result_template'),
     findRecord<Patient>('patient', patientId),
   ]);
+
   if (!patient) {
     return ['The patient is not available on this device'];
   }
+
   const order = [...prior].reverse().find((entry) => entry.step === 'lab_order');
   const items = (order?.values.items as InvestigationItem[] | undefined) ?? [];
+
   return labReportIssues(results, report, {
     facts: labPatientFacts(patient, createdOn),
     template: (id, revision) => templates.find((t) => t.id === id && t.revision === revision),
@@ -98,9 +103,11 @@ export const saveResultTemplate = async (
   existing?: ResultTemplate,
 ): Promise<ResultTemplate> => {
   const resolved = resolveLibraryParts(draft.parts, await library());
+
   if (resolved.issues.length) {
     throw new Error(resolved.issues.join('. '));
   }
+
   return (await saveWorkforce(
     'result_template',
     {
@@ -146,9 +153,11 @@ export const saveResultPart = async (
     context,
     existing,
   )) as ResultPartDefinition;
+
   if (existing) {
     await refreshTemplates((part) => part.libraryPartId === saved.id, context);
   }
+
   return saved;
 };
 
@@ -158,14 +167,18 @@ export const saveAnswerList = async (
   existing?: AnswerList,
 ) => {
   const saved = (await saveWorkforce('answer_list', draft, context, existing)) as AnswerList;
+
   if (!existing) {
     return saved;
   }
+
   // Shared parts copy a list's answers too: refresh them, then every template using the list either way.
   const usesList = (part: ResultPart) => part.kind === 'choice' && part.answerListId === saved.id;
+
   const parts = (await allOfType<ResultPartDefinition>('result_part')).filter((p) =>
     usesList(p.part),
   );
+
   for (const shared of parts) {
     await saveWorkforce(
       'result_part',
@@ -174,10 +187,12 @@ export const saveAnswerList = async (
       shared,
     );
   }
+
   await refreshTemplates(
     (part) => usesList(part) || parts.some((p) => p.id === part.libraryPartId),
     context,
   );
+
   return saved;
 };
 
@@ -188,6 +203,7 @@ export const loadStandardTemplates = async () => {
     allOfType<ResultTemplate>('result_template'),
     allOfType<StandardTest>('standard_test'),
   ]);
+
   return standards
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((s) => ({
@@ -196,6 +212,7 @@ export const loadStandardTemplates = async () => {
       added: templates.some((t) => t.standardKey === s.key),
     }));
 };
+
 export type StandardTemplateOption = Awaited<ReturnType<typeof loadStandardTemplates>>[number];
 
 /**
@@ -212,20 +229,26 @@ export const adoptStandardTemplates = async (
     allOfType<StandardTest>('standard_test'),
     allOfType<ServiceDefinition>('service_definition'),
   ]);
+
   const added: string[] = [];
   const skipped: string[] = [];
+
   for (const standard of standards.filter((s) => keys.includes(s.key))) {
     const templates = await allOfType<ResultTemplate>('result_template');
+
     if (templates.some((t) => t.standardKey === standard.key)) {
       skipped.push(standard.name);
       continue;
     }
+
     const claimed = new Set(
       templates.filter((t) => t.status === 'active').flatMap((t) => t.serviceDefinitionIds),
     );
+
     const concepts = standard.tests.flatMap(
       (key) => standardTests.find((t) => t.key === key)?.concept ?? [],
     );
+
     const linked = definitions
       .filter(
         (d) =>
@@ -235,6 +258,7 @@ export const adoptStandardTemplates = async (
           concepts.some((c) => c.system === d.concept.system && c.code === d.concept.code),
       )
       .map((d) => d.id);
+
     await saveWorkforce(
       'result_template',
       {
@@ -247,8 +271,10 @@ export const adoptStandardTemplates = async (
       },
       context,
     );
+
     added.push(standard.name);
   }
+
   return { added, skipped };
 };
 
@@ -261,6 +287,7 @@ export const loadTemplatePage = async (
   const like = likeOf(query);
   const where = `WHERE t."facilityId" = ? AND (t."name" LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM json_each(t."serviceDefinitionIds") j JOIN ${TABLE_FOR.service_definition} d ON d.id = j.value WHERE d."name" LIKE ? ESCAPE '\\'))`;
   const parameters = [context.facilityId, like, like];
+
   const [count, rows] = await Promise.all([
     db.getOptional<{ total: number }>(
       `SELECT COUNT(*) AS total FROM ${TABLE_FOR.result_template} t ${where}`,
@@ -271,8 +298,10 @@ export const loadTemplatePage = async (
       [...parameters, pageSize, Math.max(0, page) * pageSize],
     ),
   ]);
+
   const templates = rows.map((row) => fromRow<ResultTemplate>('result_template', row));
   const ids = [...new Set(templates.flatMap((t) => t.serviceDefinitionIds))];
+
   const names = new Map(
     ids.length
       ? (
@@ -283,6 +312,7 @@ export const loadTemplatePage = async (
         ).map((d) => [d.id, d.name])
       : [],
   );
+
   return {
     items: templates.map((template) => ({
       template,
@@ -291,6 +321,7 @@ export const loadTemplatePage = async (
     total: Number(count?.total ?? 0),
   };
 };
+
 export type TemplateRow = Awaited<ReturnType<typeof loadTemplatePage>>['items'][number];
 
 /** How many templates use each of these shared parts or answer lists. */
@@ -298,10 +329,12 @@ const usage = async (ids: readonly string[], field: 'libraryPartId' | 'answerLis
   if (!ids.length) {
     return new Map<string, number>();
   }
+
   const rows = await getDatabase().getAll<{ id: string; uses: number }>(
     `SELECT json_extract(p.value, '$.${field}') AS id, COUNT(DISTINCT t.id) AS uses FROM ${TABLE_FOR.result_template} t, json_each(t."parts") p WHERE json_extract(p.value, '$.${field}') IN (${ids.map(() => '?').join(',')}) GROUP BY 1`,
     [...ids],
   );
+
   return new Map(rows.map((row) => [row.id, Number(row.uses)]));
 };
 
@@ -312,6 +345,7 @@ export const loadPartPage = async (
   const db = getDatabase();
   const where = `WHERE "facilityId" = ? AND json_extract("part", '$.label') LIKE ? ESCAPE '\\'`;
   const parameters = [context.facilityId, likeOf(query)];
+
   const [count, rows] = await Promise.all([
     db.getOptional<{ total: number }>(
       `SELECT COUNT(*) AS total FROM ${TABLE_FOR.result_part} ${where}`,
@@ -322,11 +356,14 @@ export const loadPartPage = async (
       [...parameters, pageSize, Math.max(0, page) * pageSize],
     ),
   ]);
+
   const parts = rows.map((row) => fromRow<ResultPartDefinition>('result_part', row));
+
   const uses = await usage(
     parts.map((p) => p.id),
     'libraryPartId',
   );
+
   return {
     items: parts.map((part) => ({ part, uses: uses.get(part.id) ?? 0 })),
     total: Number(count?.total ?? 0),
@@ -341,6 +378,7 @@ export const loadAnswerListPage = async (
   const where = `WHERE "facilityId" = ? AND ("name" LIKE ? ESCAPE '\\' OR "answers" LIKE ? ESCAPE '\\')`;
   const like = likeOf(query);
   const parameters = [context.facilityId, like, like];
+
   const [count, rows] = await Promise.all([
     db.getOptional<{ total: number }>(
       `SELECT COUNT(*) AS total FROM ${TABLE_FOR.answer_list} ${where}`,
@@ -351,11 +389,14 @@ export const loadAnswerListPage = async (
       [...parameters, pageSize, Math.max(0, page) * pageSize],
     ),
   ]);
+
   const lists = rows.map((row) => fromRow<AnswerList>('answer_list', row));
+
   const uses = await usage(
     lists.map((l) => l.id),
     'answerListId',
   );
+
   return {
     items: lists.map((list) => ({ list, uses: uses.get(list.id) ?? 0 })),
     total: Number(count?.total ?? 0),

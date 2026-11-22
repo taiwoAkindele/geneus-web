@@ -41,6 +41,7 @@ const UNUSABLE: Record<string, string> = {
  * Storage can be unavailable (private mode); the token in hand still works then.
  */
 const TOKEN_KEY = 'geneus.invitationToken';
+
 const keepToken = (token: string | undefined) => {
   try {
     if (token) {
@@ -52,6 +53,7 @@ const keepToken = (token: string | undefined) => {
     /* the token in hand is enough */
   }
 };
+
 const keptToken = () => {
   try {
     return sessionStorage.getItem(TOKEN_KEY) ?? undefined;
@@ -59,17 +61,21 @@ const keptToken = () => {
     return undefined;
   }
 };
+
 const initialToken = () => {
   const fromLink = invitationTokenFromHash(window.location.hash);
+
   if (fromLink) {
     keepToken(fromLink);
   }
+
   return fromLink ?? invitationTokenFromHash(`#token=${keptToken() ?? ''}`);
 };
 
 const Card = ({ children }: { children: ReactNode }) => (
   <div className="mt-6 space-y-4 rounded-[22px] bg-white p-5 text-[15px] text-ink">{children}</div>
 );
+
 const Steps = ({ current }: { current: 1 | 2 }) => (
   <ol className="flex gap-4 text-sm" aria-label="Steps">
     {['Set up this device', 'Choose your PIN'].map((label, index) => (
@@ -106,16 +112,19 @@ export const InvitationScreen = () => {
   useEffect(() => {
     document.title = 'Accept invitation · Geneus Health';
   }, []);
+
   // Keep the token out of browser history and anything the address bar is shared with.
   useEffect(() => {
     if (window.location.hash) {
       window.history.replaceState(window.history.state, '', window.location.pathname);
     }
   }, []);
+
   useEffect(() => {
     if (!token) {
       return;
     }
+
     let alive = true;
     setLoadError(undefined);
     openInvitationLink(token).then(
@@ -130,6 +139,7 @@ export const InvitationScreen = () => {
         }
       },
     );
+
     return () => {
       alive = false;
     };
@@ -137,20 +147,24 @@ export const InvitationScreen = () => {
 
   const credential = getDeviceCredential();
   const workspaces = listFacilityWorkspaces();
+
   const step = view
     ? invitationStep(view, {
         facilityId: credential?.facilityId,
         workspaceFacilityIds: workspaces.map((w) => w.facilityId),
       })
     : undefined;
+
   const firstName = view?.staffName.split(' ')[0] ?? 'there';
 
   const run = async (message: string, action: () => Promise<void>, fallback: string) => {
     if (busy) {
       return;
     }
+
     setBusy(message);
     setError(undefined);
+
     try {
       await action();
     } catch (cause) {
@@ -182,6 +196,7 @@ export const InvitationScreen = () => {
       },
     });
   };
+
   const choosePin = () =>
     run(
       'Opening your invitation…',
@@ -210,18 +225,22 @@ export const InvitationScreen = () => {
           `device:${crypto.randomUUID()}`,
           label,
         );
+
         await switchFacilityWorkspace(issued.deviceId, issued);
       },
       'This facility could not be added',
     );
+
   const openFacility = () =>
     run(
       'Opening the facility…',
       async () => {
         const target = workspaces.find((w) => w.facilityId === view!.facilityId);
+
         if (!target) {
           throw new Error('This facility is no longer on this device');
         }
+
         await switchFacilityWorkspace(target.deviceId);
       },
       'The facility could not be opened',
@@ -233,6 +252,7 @@ export const InvitationScreen = () => {
       to choose your PIN.
     </p>
   );
+
   const deviceName = (
     <TextField
       label="Name for this device"
@@ -244,6 +264,7 @@ export const InvitationScreen = () => {
       disabled={Boolean(busy)}
     />
   );
+
   const renderStatus = () => {
     if (busy) {
       return (
@@ -263,9 +284,11 @@ export const InvitationScreen = () => {
 
     return null;
   };
+
   const status = renderStatus();
 
   let body: ReactNode;
+
   if (!token) {
     body = (
       <Card>

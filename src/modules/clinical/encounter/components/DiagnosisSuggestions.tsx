@@ -3,6 +3,7 @@ import type { ClinicalEvent, EncounterEntry } from '@shared';
 import { allWhere } from '@/data/db';
 
 export const DIAGNOSIS_LIST_ID = 'geneus-diagnosis-names';
+
 export type KnownDiagnosis = {
   label: string;
   code?: string;
@@ -20,13 +21,16 @@ export const facilityDiagnoses = (
   problems: readonly ClinicalEvent[],
 ): KnownDiagnosis[] => {
   const known = new Map<string, KnownDiagnosis>();
+
   const add = (label: unknown, code?: unknown, codingSystem?: unknown) => {
     if (typeof label !== 'string' || !label.trim()) {
       return;
     }
+
     const key = label.trim().toLowerCase();
     const current = known.get(key) ?? { label: label.trim(), uses: 0 };
     current.uses += 1;
+
     if (typeof code === 'string' && code.trim()) {
       current.code = code.trim();
       current.codingSystem =
@@ -34,11 +38,14 @@ export const facilityDiagnoses = (
           ? codingSystem
           : current.codingSystem;
     }
+
     known.set(key, current);
   };
+
   for (const entry of entries) {
     const lines = entry.values.diagnoses as
       { label?: unknown; code?: unknown; codingSystem?: unknown }[] | undefined;
+
     if (lines?.length) {
       for (const line of lines) {
         add(line.label, line.code, line.codingSystem);
@@ -47,9 +54,11 @@ export const facilityDiagnoses = (
       add(entry.values.diagnosis);
     }
   }
+
   for (const problem of problems) {
     add(problem.values.label, problem.values.code, problem.values.codingSystem);
   }
+
   return [...known.values()].sort((a, b) => b.uses - a.uses || a.label.localeCompare(b.label));
 };
 
@@ -60,6 +69,7 @@ export const useDiagnosisSuggestions = (enabled: boolean): KnownDiagnosis[] => {
     if (!enabled) {
       return;
     }
+
     let active = true;
     Promise.all([
       allWhere<EncounterEntry>('encounter_entry', 'step', 'diagnosis'),
@@ -73,10 +83,12 @@ export const useDiagnosisSuggestions = (enabled: boolean): KnownDiagnosis[] => {
       .catch(() => {
         /* Suggestions are optional; typing still works. */
       });
+
     return () => {
       active = false;
     };
   }, [enabled]);
+
   return known;
 };
 

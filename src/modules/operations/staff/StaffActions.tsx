@@ -38,10 +38,13 @@ export const SignInWindowSheet = ({
   const effectiveEnd = shift?.extendedUntil ?? shift?.endsAt;
   const [start, setStart] = useState(shift ? timeLabel(shift.startsAt) : '08:00');
   const [end, setEnd] = useState(effectiveEnd ? timeLabel(effectiveEnd) : '16:00');
+
   const [endDay, setEndDay] = useState<'same' | 'next'>(
     effectiveEnd && calendarDate(effectiveEnd) !== day ? 'next' : 'same',
   );
+
   const [saving, setSaving] = useState(false);
+
   const makeFullDay = () => {
     try {
       const result = fullDayEnd(day, start);
@@ -52,11 +55,14 @@ export const SignInWindowSheet = ({
       toast(cause instanceof Error ? cause.message : 'Choose a start time');
     }
   };
+
   const save = async () => {
     if (saving) {
       return;
     }
+
     setSaving(true);
+
     try {
       const window = shiftWindow(day, start, end, endDay === 'next');
       await assignShift({ ...window, id: shift?.id, staffId: staff.staffId }, context);
@@ -68,6 +74,7 @@ export const SignInWindowSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       onClose={onClose}
@@ -175,12 +182,15 @@ export const PinCodeSheet = ({ staff, onClose }: { staff: Staff; onClose: () => 
   const [error, setError] = useState<string>();
   const [creating, setCreating] = useState(false);
   const first = staff.fullName.split(' ')[0];
+
   const create = async () => {
     if (creating) {
       return;
     }
+
     setCreating(true);
     setError(undefined);
+
     try {
       setIssued(await issuePinSetupCode(context, staff.staffId));
     } catch (cause) {
@@ -189,6 +199,7 @@ export const PinCodeSheet = ({ staff, onClose }: { staff: Staff; onClose: () => 
       setCreating(false);
     }
   };
+
   return (
     <Sheet onClose={onClose} closeDisabled={creating} eyebrow="PIN code" title={staff.fullName}>
       {issued ? (
@@ -263,16 +274,20 @@ export const RemoveAccessSheet = ({
   const toast = useToast();
   const context = useAuthorizationContext();
   const [busy, setBusy] = useState(false);
+
   const remove = async () => {
     if (busy) {
       return;
     }
+
     setBusy(true);
+
     try {
       await removeStaff(staff, context);
       toast(
         'Access at this facility removed on this device; the change will sync to other devices',
       );
+
       onRemoved?.();
       onClose();
     } catch (cause) {
@@ -281,6 +296,7 @@ export const RemoveAccessSheet = ({
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title={`Remove ${staff.fullName}'s access at this facility?`}

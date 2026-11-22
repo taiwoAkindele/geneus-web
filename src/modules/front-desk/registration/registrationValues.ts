@@ -104,39 +104,51 @@ export const parseAge = (age: string): number | undefined =>
 
 export const toPatientDetails = (values: RegistrationValues): PatientDetails => {
   const provisional = values.identityStatus === 'provisional';
+
   if (!provisional && !values.sex) {
     throw new Error('Choose the patient’s sex');
   }
+
   if (provisional && values.provisionalReason.trim().length < 3) {
     throw new Error('Explain why identity is not yet known');
   }
+
   const today = new Date().toISOString().slice(0, 10);
   const age = parseAge(values.age);
+
   if (
     values.dateOfBirth &&
     (!validCalendarDate(values.dateOfBirth) || values.dateOfBirth > today)
   ) {
     throw new Error('Enter a valid date of birth that is not in the future');
   }
+
   if (values.dateOfBirth && yearsBetween(values.dateOfBirth, today) > 130) {
     throw new Error('Check the birth date; the age must be between 0 and 130 years');
   }
+
   if (age !== undefined && (!Number.isInteger(age) || age < 0 || age > 130)) {
     throw new Error('Age must be between 0 and 130 whole years');
   }
+
   if (values.dateOfBirth && age !== undefined && yearsBetween(values.dateOfBirth, today) !== age) {
     throw new Error('Age and date of birth do not agree');
   }
+
   const nin = values.nin.replace(/\s/g, '');
+
   if (nin && !/^\d{11}$/.test(nin)) {
     throw new Error('NIN must contain 11 digits, or leave it blank');
   }
+
   if (values.identityEvidence === 'document_seen' && !values.identityEvidenceNote.trim()) {
     throw new Error('Describe the identity document checked');
   }
+
   if (values.identityEvidenceNote.length > 300) {
     throw new Error('Keep the evidence description within 300 characters');
   }
+
   return {
     fullName: provisional ? '' : values.fullName.trim(),
     address: optional(values.address),

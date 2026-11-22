@@ -6,6 +6,7 @@ describe('registration values', () => {
     expect(EMPTY_REGISTRATION.sex).toBe('');
     expect(() => toPatientDetails(EMPTY_REGISTRATION)).toThrow(/Choose/);
   });
+
   it('trims what was typed and leaves blanks out, so nothing unasked is recorded', () => {
     const details = toPatientDetails({
       ...EMPTY_REGISTRATION,
@@ -40,6 +41,7 @@ describe('registration values', () => {
     expect(() => toPatientDetails({ ...values, identityEvidence: 'document_seen' })).toThrow(
       /document checked/,
     );
+
     expect(
       toPatientDetails({
         ...values,
@@ -48,6 +50,7 @@ describe('registration values', () => {
       }).identityEvidence,
     ).toBe('document_seen');
   });
+
   it('refuses contradictory birth dates and ages before saving', () => {
     expect(() =>
       toPatientDetails({ ...EMPTY_REGISTRATION, sex: 'M', age: '2', dateOfBirth: '1980-01-01' }),
@@ -63,6 +66,7 @@ describe('registration values', () => {
       dateOfBirth: '1980-01-01',
       religion: 'islam' as const,
     };
+
     const details = toPatientDetails(values);
 
     const patient = {
@@ -78,6 +82,7 @@ describe('registration values', () => {
       dobEstimated: false,
       allergies: [],
     };
+
     expect(fromPatient({ ...patient, identityStatus: 'identified' })).toEqual(values);
   });
 });

@@ -11,21 +11,26 @@ export const RetainedDocument = ({ rejection }: { rejection: SyncRejection }) =>
   const context = useAuthorizationContext();
   const [preview, setPreview] = useState(false);
   const parsed = DocumentFile.safeParse(rejection.refusedRecord?.file);
+
   if (!clinicalDocumentAccess(context) || !parsed.success) {
     return null;
   }
+
   const title =
     typeof rejection.refusedRecord?.title === 'string'
       ? rejection.refusedRecord.title
       : 'Retained document';
+
   const patient = rejection.refusedRecord?.patientId;
   const visit = rejection.refusedRecord?.encounterId;
+
   const destination =
     rejection.entityType === 'visit_document' &&
     typeof patient === 'string' &&
     typeof visit === 'string'
       ? patientChartPath(patient, 'documents', { visit })
       : '/documents';
+
   return (
     <div className="mt-3 space-y-2">
       <p className="text-sm">

@@ -27,6 +27,7 @@ export const SegmentedControl = <T extends string>({
     <div role="radiogroup" aria-label={ariaLabel} className={`flex gap-2 ${className}`}>
       {options.map((o) => {
         const active = o.value === value;
+
         return (
           <button
             key={o.value}

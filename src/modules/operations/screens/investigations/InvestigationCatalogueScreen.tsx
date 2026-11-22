@@ -59,9 +59,11 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
   const [draft, setDraft] = useState({ name: '', specimen: '', classification: '', aliases: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       const result = await addOwnTests(
         [
@@ -75,6 +77,7 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
         ],
         context,
       );
+
       if (result.added.length) {
         onClose();
       } else {
@@ -86,6 +89,7 @@ const SingleTestSheet = ({ onClose }: { onClose: () => void }) => {
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title="Add a single test"
@@ -148,25 +152,32 @@ const UploadSheet = ({ onClose }: { onClose: () => void }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AddedTests>();
+
   const template = useMemo(
     () => `data:text/csv;charset=utf-8,${encodeURIComponent(TEST_CSV_TEMPLATE)}`,
     [],
   );
+
   const read = async (chosen?: File) => {
     setResult(undefined);
     setError('');
+
     if (!chosen) {
       return;
     }
+
     setFile(chosen.name);
     setParsed(parseTestCsv(await chosen.text()));
   };
+
   const add = async () => {
     if (!parsed) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       setResult(await addOwnTests(parsed.tests, context));
       setParsed(undefined);
@@ -177,6 +188,7 @@ const UploadSheet = ({ onClose }: { onClose: () => void }) => {
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title="Upload a list of tests"
@@ -263,6 +275,7 @@ const StandardTestsSheet = ({ onClose }: { onClose: () => void }) => {
   const [result, setResult] = useState<AddedTests>();
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
+
   // Searches names, other names and specimens; ticks are kept while the list is filtered.
   const shown = (tests ?? []).filter(
     (test) =>
@@ -271,20 +284,26 @@ const StandardTestsSheet = ({ onClose }: { onClose: () => void }) => {
         text.toLowerCase().includes(needle),
       ),
   );
+
   const groups = [...new Set(shown.map((test) => test.classification))];
+
   const toggle = (key: string) =>
     setPicked((current) => {
       const next = new Set(current);
+
       if (next.has(key)) {
         next.delete(key);
       } else {
         next.add(key);
       }
+
       return next;
     });
+
   const add = async () => {
     setBusy(true);
     setError('');
+
     try {
       setResult(await adoptStandardTests([...picked], context));
       setPicked(new Set());
@@ -295,6 +314,7 @@ const StandardTestsSheet = ({ onClose }: { onClose: () => void }) => {
       setBusy(false);
     }
   };
+
   const renderStandardTests = () => {
     if (standards.error) {
       return (
@@ -413,11 +433,14 @@ const EditSheet = ({ row, onClose }: { row: CatalogueRow; onClose: () => void })
   const [chosen, setChosen] = useState<FeeItem>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const save = async () => {
     if (!chosen || busy) {
       return;
     }
+
     setBusy(true);
+
     try {
       await linkInvestigationDefinition(row.definition, chosen.id, context);
       onClose();
@@ -427,6 +450,7 @@ const EditSheet = ({ row, onClose }: { row: CatalogueRow; onClose: () => void })
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title={row.definition.name}
@@ -482,21 +506,25 @@ export const InvestigationCatalogueScreen = () => {
   const query = params.get('q') ?? '';
   const page = Math.max(0, Number(params.get('page')) || 0);
   const descending = params.get('descending') === '1';
+
   const data = useLiveQuery(
     useCallback(
       () => loadCataloguePage(context, { query, page, descending }),
       [context.facilityId, query, page, descending],
     ),
   );
+
   const [panel, setPanel] = useState<Panel>();
   const canManage = context.permissions.includes('service:manage');
   useEffect(() => {
     document.title = 'Investigation catalogue · Geneus Health';
   }, []);
+
   const set = (changes: Record<string, string>) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
+
         for (const [key, value] of Object.entries(changes)) {
           if (value) {
             next.set(key, value);
@@ -504,16 +532,20 @@ export const InvestigationCatalogueScreen = () => {
             next.delete(key);
           }
         }
+
         return next;
       },
       { replace: true },
     );
+
   const close = () => {
     setPanel(undefined);
     data.reload();
   };
+
   const operational = params.get('view') === 'operational';
   const empty = data.data?.total === 0 && !query;
+
   const columns: TableColumn<CatalogueRow>[] = [
     {
       key: 'name',
@@ -593,11 +625,13 @@ export const InvestigationCatalogueScreen = () => {
         ]
       : []),
   ];
+
   const addActions = [
     { label: 'Add a single test', onSelect: () => setPanel('single') },
     { label: 'Upload a list of tests', onSelect: () => setPanel('upload') },
     { label: 'Choose from standard tests', onSelect: () => setPanel('standard') },
   ];
+
   // Result templates, parts and answer lists are the next Laboratory settings page.
   if (!operational) {
     return (
@@ -614,6 +648,7 @@ export const InvestigationCatalogueScreen = () => {
       </div>
     );
   }
+
   const renderTests = () => {
     if (data.loading && !data.data) {
       return <p role="status">Reading tests…</p>;

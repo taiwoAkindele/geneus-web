@@ -13,6 +13,7 @@ describe('date ranges for filters', () => {
       from: '2027-02-01',
       to: '2027-02-28',
     });
+
     expect(presetRange('last7', '2026-03-03')).toEqual({ from: '2026-02-25', to: '2026-03-03' });
   });
 

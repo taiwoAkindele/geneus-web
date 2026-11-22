@@ -17,6 +17,7 @@ export const isFrozen = (lastServerContactOn: string | undefined, now = Date.now
   if (!lastServerContactOn) {
     return true;
   }
+
   return now - Date.parse(lastServerContactOn) > OFFLINE_AUTHORIZATION_POLICY.generalMs;
 };
 
@@ -33,19 +34,25 @@ const toHex = (bytes: Uint8Array): string =>
  */
 const publicKey = ((): Uint8Array | undefined => {
   const configured = import.meta.env.VITE_SIGNING_PUBLIC_KEY;
+
   if (!configured) {
     console.warn(
       'VITE_SIGNING_PUBLIC_KEY is not set: roster signatures cannot be checked on this build',
     );
+
     return undefined;
   }
+
   const der = base64ToBytes(configured);
+
   if (der.length !== 44 || toHex(der.subarray(0, 12)) !== ED25519_SPKI_PREFIX) {
     console.warn(
       'VITE_SIGNING_PUBLIC_KEY is not an Ed25519 public key: roster signatures cannot be checked',
     );
+
     return undefined;
   }
+
   return der.subarray(12);
 })();
 
@@ -64,9 +71,11 @@ export const checkShiftSignature = async (
   if (!shift.signature || !key) {
     return 'unsigned';
   }
+
   try {
     const signature = base64ToBytes(shift.signature);
     const message = new TextEncoder().encode(rosterSignaturePayload(shift));
+
     return (await verifyAsync(signature, message, key, { zip215: false })) ? 'valid' : 'invalid';
   } catch {
     return 'invalid';

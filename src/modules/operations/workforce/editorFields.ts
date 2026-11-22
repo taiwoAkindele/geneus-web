@@ -10,6 +10,7 @@ import {
 import type { WorkforceData } from '@/data/repos/workforce';
 import { humanize, unitPath } from './presentation';
 import { nextPlaceNumber } from './placeBatch';
+
 export type EditorKind =
   | 'unit'
   | 'location'
@@ -22,11 +23,14 @@ export type EditorKind =
   | 'capability_decision'
   | 'reviewer_delegation'
   | 'billing_department';
+
 export type Values = Record<string, string | string[] | boolean | undefined>;
+
 export type Option = {
   value: string;
   label: string;
 };
+
 export type Field = {
   key: string;
   label: string;
@@ -35,8 +39,10 @@ export type Field = {
   options?: Option[];
   required?: boolean;
 };
+
 const choices = (items: readonly string[]): Option[] =>
   items.map((value) => ({ value, label: humanize(value) }));
+
 const timeZones = (
   Intl as typeof Intl & {
     supportedValuesOf?: (key: string) => string[];
@@ -49,6 +55,7 @@ const timeZones = (
   'America/New_York',
   'Asia/Kolkata',
 ];
+
 const field = (
   key: string,
   label: string,
@@ -57,6 +64,7 @@ const field = (
   options?: Option[],
   required = true,
 ): Field => ({ key, label, help, kind, options, required });
+
 /** A new place can be added several at a time ("Bed 1" … "Bed N"); the name becomes the part before the number. */
 const placeBatchFields = (data: WorkforceData, values: Values, name: Field): Field[] => {
   const count = field(
@@ -65,11 +73,14 @@ const placeBatchFields = (data: WorkforceData, values: Values, name: Field): Fie
     'Add several places of this type at once, such as every bed in a ward. Leave 1 for a single place.',
     'number',
   );
+
   if (!(Number(values.placeCount) > 1)) {
     return [name, count];
   }
+
   const prefix = String(values.name ?? '').trim() || 'Bed';
   const auto = nextPlaceNumber(prefix, String(values.parentId ?? '') || undefined, data.locations);
+
   return [
     {
       ...name,
@@ -87,6 +98,7 @@ const placeBatchFields = (data: WorkforceData, values: Values, name: Field): Fie
     ),
   ];
 };
+
 export const editorFields = (
   kind: EditorKind,
   data: WorkforceData,
@@ -100,23 +112,29 @@ export const editorFields = (
       value: s.staffId,
       label: `${s.fullName} · ${humanize(s.role)} · ${s.id.slice(-5)}`,
     }));
+
   const units = data.units.map((u) => ({
     value: u.id,
     label: unitPath(u.id, data.units) + (u.active ? '' : ' (retired)'),
   }));
+
   const places = data.locations
     .filter((l) => l.active)
     .map((l) => ({ value: l.id, label: `${l.name} · ${humanize(l.kind)}` }));
+
   const offerings = data.offerings
     .filter((o) => o.configuration !== 'retired')
     .map((o) => ({ value: o.id, label: `${o.name} · ${unitPath(o.unitId, data.units)}` }));
+
   const name = field('name', 'Name', 'Use the name people at this facility recognize.');
+
   const active = field(
     'active',
     'Available for new work',
     'Retirement preserves history. Review linked care before changing this.',
     'boolean',
   );
+
   const unit = field(
     'unitId',
     'Responsible team',
@@ -124,6 +142,7 @@ export const editorFields = (
     'select',
     units,
   );
+
   const locations = field(
     'locationIds',
     'Care locations',
@@ -132,6 +151,7 @@ export const editorFields = (
     places,
     false,
   );
+
   const actions = field(
     'requiredActions',
     'Clinical activities',
@@ -140,6 +160,7 @@ export const editorFields = (
     choices(ClinicalAction.options),
     false,
   );
+
   const zone = field(
     'timeZone',
     'Timezone',
@@ -153,6 +174,7 @@ export const editorFields = (
       ]),
     ]),
   );
+
   const dates = [
     field(
       'startsAt',
@@ -169,6 +191,7 @@ export const editorFields = (
       kind === 'service_session',
     ),
   ];
+
   const reason = field(
     'reason',
     'Reason',
@@ -177,6 +200,7 @@ export const editorFields = (
     undefined,
     ['capability_decision', 'reviewer_delegation'].includes(kind),
   );
+
   switch (kind) {
     case 'unit':
       return [

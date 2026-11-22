@@ -23,17 +23,21 @@ export const SectionTabs = <T extends string>({
   useEffect(() => {
     const parent = navigation.current;
     const selected = parent?.querySelector<HTMLElement>('[aria-current="page"]');
+
     if (!parent || !selected) {
       return;
     }
+
     const bounds = parent.getBoundingClientRect();
     const item = selected.getBoundingClientRect();
+
     if (item.left < bounds.left) {
       parent.scrollLeft -= bounds.left - item.left;
     } else if (item.right > bounds.right) {
       parent.scrollLeft += item.right - bounds.right;
     }
   }, [value]);
+
   return (
     <nav
       ref={navigation}
@@ -43,11 +47,14 @@ export const SectionTabs = <T extends string>({
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
           return;
         }
+
         const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')];
         const index = buttons.indexOf(event.target as HTMLButtonElement);
+
         if (index < 0) {
           return;
         }
+
         event.preventDefault();
         const next = nextFocusIndex(event.key, index, options.length, 'ArrowRight');
         buttons[next]?.focus();

@@ -13,12 +13,14 @@ export const StaffSectionTabs = ({ value }: { value: StaffView }) => {
   const navigate = useNavigate();
   const context = useAuthorizationContext();
   const manage = context.permissions.includes('staff:manage');
+
   const options: { value: StaffView; label: string }[] = [
     { value: 'directory', label: 'Staff' },
     { value: 'roster', label: 'Sign-in windows' },
     { value: 'coverage', label: 'Coverage' },
     ...(manage ? [{ value: 'facilities' as const, label: 'Facility assignments' }] : []),
   ];
+
   return (
     <SectionTabs
       label="Staff sections"

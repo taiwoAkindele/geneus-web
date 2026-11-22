@@ -29,7 +29,9 @@ export const AddDeviceScreen = () => {
     if (!issued) {
       return;
     }
+
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+
     return () => window.clearInterval(timer);
   }, [issued]);
 
@@ -39,6 +41,7 @@ export const AddDeviceScreen = () => {
   const ask = async () => {
     setAsking(true);
     setError(undefined);
+
     try {
       setIssued(await issueEnrollmentCode(context.userId));
       setNow(Date.now());

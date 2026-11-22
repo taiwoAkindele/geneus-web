@@ -40,10 +40,13 @@ export const BillDetail = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const root = useRef<HTMLDivElement>(null);
+
   const [sheet, setSheet] = useState<
     'pay' | 'adjust' | 'statement' | 'questions' | 'link' | undefined
   >(transfer ? 'pay' : undefined);
+
   const [error, setError] = useState('');
+
   const summaries = useLiveQuery(
     useCallback(
       () =>
@@ -56,35 +59,43 @@ export const BillDetail = ({
     ),
     ['coverage_financial_summary'],
   );
+
   const money = (n: number) => displayMoney(n, bill.currency);
   const patient = data.patients.find((p) => p.patientId === bill.patientId);
   const staffName = (id: string) => data.staff.find((s) => s.staffId === id)?.fullName ?? id;
   const chargeIds = bill.rows.map((r) => r.charge.id);
   const insured = bill.rows.some((r) => r.coverage) || bill.pending > 0;
   const canReceive = context.permissions.includes('payment:receive') && bill.due > 0;
+
   const sends = useLiveQuery(
     useCallback(() => messagesFor(bill.id), [bill.id]),
     ['patient_message'],
   );
+
   const events = billActivity({
     bill,
     data,
     messages: sends.data ?? [],
     staffName,
   });
+
   const print = () => {
     const popup = window.open('', '_blank', 'width=900,height=1000');
+
     if (!popup || !root.current) {
       const message = 'The print window was blocked. Allow pop-ups for this app and try again.';
       setError(message);
       toast(message, { tone: 'error' });
+
       return;
     }
+
     setError('');
     popup.document.title = bill.reference;
     const style = popup.document.createElement('style');
     style.textContent =
       'body{font:14px Arial;color:#18342b;margin:30px}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}.r{text-align:right}.print-hide,.md\\:hidden{display:none!important}';
+
     popup.document.head.append(style);
     const heading = popup.document.createElement('p');
     heading.textContent = new Date().toLocaleString('en-GB');
@@ -92,11 +103,13 @@ export const BillDetail = ({
     popup.focus();
     popup.print();
   };
+
   const line = (r: BillDocument['rows'][number]) => {
     const summary = summaries.data?.find(
       (s) =>
         r.coverage && 'allocation' in r.coverage && s.allocationId === r.coverage.allocation.id,
     );
+
     const notes = [
       r.charge.exemptionReason ? `Exempt: ${r.charge.exemptionReason}` : '',
       r.discountMinor || r.waivedMinor
@@ -107,14 +120,18 @@ export const BillDetail = ({
       r.estimated ? 'Estimated share' : '',
       r.refundedMinor ? `Refunded ${money(r.refundedMinor)}` : '',
     ].filter(Boolean);
+
     return notes.length ? (
       <p className="mt-0.5 text-xs text-ink-muted">{notes.join(' · ')}</p>
     ) : null;
   };
+
   const categories = [...new Set(bill.rows.map((r) => r.charge.category))];
   const quantity = (r: BillDocument['rows'][number]) => r.charge.quantity ?? 1;
+
   const unitPrice = (r: BillDocument['rows'][number]) =>
     r.charge.unitPriceMinor ?? Math.round(r.charge.listPriceMinor / quantity(r));
+
   return (
     <div className="space-y-4 pb-24 lg:pb-0">
       <Button variant="ghost" fullWidth={false} className="!px-0 !py-2" onClick={onBack}>

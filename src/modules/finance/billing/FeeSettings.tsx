@@ -39,18 +39,23 @@ export const FeeSettings = () => {
   useEffect(() => {
     document.title = 'Prices · Geneus Health';
   }, []);
+
   const canManage = context.permissions.includes('fee_item:manage');
+
   const save = async (draft: FeeDraft) => {
     if (editing && editing !== 'new') {
       await updateCatalogueItem(editing, draft, context);
     } else {
       await createFeeItem(draft, context);
     }
+
     toast(editing === 'new' ? 'Item saved on the server.' : 'Item updated on the server.');
     setEditing(undefined);
     query.reload();
   };
+
   const data = query.data;
+
   const renderFees = () => {
     if (query.loading) {
       return (

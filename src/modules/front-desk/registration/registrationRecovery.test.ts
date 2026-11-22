@@ -4,6 +4,7 @@ import { createRegistrationRecovery } from './registrationRecovery';
 import { EMPTY_REGISTRATION } from './registrationValues';
 
 const owner = { facilityId: 'TEST-PHC', deviceId: 'device:one', userId: 'staff:one' };
+
 const values = {
   ...EMPTY_REGISTRATION,
   fullName: 'Synthetic Registration',
@@ -11,8 +12,10 @@ const values = {
   age: '32',
   address: 'Synthetic address',
 };
+
 const memoryStorage = () => {
   let value: string | null = null;
+
   return {
     read: () => value,
     write: async (next: string) => {
@@ -48,6 +51,7 @@ describe('private registration recovery', () => {
     const first = createRegistrationRecovery(owner, storage);
     first.store.keep('new', values);
     await first.flush();
+
     for (const other of [
       { ...owner, userId: 'staff:two' },
       { ...owner, facilityId: 'OTHER-PHC' },
@@ -97,6 +101,7 @@ describe('private registration recovery', () => {
         'staff:two': { key: 'patient:edit', values: { ...values, fullName: 'Legacy colleague' } },
       }),
     );
+
     const recovery = createRegistrationRecovery(owner, storage);
     expect(recovery.needsChoice('new')).toBe(true);
     recovery.store.keep('new', { ...values, occupation: 'Updated' });
@@ -106,21 +111,25 @@ describe('private registration recovery', () => {
         'patient:edit',
       ).fullName,
     ).toBe('Legacy colleague');
+
     expect(JSON.parse(storage.read()!).version).toBe(2);
   });
 
   it('surfaces persistence failure and succeeds when retry becomes possible', async () => {
     const storage = memoryStorage();
     let available = false;
+
     const recovery = createRegistrationRecovery(owner, {
       ...storage,
       write: async (value) => {
         if (!available) {
           throw new Error('storage full');
         }
+
         await storage.write(value);
       },
     });
+
     recovery.store.keep('new', values);
     await expect(recovery.flush()).rejects.toThrow('storage full');
     expect(recovery.status().error).toMatch(/could not be saved/);
@@ -159,6 +168,7 @@ describe('private registration recovery', () => {
       setItem: (key: string, value: string) => disk.set(key, value),
       removeItem: (key: string) => disk.delete(key),
     });
+
     const recovery = createRegistrationRecovery(owner);
     recovery.store.keep('new', values);
     await recovery.flush();

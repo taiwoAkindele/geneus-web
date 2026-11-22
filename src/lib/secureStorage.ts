@@ -39,6 +39,7 @@ export const SECURE_NAMES = [
   'geneus.workforce.verificationKeys',
   'geneus.workforce.selections',
 ] as const;
+
 export type SecureName = (typeof SECURE_NAMES)[number];
 
 const memory = new Map<SecureName, string>();
@@ -56,6 +57,7 @@ const request = <T>(operation: IDBRequest<T>): Promise<T> =>
 const openKeyDatabase = (): Promise<IDBDatabase> => {
   const opening = indexedDB.open(KEY_DATABASE, 1);
   opening.onupgradeneeded = () => opening.result.createObjectStore(KEY_STORE);
+
   return request(opening);
 };
 
@@ -73,16 +75,21 @@ const loadDeviceKey = async (): Promise<CryptoKey> => {
   if (!hasIndexedDb()) {
     return generateKey();
   }
+
   const db = await openKeyDatabase();
+
   try {
     const existing = await request(db.transaction(KEY_STORE).objectStore(KEY_STORE).get(KEY_ID));
+
     if (existing instanceof CryptoKey) {
       return existing;
     }
+
     const created = await generateKey();
     await request(
       db.transaction(KEY_STORE, 'readwrite').objectStore(KEY_STORE).put(created, KEY_ID),
     );
+
     return created;
   } finally {
     db.close();
@@ -97,13 +104,16 @@ export const encryptDeviceBytes = async (
   scope: string,
 ): Promise<{ iv: Uint8Array; cipher: ArrayBuffer }> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
+
   const cipher = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(scope) },
     await key(),
     plain.slice().buffer,
   );
+
   return { iv, cipher };
 };
+
 export const decryptDeviceBytes = async (
   stored: { iv: Uint8Array; cipher: ArrayBuffer },
   scope: string,
@@ -122,28 +132,34 @@ export const decryptDeviceBytes = async (
 
 const encrypt = async (plain: string): Promise<string> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
+
   const cipher = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     await key(),
     new TextEncoder().encode(plain),
   );
+
   return `${ENCRYPTED_PREFIX}${bytesToBase64(iv)}.${bytesToBase64(new Uint8Array(cipher))}`;
 };
 
 const decrypt = async (stored: string): Promise<string> => {
   const [iv, cipher] = stored.slice(ENCRYPTED_PREFIX.length).split('.');
+
   const plain = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: base64ToBytes(iv ?? '') },
     await key(),
     base64ToBytes(cipher ?? ''),
   );
+
   return new TextDecoder().decode(plain);
 };
 
 let writes: Promise<void> = Promise.resolve();
+
 /** Persists in call order, so a later write can never be overtaken by an earlier one. */
 const persist = (task: () => Promise<void>): Promise<void> => {
   writes = writes.then(task, task);
+
   return writes;
 };
 
@@ -157,16 +173,20 @@ export const unlockSecureStorage = async (): Promise<void> => {
   if (!hasLocalStorage()) {
     return;
   }
+
   for (const name of SECURE_NAMES) {
     const stored = localStorage.getItem(name);
+
     if (stored === null) {
       continue;
     }
+
     if (!stored.startsWith(ENCRYPTED_PREFIX)) {
       memory.set(name, stored);
       await persist(async () => localStorage.setItem(name, await encrypt(stored)));
       continue;
     }
+
     try {
       memory.set(name, await decrypt(stored));
     } catch {
@@ -179,17 +199,21 @@ export const secureGet = (name: SecureName): string | null => memory.get(name) ?
 
 export const secureSet = (name: SecureName, value: string): Promise<void> => {
   memory.set(name, value);
+
   if (!hasLocalStorage()) {
     return Promise.resolve();
   }
+
   return persist(async () => localStorage.setItem(name, await encrypt(value)));
 };
 
 export const secureRemove = (name: SecureName): Promise<void> => {
   memory.delete(name);
+
   if (!hasLocalStorage()) {
     return Promise.resolve();
   }
+
   return persist(async () => localStorage.removeItem(name));
 };
 
@@ -201,6 +225,7 @@ export const secureRemove = (name: SecureName): Promise<void> => {
 export const destroySecureStorage = async (): Promise<void> => {
   await Promise.all(SECURE_NAMES.map((name) => secureRemove(name)));
   deviceKey = undefined;
+
   if (hasIndexedDb()) {
     await request(indexedDB.deleteDatabase(KEY_DATABASE));
   }
@@ -212,8 +237,10 @@ export const destroySecureStorage = async (): Promise<void> => {
  */
 export const resetSecureStorageForTests = ({ keepKey = false } = {}): void => {
   memory.clear();
+
   if (!keepKey) {
     deviceKey = undefined;
   }
+
   writes = Promise.resolve();
 };

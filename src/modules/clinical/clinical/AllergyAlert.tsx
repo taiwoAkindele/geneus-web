@@ -9,16 +9,19 @@ export const AllergyAlert = ({ patientId }: { patientId: string }) => {
   const live = useLiveQuery(
     useCallback(async () => {
       const ids = await patientIdentityIds(patientId);
+
       const [groups, patients] = await Promise.all([
         Promise.all(ids.map(clinicalEventsForPatient)),
         Promise.all(ids.map(getPatient)),
       ]);
+
       return currentAllergies(
         groups.flat(),
         patients.filter((patient) => patient !== undefined),
       );
     }, [patientId]),
   );
+
   if (live.loading) {
     return (
       <span role="status" className="text-xs">
@@ -26,6 +29,7 @@ export const AllergyAlert = ({ patientId }: { patientId: string }) => {
       </span>
     );
   }
+
   if (live.error) {
     return (
       <button
@@ -37,6 +41,7 @@ export const AllergyAlert = ({ patientId }: { patientId: string }) => {
       </button>
     );
   }
+
   return live.data?.length ? (
     <span
       role="status"

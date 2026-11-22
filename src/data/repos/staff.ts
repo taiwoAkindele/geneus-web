@@ -17,6 +17,7 @@ export type StaffDetails = Pick<
 >;
 
 export const listStaff = () => allOfType<Staff>('staff');
+
 export const listShifts = () => allOfType<RosterShift>('roster_shift');
 
 export const createStaff = async (
@@ -26,6 +27,7 @@ export const createStaff = async (
   assertAllowed(context, 'staff:manage');
   assertAllowed(context, 'staff:permission');
   const staffId = newId('staff');
+
   return insertRecord<Staff>(context, 'staff:manage', 'staff', {
     ...envelope(context),
     id: staffId,
@@ -48,7 +50,9 @@ const guardAdministrator = async (before: Staff, after: Staff): Promise<void> =>
   if (!workingAdmin(before) || workingAdmin(after)) {
     return;
   }
+
   const others = await listStaff();
+
   if (!others.some((member) => member.id !== before.id && workingAdmin(member))) {
     throw new Error('Keep at least one active facility administrator with write access');
   }
@@ -60,39 +64,50 @@ export const editStaff = async (
   context: AuthorizationContext,
 ): Promise<void> => {
   const changes: Partial<StaffDetails> = {};
+
   if (details.fullName.trim() !== staff.fullName) {
     changes.fullName = details.fullName.trim();
   }
+
   if (details.role !== staff.role) {
     changes.role = details.role;
   }
+
   if (details.permission !== staff.permission) {
     changes.permission = details.permission;
   }
+
   if ((details.loginAccess ?? 'shift') !== (staff.loginAccess ?? 'shift')) {
     changes.loginAccess = details.loginAccess ?? 'shift';
   }
+
   if (
     JSON.stringify(details.additionalRoles ?? []) !== JSON.stringify(staff.additionalRoles ?? [])
   ) {
     changes.additionalRoles = details.additionalRoles ?? [];
   }
+
   if (
     JSON.stringify(details.additionalPermissions ?? []) !==
     JSON.stringify(staff.additionalPermissions ?? [])
   ) {
     changes.additionalPermissions = details.additionalPermissions ?? [];
   }
+
   const accessChanged = Object.keys(changes).some((field) => field !== 'fullName');
+
   if (!Object.keys(changes).length) {
     return;
   }
+
   if ('fullName' in changes) {
     assertAllowed(context, 'staff:manage');
   }
+
   if (accessChanged) {
     assertAllowed(context, 'staff:permission');
   }
+
   await guardAdministrator(staff, { ...staff, ...changes });
   await updateRecord<Staff>(
     context,
@@ -132,14 +147,18 @@ export const findShift = (
   const staffShifts = shifts
     .filter((shift) => shift.staffId === staffId)
     .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+
   const active = staffShifts.find(
     (shift) => Date.parse(shift.startsAt) <= at && at < shiftEnd(shift),
   );
+
   if (active) {
     return active;
   }
+
   const day = calendarDate(new Date(at));
   const sameDay = staffShifts.filter((shift) => calendarDate(shift.startsAt) === day);
+
   return [...sameDay].reverse().find((shift) => Date.parse(shift.startsAt) > at) ?? sameDay[0];
 };
 
@@ -155,9 +174,11 @@ export const assignShift = async (
   assertAllowed(context, 'roster:assign');
   const id = shift.id ?? shiftId(shift.staffId, shift.day);
   const existing = await findRecord<RosterShift>('roster_shift', id);
+
   if (shift.id && (!existing || existing.staffId !== shift.staffId)) {
     throw new Error('This shift is no longer available for that staff member');
   }
+
   if (existing) {
     await updateRecord<RosterShift>(context, 'roster:assign', 'roster_shift', id, {
       startsAt: shift.startsAt,
@@ -165,8 +186,10 @@ export const assignShift = async (
       // A previous extension must not override the newly assigned window.
       extendedUntil: shift.endsAt,
     });
+
     return;
   }
+
   await insertRecord<RosterShift>(context, 'roster:assign', 'roster_shift', {
     ...envelope(context),
     id,

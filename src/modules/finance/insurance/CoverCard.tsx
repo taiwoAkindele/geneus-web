@@ -35,10 +35,13 @@ export const useDeviceInsurance = (): DeviceInsurance | undefined => {
     const refresh = () => setState(deviceInsurance(context));
     refresh();
     window.addEventListener(INSURANCE_SUPPORT_EVENT, refresh);
+
     return () => window.removeEventListener(INSURANCE_SUPPORT_EVENT, refresh);
   }, [context.facilityId, context.deviceId]);
+
   return state;
 };
+
 export const useInsuranceSupported = () => useDeviceInsurance() !== undefined;
 
 const COVER_TABLES = ['patient_cover', 'cover_check', 'payer', 'facility'] as const;
@@ -52,22 +55,29 @@ export const coverStatus = (
   if (!cover.active) {
     return 'Inactive';
   }
+
   if (today && cover.validTo && cover.validTo < today) {
     return `Expired on ${cover.validTo}`;
   }
+
   if (!cover.enrolleeNumber.trim() || !cover.planCode.trim()) {
     return 'Details incomplete';
   }
+
   if (!latest) {
     return 'Not yet verified';
   }
+
   const current = today && latest.coversFrom <= today && today <= latest.coversTo;
+
   if (latest.result === 'pending') {
     return 'Verification pending with the payer';
   }
+
   if (latest.result === 'not_eligible') {
     return current ? 'Not eligible (payer said so)' : 'Last found not eligible';
   }
+
   return current ? 'Verified for today' : 'Verified before; not checked for today';
 };
 
@@ -81,6 +91,7 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
   const context = useAuthorizationContext();
   const insurance = useDeviceInsurance();
   const supported = insurance !== undefined;
+
   const data = useLiveQuery(
     useCallback(async () => {
       const [covers, checks, payers, facility] = await Promise.all([
@@ -89,22 +100,29 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
         listPayers(),
         findRecord<Facility>('facility', context.facilityId),
       ]);
+
       return { covers, checks, payers, timeZone: facility?.timeZone };
     }, [patientId, context.facilityId]),
     COVER_TABLES,
   );
+
   const [editing, setEditing] = useState<PatientCover | 'new'>();
   const [checking, setChecking] = useState<PatientCover>();
+
   if (!supported || !data.data) {
     return null;
   }
+
   const { covers, checks, payers, timeZone } = data.data;
   const current = currentCovers(patientId, covers);
+
   const payerName = (id: string) =>
     payers.find((p) => p.id === id)?.name ?? 'Payer not available on this device';
+
   const today = serviceDateOf(new Date().toISOString(), timeZone);
   const canRecord = context.permissions.includes('cover:record');
   const canCheck = context.permissions.includes('cover:verify');
+
   return (
     <section
       aria-label="Insurance cover"
@@ -139,9 +157,12 @@ export const CoverCard = ({ patientId }: { patientId: string }) => {
           const history = checks
             .filter((c) => c.coverId === cover.id)
             .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+
           const latest = history[0];
+
           const checkedToday =
             today && history.some((c) => c.coversFrom <= today && today <= c.coversTo);
+
           return (
             <article
               key={cover.id}
@@ -246,6 +267,7 @@ const CoverSheet = ({
   onClose: () => void;
 }) => {
   const context = useAuthorizationContext();
+
   const [value, setValue] = useState<CoverFieldsValue>(() =>
     existing
       ? {
@@ -260,16 +282,21 @@ const CoverSheet = ({
         }
       : { ...emptyCover(), payerId: payers[0]?.id ?? '' },
   );
+
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       const issue = coverIssue(value);
+
       if (issue) {
         throw new Error(issue);
       }
+
       await recordCover({ patientId, ...value, replaces: existing?.id }, context);
       onClose();
     } catch (cause) {
@@ -278,6 +305,7 @@ const CoverSheet = ({
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title={existing ? 'Change insurance cover' : 'Add insurance cover'}
@@ -334,13 +362,16 @@ const CheckSheet = ({
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       if (!from || !to || from > to) {
         throw new Error('Enter the dates the payer confirmed, the start on or before the end');
       }
+
       await recordCheck(
         {
           patientId: cover.patientId,
@@ -354,6 +385,7 @@ const CheckSheet = ({
         },
         context,
       );
+
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the check');
@@ -361,6 +393,7 @@ const CheckSheet = ({
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title="Record cover check"
@@ -440,6 +473,7 @@ export const CheckInCoverPrompt = ({
   // During setup cover does not change bills, so the desk is not prompted yet.
   const supported = useDeviceInsurance() === 'active';
   const context = useAuthorizationContext();
+
   const data = useLiveQuery(
     useCallback(async () => {
       const [covers, checks, facility] = await Promise.all([
@@ -447,8 +481,10 @@ export const CheckInCoverPrompt = ({
         checksForPatient(patientId),
         findRecord<Facility>('facility', context.facilityId),
       ]);
+
       const today = serviceDateOf(new Date().toISOString(), facility?.timeZone);
       const current = currentCovers(patientId, covers).filter((c) => c.active);
+
       return today
         ? current.find(
             (cover) =>
@@ -460,12 +496,15 @@ export const CheckInCoverPrompt = ({
     }, [patientId, context.facilityId]),
     COVER_TABLES,
   );
+
   if (!supported) {
     return null;
   }
+
   if (!data.data || !context.permissions.includes('cover:verify')) {
     return <PlanApprovalSummary patientId={patientId} />;
   }
+
   const renderRecordAction = () => {
     if (onRecord) {
       return (

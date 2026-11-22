@@ -43,9 +43,31 @@ import { listWardDrafts } from '@/data/repos/drafts';
 import { patientIdentityIds } from '@/data/repos/patientIdentity';
 import { AdmissionMedicationSheet } from './AdmissionMedicationSheet';
 
+const MEDICATION_ACTION_WORDS: Record<string, string> = {
+  start: 'started',
+  change: 'changed',
+  stop: 'stopped',
+};
+
+/** A complaint entry with no complaints is a ward progress note. */
+const wardEntryTitle = (entry: EncounterEntry): string => {
+  if (entry.step === 'amendment') {
+    return 'Correction';
+  }
+
+  const complaints = entry.values.complaints as string[] | undefined;
+
+  if (entry.step === 'complaint' && !complaints?.length) {
+    return 'Progress note';
+  }
+
+  return STEP_DEFS[entry.step].title;
+};
+
 const time = (iso: string) => {
   const at = new Date(iso);
   const today = new Date();
+
   return at.toDateString() === today.toDateString()
     ? at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     : at.toLocaleString('en-GB', {
@@ -55,6 +77,7 @@ const time = (iso: string) => {
         minute: '2-digit',
       });
 };
+
 /** What an unfinished draft is, in plain words. */
 const DRAFT_NAME: Record<WardAction, string> = {
   note: 'progress note',
@@ -64,13 +87,16 @@ const DRAFT_NAME: Record<WardAction, string> = {
   medicine: 'medicine order',
   injection: 'injection order',
 };
+
 /** "↑ 0.4" against the previous reading, or nothing when there is none to compare. */
 const change = (now: string, before: string | undefined) => {
   const a = Number.parseFloat(now);
   const b = before === undefined ? NaN : Number.parseFloat(before);
+
   if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) {
     return '';
   }
+
   return `${a > b ? '↑' : '↓'} ${+Math.abs(a - b).toFixed(1)}`;
 };
 
@@ -87,6 +113,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const identities = useLiveQuery(useCallback(() => patientIdentityIds(patientId), [patientId]));
+
   const stays = (inpatient.data?.heads ?? [])
     .filter((e) => (identities.data ?? [patientId]).includes(e.patientId))
     .sort(
@@ -94,43 +121,52 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
         Number(activeAdmission(b)) - Number(activeAdmission(a)) ||
         b.createdOn.localeCompare(a.createdOn),
     );
+
   const admissionId = params.get('admission') ?? stays[0]?.admissionId ?? '';
   const admission = stays.find((e) => e.admissionId === admissionId);
   const recordPatientId = admission?.patientId ?? patientId;
+
   const query = useLiveQuery(
     useCallback(async () => {
       if (!admissionId) {
         return undefined;
       }
+
       const [records, staff, pending, drafts] = await Promise.all([
         loadWardCare(admissionId, context),
         listStaff(),
         pendingWorkforceIds(),
         listWardDrafts({ staffId: context.userId!, patientId: recordPatientId }, admissionId),
       ]);
+
       return { records, staff, pending, drafts };
     }, [admissionId, recordPatientId, context.userId, context.permissions.join('|')]),
   );
+
   const [action, setAction] = useState<{
     session: WardSession;
     action: WardAction;
     changeOrder?: WardCareEvent;
   }>();
+
   const [medication, setMedication] = useState<{
     session: WardSession;
     order: WardCareEvent;
     action: 'administration' | 'continue' | 'stop';
     previous?: WardCareEvent;
   }>();
+
   const [discharge, setDischarge] = useState<WardSession>();
   const [summary, setSummary] = useState<WardCareEvent>();
   const [correction, setCorrection] = useState<EncounterEntry>();
   const [structuredCorrection, setStructuredCorrection] = useState<EncounterEntry>();
+
   const [admissionMedicine, setAdmissionMedicine] = useState<{
     session: WardSession;
     sourceEntryId: string;
     line: PrescriptionLine;
   }>();
+
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -139,11 +175,14 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
   useEffect(() => {
     const refresh = () => query.reload();
     window.addEventListener('geneus:wardCareSupport', refresh);
+
     return () => window.removeEventListener('geneus:wardCareSupport', refresh);
   }, [query.reload]);
+
   if (inpatient.loading || patient.loading || identities.loading) {
     return <p role="status">Reading inpatient care…</p>;
   }
+
   if (inpatient.error || patient.error) {
     return (
       <div role="alert">
@@ -159,6 +198,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       </div>
     );
   }
+
   if (!stays.length) {
     return (
       <p className="rounded-field border border-outline p-4">
@@ -166,27 +206,33 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       </p>
     );
   }
+
   if (!admission || !patient.data) {
     return <p role="alert">This admission is not available for this patient.</p>;
   }
+
   const data = query.data?.records;
   const pending = query.data?.pending ?? new Set<string>();
   const has = (p: string) => context.permissions.includes(p as never);
   const active = activeAdmission(admission);
+
   const writable =
     !query.loading &&
     !query.error &&
     active &&
     has('encounter:record') &&
     wardCareSupported(context);
+
   const session = (purpose: WardSession['purpose']): WardSession => ({
     id: `encounter:${crypto.randomUUID()}`,
     admissionId,
     patientId: recordPatientId,
     purpose,
   });
+
   // A clinician who diagnoses writes notes as a doctor activity; everyone else as a nursing activity.
   const notePurpose: WardSession['purpose'] = has('clinical:diagnose') ? 'review' : 'nursing';
+
   const start = (kind: WardAction, changeOrder?: WardCareEvent) =>
     setAction({
       session: session(
@@ -197,16 +243,22 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       action: kind,
       changeOrder,
     });
+
   const nameOf = (id: string) => query.data?.staff.find((s) => s.staffId === id)?.fullName ?? id;
+
   const saved = () => {
     query.reload();
     inpatient.reload();
   };
+
   const entries = data ? effectiveEncounterEntries(data.entries) : [];
+
   const newestFirst = (a: EncounterEntry, b: EncounterEntry) =>
     (b.performedOn ?? b.createdOn).localeCompare(a.performedOn ?? a.createdOn);
+
   const orders = data ? activeWardOrders(data) : [];
   const summaries = data ? currentDischargeSummary(data) : [];
+
   const timeline = data
     ? [
         ...data.entries.map((entry) => ({
@@ -230,28 +282,36 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
   const admittedOn =
     inpatient.data?.events.find((v) => v.id === admission.admissionId)?.createdOn ??
     admission.createdOn;
+
   const day = Math.max(1, Math.floor((Date.now() - Date.parse(admittedOn)) / 86_400_000) + 1);
   const latestDiagnosis = entries.filter((e) => e.step === 'diagnosis').sort(newestFirst)[0];
+
   const diagnosisText = latestDiagnosis
     ? summarize(
         fromStepValues('diagnosis', latestDiagnosis.values, structuredClone(EMPTY_ENCOUNTER_DATA)),
         'diagnosis',
       )[0]?.value
     : undefined;
+
   const vitals = entries.filter((e) => e.step === 'vitals').sort(newestFirst);
+
   const readVitals = (e?: EncounterEntry) =>
     e
       ? fromStepValues('vitals', e.values, structuredClone(EMPTY_ENCOUNTER_DATA)).vitals
       : undefined;
+
   const now = readVitals(vitals[0]);
   const before = readVitals(vitals[1]);
+
   const lastGiven = (order: WardCareEvent) => {
     const orderId = order.values.kind === 'medication' ? order.values.orderId : order.id;
+
     const chain = new Set(
       data?.events
         .filter((e) => e.values.kind === 'medication' && e.values.orderId === orderId)
         .map((e) => e.id),
     );
+
     return data?.events
       .filter(
         (e) =>
@@ -261,11 +321,13 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       )
       .sort((a, b) => b.occurredOn.localeCompare(a.occurredOn))[0];
   };
+
   const labOrders = data
     ? data.encounters.filter((e) =>
         entries.some((v) => v.encounterId === e.id && v.step === 'lab_order'),
       )
     : [];
+
   const openActivities =
     writable && data
       ? data.encounters.filter(
@@ -277,6 +339,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
             data.entries.some((v) => v.encounterId === e.id),
         )
       : [];
+
   const toReview =
     data && writable && has('clinical:prescribe')
       ? entries
@@ -353,26 +416,33 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
 
   const print = () => {
     const popup = window.open('', '_blank', 'width=800,height=900');
+
     if (!popup || !printContent.current) {
       const m = 'The print window was blocked. Allow pop-ups and try again.';
       setError(m);
       toast(m, { tone: 'error' });
+
       return;
     }
+
     const style = popup.document.createElement('style');
     style.textContent =
       'body{font:14px Arial,sans-serif;padding:24px;color:#111}dt{font-weight:bold;margin-top:16px}dd{margin:4px 0;white-space:pre-wrap}h1{font-size:22px}';
+
     popup.document.head.append(style);
     popup.document.body.append(printContent.current.cloneNode(true));
     popup.focus();
     popup.print();
   };
+
   const correct = async () => {
     if (!correction || correcting.current) {
       return;
     }
+
     correcting.current = true;
     setSaving(true);
+
     try {
       await amendEntry(correction, note, context);
       setCorrection(undefined);
@@ -388,6 +458,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       setSaving(false);
     }
   };
+
   const closeActivity = async (id: string) => {
     try {
       await saveWardEvent(
@@ -395,6 +466,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
         { kind: 'complete' },
         context,
       );
+
       toast('Earlier activity closed');
       saved();
     } catch (cause) {
@@ -403,6 +475,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
       toast(m, { tone: 'error' });
     }
   };
+
   const vitalTiles = now
     ? ([
         ['Temp', now.temp, '°', before?.temp],
@@ -458,6 +531,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
                 setParams((p) => {
                   const next = new URLSearchParams(p);
                   next.set('admission', e.target.value);
+
                   return next;
                 });
               }}
@@ -558,6 +632,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
               {orders.map((order) => {
                 const line = orderLine(order, data.entries);
                 const given = lastGiven(order);
+
                 return (
                   <li
                     key={order.id}
@@ -670,9 +745,11 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
             {labOrders.map((encounter) => {
               const care = entries.filter((e) => e.encounterId === encounter.id);
               const ordered = care.find((e) => e.step === 'lab_order')!;
+
               const results = care
                 .filter((e) => e.step === 'lab_results')
                 .flatMap((e) => e.values.results as { test: string; result: string }[]);
+
               return (
                 <li
                   key={encounter.id}
@@ -759,12 +836,15 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
                     const target = draft.changeOrderId
                       ? data.events.find((e) => e.id === draft.changeOrderId)
                       : undefined;
+
                     if (draft.changeOrderId && !target) {
                       const m = 'The original medicine order is unavailable. Sync, then try again.';
                       setError(m);
                       toast(m, { tone: 'error' });
+
                       return;
                     }
+
                     setAction({
                       session: draft.session,
                       action: actionForStep(draft.step) ?? 'note',
@@ -841,12 +921,7 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
                 {entry ? (
                   <>
                     <h4 className="font-bold">
-                      {entry.step === 'amendment'
-                        ? 'Correction'
-                        : entry.step === 'complaint' &&
-                            !(entry.values.complaints as string[] | undefined)?.length
-                          ? 'Progress note'
-                          : STEP_DEFS[entry.step].title}
+                      {wardEntryTitle(entry)}
                       {entry.lateReason ? (
                         <span className="ml-2 rounded-full bg-amber-bg px-2 py-0.5 text-xs font-bold text-amber-text">
                           Late entry
@@ -913,10 +988,13 @@ export const WardCareWorkspace = ({ patientId }: { patientId: string }) => {
                       event.values.kind === 'administration'
                         ? () => {
                             const v = event.values;
+
                             if (v.kind !== 'administration') {
                               return;
                             }
+
                             const order = data!.events.find((e) => e.id === v.orderEventId);
+
                             if (order) {
                               setMedication({
                                 session: session('nursing'),
@@ -1084,25 +1162,19 @@ const WardEventBody = ({
   onCorrect?: () => void;
 }) => {
   const v = event.values;
+
   if (v.kind === 'complete') {
     return (
       <p className="text-sm font-bold">Care activity completed{v.note ? ' · ' + v.note : ''}</p>
     );
   }
+
   if (v.kind === 'medication') {
     const line = orderLine(event, records.entries);
+
     return (
       <>
-        <h4 className="font-bold">
-          Medicine{' '}
-          {v.action === 'start'
-            ? 'started'
-            : v.action === 'change'
-              ? 'changed'
-              : v.action === 'stop'
-                ? 'stopped'
-                : 'continued'}
-        </h4>
+        <h4 className="font-bold">Medicine {MEDICATION_ACTION_WORDS[v.action] ?? 'continued'}</h4>
         <p className="text-sm">
           {line?.drug} · {line?.dose} · {line?.frequency} {line?.route}
         </p>
@@ -1110,9 +1182,11 @@ const WardEventBody = ({
       </>
     );
   }
+
   if (v.kind === 'administration') {
     const order = records.events.find((e) => e.id === v.orderEventId);
     const line = order && orderLine(order, records.entries);
+
     return (
       <>
         <h4 className="font-bold">
@@ -1135,6 +1209,7 @@ const WardEventBody = ({
       </>
     );
   }
+
   return (
     <p className="font-bold">Discharge summary signed{v.previousId ? ' · Revised version' : ''}</p>
   );

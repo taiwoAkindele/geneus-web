@@ -27,6 +27,7 @@ import {
 import { Button, Tag, useToast } from '@/ui';
 
 const QUEUE = '/laboratory';
+
 export const labRequestPath = (patientId: string, encounterId: string) =>
   `/laboratory/request?${new URLSearchParams({ patient: patientId, visit: encounterId })}`;
 
@@ -61,6 +62,7 @@ const LabRequest = () => {
       setLater(pendingLabOrder(ctl.rawEntries));
     }
   }, [first, later, ctl.rawEntries]);
+
   const data = first ? ctl.enc.data : later;
   const [preview, setPreview] = useState<LabSubmission>();
   const [saving, setSaving] = useState(false);
@@ -74,6 +76,7 @@ const LabRequest = () => {
   if (!patientId || !encounterId) {
     return <p className="p-6">Open a request from the Laboratory.</p>;
   }
+
   if (patient.loading || (ctl.loading && !ctl.enc.id)) {
     return (
       <p role="status" className="p-6">
@@ -81,6 +84,7 @@ const LabRequest = () => {
       </p>
     );
   }
+
   if (!patient.data || ctl.error) {
     return (
       <div role="alert" className="space-y-3 p-6">
@@ -91,11 +95,13 @@ const LabRequest = () => {
       </div>
     );
   }
+
   const record = patient.data;
   const enc = ctl.enc;
   const order = enc.data.lab_order;
   const canRecord = context.permissions.includes('encounter:record');
   const results = ctl.rawEntries.filter((entry) => entry.step === 'lab_results');
+
   const resulted = new Set(
     results.flatMap((entry) =>
       ENCOUNTER_STEP_VALUES.lab_results
@@ -103,6 +109,7 @@ const LabRequest = () => {
         .results.map((r) => r.orderItemId ?? r.test),
     ),
   );
+
   const pending = order.tests.filter((_, index) => !resulted.has(orderKey(enc.data, index)));
   const heading = `Laboratory report · ${record.fullName} · ${record.patientId}`;
 
@@ -113,6 +120,7 @@ const LabRequest = () => {
           (current) =>
             current && { ...current, lab_results: { ...current.lab_results, [key]: value } },
         );
+
   const setReport = (key: string, draft: LabItemDraft) =>
     first
       ? ctl.setLabReport(key, draft)
@@ -120,29 +128,37 @@ const LabRequest = () => {
           (current) =>
             current && { ...current, lab_report: { ...current.lab_report, [key]: draft } },
         );
+
   const previewResults = () => {
     if (!data) {
       return;
     }
+
     const submission = buildLabSubmission(
       data,
       { templates: labSetup.data?.templates ?? [], patient: labSetup.data?.patient },
       new Date().toISOString(),
     );
+
     if (submission.problems.length) {
       setError(submission.problems.join(' · '));
+
       return;
     }
+
     setError('');
     setPreview(submission);
   };
+
   const publish = async () => {
     if (!preview || busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       if (first) {
         await ctl.lockStep('lab_results', undefined, preview);
@@ -159,15 +175,18 @@ const LabRequest = () => {
           context,
         );
       }
+
       toast('Results published on this device. The requesting clinician is alerted once it syncs');
       navigate(QUEUE);
     } catch (cause) {
       if (!(cause instanceof AuthorizationError)) {
         console.error('Result publish failed', cause);
       }
+
       setError(
         cause instanceof Error ? cause.message : 'Could not publish. Your entries are still here.',
       );
+
       setPreview(undefined);
     } finally {
       busy.current = false;
@@ -243,6 +262,7 @@ const LabRequest = () => {
         <ul className="flex flex-wrap gap-2">
           {order.tests.map((test, index) => {
             const item = order.items?.[index];
+
             return (
               <li key={orderKey(enc.data, index)}>
                 <Tag tone={resulted.has(orderKey(enc.data, index)) ? 'green' : 'neutral'}>

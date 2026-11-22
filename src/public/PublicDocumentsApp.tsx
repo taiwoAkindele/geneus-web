@@ -16,8 +16,10 @@ import { BillCheckout } from './BillCheckout';
  * wider screen. The data and the PDF come from the server's public document API.
  */
 type Route = { kind: 'bill' | 'receipt'; token: string; messages: boolean } | undefined;
+
 export const publicRoute = (pathname: string): Route => {
   const match = /^\/p\/(b|r)\/([A-Za-z0-9_-]{20,100})(\/messages)?\/?$/.exec(pathname);
+
   return match
     ? { kind: match[1] === 'b' ? 'bill' : 'receipt', token: match[2], messages: Boolean(match[3]) }
     : undefined;
@@ -34,6 +36,7 @@ const money = (minor: number, currency: string) => {
     return `${currency} ${(minor / 100).toFixed(2)}`;
   }
 };
+
 const date = (iso: string, timeZone: string, time = false) =>
   new Date(iso).toLocaleString('en-GB', {
     timeZone,
@@ -42,6 +45,7 @@ const date = (iso: string, timeZone: string, time = false) =>
     year: 'numeric',
     ...(time ? { hour: '2-digit', minute: '2-digit' } : {}),
   });
+
 const failure = (cause: unknown) => {
   if (cause instanceof ApiError && cause.code === 'link_unavailable') {
     return 'unavailable';
@@ -64,6 +68,7 @@ const Shell = ({
   footer?: ReactNode;
 }) => {
   const h = typeof hospital === 'string' ? ({ name: hospital } as DocumentHospital) : hospital;
+
   return (
     <div className="min-h-screen bg-surface text-ink">
       <header className="border-b border-outline-soft bg-white">
@@ -88,11 +93,13 @@ const Shell = ({
     </div>
   );
 };
+
 const Card = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <section className={`rounded-card border border-outline-soft bg-white p-5 md:p-6 ${className}`}>
     {children}
   </section>
 );
+
 const Row = ({
   label,
   value,
@@ -107,6 +114,7 @@ const Row = ({
     <span className="text-right tabular-nums">{value}</span>
   </div>
 );
+
 const Pill = ({ paid, children }: { paid: boolean; children: ReactNode }) => (
   <span
     className={`inline-flex rounded-full px-3 py-1 text-sm font-bold ${paid ? 'bg-brand-tint text-brand' : 'bg-amber-bg text-amber-text'}`}
@@ -114,6 +122,7 @@ const Pill = ({ paid, children }: { paid: boolean; children: ReactNode }) => (
     {children}
   </span>
 );
+
 const PdfButton = ({ href }: { href: string }) => (
   <a
     href={href}
@@ -122,6 +131,7 @@ const PdfButton = ({ href }: { href: string }) => (
     Download PDF
   </a>
 );
+
 const Status = ({ title, body }: { title: string; body: string }) => (
   <Shell>
     <Card className="mx-auto max-w-lg text-center">
@@ -146,6 +156,7 @@ const BillScreen = ({
   const t = bill.totals;
   const paid = bill.status === 'Paid';
   const categories = [...new Set(bill.lines.map((l) => l.category))];
+
   return (
     <Shell
       hospital={bill.hospital}
@@ -274,6 +285,7 @@ const ReceiptScreen = ({
   messages: string;
 }) => {
   const m = (minor: number) => money(minor, receipt.currency);
+
   return (
     <Shell
       hospital={receipt.hospital}
@@ -350,9 +362,11 @@ const ReceiptScreen = ({
 
 const MessagesScreen = ({ api, back }: { api: string; back: string }) => {
   const [choices, setChoices] = useState<PublicMessageChoices>();
+
   const [state, setState] = useState<'loading' | 'ready' | 'unavailable' | 'offline' | 'error'>(
     'loading',
   );
+
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   useEffect(() => {
@@ -364,9 +378,11 @@ const MessagesScreen = ({ api, back }: { api: string; back: string }) => {
       (cause) => setState(failure(cause)),
     );
   }, [api]);
+
   const choose = async (channel: 'sms' | 'email', choice: 'stop' | 'start') => {
     setBusy(channel);
     setNotice('');
+
     try {
       const next = await post<PublicMessageChoices>(api, { channel, choice });
       setChoices(next);
@@ -385,9 +401,11 @@ const MessagesScreen = ({ api, back }: { api: string; back: string }) => {
       setBusy('');
     }
   };
+
   if (state !== 'ready' || !choices) {
     return <Unavailable state={state} />;
   }
+
   const channel = (key: 'sms' | 'email', label: string) => {
     const c = choices[key];
 
@@ -426,6 +444,7 @@ const MessagesScreen = ({ api, back }: { api: string; back: string }) => {
       </Card>
     );
   };
+
   return (
     <Shell
       hospital={choices.hospital}
@@ -509,9 +528,11 @@ export const PublicDocumentsApp = () => {
   const [revision, setRevision] = useState(0);
   const paymentConfirmed = useCallback(() => setRevision((value) => value + 1), []);
   const [doc, setDoc] = useState<PublicDocument>();
+
   const [state, setState] = useState<'loading' | 'ready' | 'unavailable' | 'offline' | 'error'>(
     'loading',
   );
+
   useEffect(() => {
     // Never indexed, and the token never leaves in a Referer header.
     for (const [name, content] of [
@@ -524,10 +545,12 @@ export const PublicDocumentsApp = () => {
       document.head.append(meta);
     }
   }, []);
+
   useEffect(() => {
     if (!route || route.messages) {
       return;
     }
+
     get<PublicDocument>(`/public/documents/${route.kind}/${route.token}`).then(
       (d) => {
         setDoc(d);
@@ -540,17 +563,22 @@ export const PublicDocumentsApp = () => {
       (cause) => setState(failure(cause)),
     );
   }, [route?.kind, route?.token, route?.messages, revision]);
+
   if (!route) {
     return <Status title="Page not found" body="Check the link the hospital sent you." />;
   }
+
   const api = `/public/documents/${route.kind}/${route.token}`;
   const page = `/p/${route.kind === 'bill' ? 'b' : 'r'}/${route.token}`;
+
   if (route.messages) {
     return <MessagesScreen api={`${api}/messages`} back={page} />;
   }
+
   if (state !== 'ready' || !doc) {
     return <Unavailable state={state} />;
   }
+
   return doc.kind === 'bill' ? (
     <BillScreen
       bill={doc.bill}

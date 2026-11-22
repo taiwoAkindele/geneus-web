@@ -9,17 +9,21 @@ import {
 } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, postAsDevice } from './client';
+
 export const organizationRequest = <T>(
   path: string,
   actorStaffId: string,
   values: Record<string, unknown> = {},
 ): Promise<T> => {
   const device = getDeviceCredential();
+
   if (!device) {
     return Promise.reject(new Error('This facility is not enrolled'));
   }
+
   return postAsDevice<T>(path, device.credential, { actorStaffId, ...values });
 };
+
 export const currentOrganization = (actorStaffId: string) =>
   organizationRequest<{
     organization: OrganizationSummary | null;
@@ -30,14 +34,17 @@ export const listOrganizationFacilities = async (actorStaffId: string) =>
   OrganizationFacilityDirectory.parse(
     await organizationRequest('/organization/facilities/list', actorStaffId),
   );
+
 export const organizationFacilityDefaults = async (actorStaffId: string) =>
   OrganizationFacilityDefaults.parse(
     await organizationRequest('/organization/facilities/defaults', actorStaffId),
   );
+
 export const createOrganizationFacility = async (input: OrganizationFacilityRegistration) =>
   OrganizationFacilityResult.parse(
     await organizationRequest('/organization/facilities', input.actorStaffId, input),
   );
+
 export const openOrganizationFacility = async (
   actorStaffId: string,
   facilityId: string,
@@ -67,6 +74,7 @@ export const resolveOrganizationFacility = async (
     ) {
       return undefined;
     }
+
     throw cause;
   }
 };

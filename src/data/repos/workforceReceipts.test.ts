@@ -32,11 +32,13 @@ const mutation = (clientId = 7): UploadMutation => ({
   id: 'unit:test',
   data: { revision: 1 },
 });
+
 const reply = (body: unknown) =>
   new Response(JSON.stringify(body), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
+
 const confirm = (applied: number[], rejected: number[] = []) =>
   vi.stubGlobal(
     'fetch',
@@ -57,10 +59,13 @@ describe('workforce confirmations on a SQLite view', () => {
       CREATE TRIGGER receipt_update INSTEAD OF UPDATE ON ${WORKFORCE_RECEIPTS_TABLE}
         BEGIN UPDATE receipt_storage SET clientId=NEW.clientId, outcome=NEW.outcome WHERE id=OLD.id; END;
     `);
+
     const execute = async (sql: string, parameters: unknown[] = []) =>
       sqlite.prepare(sql).run(...parameters);
+
     const getOptional = async <T>(sql: string, parameters: unknown[] = []) =>
       (sqlite.prepare(sql).get(...parameters) ?? null) as T | null;
+
     db = {
       ...fakeDatabase(),
       execute,
@@ -69,9 +74,11 @@ describe('workforce confirmations on a SQLite view', () => {
         sqlite.prepare(sql).all(...parameters) as T[],
       writeTransaction: async (callback) => {
         sqlite.exec('BEGIN');
+
         try {
           const result = await callback({ execute, getOptional });
           sqlite.exec('COMMIT');
+
           return result;
         } catch (error) {
           sqlite.exec('ROLLBACK');
@@ -79,6 +86,7 @@ describe('workforce confirmations on a SQLite view', () => {
         }
       },
     };
+
     setDatabaseForTests(db);
     await saveDeviceCredential({
       deviceId: 'device-test',
@@ -154,6 +162,7 @@ describe('workforce confirmations on a SQLite view', () => {
     const complete = vi.fn(async () => {
       queued = null;
     });
+
     const transaction = {
       transactionId: 3,
       crud: [
@@ -167,8 +176,10 @@ describe('workforce confirmations on a SQLite view', () => {
       ],
       complete,
     } as unknown as CrudTransaction;
+
     let queued: CrudTransaction | null = transaction;
     db.getNextCrudTransaction = async () => queued;
+
     return complete;
   };
 
@@ -178,9 +189,11 @@ describe('workforce confirmations on a SQLite view', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+
         if (url.endsWith('/sync/receipts')) {
           return reply({ applied: [7], rejected: [] });
         }
+
         return reply({
           applied: 1,
           duplicates: 0,
@@ -208,6 +221,7 @@ describe('workforce confirmations on a SQLite view', () => {
         if (String(input).endsWith('/sync/receipts')) {
           return reply({ applied: receiptAvailable ? [7] : [], rejected: [] });
         }
+
         return reply({
           applied: 0,
           duplicates: 1,
@@ -216,6 +230,7 @@ describe('workforce confirmations on a SQLite view', () => {
         });
       }),
     );
+
     const connector = createConnector({ onDeenrolled: vi.fn() });
 
     await expect(connector.uploadData(db as never)).rejects.toThrow(/Waiting for the server/);

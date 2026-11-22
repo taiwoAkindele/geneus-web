@@ -57,11 +57,14 @@ let opening: Promise<LocalDatabase> | undefined;
 
 const databaseKey = async (): Promise<string> => {
   const existing = secureGet(DB_KEY);
+
   if (existing) {
     return existing;
   }
+
   const created = bytesToBase64(crypto.getRandomValues(new Uint8Array(32)));
   await secureSet(DB_KEY, created);
+
   return created;
 };
 
@@ -96,11 +99,15 @@ export const canRetireLegacy = async (
   if ((await pendingUploads(legacy)) > 0) {
     return false;
   }
+
   const encryptedSync = encrypted.currentStatus;
+
   if (!encryptedSync.hasSynced || !encryptedSync.lastSyncedAt) {
     return false;
   }
+
   const legacySynced = legacy.currentStatus.lastSyncedAt;
+
   return !legacySynced || encryptedSync.lastSyncedAt >= legacySynced;
 };
 
@@ -108,17 +115,21 @@ export const openDatabase = (): Promise<LocalDatabase> => {
   if (instance) {
     return Promise.resolve(instance);
   }
+
   opening ??= (async () => {
     const [{ PowerSyncDatabase }, { AppSchema }] = await Promise.all([
       import('@powersync/web'),
       import('./schema'),
     ]);
+
     const open = async (dbFilename: string, encryptionKey?: string): Promise<LocalDatabase> => {
       const db = new PowerSyncDatabase({
         schema: AppSchema,
         database: { dbFilename, encryptionKey },
       });
+
       await db.init();
+
       return db;
     };
 
@@ -126,18 +137,24 @@ export const openDatabase = (): Promise<LocalDatabase> => {
       activeWorkspace()?.databaseName ?? ORIGINAL_DB_FILENAME,
       await databaseKey(),
     );
+
     if (!activeWorkspace()?.legacy || !(await indexedDbExists(LEGACY_FILENAME))) {
       instance = encrypted;
+
       return encrypted;
     }
 
     const legacy = await open(LEGACY_FILENAME);
+
     if (await canRetireLegacy(legacy, encrypted)) {
       await legacy.close();
+
       if (activeWorkspace()?.legacy) {
         await deleteIndexedDb(LEGACY_FILENAME);
       }
+
       instance = encrypted;
+
       return encrypted;
     }
 
@@ -145,8 +162,10 @@ export const openDatabase = (): Promise<LocalDatabase> => {
     // one syncs beside it (sync.ts connects both). A later start retires it.
     catchingUp = encrypted;
     instance = legacy;
+
     return legacy;
   })();
+
   return opening;
 };
 
@@ -163,12 +182,15 @@ export const destroyDatabases = async (): Promise<void> => {
     if (!db) {
       continue;
     }
+
     await db.disconnectAndClear();
     await db.close();
   }
+
   instance = undefined;
   catchingUp = undefined;
   opening = undefined;
+
   if (typeof indexedDB !== 'undefined') {
     await deleteIndexedDb(activeWorkspace()?.databaseName ?? ORIGINAL_DB_FILENAME);
     await deleteIndexedDb(LEGACY_FILENAME);
@@ -178,15 +200,18 @@ export const destroyDatabases = async (): Promise<void> => {
 /** The open database. Screens that read or write sit behind DataProvider, which opened it. */
 export const getDatabase = (): LocalDatabase => {
   const active = activeWorkspace();
+
   if (
     isWorkspaceSwitching() ||
     (active && activeEnrollmentMarker() && activeEnrollmentMarker() !== active.deviceId)
   ) {
     throw new Error('The facility workspace changed. Reload before continuing');
   }
+
   if (!instance) {
     throw new Error('the local database is not open yet — is this inside DataProvider?');
   }
+
   return instance;
 };
 

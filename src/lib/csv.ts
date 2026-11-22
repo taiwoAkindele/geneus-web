@@ -9,6 +9,7 @@ export const csvText = (rows: readonly (readonly unknown[])[]): string =>
           // A cell starting with = + @ or - would run as a formula in a spreadsheet; quote it.
           const looksLikeFormula = typeof value !== 'number' && /^[\s]*[=+@-]/.test(text);
           const safe = looksLikeFormula ? "'" + text : text;
+
           return '"' + safe.replace(/"/g, '""') + '"';
         })
         .join(','),

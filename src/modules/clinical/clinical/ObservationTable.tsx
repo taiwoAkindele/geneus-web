@@ -13,6 +13,7 @@ const COLUMNS = [
   'SpO₂ (%)',
   'Resp. (/min)',
 ];
+
 export const ObservationTable = ({
   observations,
   compact = false,
@@ -21,6 +22,7 @@ export const ObservationTable = ({
   compact?: boolean;
 }) => {
   const [limit, setLimit] = useState(10);
+
   return (
     <details
       className={compact ? 'text-sm' : 'rounded-card border border-outline-soft bg-white p-4'}
@@ -59,6 +61,7 @@ export const ObservationTable = ({
                   v.spo2Percent,
                   v.respiratoryRate,
                 ];
+
                 return (
                   <tr key={v.id} className="border-t border-outline-soft">
                     {values.map((value, index) => (

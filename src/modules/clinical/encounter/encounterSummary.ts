@@ -54,6 +54,7 @@ export const summariseEncounter = (
 
   const chips: string[] = [];
   const disposition = dispositionHeads(steps)[0];
+
   if (disposition) {
     chips.push(
       (
@@ -66,22 +67,30 @@ export const summariseEncounter = (
       )[String(disposition.values.kind)],
     );
   }
+
   const vitals = firstOf(steps, 'vitals');
+
   if (vitals) {
     const v = ENCOUNTER_STEP_VALUES.vitals.parse(vitals.values);
+
     if (v.temperatureC !== undefined) {
       chips.push(`${v.temperatureC}°C`);
     }
+
     if (v.systolicMmHg !== undefined && v.diastolicMmHg !== undefined) {
       chips.push(`${v.systolicMmHg}/${v.diastolicMmHg}`);
     }
   }
+
   const order = firstOf(steps, 'lab_order');
+
   if (order) {
     const tests = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values).tests.length;
     chips.push(`${tests} test${tests === 1 ? '' : 's'}`);
   }
+
   const followUp = firstOf(steps, 'follow_up');
+
   if (followUp && ENCOUNTER_STEP_VALUES.follow_up.parse(followUp.values).followUpOn) {
     chips.push('Follow-up');
   }
@@ -89,6 +98,7 @@ export const summariseEncounter = (
   const diagnosis = firstOf(steps, 'diagnosis');
   const complaint = firstOf(steps, 'complaint');
   const last = steps[steps.length - 1];
+
   // A visit is named by its diagnosis, else its complaints, else the last thing saved.
   const titleFor = (): string => {
     if (diagnosis) {
@@ -107,9 +117,11 @@ export const summariseEncounter = (
 
     return 'Opened';
   };
+
   const title = titleFor();
 
   const opened = stamp(encounter.openedOn);
+
   const projected = projectEncounter({
     patientId: encounter.patientId,
     encounter,
@@ -118,6 +130,7 @@ export const summariseEncounter = (
     skippedNow: [],
     staffNames: new Map(),
   });
+
   const next = stepsFor(projected.data)[projected.activeIndex];
 
   const nextActionFor = (): string => {

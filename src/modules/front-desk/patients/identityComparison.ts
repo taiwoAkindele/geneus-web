@@ -3,22 +3,30 @@ import { currentAge, namesMatch, phoneKey } from '@/modules/front-desk/search';
 
 /** `unknown` when either record lacks the fact: a missing value is never evidence either way. */
 export type Agreement = 'match' | 'differs' | 'unknown';
+
 export type ComparisonRow = { label: string; first: string; second: string; agreement: Agreement };
 
 const NOT_RECORDED = 'Not recorded';
 const show = (value: string | undefined) => value?.trim() || NOT_RECORDED;
-const agree = (a: unknown, b: unknown, same: () => boolean): Agreement =>
-  a === undefined || a === '' || b === undefined || b === ''
-    ? 'unknown'
-    : same()
-      ? 'match'
-      : 'differs';
+const isBlank = (value: unknown) => value === undefined || value === '';
+
+/** Two records can only agree or differ on a detail both of them recorded. */
+const agree = (a: unknown, b: unknown, same: () => boolean): Agreement => {
+  if (isBlank(a) || isBlank(b)) {
+    return 'unknown';
+  }
+
+  return same() ? 'match' : 'differs';
+};
+
 const ageText = (patient: Patient, now: number) => {
   const age = currentAge(patient, now);
+
   return age === undefined
     ? NOT_RECORDED
     : `${age} years${patient.dobEstimated || !patient.dateOfBirth ? ' (estimated)' : ''}`;
 };
+
 const maskedNin = (nin?: string) => (nin ? `•••••••${nin.slice(-4)}` : NOT_RECORDED);
 
 /**
@@ -29,6 +37,7 @@ const maskedNin = (nin?: string) => (nin ? `•••••••${nin.slice(-4)
 export const compareIdentities = (a: Patient, b: Patient, now = Date.now()): ComparisonRow[] => {
   const ageA = currentAge(a, now);
   const ageB = currentAge(b, now);
+
   return [
     {
       label: 'Name',

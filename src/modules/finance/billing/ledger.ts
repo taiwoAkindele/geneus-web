@@ -11,6 +11,7 @@ export const collectionAllocations = (
   const charges = new Map(data.charges.map((charge) => [charge.id, charge]));
   const names = new Map(data.patients.map((patient) => [patient.patientId, patient.fullName]));
   const term = filters.search.trim().toLowerCase();
+
   return data.payments.flatMap((payment) => {
     if (
       payment.method === 'waiver' ||
@@ -20,8 +21,10 @@ export const collectionAllocations = (
     ) {
       return [];
     }
+
     return payment.allocations.flatMap((allocation) => {
       const charge = charges.get(allocation.chargeId);
+
       if (
         !charge ||
         (filters.departmentId &&
@@ -31,6 +34,7 @@ export const collectionAllocations = (
       ) {
         return [];
       }
+
       if (
         term &&
         !`${names.get(payment.patientId) ?? ''} ${payment.patientId} ${charge.description} ${payment.receiptNumber} ${payment.reference ?? ''}`
@@ -39,6 +43,7 @@ export const collectionAllocations = (
       ) {
         return [];
       }
+
       return [
         { payment, charge, amountMinor: (payment.reverses ? -1 : 1) * allocation.amountMinor },
       ];
@@ -83,8 +88,10 @@ export const billingRows = (
     const receipts = payments.filter((p) =>
       p.allocations.some((a) => a.chargeId === row.charge.id),
     );
+
     const reasons = adjustments.filter((a) => a.chargeId === row.charge.id).map((a) => a.reason);
     const status = chargeStatus(row);
+
     return { ...row, receipts, reasons, status };
   });
 

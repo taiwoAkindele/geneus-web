@@ -24,12 +24,15 @@ export const useStaffVerification = () => {
     const refresh = () => tick((n) => n + 1);
     window.addEventListener(STAFF_SESSION_EVENT, refresh);
     const timer = window.setInterval(refresh, 30_000);
+
     return () => {
       window.removeEventListener(STAFF_SESSION_EVENT, refresh);
       window.clearInterval(timer);
     };
   }, []);
+
   const expiresOn = staffSessionExpires(context);
+
   return {
     verified: true,
     hasServerSession: Boolean(staffSessionToken(context)),
@@ -51,6 +54,7 @@ const refusalText = (cause: unknown): string => {
 };
 
 const digits = (value: string) => value.replace(/\D/g, '').slice(0, 6);
+
 const REFUSALS: Record<string, string> = {
   wrong_pin: 'That PIN is not right.',
   locked: 'Too many wrong PINs. Wait a few minutes, then try again.',
@@ -90,16 +94,21 @@ export const StaffVerification = ({
   const [proof, setProof] = useState('');
   const [sentTo, setSentTo] = useState('');
   const previouslyVerified = useRef(false);
+
   if (verified) {
     previouslyVerified.current = true;
   }
+
   if (verified && !requireServerSession) {
     return <>{children}</>;
   }
+
   const online = sync.connected || (typeof navigator !== 'undefined' && navigator.onLine);
+
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
+
     try {
       await action();
       setPin('');
@@ -116,6 +125,7 @@ export const StaffVerification = ({
       setBusy(false);
     }
   };
+
   return (
     <>
       <section
@@ -184,6 +194,7 @@ export const StaffVerification = ({
                     void (async () => {
                       setBusy(true);
                       setError('');
+
                       try {
                         setSentTo((await requestWorkforceCode(context)).sentTo);
                         setEnrol('email');

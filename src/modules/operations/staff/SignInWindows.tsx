@@ -24,11 +24,14 @@ export const SignInWindows = () => {
   const [chosen, setChosen] = useState('');
   const canAssign = context.permissions.includes('roster:assign');
   const planned = (shifts.data ?? []).filter((shift) => calendarDate(shift.startsAt) === day);
+
   const person = (staffId: string) =>
     roster.find((entry) => entry.staff.staffId === staffId)?.staff;
+
   const shiftBased = roster
     .filter((entry) => accessFor(entry.staff) === 'shift')
     .sort((a, b) => a.staff.fullName.localeCompare(b.staff.fullName));
+
   const renderWindows = () => {
     if (loading || shifts.loading) {
       return <p role="status">Reading sign-in windows…</p>;
@@ -93,6 +96,7 @@ export const SignInWindows = () => {
             label: 'Action',
             render: (shift) => {
               const staff = person(shift.staffId);
+
               return staff && canAssign ? (
                 <Button
                   fullWidth={false}
@@ -163,6 +167,7 @@ export const SignInWindows = () => {
               onClick={() => {
                 const staff = person(chosen);
                 setChoosing(false);
+
                 if (staff) {
                   setEditing({ staff });
                 }

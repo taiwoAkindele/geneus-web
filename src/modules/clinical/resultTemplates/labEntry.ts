@@ -35,9 +35,11 @@ export const useLabSetup = (patientId: string) =>
         allOfType<ResultTemplate>('result_template'),
         findRecord<Patient>('patient', patientId),
       ]);
+
       return { templates, patient };
     }, [patientId]),
   );
+
 export type LabSetup = { templates: readonly ResultTemplate[]; patient?: Patient };
 
 const PERSON_WORDS: Record<string, string> = {
@@ -75,6 +77,7 @@ export const factsLabel = (facts: LabPatientFacts): string => {
 
 export const orderKey = (data: EncounterData, index: number) =>
   data.lab_order.items?.[index]?.id ?? data.lab_order.tests[index];
+
 /** The template in use for an ordered test, if it has one. */
 export const templateForOrder = (
   data: EncounterData,
@@ -84,6 +87,7 @@ export const templateForOrder = (
 
 const filled = (draft?: LabPartDraft) =>
   Boolean(draft && (draft.value?.trim() || draft.growth || draft.files?.length));
+
 export const hasEntry = (draft?: LabItemDraft) =>
   Boolean(draft && (draft.comment.trim() || Object.values(draft.values).some(filled)));
 
@@ -97,20 +101,28 @@ const valueFor = (
   if (!filled(draft)) {
     return [];
   }
+
   const base = { key: part.key, label: part.label };
   const flag = draft!.flag ? { flag: draft!.flag } : {};
   const typed = draft!.value?.trim() ?? '';
+
   if (part.kind === 'number') {
     const value = Number(typed);
+
     if (!Number.isFinite(value)) {
       problems.push(`${part.label}: enter a number`);
+
       return [];
     }
+
     if (Number(value.toFixed(part.decimals)) !== value) {
       problems.push(`${part.label}: use ${part.decimals} decimal places at most`);
+
       return [];
     }
+
     const range = rangeFor(part, facts);
+
     return [
       {
         kind: 'number',
@@ -122,22 +134,29 @@ const valueFor = (
       },
     ];
   }
+
   if (part.kind === 'choice') {
     return typed ? [{ kind: 'choice', ...base, answer: typed, ...flag }] : [];
   }
+
   if (part.kind === 'text') {
     return typed ? [{ kind: 'text', ...base, text: typed, ...flag }] : [];
   }
+
   if (part.kind === 'section') {
     return typed ? [{ kind: 'section', ...base, text: typed }] : [];
   }
+
   if (part.kind === 'images') {
     return draft!.files?.length ? [{ kind: 'images', ...base, files: draft!.files }] : [];
   }
+
   if (!draft!.growth) {
     problems.push(`${part.label}: record growth or no growth`);
+
     return [];
   }
+
   const organisms =
     draft!.growth === 'growth'
       ? (draft!.organisms ?? [])
@@ -150,10 +169,13 @@ const valueFor = (
             ),
           }))
       : [];
+
   if (draft!.growth === 'growth' && !organisms.length) {
     problems.push(`${part.label}: name the organism grown`);
+
     return [];
   }
+
   return [{ kind: 'culture', ...base, growth: draft!.growth, organisms, ...flag }];
 };
 
@@ -184,8 +206,10 @@ export const buildLabSubmission = (
     const template = templateForOrder(data, index, setup.templates);
     const identity = { test, ...(order ? { orderItemId: order.id } : {}) };
     let item: LabReportItem | undefined;
+
     if (!template) {
       const text = data.lab_results[key]?.trim();
+
       if (text) {
         item = {
           ...identity,
@@ -197,13 +221,17 @@ export const buildLabSubmission = (
     } else if (hasEntry(data.lab_report[key])) {
       const draft = data.lab_report[key];
       const own: string[] = [];
+
       const values = template.parts.flatMap((part) =>
         valueFor(part, draft.values[part.key], facts, own),
       );
+
       problems.push(...own.map((problem) => `${test}: ${problem}`));
+
       if (!own.length && !values.length) {
         problems.push(`${test}: enter at least one result`);
       }
+
       if (values.length) {
         item = {
           ...identity,
@@ -213,19 +241,24 @@ export const buildLabSubmission = (
         };
       }
     }
+
     if (!item) {
       return;
     }
+
     items.push(item);
     results.push({
       ...identity,
       result: labItemSummary(item, template?.parts ?? [TEXT_RESULT_PART]),
     });
   });
+
   const labReport: LabReport = { patient: facts, items };
+
   if (!items.length && !problems.length) {
     problems.push('Enter at least one result before previewing the report');
   }
+
   if (!problems.length) {
     problems.push(
       ...labReportIssues(results, labReport, {
@@ -237,6 +270,7 @@ export const buildLabSubmission = (
       }),
     );
   }
+
   return { values: { results }, labReport, problems };
 };
 
@@ -246,15 +280,19 @@ export const buildLabSubmission = (
  */
 export const pendingLabOrder = (entries: readonly EncounterEntry[]): EncounterData => {
   let data = structuredClone(EMPTY_ENCOUNTER_DATA);
+
   for (const entry of effectiveEncounterEntries([...entries])) {
     if (entry.step !== 'amendment') {
       data = fromStepValues(entry.step as StepKey, entry.values, data);
     }
   }
+
   const done = new Set(Object.keys(data.lab_results));
+
   const pending = data.lab_order.tests
     .map((test, index) => ({ test, item: data.lab_order.items?.[index] }))
     .filter(({ test, item }) => !done.has(item?.id ?? test));
+
   return {
     ...data,
     lab_order: {

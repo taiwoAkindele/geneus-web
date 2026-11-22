@@ -27,16 +27,21 @@ export const useLiveQuery = <T>(
   const latestLoad = useRef(load);
   const generation = useRef(0);
   latestLoad.current = load;
+
   const run = useCallback(async () => {
     if (!isDatabaseOpen()) {
       return;
     }
+
     const request = ++generation.current;
+
     try {
       const result = await latestLoad.current();
+
       if (request !== generation.current) {
         return;
       }
+
       setData(result);
       setError(undefined);
     } catch (cause) {
@@ -49,26 +54,33 @@ export const useLiveQuery = <T>(
       }
     }
   }, []);
+
   useEffect(() => {
     setData(undefined);
     setError(undefined);
     setLoading(open);
+
     if (!open) {
       return;
     }
+
     void run();
+
     const stop = onChange(
       () => void run(),
       watchKey ? (watchKey.split('|') as DocType[]) : undefined,
     );
+
     return () => {
       generation.current += 1;
       stop();
     };
   }, [run, open, load, watchKey]);
+
   const reload = useCallback(() => {
     setLoading(true);
     void run();
   }, [run]);
+
   return { data, loading, error, reload };
 };

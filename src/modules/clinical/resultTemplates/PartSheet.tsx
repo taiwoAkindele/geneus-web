@@ -19,15 +19,18 @@ type RangeRow = {
   low: string;
   high: string;
 };
+
 const UNITS = [
   { value: 'years', label: 'years' },
   { value: 'months', label: 'months' },
   { value: 'days', label: 'days' },
 ];
+
 const KINDS = (Object.keys(RESULT_PART_KIND_LABELS) as Kind[]).map((value) => ({
   value,
   label: RESULT_PART_KIND_LABELS[value],
 }));
+
 const blankRange: RangeRow = {
   sex: '',
   from: '18',
@@ -37,11 +40,13 @@ const blankRange: RangeRow = {
   low: '',
   high: '',
 };
+
 const lines = (text: string) =>
   text
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+
 const numberOrUndefined = (text: string) => (text.trim() === '' ? undefined : Number(text));
 
 const toRow = (range: ReferenceRange): RangeRow => ({
@@ -53,6 +58,7 @@ const toRow = (range: ReferenceRange): RangeRow => ({
   low: range.low === undefined ? '' : String(range.low),
   high: range.high === undefined ? '' : String(range.high),
 });
+
 const toRange = (row: RangeRow) => ({
   ...(row.sex ? { sex: row.sex } : {}),
   ...(row.from.trim() ? { ageFrom: { value: Number(row.from), unit: row.fromUnit } } : {}),
@@ -64,9 +70,11 @@ const toRange = (row: RangeRow) => ({
 /** Explains a refused part in the editor's words, naming the range row when it is one. */
 const firstIssue = (issues: { path: PropertyKey[]; message: string }[]) => {
   const issue = issues[0];
+
   if (!issue) {
     return 'Check this part and try again';
   }
+
   return issue.path[0] === 'ranges' && typeof issue.path[1] === 'number'
     ? `Range ${issue.path[1] + 1}: ${issue.message}`
     : issue.message;
@@ -106,18 +114,24 @@ export const PartSheet = ({
   const [required, setRequired] = useState(part?.required ?? true);
   const [unit, setUnit] = useState(part?.kind === 'number' ? (part.unit ?? '') : '');
   const [decimals, setDecimals] = useState(part?.kind === 'number' ? String(part.decimals) : '1');
+
   const [ranges, setRanges] = useState<RangeRow[]>(
     part?.kind === 'number' ? part.ranges.map(toRow) : [],
   );
+
   const [answers, setAnswers] = useState(part?.kind === 'choice' ? part.answers.join('\n') : '');
+
   const [answerListId, setAnswerListId] = useState(
     part?.kind === 'choice' ? (part.answerListId ?? '') : '',
   );
+
   const [antibiotics, setAntibiotics] = useState(
     part?.kind === 'culture' ? part.antibiotics.join('\n') : '',
   );
+
   const [maxFiles, setMaxFiles] = useState(part?.kind === 'images' ? String(part.maxFiles) : '6');
   const [error, setError] = useState('');
+
   const snapshot = JSON.stringify([
     kind,
     label,
@@ -130,8 +144,10 @@ export const PartSheet = ({
     antibiotics,
     maxFiles,
   ]);
+
   const [initial] = useState(snapshot);
   const list = lists.find((l) => l.id === answerListId);
+
   const setRange = (index: number, changes: Partial<RangeRow>) =>
     setRanges((current) => current.map((row, i) => (i === index ? { ...row, ...changes } : row)));
 
@@ -141,6 +157,7 @@ export const PartSheet = ({
       label: label.trim(),
       required: showRequired ? required : false,
     };
+
     // Each kind of part keeps only the settings that apply to it.
     const candidateFor = () => {
       if (kind === 'number') {
@@ -172,7 +189,9 @@ export const PartSheet = ({
 
       return { ...base, kind };
     };
+
     const candidate = candidateFor();
+
     if (
       ranges.some((row) =>
         [row.from, row.to, row.low, row.high].some(
@@ -181,13 +200,18 @@ export const PartSheet = ({
       )
     ) {
       setError('Use numbers for ages and range values');
+
       return;
     }
+
     const parsed = ResultPart.safeParse(candidate);
+
     if (!parsed.success) {
       setError(firstIssue(parsed.error.issues));
+
       return;
     }
+
     setError('');
     onSave(parsed.data);
   };
@@ -268,14 +292,17 @@ export const PartSheet = ({
                 <ol className="space-y-3">
                   {ranges.map((row, index) => {
                     const n = index + 1;
+
                     const cell =
                       'min-h-[44px] w-full min-w-0 rounded-field border border-outline bg-white px-2 text-base';
+
                     const field = (label: string, control: ReactNode) => (
                       <label className="block min-w-0 text-xs font-bold text-ink-soft">
                         {label}
                         <span className="mt-1 block">{control}</span>
                       </label>
                     );
+
                     const units = (
                       name: string,
                       value: AgeUnit,
@@ -294,6 +321,7 @@ export const PartSheet = ({
                         ))}
                       </select>
                     );
+
                     return (
                       <li
                         key={index}

@@ -18,12 +18,15 @@ const onShiftNow = (entry: RosterEntry): boolean => {
   if (!entry.shift) {
     return false;
   }
+
   const now = Date.now();
+
   return (
     new Date(entry.shift.startsAt).getTime() <= now &&
     now < new Date(entry.shift.extendedUntil ?? entry.shift.endsAt).getTime()
   );
 };
+
 const roles = (entry: RosterEntry): Role[] => [
   entry.staff.role,
   ...(entry.staff.additionalRoles ?? []),
@@ -60,15 +63,18 @@ const NeedsAttention = ({
 }) => {
   const { requests } = usePendingEmailRequests();
   const emails = [...new Map((requests ?? []).map((r) => [r.staffId, r.staffName])).entries()];
+
   const invitations: [string, string][] = roster
     .filter(
       (entry) =>
         entry.staff.active && onboardingTag(summaries?.get(entry.staff.staffId))?.tone === 'amber',
     )
     .map((entry) => [entry.staff.staffId, entry.staff.fullName]);
+
   if (!emails.length && !invitations.length) {
     return null;
   }
+
   return (
     <div
       role="status"
@@ -109,21 +115,27 @@ export const ManageStaffScreen = () => {
   useEffect(() => {
     document.title = 'Staff · Geneus Health';
   }, []);
+
   const navigate = useNavigate();
   const { roster, loading, error, reload } = useAuth();
   const context = useAuthorizationContext();
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<Role | ''>('');
   const [signIn, setSignIn] = useState<Access | ''>('');
+
   const canAdd =
     context.permissions.includes('staff:manage') &&
     context.permissions.includes('staff:permission');
+
   const summaries = useOnboardingSummaries();
+
   const invited = (entry: RosterEntry) =>
     entry.staff.active ? onboardingTag(summaries?.get(entry.staff.staffId)) : undefined;
+
   const presentRoles = [...new Set(roster.flatMap(roles))].sort((a, b) =>
     ROLE_LABELS[a].localeCompare(ROLE_LABELS[b]),
   );
+
   const shown = roster
     .filter((entry) =>
       (entry.staff.fullName + ' ' + roleLabel(entry.staff))
@@ -133,8 +145,10 @@ export const ManageStaffScreen = () => {
     .filter((entry) => !role || roles(entry).includes(role))
     .filter((entry) => !signIn || accessFor(entry.staff) === signIn)
     .sort((a, b) => a.staff.fullName.localeCompare(b.staff.fullName));
+
   const profile = (entry: RosterEntry) =>
     navigate('/admin/staff/' + encodeURIComponent(entry.staff.staffId));
+
   const today = (entry: RosterEntry) => {
     const access = accessFor(entry.staff);
 
@@ -148,7 +162,9 @@ export const ManageStaffScreen = () => {
 
     return 'No sign-in window today';
   };
+
   const filtered = Boolean(search || role || signIn);
+
   const renderRoster = () => {
     if (loading) {
       return (

@@ -4,6 +4,7 @@ import { Button, SelectField, Sheet, TextAreaField, Tag } from '@/ui';
 import { useAuthorizationContext } from '@/session';
 import { eventHeads, saveOwnership, type WorkforceData } from '@/data/repos/workforce';
 import { humanize, proposalState } from './presentation';
+
 type OwnershipAction = WorkOwnershipEvent['action'];
 
 /** What the signed-in person may do next with a piece of work, given who holds it now. */
@@ -52,6 +53,7 @@ export const OwnershipPanel = ({ source, data }: { source: Handoff; data: Workfo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const history = data.ownership.filter((e) => e.sourceId === source.id);
+
   const accepted = history.filter(
     (e) =>
       !data.pending.has(e.id) &&
@@ -60,17 +62,22 @@ export const OwnershipPanel = ({ source, data }: { source: Handoff; data: Workfo
         (r) => r.type === 'sync_rejection' && r.entityId === e.id && !r.resolvedOn,
       ),
   );
+
   const heads = eventHeads(accepted);
   const previous = heads[0];
   const pending = history.filter((e) => data.pending.has(e.id));
   const unit = data.units.find((u) => [u.id, u.unitId].includes(source.toUnitId));
+
   const offerings = data.offerings.filter(
     (o) => unit && [unit.id, unit.unitId].includes(o.unitId) && o.configuration === 'active',
   );
+
   const chosen = service || previous?.offeringId || (offerings.length === 1 ? offerings[0].id : '');
   const mine = previous?.ownerStaffId === context.userId;
+
   const isRecipient =
     previous?.action === 'offer_transfer' && previous.recipientStaffId === context.userId;
+
   const allowed = allowedOwnershipActions({
     isDone: source.status === 'done',
     previous,
@@ -78,9 +85,11 @@ export const OwnershipPanel = ({ source, data }: { source: Handoff; data: Workfo
     isMine: mine,
     canManage: context.permissions.includes('work_ownership:manage'),
   });
+
   if (!offerings.length && !previous) {
     return null;
   }
+
   return (
     <div className="mb-3 rounded-field border border-outline-soft p-3 text-sm">
       <p className="font-bold">
@@ -194,6 +203,7 @@ export const OwnershipPanel = ({ source, data }: { source: Handoff; data: Workfo
             loading={busy}
             onClick={async () => {
               setBusy(true);
+
               try {
                 await saveOwnership(
                   source,
@@ -204,6 +214,7 @@ export const OwnershipPanel = ({ source, data }: { source: Handoff; data: Workfo
                   context,
                   previous,
                 );
+
                 setAction(undefined);
               } catch (cause) {
                 setError(

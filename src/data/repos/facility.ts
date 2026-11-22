@@ -15,12 +15,15 @@ export const suggestCode = (name: string): string => {
     .trim()
     .split(/[\s-]+/)
     .filter(Boolean);
+
   if (words.length === 0) {
     return '';
   }
+
   const isAcronym = (word: string) => word.length <= 4 && word === word.toUpperCase();
   const tail = words.filter(isAcronym);
   const head = words.filter((word) => !isAcronym(word));
   const initials = head.map((word) => word[0]?.toUpperCase() ?? '').join('');
+
   return [initials, ...tail.map((word) => word.toUpperCase())].filter(Boolean).join('-');
 };

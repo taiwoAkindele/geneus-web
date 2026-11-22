@@ -34,10 +34,13 @@ export const VisitSoFar = ({
 }) => {
   const [open, setOpen] = useState(startsOpen);
   const keys = visitContextSteps(visitSteps, current);
+
   if (!keys.length) {
     return null;
   }
+
   const signed = keys.filter((key) => enc.sig[key]).length;
+
   return (
     <aside aria-label="Visit so far" className={`hidden sm:block ${className}`}>
       <details
@@ -58,6 +61,7 @@ export const VisitSoFar = ({
             const signature = enc.sig[key];
             const label = STATE_LABEL[state];
             const recorded = state === 'signed' || state === 'draft';
+
             return (
               <details key={key} open={recorded} className="rounded-field bg-white p-3 text-sm">
                 <summary className="cursor-pointer">

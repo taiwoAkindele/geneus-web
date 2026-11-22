@@ -28,6 +28,7 @@ export const InvestigationPicker = ({
   const context = useAuthorizationContext();
   const expanded = useBillingCatalogue(context);
   const catalogue = useLiveQuery(useCallback(() => loadInvestigationCatalogue(), [expanded]));
+
   const bills = useLiveQuery(
     useCallback(
       () => (patientId ? chargesForPatient(patientId) : Promise.resolve([])),
@@ -35,12 +36,14 @@ export const InvestigationPicker = ({
     ),
     ['charge'],
   );
+
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [noteFor, setNoteFor] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
+
   const tests = useLiveQuery(
     useCallback(
       () =>
@@ -57,11 +60,14 @@ export const InvestigationPicker = ({
     ),
     ['fee_item'],
   );
+
   const addFee = (fee: FeeItem) => {
     const configured = catalogue.data?.items.find((row) => row.central && row.fee.id === fee.id);
+
     const item = selectInvestigation(
       configured ?? { fee, central: true, definition: undefined, offering: undefined },
     );
+
     if (
       patientId &&
       manualBillCandidates(bills.data ?? [], patientId, fee.id, encounterId).length
@@ -69,17 +75,22 @@ export const InvestigationPicker = ({
       item.billingReviewReason =
         'An existing manual bill may cover this investigation; billing review required';
     }
+
     return item;
   };
+
   const update = (id: string, patch: Partial<InvestigationItem>) =>
     onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
   const term = query.trim().toLowerCase();
+
   const done = (item: InvestigationItem) => {
     onChange([...items, item]);
     setQuery('');
     setActive(0);
     input.current?.focus();
   };
+
   const options: Option[] = [
     ...(catalogue.data?.items ?? [])
       .filter(
@@ -101,6 +112,7 @@ export const InvestigationPicker = ({
         pick: () => done(addFee(f)),
       })),
   ];
+
   // Nothing matches: offer to send the typed name to the laboratory as an unlisted request.
   const custom: Option | undefined =
     term && !options.some((o) => o.name.toLowerCase() === term)
@@ -118,12 +130,15 @@ export const InvestigationPicker = ({
             }),
         }
       : undefined;
+
   const shown = [...options, ...(custom ? [custom] : [])];
+
   const choose = (o?: Option) => {
     if (o && !o.added) {
       o.pick();
     }
   };
+
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -139,6 +154,7 @@ export const InvestigationPicker = ({
       setOpen(false);
     }
   };
+
   return (
     <div className="space-y-3">
       {!expanded && !(catalogue.data?.items ?? []).some((r) => !r.central) ? (

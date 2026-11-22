@@ -12,6 +12,7 @@ import {
 
 const now = new Date(2026, 9, 22, 14);
 const at = (day: number, hour = 10) => new Date(2026, 9, day, hour).toISOString();
+
 const envelope = {
   facilityId: 'OOE-PHC',
   deviceId: 'device:1',
@@ -19,6 +20,7 @@ const envelope = {
   createdOn: at(21),
   schemaVersion: 3,
 };
+
 const patient = Patient.parse({
   ...envelope,
   type: 'patient',
@@ -29,6 +31,7 @@ const patient = Patient.parse({
   sex: 'female',
   ageYears: 32,
 });
+
 const appointment = (id: string, day: number, scheduled = false) =>
   Appointment.parse({
     ...envelope,
@@ -44,6 +47,7 @@ const appointment = (id: string, day: number, scheduled = false) =>
 describe('the working appointment day', () => {
   it('uses structured allergy reviews in the worklist while retaining unreviewed legacy allergies', () => {
     const withLegacy = { ...patient, allergies: ['Penicillin', 'Sulfa'] };
+
     const review = ClinicalEvent.parse({
       ...envelope,
       id: 'allergy:review',
@@ -60,6 +64,7 @@ describe('the working appointment day', () => {
         status: 'inactive',
       },
     });
+
     const rows = projectAppointments(
       [appointment('allergy-booking', 22)],
       [withLegacy],
@@ -71,6 +76,7 @@ describe('the working appointment day', () => {
       [],
       [review],
     );
+
     expect(rows[0].patient.allergy).toBe('Sulfa');
     expect(withLegacy.allergies).toEqual(['Penicillin', 'Sulfa']);
   });
@@ -83,25 +89,30 @@ describe('the working appointment day', () => {
       [],
       now,
     );
+
     expect(rows.map(({ id, group }) => [id, group])).toEqual([
       ['old', 'overdue'],
       ['today', 'today'],
       ['future', 'upcoming'],
     ]);
+
     expect(rows[0].when).not.toBe('Now');
   });
 
   it('uses the local calendar day around midnight rather than the UTC string prefix', () => {
     const localNow = new Date(2026, 9, 22, 0, 5);
+
     const booking = {
       ...appointment('early', 22, true),
       scheduledFor: new Date(2026, 9, 22, 0, 1).toISOString(),
     };
+
     expect(projectAppointments([booking], [patient], [], [], localNow)[0].group).toBe('today');
   });
 
   it('moves a linked booking to Completed only when a closing step is saved', () => {
     const booking = appointment('appointment:1', 22);
+
     const encounter = Encounter.parse({
       ...envelope,
       id: 'encounter:1',
@@ -110,6 +121,7 @@ describe('the working appointment day', () => {
       appointmentId: booking.id,
       openedOn: at(22),
     });
+
     const closing = EncounterEntry.parse({
       ...envelope,
       id: 'entry:1',
@@ -120,26 +132,32 @@ describe('the working appointment day', () => {
       step: 'follow_up',
       values: {},
     });
+
     expect(projectAppointments([booking], [patient], [encounter], [], now)[0]).toMatchObject({
       group: 'today',
       encounterId: encounter.id,
     });
+
     expect(projectAppointments([booking], [patient], [encounter], [closing], now)[0].group).toBe(
       'completed',
     );
   });
+
   it('does not confirm a booking before its linked charges have downloaded', () => {
     const booking = {
       ...appointment('appointment:pending-sync', 22),
       chargeIds: ['charge:registration'],
     };
+
     expect(projectAppointments([booking], [patient], [], [], now)[0].paymentStatus).toBe(
       'Awaiting payment',
     );
+
     expect(
       projectAppointments([{ ...booking, chargeIds: [] }], [patient], [], [], now)[0].paymentStatus,
     ).toBe('Confirmed');
   });
+
   it('removes cancelled and missed bookings from outstanding date groups while retaining their history', () => {
     const missed = Appointment.parse({
       ...appointment('missed', 21),
@@ -156,6 +174,7 @@ describe('the working appointment day', () => {
         },
       ],
     });
+
     const cancelled = Appointment.parse({
       ...appointment('cancelled', 23, true),
       createdOn: at(21),
@@ -174,6 +193,7 @@ describe('the working appointment day', () => {
         },
       ],
     });
+
     const rows = projectAppointments([missed, cancelled], [patient], [], [], now);
     expect(rows.map((row) => row.group)).toEqual(['no_show', 'cancelled']);
     expect(rows[0].activity?.[0].reason).toBe('Patient did not attend');
@@ -193,6 +213,7 @@ describe('front-desk shortcuts on the appointment list', () => {
     expect(
       quickActionFor({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' }),
     ).toBeUndefined();
+
     expect(quickActionFor({ group: 'today', attendance: 'cancelled' })).toBeUndefined();
     expect(quickActionFor({ group: 'overdue', attendance: 'no_show' })).toBeUndefined();
     expect(quickActionFor({ group: 'upcoming', attendance: 'booked' })).toBeUndefined();
@@ -205,6 +226,7 @@ describe('front-desk shortcuts on the appointment list', () => {
       { id: 'b', attendance: 'arrived' as const },
       { id: 'c', attendance: undefined, encounterId: 'encounter:1' },
     ];
+
     const { expected, arrived } = splitToday(rows);
     expect(expected.map((row) => row.id)).toEqual(['a']);
     expect(arrived.map((row) => row.id)).toEqual(['b', 'c']);
@@ -212,6 +234,7 @@ describe('front-desk shortcuts on the appointment list', () => {
 
   it('counts active scheduled bookings per local time on one day only', () => {
     const day = '2026-10-23';
+
     const load = slotLoad(
       [
         { scheduledFor: new Date(2026, 9, 23, 10, 30).toISOString(), attendance: 'booked' },
@@ -222,6 +245,7 @@ describe('front-desk shortcuts on the appointment list', () => {
       ],
       day,
     );
+
     expect([...load]).toEqual([['10:30', 2]]);
     expect(BOOKING_SLOTS[0]).toBe('08:00');
     expect(BOOKING_SLOTS[BOOKING_SLOTS.length - 1]).toBe('15:30');
@@ -237,12 +261,14 @@ describe('appointment table rows', () => {
       'booking',
       'patient',
     ]);
+
     expect(rowActionsFor({ group: 'overdue', attendance: 'booked' }, all)).toEqual([
       'rebook',
       'visit',
       'booking',
       'patient',
     ]);
+
     expect(
       rowActionsFor({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' }, all),
     ).toEqual(['visit', 'booking', 'patient']);
@@ -255,9 +281,11 @@ describe('appointment table rows', () => {
         { canUpdate: false, canRecord: false },
       ),
     ).toEqual(['booking', 'patient']);
+
     expect(
       rowActionsFor({ group: 'completed', attendance: 'arrived', encounterId: 'encounter:1' }, all),
     ).toEqual(['booking', 'patient']);
+
     expect(rowActionsFor({ group: 'cancelled', attendance: 'cancelled' }, all)).toEqual([
       'booking',
       'patient',
@@ -269,17 +297,21 @@ describe('appointment table rows', () => {
       label: 'Not arrived',
       tone: 'neutral',
     });
+
     expect(bookingStatus({ group: 'overdue', attendance: 'booked' })).toEqual({
       label: 'Not arrived',
       tone: 'amber',
     });
+
     expect(bookingStatus({ group: 'today', attendance: 'arrived' })).toEqual({
       label: 'Arrived',
       tone: 'green',
     });
+
     expect(
       bookingStatus({ group: 'today', attendance: 'arrived', encounterId: 'encounter:1' }),
     ).toEqual({ label: 'Visit in progress', tone: 'green' });
+
     expect(bookingStatus({ group: 'no_show', attendance: 'no_show' })).toEqual({
       label: 'No-show',
       tone: 'neutral',

@@ -37,6 +37,7 @@ const INTAKE: { value: ServiceOffering['intakePolicy']; label: string }[] = [
   { value: 'walk_in', label: 'Walk-in only' },
   { value: 'scheduled', label: 'Booked only' },
 ];
+
 const intakeLabel = (value: string) =>
   INTAKE.find((i) => i.value === value)?.label ?? humanize(value);
 
@@ -91,9 +92,11 @@ const AddCareServiceSheet = ({
   const start = defaultPlacement(preset, data);
   const [name, setName] = useState(preset?.name ?? '');
   const [category, setCategory] = useState<CareCategory>(preset?.category ?? 'consultation');
+
   const [intakePolicy, setIntake] = useState<ServiceOffering['intakePolicy']>(
     preset?.intakePolicy ?? 'both',
   );
+
   const [visitTypes, setVisitTypes] = useState<VisitType[]>(preset?.visitTypes ?? ['general']);
   const [unitId, setUnit] = useState(start.unitId);
   const [locationId, setLocation] = useState(start.locationId);
@@ -103,18 +106,22 @@ const AddCareServiceSheet = ({
   const { verified } = useStaffVerification();
   const teams = routableTeams(data.units);
   const places = carePlaces(data.locations);
+
   const save = async () => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await addCareService(
         { key: preset?.key, name, category, intakePolicy, visitTypes, unitId, locationId },
         data,
         context,
       );
+
       toast(`${name.trim()} added`);
       onSaved();
       onClose();
@@ -124,6 +131,7 @@ const AddCareServiceSheet = ({
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title={preset ? `Add ${preset.name}` : 'Add a care service'}
@@ -225,30 +233,39 @@ export const CareServicesStep = ({ mode = 'setup' }: { mode?: 'setup' | 'setting
   const [editing, setEditing] = useState<AnyDocument>();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+
   // Keep the list on screen while it refreshes after a save; the placeholder is only for the first load.
   if (!query.data) {
     return <WorkspaceLoading error={query.error} reload={query.reload} />;
   }
+
   const data = query.data;
   const allowed = context.permissions.includes('service:manage');
+
   const services = careServiceOfferings(data.offerings, data.definitions).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
+
   const filtered = services.filter((o) =>
     o.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
+
   const categoryOf = (o: ServiceOffering): CareCategory =>
     data.definitions.find((d) => d.id === o.serviceDefinitionId)?.category ?? 'other';
+
   const groups = (Object.keys(CATEGORY_LABELS) as CareCategory[])
     .map((c) => ({ category: c, items: filtered.filter((o) => categoryOf(o) === c) }))
     .filter((g) => g.items.length);
+
   const place = (o: ServiceOffering) =>
     o.locationIds
       .map((id) => data.locations.find((l) => l.id === id)?.name)
       .filter(Boolean)
       .join(', ');
+
   const team = (o: ServiceOffering) =>
     data.units.find((u) => u.id === o.unitId || u.unitId === o.unitId)?.name;
+
   const available = CARE_SERVICE_PRESETS.filter((p) => !existingCareService(p, data));
 
   const renderServicesSummary = () => {
@@ -349,6 +366,7 @@ export const CareServicesStep = ({ mode = 'setup' }: { mode?: 'setup' | 'setting
               <ul className="mt-1 divide-y divide-outline-soft rounded-field border border-outline-soft">
                 {group.items.map((o) => {
                   const status = careServiceStatus(o, data);
+
                   return (
                     <li
                       key={o.id}

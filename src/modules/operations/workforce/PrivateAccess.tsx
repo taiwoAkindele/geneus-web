@@ -8,6 +8,7 @@ import {
   verifyWorkforceCode,
   clearPrivateWorkforce,
 } from '@/lib/api/workforce';
+
 export const PrivateAccess = ({ children }: { children: ReactNode }) => {
   const context = useAuthorizationContext();
   const [ready, setReady] = useState(() => privateAccessValid(context));
@@ -19,6 +20,7 @@ export const PrivateAccess = ({ children }: { children: ReactNode }) => {
     if (!ready) {
       return;
     }
+
     const timer = setTimeout(
       () => {
         clearPrivateWorkforce();
@@ -27,11 +29,14 @@ export const PrivateAccess = ({ children }: { children: ReactNode }) => {
       },
       Math.max(0, Date.parse(privateAccessExpires(context) || '') - Date.now()),
     );
+
     return () => clearTimeout(timer);
   }, [ready, context.userId]);
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError('');
+
     try {
       await action();
     } catch (cause) {
@@ -40,9 +45,11 @@ export const PrivateAccess = ({ children }: { children: ReactNode }) => {
       setBusy(false);
     }
   };
+
   if (ready) {
     return <>{children}</>;
   }
+
   return (
     <section className="space-y-3 rounded-field border border-outline-soft bg-white p-4">
       <p className="text-sm text-ink-muted">

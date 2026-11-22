@@ -8,11 +8,13 @@ import {
 import { SelectField, TextField } from '@/ui';
 import { zonedInput, zonedInstant, showInterval } from '@/lib/workforceTime';
 import { useWorkforce } from './useWorkforce';
+
 export type AllocationProposal = {
   allocation?: AppointmentAllocation;
   scheduledFor?: string;
   error?: string;
 };
+
 export const AllocationFields = ({
   start,
   startInstant,
@@ -33,9 +35,11 @@ export const AllocationFields = ({
   const [assignment, setAssignment] = useState(initial?.assignmentId || '');
   const [end, setEnd] = useState('');
   const [places, setPlaces] = useState<string[]>(initial?.locations.map((l) => l.locationId) || []);
+
   const [units, setUnits] = useState<Record<string, string>>(
     Object.fromEntries(initial?.locations.map((l) => [l.locationId, String(l.units)]) || []),
   );
+
   const data = query.data;
   const offering = data?.offerings.find((o) => o.id === service);
   const zone = offering?.timeZone || 'Africa/Lagos';
@@ -44,26 +48,34 @@ export const AllocationFields = ({
       setEnd(zonedInput(initial.endsAt, zone));
     }
   }, [offering?.id, offering?.timeZone]);
+
   useEffect(() => {
     if (!service) {
       onChange({});
+
       return;
     }
+
     try {
       if (!data || !offering) {
         throw new Error('Wait for service records to load');
       }
+
       if (!start && !startInstant) {
         throw new Error('Choose the appointment date and time first');
       }
+
       const scheduledFor = startInstant || zonedInstant(start, zone);
       const endsAt = zonedInstant(end, zone);
+
       const person = effectiveFacilityRevisions(data.assignments, Date.parse(scheduledFor)).find(
         (a) => a.assignmentId === assignment && a.offeringId === service && a.status === 'active',
       );
+
       if (assignment && !person) {
         throw new Error('Choose an effective active practitioner assignment');
       }
+
       onChange({
         scheduledFor,
         allocation: {
@@ -84,6 +96,7 @@ export const AllocationFields = ({
       });
     }
   }, [start, startInstant, service, session, assignment, end, places, units, data, zone]);
+
   return (
     <section className="space-y-3 rounded-field border border-outline-soft p-3">
       <h3 className="font-bold">Service and resources</h3>

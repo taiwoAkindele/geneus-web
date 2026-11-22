@@ -33,10 +33,13 @@ export const WardDischargeSheet = ({
   const { facility } = useDeviceContext();
   const { data, setData, ctl } = useWardForm();
   const original = records.admissions.find((e) => e.id === session.admissionId)!;
+
   const sources = effectiveEncounterEntries(records.entries).filter(
     (e) => e.encounterId !== session.id,
   );
+
   const prior = previous?.values.kind === 'discharge' ? previous.values : undefined;
+
   const [form, setForm] = useState(() => ({
     admissionReason:
       prior?.admissionReason ??
@@ -63,48 +66,59 @@ export const WardDischargeSheet = ({
       records.encounters
         .flatMap((encounter) => {
           const care = records.entries.filter((e) => e.encounterId === encounter.id);
+
           const tests = care
             .filter((e) => e.step === 'lab_order')
             .flatMap((e) => e.values.tests as string[]);
+
           const done = new Set(
             care
               .filter((e) => e.step === 'lab_results')
               .flatMap((e) => (e.values.results as { test: string }[]).map((r) => r.test)),
           );
+
           return tests.filter((test) => !done.has(test)).map((test) => 'Pending result: ' + test);
         })
         .join('\n'),
     instructions: prior?.instructions ?? '',
     followUpOn: prior?.followUpOn ?? '',
   }));
+
   const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [baseSummaryId, setBaseSummaryId] = useState(previous?.id);
+
   const [sourceEntryIds, setSourceEntryIds] = useState(() =>
     records.entries.filter((e) => e.encounterId !== session.id).map((e) => e.id),
   );
+
   const [sourceWardEventIds, setSourceWardEventIds] = useState(() =>
     records.events
       .filter((e) => e.values.kind === 'medication' || e.values.kind === 'administration')
       .map((e) => e.id),
   );
+
   const newEntries = records.entries.filter(
     (e) => e.encounterId !== session.id && !sourceEntryIds.includes(e.id),
   );
+
   const newMedication = records.events.filter(
     (e) =>
       ['medication', 'administration'].includes(e.values.kind) &&
       !sourceWardEventIds.includes(e.id),
   );
+
   const sourceChanged =
     baseSummaryId !== previous?.id || newEntries.length > 0 || newMedication.length > 0;
+
   const owner = {
     staffId: context.userId!,
     patientId: session.patientId,
     encounterKey: `ward-discharge:${session.admissionId}`,
   };
+
   const busy = useRef(false);
   const latest = useRef({ form, data, baseSummaryId, sourceEntryIds, sourceWardEventIds });
   latest.current = { form, data, baseSummaryId, sourceEntryIds, sourceWardEventIds };
@@ -114,6 +128,7 @@ export const WardDischargeSheet = ({
       .then((drafts) => {
         const saved = drafts.find((d) => d.step === 'summary')?.data as
           typeof latest.current | undefined;
+
         if (active && saved) {
           setForm(saved.form);
           setData(saved.data);
@@ -121,52 +136,66 @@ export const WardDischargeSheet = ({
           setSourceEntryIds(saved.sourceEntryIds ?? []);
           setSourceWardEventIds(saved.sourceWardEventIds ?? []);
         }
+
         if (active) {
           setReady(true);
         }
       })
       .catch(() => setError('The discharge draft could not be restored. Close and retry.'));
+
     return () => {
       active = false;
     };
   }, [session.admissionId]);
+
   useEffect(() => {
     if (!ready) {
       return;
     }
+
     const timer = window.setTimeout(() => {
       void writeDraft(owner, 'summary', latest.current).catch(() =>
         setError('The private discharge draft could not be saved'),
       );
     }, 250);
+
     return () => window.clearTimeout(timer);
   }, [form, data, ready, baseSummaryId, sourceEntryIds, sourceWardEventIds]);
+
   const close = async () => {
     try {
       if (ready) {
         await writeDraft(owner, 'summary', latest.current);
       }
+
       onClose();
     } catch {
       setError('The private draft could not be saved. Keep this form open.');
     }
   };
+
   const save = async () => {
     if (busy.current || !ready) {
       return;
     }
+
     if (sourceChanged) {
       setError(
         'Care or the signed summary changed. Review the new information before signing this draft.',
       );
+
       return;
     }
+
     setError('');
     const issues = stepProblems('prescription', data);
+
     if (issues.length) {
       setError('Review take-home medicines: ' + issues.join('. '));
+
       return;
     }
+
     if (
       !form.admissionReason.trim() ||
       !form.diagnoses.trim() ||
@@ -174,14 +203,19 @@ export const WardDischargeSheet = ({
       !form.instructions.trim()
     ) {
       setError('Complete the admission reason, diagnoses, care summary and discharge instructions');
+
       return;
     }
+
     if (!reviewing) {
       setReviewing(true);
+
       return;
     }
+
     busy.current = true;
     setSaving(true);
+
     try {
       const takeHome = toStepValues('prescription', data).prescription;
       await saveWardEvent(
@@ -207,6 +241,7 @@ export const WardDischargeSheet = ({
             : undefined,
         },
       );
+
       await discardDraft(owner, 'summary');
       onSaved();
       onClose();
@@ -219,6 +254,7 @@ export const WardDischargeSheet = ({
       setSaving(false);
     }
   };
+
   const renderSheetBody = () => {
     if (!ready) {
       return <p role="status">Restoring private draft…</p>;
@@ -355,11 +391,13 @@ export const WardDischargeSheet = ({
                 setSourceEntryIds(
                   records.entries.filter((e) => e.encounterId !== session.id).map((e) => e.id),
                 );
+
                 setSourceWardEventIds(
                   records.events
                     .filter((e) => ['medication', 'administration'].includes(e.values.kind))
                     .map((e) => e.id),
                 );
+
                 setReviewing(false);
               }}
             >

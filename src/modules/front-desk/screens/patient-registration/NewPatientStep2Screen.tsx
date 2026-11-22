@@ -8,5 +8,6 @@ import type { RegistrationNavState } from '@/modules/front-desk/registration';
  */
 export const NewPatientStep2Screen = () => {
   const state = (useLocation().state as RegistrationNavState) ?? {};
+
   return <Navigate to="/patients/new" state={state} replace />;
 };

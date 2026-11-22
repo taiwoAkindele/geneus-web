@@ -35,14 +35,17 @@ const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
 export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
   const kinds = fieldKindsFor(type);
   const row: Row = {};
+
   for (const [field, value] of Object.entries(record)) {
     if (field === 'type') {
       continue;
     }
+
     if (value === undefined || value === null) {
       row[field] = null;
       continue;
     }
+
     switch (kinds[field]) {
       case 'boolean':
         row[field] = value ? 1 : 0;
@@ -54,6 +57,7 @@ export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
         row[field] = value;
     }
   }
+
   return row;
 };
 
@@ -65,17 +69,21 @@ export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
 export const decodeValues = (type: DocType, row: Row): Record<string, unknown> => {
   const kinds = fieldKindsFor(type);
   const record: Record<string, unknown> = {};
+
   for (const [field, value] of Object.entries(row)) {
     if (value === null || value === undefined) {
       if (value === null && CLEARABLE[type]?.includes(field)) {
         record[field] = null;
       }
+
       continue;
     }
+
     // PowerSync's own columns (`_metadata`) are not part of the record.
     if (field.startsWith('_')) {
       continue;
     }
+
     switch (kinds[field]) {
       case 'boolean':
         record[field] = value === 1 || value === true || value === '1';
@@ -90,6 +98,7 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
         record[field] = value;
     }
   }
+
   return record;
 };
 
@@ -106,13 +115,17 @@ export const fromRow = <T extends AnyDocument>(type: DocType, row: Row): T => {
     ),
     type,
   };
+
   const parsed = parseDocument(decoded);
+
   if (!parsed.success) {
     console.warn(
       `record ${String(row.id)} in ${type} does not match the contract`,
       parsed.error.issues,
     );
+
     return decoded as T;
   }
+
   return { ...decoded, ...(parsed.data as object) } as T;
 };

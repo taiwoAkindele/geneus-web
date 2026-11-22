@@ -20,6 +20,7 @@ import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
 
 import type { CoverFieldsValue } from '@/modules/finance/insurance';
+
 /** `visit` is the booking chosen on the form; registering as a new person keeps it. */
 export type DuplicateNavState = {
   matchIds: string[];
@@ -73,14 +74,17 @@ const DuplicateCheck = () => {
   const candidates = (patients.data ?? []).filter((patient) =>
     state.matchIds.includes(patient.patientId),
   );
+
   const matches = findLikelyMatches(toPatientDetails(values), candidates);
   const match = matches[Math.min(index, matches.length - 1)];
 
   const registerAsNew = async () => {
     if (saving || reason.trim().length < 3) {
       setError('Explain why this is a different person or why review is needed');
+
       return;
     }
+
     setSaving(true);
     await savePatient(
       values,
@@ -93,6 +97,7 @@ const DuplicateCheck = () => {
       state.visit,
       state.cover,
     );
+
     setSaving(false);
   };
 
@@ -100,8 +105,10 @@ const DuplicateCheck = () => {
     if (!match || saving) {
       return;
     }
+
     setSaving(true);
     setError('');
+
     try {
       await recordExistingSelection(match.patient.patientId, context);
       await clearDraft();
@@ -117,6 +124,7 @@ const DuplicateCheck = () => {
   };
 
   const typedAge = values.age || (values.dateOfBirth ? `born ${values.dateOfBirth}` : '—');
+
   const comparison = match
     ? [
         { label: 'Name', typed: values.fullName, registered: match.patient.fullName },

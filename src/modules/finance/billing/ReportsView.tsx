@@ -10,19 +10,25 @@ import { FinancialSnapshotReport } from './FinancialSnapshotReport';
 import { FilterChip, PageHeader, displayMoney } from './billingUi';
 
 type Period = 'today' | 'week' | 'month' | 'all' | 'custom';
+
 const range = (period: Period, now = new Date()): [string, string] => {
   const today = calendarDate(now);
+
   if (period === 'today') {
     return [today, today];
   }
+
   if (period === 'week') {
     const start = new Date(now);
     start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+
     return [calendarDate(start), today];
   }
+
   if (period === 'month') {
     return [calendarDate(new Date(now.getFullYear(), now.getMonth(), 1)), today];
   }
+
   return ['', ''];
 };
 
@@ -33,11 +39,14 @@ export const ReportsView = ({ data }: { data: BillingData }) => {
   const [customTo, setTo] = useState('');
   const [currencyChoice, setCurrency] = useState('');
   const [from, to] = period === 'custom' ? [customFrom, customTo] : range(period);
+
   const currencies = [
     ...new Set([...data.payments.map((p) => p.currency), ...data.charges.map((c) => c.currency)]),
   ].sort();
+
   const currency = currencies.includes(currencyChoice) ? currencyChoice : (currencies[0] ?? 'NGN');
   const money = (n: number) => displayMoney(n, currency);
+
   const allocations = collectionAllocations(data, {
     currency,
     from,
@@ -45,35 +54,44 @@ export const ReportsView = ({ data }: { data: BillingData }) => {
     departmentId: '',
     search: '',
   });
+
   const received = (test: (category: string, actor: string, method: string) => boolean) =>
     allocations.reduce(
       (n, a) =>
         n + (test(a.charge.category, a.payment.createdBy, a.payment.method) ? a.amountMinor : 0),
       0,
     );
+
   const refunds = (data.insurance?.refunds ?? []).filter(
     (r) =>
       r.currency === currency &&
       (!from || calendarDate(r.createdOn) >= from) &&
       (!to || calendarDate(r.createdOn) <= to),
   );
+
   const refunded = (id?: string) =>
     refunds.filter((r) => !id || r.createdBy === id).reduce((n, r) => n + r.amountMinor, 0);
+
   const cash = received((_c, _a, m) => m === 'cash');
   const bank = received((_c, _a, m) => m === 'transfer');
   const paymentCount = new Set(allocations.map((a) => a.payment.id)).size;
+
   const byCategory = FeeCategory.options
     .map((c) => ({ c, amount: received((category) => category === c) }))
     .filter((x) => x.amount)
     .sort((a, b) => b.amount - a.amount);
+
   const top = Math.max(1, ...byCategory.map((x) => x.amount));
+
   const people = [
     ...new Set([
       ...allocations.map((a) => a.payment.createdBy),
       ...refunds.map((r) => r.createdBy),
     ]),
   ];
+
   const staff = (id: string) => data.staff.find((s) => s.staffId === id)?.fullName ?? id;
+
   const tiles = [
     {
       label: 'Received',

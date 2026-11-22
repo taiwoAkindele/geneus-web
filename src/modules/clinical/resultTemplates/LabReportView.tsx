@@ -19,12 +19,14 @@ const FLAG_STYLE: Record<ResultFlag, string> = {
   critically_high: 'bg-danger-bg text-danger-strong',
   critically_low: 'bg-danger-bg text-danger-strong',
 };
+
 const ARROW: Partial<Record<ResultFlag, string>> = {
   high: '↑',
   critically_high: '↑↑',
   low: '↓',
   critically_low: '↓↓',
 };
+
 export const FlagTag = ({ flag }: { flag?: ResultFlag }) =>
   flag ? (
     <span
@@ -39,6 +41,7 @@ export const FlagTag = ({ flag }: { flag?: ResultFlag }) =>
 
 const tabular = (value: ReportValue) =>
   value.kind === 'number' || value.kind === 'choice' || value.kind === 'text';
+
 /** The value as it reads in the results table; other kinds are shown below the table. */
 const shown = (value: ReportValue): string => {
   switch (value.kind) {
@@ -106,6 +109,7 @@ const CultureResult = ({ value }: { value: Extract<ReportValue, { kind: 'culture
 /** How many values were recorded and how many the scientist flagged, for the publish confirmation. */
 export const reportCounts = (report: LabReport) => {
   const values = report.items.flatMap((item) => item.values);
+
   return {
     values: values.length,
     flagged: values.filter((value) => 'flag' in value && value.flag).length,
@@ -143,6 +147,7 @@ export const LabReportView = ({
     {report.items.map((item) => {
       const rows = item.values.filter(tabular);
       const other = item.values.filter((value) => !tabular(value));
+
       return (
         <section key={item.orderItemId ?? item.test} aria-label={item.test} className="space-y-3">
           <h3 className="text-xl font-extrabold">{item.test}</h3>

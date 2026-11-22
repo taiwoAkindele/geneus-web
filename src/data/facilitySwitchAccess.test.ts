@@ -12,21 +12,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
   resetSecureStorageForTests();
 });
+
 it('provisioning and enrollment alone do not initialize a destination PIN or bypass destination sign-in', async () => {
   vi.stubGlobal('localStorage', memoryStorage());
   resetSecureStorageForTests();
+
   const source = {
     facilityId: 'A',
     deviceId: 'device:A',
     credential: 'device:A.synthetic',
     syncEndpoint: 'http://sync',
   };
+
   const target = {
     facilityId: 'B',
     deviceId: 'device:B',
     credential: 'device:B.synthetic',
     syncEndpoint: 'http://sync',
   };
+
   await saveDeviceCredential(source);
   await ensureFacilityWorkspace(source);
   await secureSet(
@@ -35,6 +39,7 @@ it('provisioning and enrollment alone do not initialize a destination PIN or byp
       'staff:A': { salt: 'synthetic', hash: 'synthetic', iterations: 100000, digits: 6 },
     }),
   );
+
   localStorage.setItem('geneus.signedInStaffId', 'staff:A');
   localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
   setDatabaseForTests(fakeDatabase());
@@ -47,6 +52,7 @@ it('provisioning and enrollment alone do not initialize a destination PIN or byp
         Promise.resolve(callback({})),
     },
   });
+
   await switchFacilityWorkspace(target.deviceId, target, {
     sourceStaffId: 'staff:A',
     facilityId: 'B',
@@ -55,6 +61,7 @@ it('provisioning and enrollment alone do not initialize a destination PIN or byp
     personId: 'person:linked',
     createdOn: Date.now(),
   });
+
   expect(secureGet('geneus.credentials')).toBeNull();
   expect(pendingFacilityIdentity()).toBeUndefined();
   expect(localStorage.getItem('geneus.signedInStaffId')).toBeNull();

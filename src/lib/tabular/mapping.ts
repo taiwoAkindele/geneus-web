@@ -13,7 +13,9 @@ export type FieldSpec = {
   synonyms: readonly string[];
   help?: string;
 };
+
 export type ColumnMapping = Record<string, number>;
+
 export type MappedRow = { sourceRow: number; values: Record<string, string> };
 
 export const normalizeHeader = (value: string) =>
@@ -23,18 +25,23 @@ export const normalizeHeader = (value: string) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+
 const columnLetter = (index: number): string =>
   (index >= 26 ? columnLetter(Math.floor(index / 26) - 1) : '') +
   String.fromCharCode(65 + (index % 26));
+
 export const columnName = (index: number, header?: string) =>
   `Column ${columnLetter(index)}${header ? `: ${header}` : ''}`;
 
 const headerScore = (header: string, field: FieldSpec): number => {
   const h = normalizeHeader(header);
+
   if (!h) {
     return 0;
   }
+
   let best = 0;
+
   for (const synonym of field.synonyms.map(normalizeHeader)) {
     if (h === synonym) {
       best = Math.max(best, 3);
@@ -44,6 +51,7 @@ const headerScore = (header: string, field: FieldSpec): number => {
       best = Math.max(best, 1);
     }
   }
+
   return best;
 };
 
@@ -53,18 +61,23 @@ export const detectHeaderRow = (
   fields: readonly FieldSpec[],
 ): number => {
   let best = { row: -1, score: 0 };
+
   for (let r = 0; r < Math.min(rows.length, 20); r++) {
     const cells = rows[r] ?? [];
+
     const matches = fields.reduce(
       (n, field) => n + (cells.some((c) => headerScore(c, field) > 0) ? 1 : 0),
       0,
     );
+
     const text = cells.filter((c) => c && !/^[\d.,\s₦$-]+$/.test(c)).length;
     const score = matches * 10 + Math.min(text, 5);
+
     if (matches > 0 && score > best.score) {
       best = { row: r, score };
     }
   }
+
   return best.row >= 0
     ? best.row
     : Math.max(
@@ -88,14 +101,17 @@ export const suggestMapping = (
     )
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score || a.column - b.column);
+
   const mapping: ColumnMapping = {};
   const used = new Set<number>();
+
   for (const c of candidates) {
     if (!(c.field in mapping) && !used.has(c.column)) {
       mapping[c.field] = c.column;
       used.add(c.column);
     }
   }
+
   return mapping;
 };
 
@@ -105,6 +121,7 @@ export const templateFits = (
   rows: readonly (readonly string[])[],
 ): boolean => {
   const headers = (rows[template.headerRow] ?? []).map(normalizeHeader);
+
   return Object.values(template.mapping).every(
     (column) => headers[column] !== undefined && headers[column] === template.headers[column],
   );

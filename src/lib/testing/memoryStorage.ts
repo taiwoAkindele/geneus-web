@@ -1,6 +1,7 @@
 /** localStorage as the browser gives it, for tests in Node, which has none. */
 export const memoryStorage = (): Storage => {
   const items = new Map<string, string>();
+
   return {
     get length() {
       return items.size;

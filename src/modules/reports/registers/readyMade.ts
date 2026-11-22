@@ -20,6 +20,7 @@ const fromVisit = (
   required: false,
   fromVisit: { fact, ...(words ? { words } : {}) },
 });
+
 const asked = (
   field: Omit<RegisterFieldDef, 'required'> & { required?: boolean },
 ): RegisterFieldDef => ({ required: false, ...field });

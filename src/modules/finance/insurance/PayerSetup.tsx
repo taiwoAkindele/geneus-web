@@ -16,9 +16,10 @@ import {
   saveSubmissionProfile,
   uploadInsuranceDocument,
   verifyInsuranceDocument,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { useAuthorizationContext } from '@/session';
+
 type SubmissionChannel = (typeof SubmissionChannel.options)[number];
 type ClaimFormat = (typeof ClaimFormat.options)[number];
 import { Button, SelectField, TextAreaField, TextField, useToast } from '@/ui';
@@ -40,6 +41,7 @@ export const DOCUMENT_LABELS: Record<InsuranceDocumentType, string> = {
   payer_decision: 'Payer decision',
   dispute_correspondence: 'Dispute correspondence',
 };
+
 export const DIAGNOSIS_REQUIREMENT_LABELS: Record<
   SubmissionProfile['diagnosisRequirement'],
   string
@@ -49,18 +51,22 @@ export const DIAGNOSIS_REQUIREMENT_LABELS: Record<
   free_text: 'Written diagnosis accepted',
   not_required: 'Not required',
 };
+
 const CHANNEL_LABELS: Record<SubmissionChannel, string> = {
   portal: 'HMO portal',
   email: 'Email',
   physical: 'Physical delivery',
   other: 'Other',
 };
+
 const FORMAT_LABELS: Record<ClaimFormat, string> = {
   csv: 'CSV',
   xlsx: 'Excel',
   pdf: 'Printed / PDF',
 };
+
 const ACCEPT = 'application/pdf,image/png,image/jpeg';
+
 const size = (bytes: number) =>
   bytes >= 1024 * 1024
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -83,10 +89,13 @@ const VERIFICATION_LABELS: Record<string, string> = {
 
 export const PayerSetup = ({ payer }: { payer: Payer }) => {
   const context = useAuthorizationContext();
+
   if (!context.permissions.includes('insurance_contract:read')) {
     return null;
   }
+
   const canManage = context.permissions.includes('insurance_contract:manage');
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Documents payer={payer} canManage={canManage} />
@@ -103,21 +112,26 @@ const Documents = ({ payer, canManage }: { payer: Payer; canManage: boolean }) =
   const [adding, setAdding] = useState<{ replaces?: InsuranceDocument }>();
   const [rejecting, setRejecting] = useState<InsuranceDocument>();
   const [reason, setReason] = useState('');
+
   const load = useCallback(async () => {
     try {
       setDocuments((await listInsuranceDocuments(context, payer.id)).documents);
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context, payer.id]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const replaced = new Set((documents ?? []).map((d) => d.replaces).filter(Boolean));
+
   const current = (documents ?? [])
     .filter((d) => !replaced.has(d.id))
     .sort((a, b) => a.documentType.localeCompare(b.documentType));
+
   const review = async (
     d: InsuranceDocument,
     verification: 'verified' | 'rejected',
@@ -130,9 +144,10 @@ const Documents = ({ payer, canManage }: { payer: Payer; canManage: boolean }) =
       setReason('');
       await load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   };
+
   const renderDocuments = () => {
     if (!documents) {
       return (
@@ -172,7 +187,7 @@ const Documents = ({ payer, canManage }: { payer: Payer; canManage: boolean }) =
                 fullWidth={false}
                 onClick={() => {
                   downloadInsuranceDocument(context, d).catch((cause) =>
-                    setError(describeInsuranceError(cause)),
+                    setError(describeStaffActionError(cause)),
                   );
                 }}
               >
@@ -207,6 +222,7 @@ const Documents = ({ payer, canManage }: { payer: Payer; canManage: boolean }) =
                 className="mt-2 space-y-2"
                 onSubmit={(e) => {
                   e.preventDefault();
+
                   if (reason.trim()) {
                     void review(d, 'rejected', reason);
                   }
@@ -263,6 +279,7 @@ const Documents = ({ payer, canManage }: { payer: Payer; canManage: boolean }) =
           replaces={adding.replaces}
           onDone={(saved) => {
             setAdding(undefined);
+
             if (saved) {
               toast(`${saved.title} uploaded.`);
               void load();
@@ -291,21 +308,29 @@ const UploadForm = ({
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const submit = async () => {
     if (!title.trim()) {
       setError('Give the document a title');
+
       return;
     }
+
     if (!file) {
       setError('Choose a file');
+
       return;
     }
+
     if (file.size > DOCUMENT_MAX_BYTES) {
       setError('Choose a PDF or image up to 10 MB');
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       onDone(
         await uploadInsuranceDocument(context, file, {
@@ -319,11 +344,12 @@ const UploadForm = ({
         }),
       );
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <form
       aria-label="Upload document"
@@ -391,21 +417,26 @@ const Submission = ({ payer, canManage }: { payer: Payer; canManage: boolean }) 
   const [stored, setStored] = useState<StoredSubmissionProfile | null>();
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
+
   const load = useCallback(async () => {
     try {
       setStored(
         (await listSubmissionProfiles(context)).profiles.find((p) => p.payerId === payer.id) ??
           null,
       );
+
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context, payer.id]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const p = stored?.profile;
+
   const renderSubmissionProfile = () => {
     if (stored === undefined) {
       return (
@@ -512,6 +543,7 @@ const Submission = ({ payer, canManage }: { payer: Payer; canManage: boolean }) 
           stored={stored ?? undefined}
           onDone={(saved) => {
             setEditing(false);
+
             if (saved) {
               toast('Submission method saved.');
               void load();
@@ -541,16 +573,21 @@ const SubmissionForm = ({
   const [deadlineDays, setDeadlineDays] = useState(p?.deadlineDays ? String(p.deadlineDays) : '');
   const [instructions, setInstructions] = useState(p?.instructions ?? '');
   const [attachments, setAttachments] = useState<string[]>(p?.requiredAttachments ?? []);
+
   const [diagnosis, setDiagnosis] = useState<SubmissionProfile['diagnosisRequirement']>(
     p?.diagnosisRequirement ?? 'codes_verified',
   );
+
   const [codeSystem, setCodeSystem] = useState(p?.diagnosisCodeSystem ?? 'ICD-10');
+
   const [paymentDueDays, setPaymentDueDays] = useState(
     p?.paymentDueDays ? String(p.paymentDueDays) : '',
   );
+
   const [referral, setReferral] = useState(p?.referralRequired ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const submit = async () => {
     const parsed = SubmissionProfile.safeParse({
       method: 'manual',
@@ -566,21 +603,26 @@ const SubmissionForm = ({
       referralRequired: referral,
       ...(paymentDueDays ? { paymentDueDays: Number(paymentDueDays) } : {}),
     });
+
     if (!parsed.success) {
       setError(parsed.error.issues.map((i) => i.message).join('; '));
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await saveSubmissionProfile(context, payer.id, parsed.data, stored?.revision);
       onDone(true);
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <form
       aria-label="Submission method"

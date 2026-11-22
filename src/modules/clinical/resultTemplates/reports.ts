@@ -12,8 +12,10 @@ export const effectiveLabReport = (
   const corrections = entries.filter(
     (e) => e.step === 'amendment' && e.amends === entry.id && e.values.correctedValues,
   );
+
   const replaced = new Set(corrections.map((e) => e.values.previousAmendmentId));
   const latest = corrections.find((e) => !replaced.has(e.id));
+
   return latest ? latest.labReport : entry.labReport;
 };
 

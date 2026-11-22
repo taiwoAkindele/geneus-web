@@ -3,7 +3,7 @@ import type { Facility } from '@shared';
 import { useLiveQuery } from '@/data';
 import { findRecord } from '@/data/db';
 import { saveTimeZone, timeZoneHistory, type TimeZoneChange } from '@/lib/api/selfService';
-import { describeInsuranceError } from '@/lib/api/insurance';
+import { describeStaffActionError } from '@/lib/api/insurance';
 import { useAuthorizationContext, StaffVerification } from '@/session';
 import { Button, SelectField, TextAreaField, useToast } from '@/ui';
 import { timeZoneOptions } from '@/lib/timeZoneOptions';
@@ -16,12 +16,15 @@ import { timeZoneOptions } from '@/lib/timeZoneOptions';
  */
 export const FacilitySettings = () => {
   const context = useAuthorizationContext();
+
   const facility = useLiveQuery(
     useCallback(() => findRecord<Facility>('facility', context.facilityId), [context.facilityId]),
     ['facility'],
   ).data;
+
   const isAdmin =
     context.role === 'facility_admin' || Boolean(context.roles?.includes('facility_admin'));
+
   return (
     <section aria-label="Facility settings" className="space-y-4">
       <div className="rounded-card border border-outline-soft bg-white p-5">
@@ -62,6 +65,7 @@ const TimeZoneForm = ({ current }: { current?: string }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [changes, setChanges] = useState<TimeZoneChange[]>([]);
+
   const load = useCallback(
     () =>
       timeZoneHistory(context).then(
@@ -70,19 +74,24 @@ const TimeZoneForm = ({ current }: { current?: string }) => {
       ),
     [context],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
   useEffect(() => {
     if (current) {
       setZone(current);
     }
   }, [current]);
+
   const options = useMemo(() => timeZoneOptions(current), [current]);
   const correcting = Boolean(current) && zone !== current;
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       const result = await saveTimeZone(context, zone, correcting ? reason : undefined);
       toast(
@@ -90,15 +99,17 @@ const TimeZoneForm = ({ current }: { current?: string }) => {
           ? `Time zone set to ${result.timeZone}. It reaches every device with the next sync.`
           : 'No change.',
       );
+
       setConfirmed(false);
       setReason('');
       void load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <form
       aria-label="Time zone"

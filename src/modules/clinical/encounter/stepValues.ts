@@ -17,7 +17,9 @@ const bloodPressure = (bp: string): { systolicMmHg?: number; diastolicMmHg?: num
   if (!bp.trim()) {
     return {};
   }
+
   const match = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(bp.trim());
+
   return match
     ? { systolicMmHg: Number(match[1]), diastolicMmHg: Number(match[2]) }
     : { systolicMmHg: Number.NaN };
@@ -47,6 +49,7 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         ...Object.fromEntries(
           ['historyOfPresentIllness', 'examination', 'assessment', 'plan'].flatMap((key) => {
             const value = data.complaint[key as keyof EncounterData['complaint']];
+
             return value?.trim() ? [[key, value.trim()]] : [];
           }),
         ),
@@ -108,6 +111,7 @@ export const toStepValues = (key: StepKey, data: EncounterData): Record<string, 
         results: data.lab_order.tests
           .map((test, index) => {
             const item = data.lab_order.items?.[index];
+
             return {
               test,
               result: data.lab_results[item?.id ?? test]?.trim() ?? '',
@@ -207,18 +211,23 @@ const FIELD_LABEL: Record<string, string> = {
  */
 export const stepProblems = (key: StepKey, data: EncounterData): string[] => {
   const parsed = ENCOUNTER_STEP_VALUES[key].safeParse(toStepValues(key, data));
+
   if (parsed.success) {
     return [];
   }
+
   const problems = parsed.error.issues.map((issue) => {
     if (issue.code === 'custom') {
       return issue.message;
     }
+
     const field = [...issue.path]
       .reverse()
       .find((part): part is string => typeof part === 'string' && part in FIELD_LABEL);
+
     return field ? `Check ${FIELD_LABEL[field]}` : issue.message;
   });
+
   return [...new Set(problems)];
 };
 
@@ -229,13 +238,16 @@ export const fromStepValues = (
   data: EncounterData,
 ): EncounterData => {
   const shown = (value: number | undefined) => (value === undefined ? '' : String(value));
+
   switch (key) {
     case 'vitals': {
       const v = ENCOUNTER_STEP_VALUES.vitals.parse(values) as EncounterStepValues['vitals'];
+
       const bp =
         v.systolicMmHg !== undefined && v.diastolicMmHg !== undefined
           ? `${v.systolicMmHg}/${v.diastolicMmHg}`
           : '';
+
       return {
         ...data,
         vitals: {
@@ -249,8 +261,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'complaint': {
       const v = ENCOUNTER_STEP_VALUES.complaint.parse(values) as EncounterStepValues['complaint'];
+
       return {
         ...data,
         complaint: {
@@ -265,16 +279,22 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'result_review': {
       const v = ENCOUNTER_STEP_VALUES.result_review.parse(values);
+
       return { ...data, result_review: { ...v, note: v.note ?? '' } };
     }
+
     case 'investigation_review': {
       const v = ENCOUNTER_STEP_VALUES.investigation_review.parse(values);
+
       return { ...data, investigation_review: { ...v, reason: v.reason ?? '' } };
     }
+
     case 'prescription': {
       const v = ENCOUNTER_STEP_VALUES.prescription.parse(values);
+
       return {
         ...data,
         prescription: {
@@ -303,8 +323,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'injection_order': {
       const v = ENCOUNTER_STEP_VALUES.injection_order.parse(values);
+
       return {
         ...data,
         injection_order: {
@@ -316,8 +338,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'disposition': {
       const v = ENCOUNTER_STEP_VALUES.disposition.parse(values);
+
       return {
         ...data,
         disposition: {
@@ -331,10 +355,13 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'lab_order':
       return { ...data, lab_order: ENCOUNTER_STEP_VALUES.lab_order.parse(values) };
+
     case 'lab_results': {
       const v = ENCOUNTER_STEP_VALUES.lab_results.parse(values);
+
       return {
         ...data,
         lab_results: {
@@ -343,8 +370,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'diagnosis': {
       const v = ENCOUNTER_STEP_VALUES.diagnosis.parse(values) as EncounterStepValues['diagnosis'];
+
       return {
         ...data,
         diagnosis: {
@@ -372,8 +401,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'injection': {
       const v = ENCOUNTER_STEP_VALUES.injection.parse(values);
+
       return {
         ...data,
         injection: {
@@ -385,8 +416,10 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'dispense': {
       const v = ENCOUNTER_STEP_VALUES.dispense.parse(values);
+
       return {
         ...data,
         dispense: {
@@ -395,12 +428,16 @@ export const fromStepValues = (
         },
       };
     }
+
     case 'admission': {
       const v = ENCOUNTER_STEP_VALUES.admission.parse(values);
+
       return { ...data, admission: { ward: v.ward, bed: v.bed ?? '', note: v.note ?? '' } };
     }
+
     case 'follow_up': {
       const v = ENCOUNTER_STEP_VALUES.follow_up.parse(values);
+
       return { ...data, follow_up: { when: v.followUpOn ?? '', reason: v.reason ?? '' } };
     }
   }

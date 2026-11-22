@@ -20,10 +20,13 @@ export const saveDeviceCredential = (credential: DeviceCredential): Promise<void
 
 export const getDeviceCredential = (): DeviceCredential | undefined => {
   const raw = secureGet(CREDENTIAL_KEY);
+
   if (!raw) {
     return undefined;
   }
+
   const parsed = DeviceCredential.safeParse(JSON.parse(raw));
+
   return parsed.success ? parsed.data : undefined;
 };
 
@@ -41,6 +44,7 @@ export const recordServerContact = (serverTime: string, expectedDeviceId?: strin
   if (expectedDeviceId && getDeviceCredential()?.deviceId !== expectedDeviceId) {
     return;
   }
+
   void secureSet(LAST_CONTACT_KEY, serverTime);
 };
 

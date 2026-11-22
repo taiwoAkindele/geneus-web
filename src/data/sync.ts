@@ -30,6 +30,7 @@ const preparedListeners = new WeakSet<LocalDatabase>();
 const onDeenrolled = async (): Promise<void> => {
   await destroyDatabases();
   await forgetActiveWorkspace();
+
   if (typeof window !== 'undefined') {
     window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/onboarding/start');
   }
@@ -41,14 +42,18 @@ const onDeenrolled = async (): Promise<void> => {
  */
 export const startSync = async (): Promise<LocalDatabase> => {
   const credential = getDeviceCredential();
+
   if (credential) {
     await ensureFacilityWorkspace(credential);
   }
+
   holdWorkspaceTab();
   const db = await openDatabase();
+
   if (credential && db.currentStatus.hasSynced) {
     await markWorkspacePrepared(credential.deviceId);
   }
+
   if (credential && !preparedListeners.has(db)) {
     preparedListeners.add(db);
     db.registerListener({
@@ -59,20 +64,24 @@ export const startSync = async (): Promise<LocalDatabase> => {
       },
     });
   }
+
   const scopedDeenrollment = async () => {
     if (!isWorkspaceSwitching() && getDeviceCredential()?.deviceId === credential?.deviceId) {
       await onDeenrolled();
     }
   };
+
   // Both connections report the main database's queue: it is the one that holds this device's unsent work.
   const pendingUploads = async () =>
     (await db.getOptional<{ n: number }>('SELECT count(*) AS n FROM ps_crud'))?.n ?? 0;
+
   await db.connect(createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }));
   // The encrypted database replacing a legacy one downloads in the background;
   // it has no local writes, so it never uploads (database.ts).
   void databaseCatchingUp()?.connect(
     createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }),
   );
+
   return db;
 };
 
@@ -88,8 +97,10 @@ export const waitForFirstSync = async (
 ): Promise<boolean> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
     await db.waitForFirstSync(controller.signal);
+
     return true;
   } catch {
     return false;

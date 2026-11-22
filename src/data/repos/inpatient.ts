@@ -33,30 +33,39 @@ import { listStaff } from './staff';
 import { readWardRecords } from './wardCare';
 
 type Reader = Pick<LocalDatabase, 'getOptional'>;
+
 /** PowerSync transactions expose getOptional; aggregate rows so checks share the insertion's write lock. */
 const recordsUnderLock = async <T extends AnyDocument>(
   reader: Reader,
   type: DocType,
 ): Promise<T[]> => {
   const fields = Object.keys(fieldKindsFor(type)).filter((field) => field !== 'type');
+
   const row = await reader.getOptional<{ records: string }>(
     `SELECT json_group_array(json_object(${fields.map((field) => `'${field}', "${field}"`).join(', ')})) AS records FROM ${TABLE_FOR[type]}`,
   );
+
   return (JSON.parse(row?.records ?? '[]') as Row[]).map((record) => fromRow<T>(type, record));
 };
+
 const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEvent) => {
   const read = <T extends AnyDocument>(type: DocType) =>
     reader ? recordsUnderLock<T>(reader, type) : allOfType<T>(type);
+
   const source = async <T extends AnyDocument>(type: DocType, id: string): Promise<T[]> => {
     if (!reader) {
       const record = await findRecord<T>(type, id);
+
       return record ? [record] : [];
     }
+
     const row = await reader.getOptional<Row>(`SELECT * FROM ${TABLE_FOR[type]} WHERE id = ?`, [
       id,
     ]);
+
     return row ? [fromRow<T>(type, row)] : [];
   };
+
   const admissionSources = async () =>
     (
       await getDatabase().getAll<Row>(
@@ -65,6 +74,7 @@ const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEve
     )
       .map((row) => fromRow<EncounterEntry>('encounter_entry', row))
       .filter(admissionRequest);
+
   // One stay's sources, or every admission request when listing the whole ward.
   const entrySources = () => {
     if (candidate?.type === 'inpatient_event') {
@@ -77,6 +87,7 @@ const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEve
 
     return admissionSources();
   };
+
   const [events, ready, locations, units, encounters, entries, rejections, identities] =
     await Promise.all([
       read<InpatientEvent>('inpatient_event'),
@@ -90,11 +101,13 @@ const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEve
       read<SyncRejection>('sync_rejection'),
       read<PatientIdentityEvent>('patient_identity_event'),
     ]);
+
   const rejected = new Set(
     rejections
       .filter((item) => ['inpatient_event', 'bed_ready_event'].includes(item.entityType))
       .map((item) => item.entityId),
   );
+
   // Receipts outlive the visible reconciliation item, including after it is marked resolved.
   const receipts = reader
     ? await reader
@@ -103,12 +116,15 @@ const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEve
         )
         .then((row) => JSON.parse(row?.records ?? '[]') as { id: string; outcome: string }[])
     : await listWorkforceReceipts();
+
   for (const receipt of receipts) {
     if (receipt.outcome === 'rejected') {
       rejected.add(receipt.id);
     }
   }
+
   const usable = usableInpatientEvents(events, rejected);
+
   return {
     events: usable,
     ready: ready.filter(
@@ -123,10 +139,12 @@ const records = async (reader?: Reader, candidate?: InpatientEvent | BedReadyEve
     identities,
   };
 };
+
 export const loadInpatient = async () => {
   const [data, pending, staff] = await Promise.all([records(), pendingWorkforceIds(), listStaff()]);
   const heads = inpatientHeads(data.events);
   const handled = new Set(data.events.map((event) => event.requestEntryId));
+
   return {
     ...data,
     pending,
@@ -136,15 +154,19 @@ export const loadInpatient = async () => {
     requests: data.entries.filter((entry) => admissionRequest(entry) && !handled.has(entry.id)),
   };
 };
+
 export type InpatientData = Awaited<ReturnType<typeof loadInpatient>>;
+
 const assertSupport = (context: AuthorizationContext) => {
   assertAllowed(context, 'admission:manage');
+
   if (!inpatientSupported(context)) {
     throw new Error(
       'Connect once to confirm this server supports admissions before recording ward work',
     );
   }
 };
+
 export const confirmAdmission = async (
   request: EncounterEntry,
   receivingUnitId: string,
@@ -153,6 +175,7 @@ export const confirmAdmission = async (
 ) => {
   assertSupport(context);
   const id = newId('inpatient_event');
+
   const event = InpatientEvent.parse({
     ...envelope(context),
     id,
@@ -166,8 +189,10 @@ export const confirmAdmission = async (
     actorRole: context.role,
     note: note.trim() || undefined,
   });
+
   return writeEvent(event, context);
 };
+
 export const changeAdmission = async (
   previous: InpatientEvent,
   action: Exclude<InpatientAction, 'confirm'>,
@@ -181,9 +206,11 @@ export const changeAdmission = async (
   } = {},
 ) => {
   assertSupport(context);
+
   const summaries = ['ready_for_discharge', 'discharge'].includes(action)
     ? dischargeHeads((await readWardRecords(previous.admissionId)).events)
     : [];
+
   const event = InpatientEvent.parse({
     ...previous,
     ...envelope(context),
@@ -198,13 +225,16 @@ export const changeAdmission = async (
     bedId: changes.bedId ?? previous.bedId,
     receivingUnitId: changes.receivingUnitId ?? previous.receivingUnitId,
   });
+
   return writeEvent(event, context);
 };
+
 const writeEvent = (event: InpatientEvent, context: AuthorizationContext) =>
   insertRecord<InpatientEvent>(context, 'admission:manage', 'inpatient_event', event, {
     checkUnderLock: async (transaction) => {
       const data = await records(transaction, event);
       const issues = inpatientIssues(event, data);
+
       if (['ready_for_discharge', 'discharge'].includes(event.action)) {
         const ward = await readWardRecords(event.admissionId, transaction);
         issues.push(
@@ -215,17 +245,20 @@ const writeEvent = (event: InpatientEvent, context: AuthorizationContext) =>
           ),
         );
       }
+
       if (issues.length) {
         throw new Error(issues.join('. '));
       }
     },
   });
+
 export const confirmBedReady = async (
   bedId: string,
   releaseEventId: string,
   context: AuthorizationContext,
 ) => {
   assertSupport(context);
+
   const event = BedReadyEvent.parse({
     ...envelope(context),
     id: newId('bed_ready_event'),
@@ -234,9 +267,11 @@ export const confirmBedReady = async (
     releaseEventId,
     actorRole: context.role,
   });
+
   return insertRecord<BedReadyEvent>(context, 'admission:manage', 'bed_ready_event', event, {
     checkUnderLock: async (transaction) => {
       const issues = bedReadyIssues(event, await records(transaction, event));
+
       if (issues.length) {
         throw new Error(issues.join('. '));
       }

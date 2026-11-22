@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<ClinicalKind, string> = {
   care_plan: 'Care plans',
   specialty: 'Specialty care',
 };
+
 const ADD_LABELS: Record<ClinicalKind, string> = {
   problem: 'problem',
   history: 'history / examination',
@@ -49,6 +50,7 @@ export const ClinicalRecordManager = ({
   const [search, setSearch] = useState('');
   const records = data.current.filter((event) => event.kind === kind);
   const query = search.trim().toLocaleLowerCase();
+
   const shown = records.filter(
     (event) =>
       !query ||
@@ -60,8 +62,10 @@ export const ClinicalRecordManager = ({
         .toLocaleLowerCase()
         .includes(query),
   );
+
   const problems = data.current.filter((event) => event.kind === 'problem');
   const legacy = unreviewedLegacyAllergies(data.events, data.patients);
+
   const renderEmptyMessage = () => {
     if (records.length && query) {
       return (

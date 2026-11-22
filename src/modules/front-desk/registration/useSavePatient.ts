@@ -21,10 +21,13 @@ const outcomeOf = (patientId: string, booked: boolean, charges: readonly Charge[
   if (!booked) {
     return `Registered — ${patientId}`;
   }
+
   const due = amountsDue(charges);
+
   if (due.length) {
     return `Registered — ${patientId}. Booked for now · ${due.join(' + ')} to pay at the cashier.`;
   }
+
   return `Registered — ${patientId}. Booked for now · nothing to pay, ready for the nurse station.`;
 };
 
@@ -52,21 +55,26 @@ export const useSavePatient = () => {
       if (saving.current) {
         return;
       }
+
       saving.current = true;
+
       try {
         const details = toPatientDetails(values);
         // The email is recorded at registration; a registered patient's email is changed from their personal details.
         const email = editingPatientId ? undefined : tidyEmail(values.email ?? '');
         const charges: Charge[] = [];
         const booked = Boolean(visit) && !editingPatientId;
+
         const patient = editingPatientId
           ? await updatePatient(editingPatientId, details, context)
           : await registerPatient(details, context, (patientId, created) => {
               const extra: NewRecord[] = [...identityReviewRecords(patientId, decision, context)];
+
               // Insurance chosen at registration is saved with the patient, as cover not yet checked.
               if (email) {
                 extra.push(newPatientContact(patientId, email, context));
               }
+
               if (cover) {
                 extra.push({
                   permission: 'cover:record',
@@ -74,7 +82,9 @@ export const useSavePatient = () => {
                   record: coverRecord({ ...cover, patientId }, context),
                 });
               }
+
               charges.push(...created.charges);
+
               if (visit) {
                 const booking = newPatientBookingRecords(
                   {
@@ -86,19 +96,25 @@ export const useSavePatient = () => {
                   context,
                   created,
                 );
+
                 charges.push(
                   ...booking
                     .filter((record) => record.type === 'charge')
                     .map((record) => record.record as Charge),
                 );
+
                 extra.push(...booking);
               }
+
               return extra;
             });
+
         const message = editingPatientId
           ? 'Patient details saved'
           : outcomeOf(patient.patientId, booked, charges);
+
         toast(message);
+
         try {
           await clearDraft(editingPatientId ?? 'new');
         } catch {
@@ -107,9 +123,11 @@ export const useSavePatient = () => {
             { tone: 'error' },
           );
         }
+
         const outcome: RegistrationOutcome | undefined = editingPatientId
           ? undefined
           : { patientId: patient.patientId, message };
+
         navigate('/patients/profile', {
           state: { patientId: patient.patientId, outcome },
           replace: true,

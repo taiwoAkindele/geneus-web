@@ -14,6 +14,7 @@ import { TABLE_FOR } from '../tables';
  */
 export const contactsForPatient = (patientId: string) =>
   allWhere<PatientContact>('patient_contact', 'patientId', patientId);
+
 export const currentContact = async (patientId: string) =>
   currentPatientContact(await contactsForPatient(patientId), patientId);
 
@@ -22,10 +23,13 @@ export const tidyEmail = (typed: string): string | undefined => {
   if (!typed.trim()) {
     return undefined;
   }
+
   const parsed = emailAddress.safeParse(typed);
+
   if (!parsed.success || parsed.data.length > 200) {
     throw new Error('Enter a valid email address, or leave it blank');
   }
+
   return parsed.data;
 };
 
@@ -65,9 +69,11 @@ export const saveContactEmail = async (
   context: AuthorizationContext,
 ): Promise<boolean> => {
   const previous = await currentContact(patientId);
+
   if ((previous?.email ?? undefined) === email) {
     return false;
   }
+
   await insertRecord<PatientContact>(
     context,
     'patient:update',
@@ -84,6 +90,7 @@ export const saveContactEmail = async (
               `SELECT id FROM ${TABLE_FOR.patient_contact} WHERE "patientId" = ?`,
               [patientId],
             );
+
         if (later) {
           throw new Error(
             "This patient's email was changed meanwhile. Close and review it before saving.",
@@ -92,6 +99,7 @@ export const saveContactEmail = async (
       },
     },
   );
+
   return true;
 };
 
@@ -100,6 +108,7 @@ export const stoppedChannelsNote = (contact: PatientContact | undefined): string
   const stopped = [contact?.smsStopped ? 'SMS' : '', contact?.emailStopped ? 'email' : ''].filter(
     Boolean,
   );
+
   return stopped.length
     ? `The patient stopped bills and receipts by ${stopped.join(' and ')}. Only the patient can start them again.`
     : undefined;
@@ -108,12 +117,15 @@ export const stoppedChannelsNote = (contact: PatientContact | undefined): string
 /** Every patient's current contact record, by patient ID, for lists. */
 export const currentContactsByPatient = async (): Promise<Map<string, PatientContact>> => {
   const byPatient = new Map<string, PatientContact[]>();
+
   for (const c of await allOfType<PatientContact>('patient_contact')) {
     byPatient.set(c.patientId, [...(byPatient.get(c.patientId) ?? []), c]);
   }
+
   return new Map(
     [...byPatient].flatMap(([id, records]) => {
       const head = currentPatientContact(records, id);
+
       return head ? [[id, head] as const] : [];
     }),
   );
@@ -145,5 +157,6 @@ const messageOutcome = (m: PatientMessage): string => {
 export const messageActivity = (m: PatientMessage) => {
   const what = `${m.kind === 'bill' ? 'Bill' : 'Receipt'} ${m.automatic ? 'sent automatically' : 'sent'} by ${m.channel === 'sms' ? 'SMS' : 'email'} to ${m.to}`;
   const outcome = messageOutcome(m);
+
   return { text: `${what} · ${outcome}`, failed: m.status === 'failed' };
 };

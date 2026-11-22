@@ -11,9 +11,12 @@ import { useAuthorizationContext } from '@/session';
  */
 export const useNextPatientNumber = (): string | undefined => {
   const { facilityId } = useAuthorizationContext();
+
   const load = useCallback(async () => {
     const patientIds = await listPatientIds();
+
     return `${facilityId}-${formatSequence(nextSequence(facilityId, patientIds))}`;
   }, [facilityId]);
+
   return useLiveQuery(load, ['patient']).data;
 };

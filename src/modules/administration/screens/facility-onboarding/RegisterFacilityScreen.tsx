@@ -14,6 +14,7 @@ import { FacilityDetailsFields } from './FacilityDetailsFields';
 const endOfToday = (): string => {
   const end = new Date();
   end.setHours(23, 59, 0, 0);
+
   return end.toISOString();
 };
 
@@ -28,9 +29,11 @@ type PendingRegistration = { facilityCode: string; facilityName: string; admin: 
 
 const readPending = (): PendingRegistration | undefined => {
   const raw = sessionStorage.getItem(PENDING_KEY);
+
   if (!raw) {
     return undefined;
   }
+
   try {
     return JSON.parse(raw) as PendingRegistration;
   } catch {
@@ -61,6 +64,7 @@ export const RegisterFacilityScreen = () => {
     lga: '',
     level: 'phc',
   });
+
   const { name, code, state, lga, level } = details;
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -71,6 +75,7 @@ export const RegisterFacilityScreen = () => {
   const [saving, setSaving] = useState(false);
 
   const facilityCode = (code || suggestCode(name)).toUpperCase();
+
   const complete = Boolean(
     name.trim() &&
     facilityCode &&
@@ -85,7 +90,9 @@ export const RegisterFacilityScreen = () => {
     if (!adminEmail.trim() || !inviteToken || sendingCode) {
       return;
     }
+
     setSendingCode(true);
+
     try {
       const sent = await sendRegistrationEmailCode(adminEmail.trim(), inviteToken);
       setCodeSentTo(sent.sentTo);
@@ -102,6 +109,7 @@ export const RegisterFacilityScreen = () => {
     if (!pending || !facility || finishing.current) {
       return;
     }
+
     finishing.current = true;
     sessionStorage.removeItem(PENDING_KEY);
     (async () => {
@@ -116,6 +124,7 @@ export const RegisterFacilityScreen = () => {
         },
         authorizationFor({ staff: pending.admin, facilityId: pending.facilityCode, deviceId }),
       );
+
       // The first admin sets their PIN unapproved: nobody else exists yet to approve it.
       approvePinSetup(pending.admin.staffId);
       navigate('/onboarding/accept', {
@@ -145,7 +154,9 @@ export const RegisterFacilityScreen = () => {
     if (!complete || saving) {
       return;
     }
+
     setSaving(true);
+
     try {
       const { admin, device } = await registerFacility({
         code: facilityCode,
@@ -159,6 +170,7 @@ export const RegisterFacilityScreen = () => {
         deviceId,
         inviteToken,
       });
+
       // From here the facility exists on the server and this device is enrolled:
       // the rest waits for the facility to sync down (the effect above), however
       // long that takes, and survives the remount that enrolling causes.

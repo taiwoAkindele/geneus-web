@@ -20,6 +20,7 @@ import { saveWorkforce, type WorkforceData } from '@/data/repos/workforce';
  * pricing), but they belong to the Lab catalogue, never to this list.
  */
 export type CareCategory = ServiceDefinition['category'];
+
 /** visitTypes: the visits it records (first is the usual one); none for care that is not a visit. */
 export type CarePreset = {
   key: string;
@@ -99,6 +100,7 @@ export const CARE_SERVICE_PRESETS: readonly CarePreset[] = [
     place: 'ward',
   },
 ];
+
 export const CARE_CONCEPT_SYSTEM = 'urn:geneus:care-service';
 
 export const CATEGORY_LABELS: Record<CareCategory, string> = {
@@ -111,6 +113,7 @@ export const CATEGORY_LABELS: Record<CareCategory, string> = {
   rehabilitation: 'Rehabilitation',
   other: 'Other',
 };
+
 /** Categories offered when adding a custom care service; lab tests go through the Lab catalogue. */
 export const CUSTOM_CATEGORIES: readonly CareCategory[] = [
   'consultation',
@@ -131,6 +134,7 @@ export const existingCareService = (
 ) =>
   careServiceOfferings(data.offerings, data.definitions).find((o) => {
     const definition = data.definitions.find((d) => d.id === o.serviceDefinitionId);
+
     return (
       key(o.name) === key(target.name) ||
       (definition &&
@@ -156,6 +160,7 @@ const reusableDefinition = (
 
 export const routableTeams = (units: readonly Unit[]) =>
   units.filter(unitIsRoutable).sort((a, b) => a.name.localeCompare(b.name));
+
 /** Places a patient is seen in. Beds are chosen at admission, stores hold stock. */
 export const carePlaces = (locations: readonly Location[]) =>
   locations
@@ -174,12 +179,14 @@ export const defaultPlacement = (
   const places = carePlaces(data.locations);
   const team = teams.find((t) => key(t.name) !== 'laboratory') ?? teams[0];
   const fitting = (l: Location) => !preset?.place || l.kind === preset.place;
+
   const place =
     places.find((l) => fitting(l) && l.unitId === team?.id) ??
     places.find(fitting) ??
     places.find((l) => l.unitId === team?.id && key(l.name) !== 'laboratory') ??
     places.find((l) => key(l.name) !== 'laboratory') ??
     places[0];
+
   return { unitId: team?.id ?? '', locationId: place?.id ?? '' };
 };
 
@@ -205,18 +212,23 @@ export const addCareService = async (
   context: AuthorizationContext,
 ): Promise<ServiceOffering> => {
   const name = input.name.trim().replace(/\s+/g, ' ');
+
   if (!name) {
     throw new Error('Enter the name of the care service');
   }
+
   if (existingCareService({ key: input.key, name }, data)) {
     throw new Error(`${name} is already one of this hospital's care services`);
   }
+
   if (!input.unitId) {
     throw new Error('Choose the team responsible for this service');
   }
+
   if (!input.locationId) {
     throw new Error('Choose where this service takes place');
   }
+
   const definition =
     reusableDefinition({ key: input.key, name }, data.definitions) ??
     ((await saveWorkforce(
@@ -232,6 +244,7 @@ export const addCareService = async (
       },
       context,
     )) as ServiceDefinition);
+
   return (await saveWorkforce(
     'service_offering',
     {
@@ -261,12 +274,15 @@ export const careServiceStatus = (
     data.rejections.some(
       (r) => r.type === 'sync_rejection' && r.entityId === offering.id && !r.resolvedOn,
     );
+
   if (refused) {
     return { label: 'Needs attention', tone: 'danger' };
   }
+
   if (data.pending.has(offering.id)) {
     return { label: 'Saving', tone: 'amber' };
   }
+
   if (offering.configuration === 'active') {
     return { label: 'Active', tone: 'green' };
   }

@@ -13,6 +13,7 @@ export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
       const locked = Boolean(enc.sig[s.key]);
       const skipped = enc.skipped.includes(s.key);
       const active = i === enc.activeIndex;
+
       const renderStepMarker = () => {
         if (locked) {
           return '✓';

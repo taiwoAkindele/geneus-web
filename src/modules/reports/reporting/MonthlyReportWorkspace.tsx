@@ -15,11 +15,14 @@ export const MonthlyReport = () => {
   useEffect(() => {
     document.title = 'Monthly reports · Geneus Health';
   }, []);
+
   const report = query.data && validMonth(month) ? monthlyReport(query.data, month) : undefined;
+
   const exportReport = () => {
     if (!report) {
       return;
     }
+
     downloadCsv(`facility-summary-${month}.csv`, [
       ['Facility', facility.name],
       ['Month', month],
@@ -69,6 +72,7 @@ export const MonthlyReport = () => {
       ...report.trends.map((row) => [row.month, row.visits]),
     ]);
   };
+
   const renderReport = () => {
     if (query.loading) {
       return <p role="status">Preparing the report from this device…</p>;

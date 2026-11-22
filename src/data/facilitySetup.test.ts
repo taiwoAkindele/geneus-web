@@ -16,6 +16,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage());
   resetSecureStorageForTests();
 });
+
 describe('facility setup recovery and organization metadata', () => {
   it('keeps lists separate for each local facility and staff identity', async () => {
     const directory = {
@@ -23,11 +24,13 @@ describe('facility setup recovery and organization metadata', () => {
       canCreateFacility: true,
       facilities: [{ id: 'A', name: 'Synthetic A', accessible: true, canEnrollDevice: true }],
     };
+
     await cacheFacilityDirectory('A', 'staff:A', directory);
     expect(cachedFacilityDirectory('A', 'staff:A')?.directory).toEqual(directory);
     expect(cachedFacilityDirectory('B', 'staff:A')).toBeUndefined();
     expect(cachedFacilityDirectory('A', 'staff:other')).toBeUndefined();
   });
+
   it('keeps retry proofs stable without overwriting another account or facility', async () => {
     const first = await facilityOpeningProof('A', 'staff:A', 'B');
     const other = await facilityOpeningProof('C', 'staff:C', 'D');
@@ -38,6 +41,7 @@ describe('facility setup recovery and organization metadata', () => {
     expect(await facilityOpeningProof('C', 'staff:C', 'D')).toEqual(other);
     expect(await facilityOpeningProof('A', 'staff:A', 'B')).not.toEqual(first);
   });
+
   it('preserves immutable creation inputs across reloads and does not expose them to another account', async () => {
     const value = {
       sourceFacilityId: 'A',
@@ -53,12 +57,14 @@ describe('facility setup recovery and organization metadata', () => {
         ...enrollmentProof(),
       },
     };
+
     await saveFacilityCreation(value);
     await saveFacilityCreation({
       ...value,
       sourceFacilityId: 'C',
       payload: { ...value.payload, actorStaffId: 'staff:C', requestId: crypto.randomUUID() },
     });
+
     expect(pendingFacilityCreation('A', 'staff:A')).toEqual(value);
     expect(pendingFacilityCreation('A', 'staff:other')).toBeUndefined();
     await clearFacilityCreation('C', 'staff:C');

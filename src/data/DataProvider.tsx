@@ -62,6 +62,7 @@ const EnrolledDevice = ({
       void nameActiveWorkspace(data.name);
     }
   }, [data?.name]);
+
   const value = useMemo<DeviceContext>(
     () => ({ deviceId: credential.deviceId, facility: data, enrolled: true, enroll }),
     [credential.deviceId, data, enroll],
@@ -77,6 +78,7 @@ const EnrolledDevice = ({
       </Screen>
     );
   }
+
   if (loading) {
     return (
       <Screen>
@@ -84,6 +86,7 @@ const EnrolledDevice = ({
       </Screen>
     );
   }
+
   return <DeviceContextContext.Provider value={value}>{children}</DeviceContextContext.Provider>;
 };
 
@@ -91,6 +94,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [credential, setCredential] = useState<DeviceCredential | undefined>(() =>
     getDeviceCredential(),
   );
+
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<Error>();
 
@@ -98,6 +102,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!credential) {
       return;
     }
+
     let cancelled = false;
     startSync().then(
       () => {
@@ -111,6 +116,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
       },
     );
+
     return () => {
       cancelled = true;
     };
@@ -123,6 +129,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     // lands rather than when this bounded wait gives up.
     setCredential(issued);
     setOpen(true);
+
     return waitForFirstSync(db);
   }, []);
 
@@ -141,11 +148,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       </Screen>
     );
   }
+
   if (!credential) {
     return (
       <DeviceContextContext.Provider value={unenrolled}>{children}</DeviceContextContext.Provider>
     );
   }
+
   if (!open) {
     return (
       <Screen>
@@ -153,6 +162,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       </Screen>
     );
   }
+
   return (
     <EnrolledDevice credential={credential} enroll={enroll}>
       {children}
@@ -162,8 +172,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 export const useDeviceContext = (): DeviceContext => {
   const device = useContext(DeviceContextContext);
+
   if (!device) {
     throw new Error('useDeviceContext must be used within a DataProvider');
   }
+
   return device;
 };

@@ -2,6 +2,7 @@ import { DocumentFile, LabReport, type UploadMutation } from '@shared';
 import { ApiError } from '@/lib/api/client';
 import { uploadDocumentBytes } from '@/lib/api/documents';
 import { cachedDocument, confirmDocumentBytes, type DocumentScope } from './documentFiles';
+
 /** Runs inside PowerSync's existing upload transaction loop, including when nobody is signed in. */
 export const transferDocumentFiles = async (
   credential: string,
@@ -9,14 +10,17 @@ export const transferDocumentFiles = async (
   mutations: readonly UploadMutation[],
 ): Promise<void> => {
   const done = new Set<string>();
+
   // Documents carry one file; a lab result carries the images attached to its report.
   const files = mutations.flatMap((mutation) => {
     if (['library_document', 'visit_document'].includes(mutation.table)) {
       return [{ file: mutation.data.file, actor: mutation.data.createdBy }];
     }
+
     const report = LabReport.safeParse(
       mutation.table === 'encounter_entry' ? mutation.data.labReport : undefined,
     );
+
     return report.success
       ? report.data.items.flatMap((item) =>
           item.values.flatMap((value) =>
@@ -27,20 +31,27 @@ export const transferDocumentFiles = async (
         )
       : [];
   });
+
   for (const candidate of files) {
     const parsed = DocumentFile.safeParse(candidate.file);
+
     if (!parsed.success || done.has(parsed.data.id)) {
       continue;
     }
+
     const file = parsed.data;
     const actor = candidate.actor;
+
     if (typeof actor !== 'string') {
       continue;
     }
+
     const cached = await cachedDocument(scope, file).catch(() => undefined);
+
     if (!cached || cached.remote) {
       continue;
     }
+
     try {
       await uploadDocumentBytes(credential, actor, file, cached.bytes);
       await confirmDocumentBytes(scope, file);
@@ -57,6 +68,7 @@ export const transferDocumentFiles = async (
       ) {
         continue;
       }
+
       throw cause;
     }
   }

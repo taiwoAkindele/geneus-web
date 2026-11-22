@@ -51,6 +51,7 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
       listEntries(),
       listStaff(),
     ]);
+
     return projectRegisters(definitions, entries, staff);
   }, []);
 
@@ -81,6 +82,7 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
         { registerId, values: entry.values, ...(entry.visit ? { visit: entry.visit } : {}) },
         context,
       );
+
       return result.saved ? [] : result.issues;
     },
     [context],
@@ -96,8 +98,10 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
 
 export const useRegisters = (): Value => {
   const context = useContext(RegistersContext);
+
   if (!context) {
     throw new Error('useRegisters must be used within a RegistersProvider');
   }
+
   return context;
 };

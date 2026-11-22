@@ -42,23 +42,28 @@ export const AssociationEditor = ({
   const toast = useToast();
   const context = useAuthorizationContext();
   const enabled = useIntegratedBilling(context);
+
   const query = useLiveQuery(listServiceAllocations, [
     'service_charge_allocation',
     'sync_rejection',
   ]);
+
   const [chargeId, setCharge] = useState('');
   const [amount, setAmount] = useState(String(quantity));
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const records = query.data ?? [];
+
   const used = allocatedQuantity(
     records,
     (a) => a.sourceEntryId === sourceEntryId && a.sourceItemId === sourceItemId,
   );
+
   const pending = records.filter(
     (a) => !a.acceptedOn && a.sourceEntryId === sourceEntryId && a.sourceItemId === sourceItemId,
   );
+
   if (!context.permissions.includes('charge:associate')) {
     return (
       <p className="text-xs">
@@ -66,6 +71,7 @@ export const AssociationEditor = ({
       </p>
     );
   }
+
   if (used >= quantity - 1e-6) {
     return (
       <p role="status" className="text-sm">
@@ -74,11 +80,13 @@ export const AssociationEditor = ({
       </p>
     );
   }
+
   const candidates = charges.filter(
     (c) =>
       c.patientId === patientId &&
       (c.category === sourceKind || (sourceKind === 'pharmacy' && Boolean(c.dispenseEntryId))),
   );
+
   return (
     <div className="space-y-2 rounded-field bg-surface p-3">
       <p className="text-sm">
@@ -109,6 +117,7 @@ export const AssociationEditor = ({
           Remaining purchased quantity:{' '}
           {(() => {
             const c = candidates.find((c) => c.id === chargeId)!;
+
             return c.quantity === undefined
               ? 'Historical quantity unavailable'
               : Math.max(
@@ -194,8 +203,10 @@ const readAssociationHistory = async () => {
     allOfType<Charge>('charge'),
     allOfType<CoverageAllocation>('coverage_allocation'),
   ]);
+
   return { allocations, entries, charges, coverageDecisions };
 };
+
 export const ServiceReturnReviews = ({
   charges,
   onPatient,
@@ -209,27 +220,35 @@ export const ServiceReturnReviews = ({
     'service_charge_allocation',
     'encounter_entry',
   ]);
+
   const allocations = query.data?.allocations ?? [];
   const entries = query.data?.entries ?? [];
+
   const reviews = entries
     .filter((e) => !patientId || e.patientId === patientId)
     .flatMap((e) => {
       const d = dispensingDetails(e);
+
       if (d?.action !== 'return' || d.creditMinor !== 0) {
         return [];
       }
+
       const source = entries.find((s) => s.id === d.returnOf);
       const supply = source && dispensingDetails(source);
+
       if (!source || supply?.billing === 'outside') {
         return [];
       }
+
       const resolved = allocations
         .filter((a) => a.acceptedOn && a.returnEntryId === e.id)
         .reduce((n, a) => n + a.quantity, 0);
+
       return resolved + 0.000001 < d.quantity!
         ? [{ entry: e, source, supply, quantity: d.quantity! - resolved, unit: d.unit }]
         : [];
     });
+
   const renderReviews = () => {
     if (query.error) {
       return <p role="alert">Could not read recorded returns.</p>;
@@ -281,18 +300,22 @@ export const ServiceReturnReviews = ({
     </section>
   );
 };
+
 export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) => {
   const query = useLiveQuery(readAssociationHistory, [
     'service_charge_allocation',
     'encounter_entry',
     'coverage_allocation',
   ]);
+
   const context = useAuthorizationContext();
   const toast = useToast();
+
   const say = (message: string) => {
     setNotice(message);
     toast(message);
   };
+
   const enabled = useIntegratedBilling(context);
   const [selected, setSelected] = useState<ServiceChargeAllocation>();
   const [quantity, setQuantity] = useState('1');
@@ -304,25 +327,32 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
   const [busy, setBusy] = useState(false);
   const [insuranceRequestId, setInsuranceRequest] = useState(() => crypto.randomUUID());
   const records = (query.data?.allocations ?? []).filter((a) => a.patientId === patientId);
+
   const returns = (query.data?.entries ?? []).filter(
     (e) => e.patientId === patientId && dispensingDetails(e)?.action === 'return',
   );
+
   const relevantReturns = selected
     ? returns.filter((e) => dispensingDetails(e)?.returnOf === selected.sourceEntryId)
     : [];
+
   const insured = Boolean(
     selected &&
     currentAllocation(selected.chargeId, query.data?.coverageDecisions ?? [])?.state ===
       'finalised',
   );
+
   const mayCredit = context.permissions.includes(insured ? 'coverage:confirm' : 'payment:waive');
+
   const save = async () => {
     if (!selected) {
       return;
     }
+
     setBusy(true);
     setError('');
     setNotice('');
+
     const input = {
       patientId,
       chargeId: selected.chargeId,
@@ -337,6 +367,7 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
       creditReturnedUnits: credit,
       reason,
     };
+
     try {
       if (insured && credit) {
         const result = await billingRequest<{ claimReviewRequired: boolean }>(
@@ -344,6 +375,7 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
           'associations/insurance-return',
           { requestId: insuranceRequestId, input },
         );
+
         say(
           result.claimReviewRequired
             ? 'Insurance return confirmed. Review the affected claim revision in Insurance; earlier payments remain intact.'
@@ -353,6 +385,7 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
         await requestServiceAllocation(input, context);
         say('Financial release requested. It remains pending until server confirmation.');
       }
+
       query.reload();
       setSelected(undefined);
     } catch (e) {
@@ -363,15 +396,19 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
       setBusy(false);
     }
   };
+
   if (query.loading && !query.data) {
     return <p>Reading service associations…</p>;
   }
+
   if (query.error) {
     return <p role="alert">Could not read service associations.</p>;
   }
+
   if (!records.length) {
     return null;
   }
+
   const submit = (
     <Button
       disabled={
@@ -386,6 +423,7 @@ export const ServiceAssociationHistory = ({ patientId }: { patientId: string }) 
       {insured && credit ? 'Confirm insurance return' : 'Request financial release'}
     </Button>
   );
+
   return (
     <section
       aria-label="Service association history"

@@ -23,6 +23,7 @@ export const WORKFORCE_VERSIONS = {
   schemaVersion: SCHEMA_VERSION,
   policyVersion: POLICY_VERSION,
 } as const;
+
 export const fetchSyncToken = (credential: string, pendingMutationCount = 1) =>
   postAsDevice<SyncTokenResponse>('/sync/token', credential, {
     ...WORKFORCE_VERSIONS,

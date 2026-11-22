@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   laboratory_staff: 'Laboratory staff',
   pharmacy_staff: 'Pharmacy staff',
 };
+
 export const roleLabel = (staff: Pick<Staff, 'role' | 'additionalRoles'>): string =>
   rolesFor(staff)
     .map((role) => ROLE_LABELS[role])

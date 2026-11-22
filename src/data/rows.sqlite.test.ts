@@ -19,6 +19,7 @@ const { DatabaseSync } = (await import(/* @vite-ignore */ moduleName)) as Sqlite
 describe('workflow versions already stored with SQLite text affinity', () => {
   it('recovers numeric version 1 from an existing text column without rewriting the care entry', () => {
     const db = new DatabaseSync(':memory:');
+
     const entry = EncounterEntry.parse({
       type: 'encounter_entry',
       id: 'entry:legacy-version',
@@ -34,9 +35,11 @@ describe('workflow versions already stored with SQLite text affinity', () => {
       step: 'complaint',
       values: { note: 'Synthetic signed care' },
     });
+
     const row = toRow(entry.type, entry);
     const fields = Object.keys(row);
     const kinds = fieldKindsFor(entry.type);
+
     const sqlType = (field: string) => {
       if (field === 'workflowVersion') {
         return 'TEXT';
@@ -44,14 +47,18 @@ describe('workflow versions already stored with SQLite text affinity', () => {
 
       return kinds[field] === 'number' ? 'REAL' : 'TEXT';
     };
+
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     try {
       db.exec(
         `CREATE TABLE legacy_entries (${fields.map((field) => `"${field}" ${sqlType(field)}`).join(',')})`,
       );
+
       db.prepare(
         `INSERT INTO legacy_entries (${fields.map((field) => `"${field}"`).join(',')}) VALUES (${fields.map(() => '?').join(',')})`,
       ).run(...Object.values(row));
+
       const stored = db.prepare('SELECT * FROM legacy_entries').get() as Row;
       expect(typeof stored.workflowVersion).toBe('string');
       expect(Number(stored.workflowVersion)).toBe(1);

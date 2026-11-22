@@ -29,7 +29,9 @@ export const RecoveryEmailCard = () => {
     if (busy) {
       return;
     }
+
     setBusy(true);
+
     try {
       await step();
     } catch (cause) {
@@ -55,6 +57,7 @@ export const RecoveryEmailCard = () => {
         code,
         sent?.currentSentTo ? currentCode : undefined,
       );
+
       toast('Recovery email saved');
       setEmail('');
       setSent(undefined);

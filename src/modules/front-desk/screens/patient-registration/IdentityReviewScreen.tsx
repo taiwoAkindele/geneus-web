@@ -17,12 +17,14 @@ export const IdentityReviewScreen = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const context = useAuthorizationContext();
+
   const data = useLiveQuery(
     useCallback(
       async () => ({ patients: await listPatients(), events: await listIdentityEvents() }),
       [],
     ),
   );
+
   const [first, setFirst] = useState(params.get('primary') ?? '');
   const [second, setSecond] = useState(params.get('other') ?? '');
   const [outcome, setOutcome] = useState<IdentityAction['outcome']>('linked');
@@ -42,6 +44,7 @@ export const IdentityReviewScreen = () => {
       setWaitingEventId('');
     }
   }, [data.data, waitingEventId]);
+
   const change = (work: () => void) => {
     work();
     setPreview(undefined);
@@ -49,12 +52,15 @@ export const IdentityReviewScreen = () => {
     setError('');
     setMessage('');
   };
+
   const run = async (work: () => Promise<void>) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await work();
     } catch (cause) {
@@ -63,7 +69,9 @@ export const IdentityReviewScreen = () => {
       setBusy(false);
     }
   };
+
   const action: IdentityAction = { patientId: first, otherPatientId: second, outcome };
+
   const renderReviewQueue = () => {
     if (data.loading) {
       return <p role="status">Reading patient records…</p>;
@@ -145,6 +153,7 @@ export const IdentityReviewScreen = () => {
           {(() => {
             const a = patients.find((row) => row.id === first);
             const b = patients.find((row) => row.id === second);
+
             if (!a || !b) {
               return [a, b].filter(Boolean).length ? (
                 <p className="text-sm text-ink-muted">
@@ -152,12 +161,15 @@ export const IdentityReviewScreen = () => {
                 </p>
               ) : null;
             }
+
             const rows = compareIdentities(a, b);
+
             const tone = {
               match: 'text-brand font-bold',
               differs: 'text-amber-text font-bold',
               unknown: '',
             } as const;
+
             return (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[480px] text-left text-sm">
@@ -246,6 +258,7 @@ export const IdentityReviewScreen = () => {
                   setMessage(
                     'Review request saved on this device. It will synchronise when connected.',
                   );
+
                   data.reload();
                 })
               }
@@ -276,11 +289,13 @@ export const IdentityReviewScreen = () => {
                       preview.revision,
                       requestId,
                     );
+
                     setWaitingEventId(event.id);
                     setPreview(undefined);
                     setMessage(
                       'Decision confirmed by the server. Waiting for this device to synchronise the updated identity history.',
                     );
+
                     data.reload();
                   })
                 }

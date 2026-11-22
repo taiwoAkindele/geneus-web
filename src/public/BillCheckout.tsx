@@ -19,14 +19,17 @@ const REFERENCE = /^geneus-co-[a-f0-9-]{36}$/;
  */
 export const checkoutReference = (search: string): string | undefined => {
   let decoded = search;
+
   try {
     decoded = decodeURIComponent(search);
   } catch {
     /* keep it as it came */
   }
+
   const found = /geneus-co-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.exec(
     decoded,
   )?.[0];
+
   return found && REFERENCE.test(found) ? found : undefined;
 };
 
@@ -68,6 +71,7 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
 
         if (next.status === 'pending' && polls < MAX_POLLS) {
           timer = setTimeout(() => void confirm(), POLL_INTERVAL_MS);
+
           return;
         }
       } catch (cause) {
@@ -119,6 +123,7 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
           ? cause.message
           : 'Online payment could not be started. Try again.',
       );
+
       setBusy(false);
       starting.current = false;
     }

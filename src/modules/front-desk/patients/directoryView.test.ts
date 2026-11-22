@@ -7,6 +7,7 @@ import { balanceOwed, todayStatus } from './directoryView';
 const now = new Date(2026, 10, 9, 10);
 const at = (day: number, hour = 9) => new Date(2026, 10, day, hour).toISOString();
 const visit = (day: number) => ({ openedOn: at(day) }) as Encounter;
+
 const balance = (patientId: string, balanceMinor: number, currency = 'NGN'): ChargeBalance => ({
   charge: { patientId, currency } as Charge,
   balanceMinor,
@@ -38,6 +39,7 @@ describe('patient list: today at the desk', () => {
     expect(
       todayStatus({ ids: ['p1'], todayBooking: { attendance: 'arrived', createdOn: at(9) } }, now),
     ).toBe('Arrived');
+
     expect(
       todayStatus(
         {
@@ -47,6 +49,7 @@ describe('patient list: today at the desk', () => {
         now,
       ),
     ).toMatch(/^Expected 14:00$/);
+
     expect(
       todayStatus({ ids: ['p1'], todayBooking: { attendance: undefined, createdOn: at(9) } }, now),
     ).toBe('Booked for now');
@@ -66,6 +69,7 @@ describe('patient list: balance owed', () => {
       balance('p2', 999),
       balance('p1', 500, 'USD'),
     ]);
+
     expect(owed).toEqual([formatMoney(350000, 'NGN'), formatMoney(500, 'USD')]);
   });
 

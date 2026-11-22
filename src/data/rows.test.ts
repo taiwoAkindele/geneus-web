@@ -41,6 +41,7 @@ describe('field kinds', () => {
     expect(fieldKindsFor('visit_document').schemaVersion).toBe('number');
     expect(fieldKindsFor('encounter_entry').actorRole).toBe('text');
   });
+
   it('reads booleans, numbers and lists off the contract', () => {
     const kinds = fieldKindsFor('patient');
     expect(kinds.dobEstimated).toBe('boolean');
@@ -64,6 +65,7 @@ describe('fromRow', () => {
       deviceId: 'device:one',
       patientId: 'TEST-000001-K2',
     };
+
     const records = [
       Encounter.parse({ ...base, type: 'encounter', workflowVersion: 1, openedOn: base.createdOn }),
       EncounterEntry.parse({
@@ -76,7 +78,9 @@ describe('fromRow', () => {
         values: { note: 'Synthetic care' },
       }),
     ];
+
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     try {
       for (const record of records) {
         const stored = { ...toRow(record.type, record), workflowVersion: '1' };
@@ -87,15 +91,18 @@ describe('fromRow', () => {
             type: record.type,
           }).success,
         ).toBe(false);
+
         expect(
           fromRow<typeof record>(record.type, { ...stored, workflowVersion: null }).workflowVersion,
         ).toBeUndefined();
       }
+
       expect(warning).not.toHaveBeenCalled();
     } finally {
       warning.mockRestore();
     }
   });
+
   it('turns a synced row back into a contract record', () => {
     const patient = fromRow<Patient>('patient', wirePatient);
 
@@ -149,6 +156,7 @@ describe('toRow', () => {
       phone: null,
       ageYears: 32,
     });
+
     expect('type' in row).toBe(false);
   });
 
@@ -159,6 +167,7 @@ describe('toRow', () => {
       version: 2,
       status: 'published',
     };
+
     expect(decodeValues('register_definition', toRow('register_definition', record))).toEqual(
       record,
     );

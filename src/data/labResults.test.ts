@@ -26,13 +26,16 @@ const base = {
   deviceId: 'device:one',
   createdOn: '2026-11-01T08:00:00Z',
 };
+
 const admin = () =>
   authorizationFor({
     staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const adult = { value: 18, unit: 'years' } as const;
+
 const parts: ResultPart[] = [
   {
     key: 'haemoglobin',
@@ -55,6 +58,7 @@ const parts: ResultPart[] = [
     antibiotics: ['Ceftriaxone', 'Ciprofloxacin'],
   },
 ];
+
 const template = ResultTemplate.parse({
   ...base,
   id: 'result_template:fbc',
@@ -66,8 +70,10 @@ const template = ResultTemplate.parse({
   source: 'own',
   revision: 3,
 });
+
 const patientId = 'TEST-000001-K2';
 const encounterId = 'encounter:lab';
+
 const patient = Patient.parse({
   ...base,
   id: patientId,
@@ -78,6 +84,7 @@ const patient = Patient.parse({
   sex: 'female',
   dateOfBirth: '1992-05-10',
 });
+
 const fbc = {
   id: 'order_item:fbc',
   name: 'Full blood count',
@@ -87,17 +94,20 @@ const fbc = {
   definitionRevision: 1,
   priority: 'routine',
 } as const;
+
 const widal = {
   id: 'order_item:widal',
   name: 'Widal test',
   custom: true,
   priority: 'routine',
 } as const;
+
 const data = (changes: Partial<EncounterData> = {}): EncounterData => ({
   ...structuredClone(EMPTY_ENCOUNTER_DATA),
   lab_order: { tests: [fbc.name, widal.name], items: [fbc, widal] },
   ...changes,
 });
+
 const setup = { templates: [template], patient };
 
 describe('entering lab results with a template', () => {
@@ -128,6 +138,7 @@ describe('entering lab results with a template', () => {
       setup,
       '2026-11-02T10:00:00Z',
     );
+
     expect(submission.problems).toEqual([]);
     expect(submission.values.results).toEqual([
       {
@@ -138,10 +149,12 @@ describe('entering lab results with a template', () => {
       },
       { test: 'Widal test', orderItemId: widal.id, result: 'Negative' },
     ]);
+
     expect(submission.labReport.patient).toEqual({
       sex: 'female',
       age: { years: 34, months: 413, days: 12594 },
     });
+
     expect(submission.labReport.items[0]).toMatchObject({
       template: { id: template.id, revision: 3 },
       values: [
@@ -169,11 +182,13 @@ describe('entering lab results with a template', () => {
         },
       ],
     });
+
     expect(draftsFromReport(submission.labReport)[fbc.id].values.haemoglobin).toEqual({
       value: '10.8',
       flag: 'low',
     });
   });
+
   it('names what must be fixed, and leaves untouched tests pending', () => {
     expect(
       buildLabSubmission(
@@ -184,6 +199,7 @@ describe('entering lab results with a template', () => {
         '2026-11-02T10:00:00Z',
       ).problems,
     ).toEqual(['Full blood count: Haemoglobin: enter a number']);
+
     expect(
       buildLabSubmission(
         data({
@@ -193,6 +209,7 @@ describe('entering lab results with a template', () => {
         '2026-11-02T10:00:00Z',
       ).problems[0],
     ).toMatch(/1 decimal places/);
+
     expect(
       buildLabSubmission(
         data({ lab_report: { [fbc.id]: { comment: '', values: { film: { value: 'Normal' } } } } }),
@@ -200,6 +217,7 @@ describe('entering lab results with a template', () => {
         '2026-11-02T10:00:00Z',
       ).problems[0],
     ).toMatch(/Haemoglobin is required/);
+
     expect(
       buildLabSubmission(
         data({
@@ -219,19 +237,23 @@ describe('entering lab results with a template', () => {
         '2026-11-02T10:00:00Z',
       ).problems[0],
     ).toMatch(/name the organism/);
+
     const widalOnly = buildLabSubmission(
       data({ lab_results: { [widal.id]: 'Negative' } }),
       setup,
       '2026-11-02T10:00:00Z',
     );
+
     expect(widalOnly.problems).toEqual([]);
     expect(widalOnly.values.results.map((r) => r.test)).toEqual(['Widal test']);
     expect(buildLabSubmission(data(), setup, '2026-11-02T10:00:00Z').problems).toEqual([
       'Enter at least one result before previewing the report',
     ]);
   });
+
   it('shows no range, and records none, when the patient’s sex is not recorded', () => {
     const unknown = { ...patient, sex: undefined };
+
     const submission = buildLabSubmission(
       data({
         lab_report: { [fbc.id]: { comment: '', values: { haemoglobin: { value: '10.8' } } } },
@@ -239,6 +261,7 @@ describe('entering lab results with a template', () => {
       { templates: [template], patient: unknown },
       '2026-11-02T10:00:00Z',
     );
+
     expect(submission.problems).toEqual([]);
     expect(submission.labReport.items[0].values[0]).not.toHaveProperty('range');
   });
@@ -246,6 +269,7 @@ describe('entering lab results with a template', () => {
 
 describe('saving structured results on the device', () => {
   let store: ReturnType<typeof sqliteTestDatabase>;
+
   const entry = (id: string, step: string, values: Record<string, unknown>) =>
     EncounterEntry.parse({
       ...base,
@@ -258,6 +282,7 @@ describe('saving structured results on the device', () => {
       step,
       values,
     });
+
   beforeEach(async () => {
     vi.stubGlobal('localStorage', memoryStorage());
     resetSecureStorageForTests();
@@ -276,6 +301,7 @@ describe('saving structured results on the device', () => {
         active: true,
       }),
     );
+
     await store.seed(patient);
     await store.seed(template);
     await store.seed(
@@ -288,6 +314,7 @@ describe('saving structured results on the device', () => {
         openedOn: base.createdOn,
       }),
     );
+
     for (const record of [
       entry('entry:vitals', 'vitals', { temperatureC: 37 }),
       entry('entry:complaint', 'complaint', { complaints: ['Tiredness'] }),
@@ -300,6 +327,7 @@ describe('saving structured results on the device', () => {
       await store.seed(record);
     }
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await store.db.close();
@@ -316,6 +344,7 @@ describe('saving structured results on the device', () => {
       setup,
       new Date().toISOString(),
     );
+
     const forged = structuredClone(submission);
     (forged.labReport.items[0].values[0] as { range?: unknown }).range = {
       sex: 'male',
@@ -323,6 +352,7 @@ describe('saving structured results on the device', () => {
       low: 13,
       high: 17,
     };
+
     await expect(
       saveStep(
         {
@@ -336,6 +366,7 @@ describe('saving structured results on the device', () => {
         admin(),
       ),
     ).rejects.toThrow(/normal range shown does not match/);
+
     const saved = await saveStep(
       {
         encounterId,
@@ -347,10 +378,12 @@ describe('saving structured results on the device', () => {
       },
       admin(),
     );
+
     expect(saved.labReport?.items[0].values[0]).toMatchObject({
       label: 'Haemoglobin',
       value: 10.8,
     });
+
     expect(
       (await allOfType<EncounterEntry>('encounter_entry')).find((e) => e.id === saved.id)
         ?.labReport,

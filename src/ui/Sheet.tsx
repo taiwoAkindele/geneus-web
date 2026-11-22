@@ -13,6 +13,7 @@ import { Icon } from './Icon';
 import { Button } from './Button';
 
 const CloseContext = createContext<(() => void) | undefined>(undefined);
+
 export const SheetCancelButton = ({
   children = 'Cancel',
   disabled = false,
@@ -21,6 +22,7 @@ export const SheetCancelButton = ({
   disabled?: boolean;
 }) => {
   const close = useContext(CloseContext);
+
   return (
     <Button variant="outlined" disabled={disabled} onClick={close}>
       {children}
@@ -44,12 +46,14 @@ type Props = {
 // (React closes the outer one first when both go together), and the page scrolls once the last has closed.
 let openSheets = 0;
 let pageOverflow = '';
+
 const lockPageScroll = () => {
   if (openSheets++ === 0) {
     pageOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
   }
 };
+
 const unlockPageScroll = () => {
   if (--openSheets === 0) {
     document.body.style.overflow = pageOverflow;
@@ -76,44 +80,56 @@ export const Sheet = ({
     if (!confirmDiscard) {
       return;
     }
+
     discardPrompt.current?.scrollIntoView({ block: 'start' });
     discardPrompt.current?.querySelector('button')?.focus();
   }, [confirmDiscard]);
+
   const close = () => {
     if (closeDisabled) {
       return;
     }
+
     if (hasUnsavedChanges) {
       setConfirmDiscard(true);
     } else {
       onClose();
     }
   };
+
   useEffect(() => {
     if (!hasUnsavedChanges) {
       return;
     }
+
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
+
     window.addEventListener('beforeunload', warn);
+
     return () => window.removeEventListener('beforeunload', warn);
   }, [hasUnsavedChanges]);
 
   useLayoutEffect(() => {
     const element = dialog.current;
+
     if (!element) {
       return;
     }
+
     const opener =
       document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+
     lockPageScroll();
     element.showModal();
     (heading.current ?? element).focus({ preventScroll: true });
+
     return () => {
       element.close();
       unlockPageScroll();
+
       if (opener?.isConnected) {
         opener.focus({ preventScroll: true });
       }
@@ -137,9 +153,11 @@ export const Sheet = ({
         if (event.key !== 'Tab') {
           return;
         }
+
         // A nested review owns its focus trap and Escape dismissal; its parent
         // must not consume either event or discard the whole underlying form.
         event.stopPropagation();
+
         const items = [
           ...event.currentTarget.querySelectorAll<HTMLElement>(
             'a[href], button, input, select, textarea, summary, [tabindex]',
@@ -148,13 +166,17 @@ export const Sheet = ({
           (item) =>
             item.tabIndex >= 0 && !item.matches(':disabled') && item.getClientRects().length > 0,
         );
+
         const first = items[0];
         const last = items[items.length - 1];
+
         if (!first) {
           event.preventDefault();
           event.currentTarget.focus();
+
           return;
         }
+
         if (
           event.shiftKey &&
           (document.activeElement === first ||

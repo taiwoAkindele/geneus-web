@@ -21,8 +21,10 @@ import {
 
 const day = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
 const time = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
 const ALLERGY_TONE = {
   severe: 'danger',
   moderate: 'amber',
@@ -47,6 +49,7 @@ const Status = ({
       </>
     );
   }
+
   if (summary?.status === 'in_progress') {
     return (
       <>
@@ -55,6 +58,7 @@ const Status = ({
       </>
     );
   }
+
   if (summary?.status === 'unfinished') {
     return (
       <>
@@ -63,8 +67,10 @@ const Status = ({
       </>
     );
   }
+
   return <Tag>Not admitted</Tag>;
 };
+
 const Allergies = ({ summary }: { summary?: PatientClinicalSummary }) =>
   summary?.allergies.length ? (
     <div className="flex flex-wrap gap-1">
@@ -90,20 +96,25 @@ export const ClinicalPatientList = () => {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const context = useAuthorizationContext();
+
   const data = useLiveQuery(
     useCallback(async () => {
       const rows = await loadPatientDirectory(context);
+
       return { rows, clinical: await loadPatientClinicalSummaries(context, rows) };
     }, [context.userId, context.facilityId, context.deviceId]),
     [...DIRECTORY_TYPES, 'clinical_event', 'encounter_entry'],
   );
+
   const query = params.get('q') ?? '';
   const care = params.get('care') ?? 'all';
   const page = Math.max(0, Number(params.get('page')) || 0);
+
   const set = (changes: Record<string, string>) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
+
         for (const [key, value] of Object.entries(changes)) {
           if (value) {
             next.set(key, value);
@@ -111,15 +122,19 @@ export const ClinicalPatientList = () => {
             next.delete(key);
           }
         }
+
         return next;
       },
       { replace: true },
     );
+
   useEffect(() => {
     document.title = 'Patients · Geneus Health';
   }, []);
+
   const rows = data.data?.rows ?? [];
   const clinical = data.data?.clinical;
+
   const found = useMemo(() => {
     const ids = new Set(
       searchPatients(
@@ -128,6 +143,7 @@ export const ClinicalPatientList = () => {
         context.facilityId,
       ).map((patient) => patient.patientId),
     );
+
     return rows.filter(
       (row) =>
         row.ids.some((id) => ids.has(id)) &&
@@ -135,20 +151,25 @@ export const ClinicalPatientList = () => {
           (care === 'inpatient' ? Boolean(row.stay) : !row.stay && Boolean(row.lastVisit))),
     );
   }, [rows, query, care, context.facilityId]);
+
   const chart = (row: PatientDirectoryRow) =>
     navigate(
       patientChartPath(row.patient.patientId, 'now', { from: CLINICAL_PATIENTS + '?' + params }),
     );
+
   const details = (row: PatientDirectoryRow) =>
     navigate(
       patientChartPath(row.patient.patientId, 'details', {
         from: CLINICAL_PATIENTS + '?' + params,
       }),
     );
+
   const sortKey = params.get('sort');
+
   const sort = ['patient', 'lastVisit'].includes(sortKey ?? '')
     ? { key: sortKey!, descending: params.get('descending') === '1' }
     : { key: 'lastVisit', descending: true };
+
   const columns: TableColumn<PatientDirectoryRow>[] = [
     {
       key: 'patient',
@@ -188,6 +209,7 @@ export const ClinicalPatientList = () => {
       className: 'hidden lg:table-cell',
       render: (row) => {
         const problems = clinical?.get(row.patient.id)?.problems ?? [];
+
         return problems.length ? (
           <div className="flex flex-wrap gap-1">
             {problems.slice(0, 2).map((p) => (
@@ -233,6 +255,7 @@ export const ClinicalPatientList = () => {
       ),
     },
   ];
+
   const renderPatientList = () => {
     if (data.loading && !data.data) {
       return <p role="status">Reading patients…</p>;

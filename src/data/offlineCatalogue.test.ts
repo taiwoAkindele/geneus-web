@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 // The server and sync are stood in for: an accepted configuration save lands in local SQLite as sync would deliver it.
 vi.mock('./configurationSave', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./configurationSave')>()),
   saveConfiguration: (await import('./configurationSave.localDouble')).saveConfigurationLocally,
 }));
+
 import {
   Staff,
   StandardTemplate,
@@ -36,13 +38,16 @@ const base = {
   deviceId: 'device:one',
   createdOn: '2026-11-01T08:00:00Z',
 };
+
 const admin = () =>
   authorizationFor({
     staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const loinc = { system: 'http://loinc.org', code: '58410-2', label: 'Full blood count' };
+
 const hb: ResultPart = {
   key: 'haemoglobin',
   label: 'Haemoglobin',
@@ -74,6 +79,7 @@ describe('catalogue and templates saved on this device, offline', () => {
         active: true,
       }),
     );
+
     await store.seed(
       StandardTest.parse({
         ...base,
@@ -87,6 +93,7 @@ describe('catalogue and templates saved on this device, offline', () => {
         concept: loinc,
       }),
     );
+
     await store.seed(
       StandardTemplate.parse({
         ...base,
@@ -99,6 +106,7 @@ describe('catalogue and templates saved on this device, offline', () => {
       }),
     );
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await store.db.close();
@@ -111,6 +119,7 @@ describe('catalogue and templates saved on this device, offline', () => {
       added: ['Full blood count'],
       skipped: [],
     });
+
     const definitions = await allOfType<ServiceDefinition>('service_definition');
     expect(definitions[0]).toMatchObject({
       name: 'Full blood count',
@@ -121,6 +130,7 @@ describe('catalogue and templates saved on this device, offline', () => {
         aliases: ['FBC', 'CBC'],
       },
     });
+
     expect(
       await addOwnTests(
         [
@@ -135,16 +145,19 @@ describe('catalogue and templates saved on this device, offline', () => {
         admin(),
       ),
     ).toEqual({ added: ['Serum ferritin'], skipped: ['cbc'] });
+
     const [units, locations, offerings] = await Promise.all([
       allOfType<Unit>('unit'),
       allOfType<Location>('location'),
       allOfType<ServiceOffering>('service_offering'),
     ]);
+
     expect(units.map((u) => u.name)).toEqual(['Laboratory']);
     expect(locations.map((l) => l.name)).toEqual(['Laboratory']);
     expect(
       offerings.every((o) => o.unitId === units[0].id && o.locationIds[0] === locations[0].id),
     ).toBe(true);
+
     expect((await loadStandardTests())[0].added).toBe(true);
   });
 
@@ -154,6 +167,7 @@ describe('catalogue and templates saved on this device, offline', () => {
       added: ['Full blood count'],
       skipped: [],
     });
+
     const [fbc] = await allOfType<ServiceDefinition>('service_definition');
     let [template] = await allOfType<ResultTemplate>('result_template');
     expect(template).toMatchObject({
@@ -163,6 +177,7 @@ describe('catalogue and templates saved on this device, offline', () => {
       serviceDefinitionIds: [fbc.id],
       revision: 1,
     });
+
     for (const name of ['FBC (adult)', 'FBC']) {
       template = await saveResultTemplate(
         {
@@ -175,6 +190,7 @@ describe('catalogue and templates saved on this device, offline', () => {
         template,
       );
     }
+
     expect(template).toMatchObject({ name: 'FBC', revision: 3 });
     await expect(
       saveResultTemplate(
@@ -182,6 +198,7 @@ describe('catalogue and templates saved on this device, offline', () => {
         admin(),
       ),
     ).rejects.toThrow(/already uses the template “FBC”/);
+
     expect(await adoptStandardTemplates(['fbc'], admin())).toEqual({
       added: [],
       skipped: ['Full blood count'],
@@ -190,6 +207,7 @@ describe('catalogue and templates saved on this device, offline', () => {
 
   it('carries a shared part change into every template that uses it, as a new revision', async () => {
     const shared = await saveResultPart({ part: hb, active: true }, admin());
+
     const own = await saveResultTemplate(
       {
         name: 'Haemoglobin',
@@ -199,12 +217,14 @@ describe('catalogue and templates saved on this device, offline', () => {
       },
       admin(),
     );
+
     expect(own.parts[0]).toMatchObject({ label: 'Haemoglobin', libraryPartId: shared.id });
     await saveResultPart(
       { part: { ...hb, unit: 'g/L', decimals: 0 }, active: true },
       admin(),
       shared,
     );
+
     const [after] = await allOfType<ResultTemplate>('result_template');
     expect(after).toMatchObject({
       revision: 2,

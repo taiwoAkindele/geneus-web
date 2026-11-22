@@ -23,14 +23,17 @@ describe('care services across the hospital', () => {
       offeringId: 'anc',
       visitType: 'antenatal',
     });
+
     expect(defaultCareChoice([opd, anc], 'follow_up')).toEqual({
       offeringId: 'opd',
       visitType: 'follow_up',
     });
+
     expect(defaultCareChoice([opd, anc], 'immunisation')).toEqual({
       offeringId: 'opd',
       visitType: 'general',
     });
+
     expect(defaultCareChoice([], 'general')).toBeUndefined();
   });
 
@@ -48,6 +51,7 @@ describe('care services across the hospital', () => {
         },
       ],
     );
+
     expect(options.map((o) => o.label)).toEqual(['Outpatients', 'Lab test · Haemoglobin']);
   });
 
@@ -60,6 +64,7 @@ describe('care services across the hospital', () => {
         createdOn: '2026-11-10T10:00:00.000Z',
         ...(offeringId ? { offeringId } : {}),
       }) as Encounter;
+
     const data = {
       encounters: [visit('a', 'opd'), visit('b', 'opd'), visit('c', 'anc'), visit('d')],
       entries: [],
@@ -74,11 +79,13 @@ describe('care services across the hospital', () => {
         offering('anc', { name: 'Antenatal care' }),
       ],
     } as unknown as MonthlyData;
+
     expect(monthlyReport(data, '2026-11').careServices).toEqual([
       { id: 'opd', name: 'Outpatients', visits: 2 },
       { id: 'anc', name: 'Antenatal care', visits: 1 },
       { id: '', name: 'No care service recorded', visits: 1 },
     ]);
+
     expect(monthlyReport({ ...data, encounters: [visit('d')] }, '2026-11').careServices).toEqual(
       [],
     );
@@ -92,6 +99,7 @@ describe('care services across the hospital', () => {
       lga: 'Ikeja',
       level: 'general_hospital',
     } as Facility;
+
     expect(facilityForm(facility)).toMatchObject({
       code: 'SHA',
       name: 'Sunrise Hospital Annex',
@@ -102,6 +110,7 @@ describe('care services across the hospital', () => {
       address: '',
       phone: '',
     });
+
     expect(
       facilityForm({
         ...facility,

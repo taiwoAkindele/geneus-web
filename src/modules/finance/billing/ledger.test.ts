@@ -8,7 +8,9 @@ const env = {
   createdOn: '2026-10-25T10:00:00Z',
   deviceId: 'device:1',
 };
+
 const patientId = 'TEST-000001-K2';
+
 const charge = (id: string, amountMinor = 50000) =>
   Charge.parse({
     ...env,
@@ -23,10 +25,12 @@ const charge = (id: string, amountMinor = 50000) =>
     listPriceMinor: amountMinor,
     currency: 'NGN',
   });
+
 describe('department and category ledger projections', () => {
   it('allocates one receipt across categories without counting its full amount twice', () => {
     const registration = charge('charge:reg');
     const lab = { ...charge('charge:lab', 100000), category: 'laboratory' as const };
+
     const payment = Payment.parse({
       ...env,
       id: 'payment:1',
@@ -41,14 +45,18 @@ describe('department and category ledger projections', () => {
         { chargeId: lab.id, amountMinor: 100000 },
       ],
     });
+
     const rows = billingRows([registration, lab], [payment], []);
     expect(totalsFor(rows.filter((r) => r.charge.category === 'registration')).collected).toBe(
       50000,
     );
+
     expect(totalsFor(rows).collected).toBe(150000);
   });
+
   it('retains unpaid, exempt, discounted and waived entries in the category ledger', () => {
     const original = charge('charge:reg');
+
     const discount = BillingAdjustment.parse({
       ...env,
       id: 'adj:1',
@@ -59,6 +67,7 @@ describe('department and category ledger projections', () => {
       amountMinor: 10000,
       reason: 'Concession',
     });
+
     const waiver = {
       ...discount,
       id: 'adj:2',
@@ -66,6 +75,7 @@ describe('department and category ledger projections', () => {
       amountMinor: 40000,
       reason: 'Approved waiver',
     };
+
     const exempt = { ...charge('charge:exempt'), amountMinor: 0, exemptionReason: 'Under-5' };
     const rows = billingRows([original, exempt, charge('charge:unpaid')], [], [discount, waiver]);
     expect(rows).toHaveLength(3);
@@ -79,6 +89,7 @@ describe('department and category ledger projections', () => {
       outstanding: 50000,
     });
   });
+
   it('shows verified department funds even before patient allocation and tracks the unallocated remainder', () => {
     const incoming = IncomingTransfer.parse({
       ...env,
@@ -92,6 +103,7 @@ describe('department and category ledger projections', () => {
       receivedOn: env.createdOn,
       departmentId: 'pharmacy',
     });
+
     const payment = Payment.parse({
       ...env,
       id: 'payment:1',
@@ -104,11 +116,14 @@ describe('department and category ledger projections', () => {
       currency: 'NGN',
       allocations: [{ chargeId: 'charge:reg', amountMinor: 50000 }],
     });
+
     expect(incoming.amountMinor - transferAllocated(incoming.id, [])).toBe(100000);
     expect(incoming.amountMinor - transferAllocated(incoming.id, [payment])).toBe(50000);
   });
+
   it('shows older waiver payments as waived fees rather than money received', () => {
     const bill = charge('charge:reg');
+
     const waiver = Payment.parse({
       ...env,
       id: 'payment:waiver',
@@ -121,6 +136,7 @@ describe('department and category ledger projections', () => {
       amountMinor: 50000,
       allocations: [{ chargeId: bill.id, amountMinor: 50000 }],
     });
+
     const rows = billingRows([bill], [waiver], []);
     expect(rows[0]).toMatchObject({
       waivedMinor: 50000,
@@ -128,12 +144,14 @@ describe('department and category ledger projections', () => {
       settledMinor: 0,
       balanceMinor: 0,
     });
+
     expect(totalsFor(rows)).toMatchObject({ waived: 50000, collected: 0 });
   });
 });
 
 it('filters collection allocations by patient search, date and department before summing', () => {
   const bill = charge('charge:search');
+
   const payment = Payment.parse({
     ...env,
     id: 'payment:search',
@@ -145,6 +163,7 @@ it('filters collection allocations by patient search, date and department before
     amountMinor: 10000,
     allocations: [{ chargeId: bill.id, amountMinor: 10000 }],
   });
+
   const data = {
     charges: [bill],
     payments: [payment],
@@ -155,10 +174,12 @@ it('filters collection allocations by patient search, date and department before
     staff: [],
     departments: [],
   };
+
   const filters = { currency: 'NGN', from: '', to: '', departmentId: '', search: '' };
   expect(collectionAllocations(data, filters).reduce((sum, row) => sum + row.amountMinor, 0)).toBe(
     10000,
   );
+
   expect(collectionAllocations(data, { ...filters, search: 'no-matching-patient' })).toEqual([]);
   expect(collectionAllocations(data, { ...filters, search: patientId })).toHaveLength(1);
   expect(collectionAllocations(data, { ...filters, departmentId: 'other' })).toEqual([]);

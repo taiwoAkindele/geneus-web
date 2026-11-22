@@ -10,7 +10,9 @@ import type { AuthorizationContext, Permission } from '@shared';
  * another page (for example a tab of Result templates), not a page of its own.
  */
 export type ModuleSettingsId = 'laboratory' | 'insurance';
+
 export type ModuleSettingsPage = { key: string; label: string; to: string; tab: boolean };
+
 export type ModuleSettings = {
   id: ModuleSettingsId;
   label: string;
@@ -18,10 +20,12 @@ export type ModuleSettings = {
   base: string;
   pages: ModuleSettingsPage[];
 };
+
 type Viewer = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
 const has = (context: Viewer, ...permissions: Permission[]) =>
   permissions.some((permission) => context.permissions.includes(permission));
+
 const page = (
   key: string,
   label: string,
@@ -33,6 +37,7 @@ const page = (
 export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): ModuleSettings => {
   if (id === 'laboratory') {
     const templates = has(context, 'result_template:manage');
+
     return {
       id,
       label: 'Laboratory',
@@ -63,6 +68,7 @@ export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): Module
       ],
     };
   }
+
   // Billing has no module settings menu: Prices is a Finance page and bank collection is in Settings → Billing.
   return {
     id,

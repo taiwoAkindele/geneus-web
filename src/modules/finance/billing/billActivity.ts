@@ -143,6 +143,7 @@ export const billActivity = ({
 
   for (const refund of data.coverage.refunds) {
     const refundedHere = amountOnCharges(refund.allocations, chargeIds);
+
     const touchesThisBill = refund.allocations.some((allocation) =>
       chargeIds.includes(allocation.chargeId),
     );

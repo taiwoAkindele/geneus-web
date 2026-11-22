@@ -16,6 +16,7 @@ export const WardTable = <T,>({
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(rows.length / 25));
   const current = Math.min(page, pages - 1);
+
   return (
     <>
       <div className="hidden md:block">

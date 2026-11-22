@@ -45,9 +45,12 @@ export type CoverageData = CoverageRecords & {
 };
 
 export const listPayers = () => allOfType<Payer>('payer');
+
 export const listRefunds = () => allOfType<Refund>('refund');
+
 export const coversForPatient = (patientId: string) =>
   allWhere<PatientCover>('patient_cover', 'patientId', patientId);
+
 export const checksForPatient = (patientId: string) =>
   allWhere<CoverCheck>('cover_check', 'patientId', patientId);
 
@@ -63,22 +66,27 @@ export const loadCoverage = async (charges: readonly Charge[] = []): Promise<Cov
       listRefunds(),
       allOfType<Facility>('facility'),
     ]);
+
   const entries = new Map<string, EncounterEntry>();
   // Only insured patients' medicine charges need their quantity; cash patients never look it up.
   const insured = new Set(covers.map((c) => c.patientId));
+
   for (const id of new Set(
     charges
       .filter((c) => c.dispenseEntryId && insured.has(c.patientId))
       .map((c) => c.dispenseEntryId!),
   )) {
     const entry = await findRecord<EncounterEntry>('encounter_entry', id);
+
     if (entry) {
       entries.set(id, entry);
     }
   }
+
   // Cover changes a bill only for charges raised while insurance billing was active; confirmed splits always stand.
   const device = getDeviceCredential();
   const billingPeriods = device ? insuranceBillingPeriods(device) : [];
+
   return {
     covers,
     checks,
@@ -106,11 +114,13 @@ export const estimateCharge = (charge: Charge, data: CoverageData): CoverageEsti
       charge.dispenseEntryId ? data.entries.get(charge.dispenseEntryId) : undefined,
     ),
   });
+
 export const estimatesFor = (
   charges: readonly Charge[],
   data: CoverageData,
 ): Map<string, CoverageEstimate> => {
   const forPatient = indexCoverageRecords(data);
+
   return new Map(
     charges.map((charge) => [
       charge.id,
@@ -130,6 +140,7 @@ export const coverageDataAge = (data: Pick<CoverageData, 'schedules'>): string |
 export const currentCovers = (patientId: string, covers: readonly PatientCover[]) => {
   const mine = covers.filter((c) => c.patientId === patientId);
   const replaced = new Set(mine.map((c) => c.replaces).filter(Boolean));
+
   return mine.filter((c) => !replaced.has(c.id));
 };
 
@@ -140,9 +151,11 @@ export const coverNeedsCheck = (
   now = new Date().toISOString(),
 ): PatientCover | undefined => {
   const today = serviceDateOf(now, data.timeZone);
+
   if (!today) {
     return undefined;
   }
+
   return coversOn(patientId, today, data.covers).find(
     (cover) =>
       !data.checks.some(
@@ -163,6 +176,7 @@ export type CoverDraft = Pick<
   | 'validTo'
   | 'active'
 > & { replaces?: string };
+
 /** A new cover record. Recording cover is not checking it: a cover starts unchecked, whatever the card says. */
 export const coverRecord = (draft: CoverDraft, context: AuthorizationContext): PatientCover =>
   ({
@@ -177,8 +191,10 @@ export const coverRecord = (draft: CoverDraft, context: AuthorizationContext): P
     validTo: draft.validTo || undefined,
     replaces: draft.replaces || undefined,
   }) as PatientCover;
+
 export const recordCover = (draft: CoverDraft, context: AuthorizationContext) =>
   insertRecord<PatientCover>(context, 'cover:record', 'patient_cover', coverRecord(draft, context));
+
 /** Plans a payer's active contract offers, from the synced patient-facing schedules: code and name only. */
 export const plansOf = (payerId: string, schedules: readonly CoverSchedule[]) =>
   [
@@ -188,12 +204,14 @@ export const plansOf = (payerId: string, schedules: readonly CoverSchedule[]) =>
         .map((s) => [s.planCode, s.planName]),
     ).entries(),
   ].map(([code, name]) => ({ code, name }));
+
 export const listSchedules = () => allOfType<CoverSchedule>('cover_schedule');
 
 export type CheckDraft = Pick<
   CoverCheck,
   'patientId' | 'coverId' | 'method' | 'result' | 'coversFrom' | 'coversTo' | 'reference' | 'note'
 >;
+
 export const recordCheck = (draft: CheckDraft, context: AuthorizationContext) =>
   insertRecord<CoverCheck>(context, 'cover:verify', 'cover_check', {
     ...envelope(context),
@@ -232,17 +250,22 @@ export const selfPayOffered = (
   check?: CoverCheck,
 ): boolean => {
   const date = serviceDateOf(charge.createdOn, timeZoneAt(data, charge.createdOn));
+
   if (!date) {
     return false;
   }
+
   const election = {
     reason: check ? 'not_eligible' : 'patient_choice',
     coverCheckId: check?.id,
   } as CoverageElection;
+
   return selfPayPermitted(election, cover, date, data);
 };
+
 export const contractRuleOn = (charge: Charge, cover: PatientCover, data: CoverageData) => {
   const date = serviceDateOf(charge.createdOn, timeZoneAt(data, charge.createdOn));
+
   return date ? scheduleOn(cover.payerId, cover.planCode, date, data.schedules) : undefined;
 };
 
@@ -281,6 +304,7 @@ export type CompletionDraft = {
   note?: string;
   replaces?: string;
 };
+
 /** Recorded by the clinician who did the work, in the role they are signed in as. Never edited: a correction replaces it. */
 export const recordCompletion = (draft: CompletionDraft, context: AuthorizationContext) =>
   insertRecord<ServiceCompletion>(context, 'encounter:record', 'service_completion', {
@@ -310,15 +334,20 @@ export type CompletionItem = {
 export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
   const { listServiceAllocations } = await import('./serviceAllocations');
   const associations = await listServiceAllocations();
+
   const associatedEntries = associations.length
     ? await allOfType<EncounterEntry>('encounter_entry')
     : [];
+
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
+
   const [allocations, completions] = await Promise.all([
     allOfType<CoverageAllocation>('coverage_allocation'),
     allOfType<ServiceCompletion>('service_completion'),
   ]);
+
   const superseded = new Set(allocations.map((a) => a.supersedes).filter(Boolean));
+
   const claimable = new Set(
     allocations
       .filter(
@@ -326,13 +355,16 @@ export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
       )
       .map((a) => a.chargeId),
   );
+
   const current = currentCompletions(completions);
   const items: CompletionItem[] = [];
   const entriesFor = new Map<string, EncounterEntry[]>();
+
   const entries = async (encounterId?: string) => {
     if (!encounterId) {
       return [];
     }
+
     if (!entriesFor.has(encounterId)) {
       entriesFor.set(
         encounterId,
@@ -341,18 +373,23 @@ export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
         ),
       );
     }
+
     return entriesFor.get(encounterId)!;
   };
+
   for (const chargeId of claimable) {
     const charge = await findRecord<Charge>('charge', chargeId);
+
     if (!charge || charge.createdOn < since) {
       continue;
     }
+
     const visit =
       charge.encounterId ??
       (charge.appointmentId
         ? (await allWhere<Encounter>('encounter', 'appointmentId', charge.appointmentId))[0]?.id
         : undefined);
+
     const fulfillment = serviceFulfillment(charge, {
       associations,
       associatedEntries,
@@ -363,6 +400,7 @@ export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
         : undefined,
       completion: current.get(charge.id),
     });
+
     const patient = await findRecord<Patient>('patient', charge.patientId);
     items.push({
       charge,
@@ -371,5 +409,6 @@ export const completionWork = async (days = 30): Promise<CompletionItem[]> => {
       ...(current.get(charge.id) ? { completion: current.get(charge.id) } : {}),
     });
   }
+
   return items.sort((a, b) => b.charge.createdOn.localeCompare(a.charge.createdOn));
 };

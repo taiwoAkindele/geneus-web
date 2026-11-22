@@ -14,17 +14,23 @@ import {
 /** Shown to a facility administrator on Home until every setup step is done or set aside. */
 export const SetupProgressCard = () => {
   const context = useAuthorizationContext();
+
   const admin =
     context.role === 'facility_admin' || Boolean(context.roles?.includes('facility_admin'));
+
   const facts = useLiveQuery(loadSetupFacts, SETUP_WATCH);
   const [notNeeded] = useState(() => readNotNeeded(context.facilityId));
+
   if (!admin || !facts.data) {
     return null;
   }
+
   const progress = setupProgress(setupSteps(facts.data, notNeeded));
+
   if (progress.complete || !progress.next) {
     return null;
   }
+
   return (
     <section
       aria-labelledby="setup-card"

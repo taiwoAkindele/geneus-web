@@ -10,20 +10,26 @@ export const displayMoney = (amountMinor: number, currency: string): string =>
   }).format(amountMinor / 10 ** currencyDigits(currency));
 
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
 /** "09:41" today, "Yesterday", then "21 Nov 2026". */
 export const whenText = (iso: string, now = new Date()): string => {
   const at = new Date(iso);
+
   if (Number.isNaN(at.getTime())) {
     return iso;
   }
+
   if (dayKey(at) === dayKey(now)) {
     return at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
+
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
+
   if (dayKey(at) === dayKey(yesterday)) {
     return 'Yesterday';
   }
+
   return at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
@@ -34,10 +40,13 @@ const TONES: Record<string, string> = {
   Credit: 'border border-outline bg-white text-ink-soft',
   'Awaiting insurance': 'border border-dashed border-outline bg-white text-slate-text',
 };
+
 /** One word per state, the same on every billing screen. */
 export const statusLabel = (status: string) => (status === 'Paid / settled' ? 'Paid' : status);
+
 export const BillStatus = ({ status }: { status: string }) => {
   const label = statusLabel(status);
+
   return (
     <span
       className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${TONES[label] ?? 'bg-surface-muted text-ink-soft'}`}

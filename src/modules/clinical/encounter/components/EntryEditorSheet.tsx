@@ -27,6 +27,7 @@ type Props = {
   target?: EncounterEntry;
   onClose: () => void;
 };
+
 export const EntryEditorSheet = ({
   patientId,
   encounterId,
@@ -37,28 +38,35 @@ export const EntryEditorSheet = ({
 }: Props) => {
   const context = useAuthorizationContext();
   const toast = useToast();
+
   const [data, setData] = useState<EncounterData>(() => {
     const effective = target
       ? effectiveEncounterEntries(entries).find((entry) => entry.id === target.id)
       : undefined;
+
     let draft = structuredClone(EMPTY_ENCOUNTER_DATA);
+
     for (const entry of effectiveEncounterEntries(entries)) {
       if (entry.step !== 'amendment') {
         draft = fromStepValues(entry.step, entry.values, draft);
       }
     }
+
     if (target) {
       draft.workflowVersion = target.workflowVersion;
     }
+
     if (effective) {
       draft = fromStepValues(step, effective.values, draft);
     }
+
     if (step === 'result_review' && !target) {
       const reviewed = new Set(
         entries
           .filter((e) => e.step === 'result_review')
           .flatMap((e) => e.values.resultEntryIds as string[]),
       );
+
       draft.result_review = {
         resultEntryIds: entries
           .filter((e) => e.step === 'lab_results' && !reviewed.has(e.id))
@@ -66,6 +74,7 @@ export const EntryEditorSheet = ({
         note: '',
       };
     }
+
     if (step === 'disposition' && !target) {
       draft.disposition = {
         ...draft.disposition,
@@ -74,6 +83,7 @@ export const EntryEditorSheet = ({
         previousEntryId: dispositionHeads(entries)[0]?.id,
       };
     }
+
     if (step === 'lab_results' && !target) {
       const completed = new Set(Object.keys(draft.lab_results));
       draft = {
@@ -88,12 +98,14 @@ export const EntryEditorSheet = ({
         lab_results: {},
       };
     }
+
     if (step === 'lab_results' && target) {
       const rows = effective?.values.results as {
         test: string;
         result: string;
         orderItemId?: string;
       }[];
+
       draft = {
         ...draft,
         lab_order: {
@@ -103,31 +115,39 @@ export const EntryEditorSheet = ({
         },
         lab_results: Object.fromEntries(rows.map((r) => [r.orderItemId ?? r.test, r.result])),
       };
+
       // A structured result is corrected from its latest structured version.
       const corrections = entries.filter(
         (entry) => entry.step === 'amendment' && entry.amends === target.id && entry.labReport,
       );
+
       const replaced = new Set(corrections.map((entry) => entry.values.previousAmendmentId));
       draft.lab_report = draftsFromReport(
         corrections.find((entry) => !replaced.has(entry.id))?.labReport ?? target.labReport,
       );
     }
+
     return draft;
   });
+
   const [previousCorrectionId] = useState(() => {
     const corrections = entries.filter(
       (entry) =>
         entry.step === 'amendment' && entry.amends === target?.id && entry.values.correctedValues,
     );
+
     const replaced = new Set(corrections.map((entry) => entry.values.previousAmendmentId));
+
     return corrections.find((entry) => !replaced.has(entry.id))?.id ?? null;
   });
+
   const [note, setNote] = useState('');
   const initialValues = useRef(JSON.stringify(data));
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
+
   const ctl: StepFormController = {
     enc: { data },
     setField: (key, field, value) =>
@@ -191,9 +211,11 @@ export const EntryEditorSheet = ({
         },
       })),
   };
+
   const { user } = useSession();
   const labSetup = useLabSetup(patientId);
   const [labPreview, setLabPreview] = useState<LabSubmission>();
+
   const review = () => {
     if (step === 'lab_results') {
       const submission = buildLabSubmission(
@@ -201,34 +223,46 @@ export const EntryEditorSheet = ({
         { templates: labSetup.data?.templates ?? [], patient: labSetup.data?.patient },
         new Date().toISOString(),
       );
+
       const issues = [
         ...submission.problems,
         ...(target && !note.trim() ? ['Explain the correction'] : []),
       ];
+
       setError(issues.join(' · '));
+
       if (!issues.length) {
         setLabPreview(submission);
       }
+
       return;
     }
+
     const issues = stepProblems(step, data);
+
     if (target && !note.trim()) {
       issues.push('Explain the correction');
     }
+
     setError(issues.join(' · '));
+
     if (!issues.length) {
       setReviewing(true);
     }
   };
+
   const save = async () => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       const values = labPreview ? labPreview.values : toStepValues(step, data);
+
       if (target) {
         await amendEntry(
           target,
@@ -251,6 +285,7 @@ export const EntryEditorSheet = ({
           context,
         );
       }
+
       const savedMessage = () => {
         if (target) {
           return 'Correction saved; the original remains in the history';
@@ -262,6 +297,7 @@ export const EntryEditorSheet = ({
 
         return 'Additional entry saved';
       };
+
       toast(savedMessage());
       onClose();
     } catch (cause) {
@@ -272,6 +308,7 @@ export const EntryEditorSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title={`${target ? 'Correct' : 'Record another'} ${STEP_DEFS[step].short.toLowerCase()}`}

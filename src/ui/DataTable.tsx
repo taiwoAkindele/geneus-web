@@ -72,24 +72,32 @@ export const DataTable = <T,>({
   const sort = controlledSort ?? storedSort;
   const [storedPage, setStoredPage] = useState(0);
   const page = controlledPage ?? storedPage;
+
   const setPage = (value: number) => {
     setStoredPage(value);
     onPageChange?.(value);
   };
+
   const pageSize = 25;
+
   const shown = useMemo(() => {
     const column = columns.find((candidate) => candidate.key === sort?.key);
+
     if (paged || !column?.sortValue) {
       return rows;
     }
+
     const value = column.sortValue;
+
     return [...rows].sort((a, b) => {
       const first = value(a);
       const second = value(b);
+
       const comparison =
         typeof first === 'number' && typeof second === 'number'
           ? first - second
           : String(first).localeCompare(String(second), undefined, { numeric: true });
+
       return comparison * (sort?.descending ? -1 : 1);
     });
   }, [rows, columns, sort, paged]);
@@ -97,6 +105,7 @@ export const DataTable = <T,>({
   const count = paged ? total : shown.length;
   const activePage = Math.max(0, Math.min(page, Math.ceil(count / pageSize) - 1));
   const visible = paged ? shown : shown.slice(activePage * pageSize, (activePage + 1) * pageSize);
+
   return (
     <div className="overflow-x-auto rounded-card border border-outline-soft bg-white">
       <table className="w-full border-collapse text-left text-sm">
@@ -119,8 +128,10 @@ export const DataTable = <T,>({
                         key: column.key,
                         descending: sort?.key === column.key ? !sort.descending : false,
                       };
+
                       setStoredPage(0);
                       setStoredSort(next);
+
                       if (onSortChange) {
                         onSortChange(next);
                       } else {

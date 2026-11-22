@@ -12,12 +12,14 @@ const patient = (id: string, allergies: string[] = []) =>
     allergies,
     createdOn: '2026-10-01T08:00:00Z',
   }) as unknown as Patient;
+
 const row = (id: string, extra: Partial<PatientDirectoryRow> = {}): PatientDirectoryRow => ({
   patient: patient(id),
   ids: [id],
   searchRecords: [patient(id)],
   ...extra,
 });
+
 const event = (
   id: string,
   patientId: string,
@@ -34,12 +36,14 @@ const event = (
     values,
     facilityId: 'TEST',
   }) as unknown as ClinicalEvent;
+
 const visit = (
   id: string,
   patientId: string,
   openedOn: string,
   status: EncounterSummary['status'] = 'Open',
 ) => ({ id, patientId, openedOn, status }) as EncounterSummary;
+
 const stay = {
   encounterId: 'v',
   status: 'arrive',
@@ -64,16 +68,19 @@ describe('clinical patients table', () => {
       ],
       '2026-11-01',
     );
+
     expect(summaries.get('A')).toMatchObject({ status: 'in_progress', openVisit: { id: 'a1' } });
     expect(summaries.get('B')).toMatchObject({ status: 'unfinished', openVisit: { id: 'b1' } });
     expect(summaries.get('C')?.status).toBe('not_admitted');
     expect(summaries.get('D')?.status).toBe('admitted');
   });
+
   it('lists current active problems and merged allergies, most severe first, across linked records', () => {
     const linked = {
       ...row('A', { ids: ['A', 'A2'] }),
       searchRecords: [patient('A', ['Latex', 'Penicillin'])],
     };
+
     const summary = summariseClinicalRows(
       [linked],
       [
@@ -117,6 +124,7 @@ describe('clinical patients table', () => {
       [],
       '2026-11-01',
     ).get('A')!;
+
     expect(summary.problems.sort()).toEqual(['Hypertension', 'Malaria']);
     expect(summary.allergies).toEqual([
       { allergen: 'Penicillin', severity: 'severe' },

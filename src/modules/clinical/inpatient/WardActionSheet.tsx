@@ -26,6 +26,7 @@ import { useWardForm } from './useWardForm';
 
 /** One thing done on the ward, signed on its own. */
 export type WardAction = 'note' | 'observations' | 'diagnosis' | 'tests' | 'medicine' | 'injection';
+
 const STEP: Record<WardAction, StepKey> = {
   note: 'complaint',
   observations: 'vitals',
@@ -34,8 +35,10 @@ const STEP: Record<WardAction, StepKey> = {
   medicine: 'prescription',
   injection: 'injection_order',
 };
+
 export const actionForStep = (step: StepKey): WardAction | undefined =>
   (Object.keys(STEP) as WardAction[]).find((k) => STEP[k] === step);
+
 const TITLE: Record<WardAction, string> = {
   note: 'Add progress note',
   observations: 'Record observations',
@@ -44,6 +47,7 @@ const TITLE: Record<WardAction, string> = {
   medicine: 'Add medicine',
   injection: 'Order injection',
 };
+
 const DONE: Record<WardAction, string> = {
   note: 'Progress note signed',
   observations: 'Observations signed',
@@ -52,8 +56,10 @@ const DONE: Record<WardAction, string> = {
   medicine: 'Medicine added',
   injection: 'Injection ordered',
 };
+
 /** Ward rules: a diagnosis or treatment decision follows the clinician's reason, recorded in the same activity. */
 const NEEDS_REASON: readonly WardAction[] = ['diagnosis', 'medicine'];
+
 const REASON_LABEL: Partial<Record<WardAction, string>> = {
   diagnosis: 'Why the diagnosis has changed',
   medicine: 'Reason for this treatment decision',
@@ -87,8 +93,10 @@ export const WardActionSheet = ({
   const heads = wardAdmission(records, session.admissionId);
   const ended = heads.length === 1 && !activeAdmission(heads[0]);
   const initial = structuredClone(EMPTY_ENCOUNTER_DATA);
+
   if (changeOrder) {
     const line = orderLine(changeOrder, records.entries);
+
     if (line) {
       initial.prescription = {
         decision: 'prescribed',
@@ -104,12 +112,15 @@ export const WardActionSheet = ({
       };
     }
   }
+
   if (action === 'medicine' && !changeOrder) {
     initial.prescription = { decision: 'prescribed', rx: [{ name: '', dose: '' }] };
   }
+
   if (action === 'injection') {
     initial.injection_order = { ...initial.injection_order, required: true };
   }
+
   const { data, setData, ctl } = useWardForm(initial);
   const [reason, setReason] = useState('');
   const [showLate, setShowLate] = useState(ended);
@@ -121,11 +132,13 @@ export const WardActionSheet = ({
   const [ready, setReady] = useState(false);
   const [edited, setEdited] = useState(false);
   const busy = useRef(false);
+
   const owner = {
     staffId: context.userId!,
     patientId: session.patientId,
     encounterKey: `ward:${session.admissionId}:${session.id}`,
   };
+
   const latest = useRef({
     data,
     step,
@@ -135,6 +148,7 @@ export const WardActionSheet = ({
     changeOrderId: changeOrder?.id,
     reason,
   });
+
   latest.current = {
     data,
     step,
@@ -144,6 +158,7 @@ export const WardActionSheet = ({
     changeOrderId: changeOrder?.id,
     reason,
   };
+
   const title = action === 'medicine' && changeOrder ? 'Change medicine' : TITLE[action];
 
   // Private drafts: restored on open, saved while typing, kept on close.
@@ -154,16 +169,20 @@ export const WardActionSheet = ({
         const draft = drafts.find((d) => d.step === 'ward_form')?.data as
           | { data?: EncounterData; performedOn?: string; lateReason?: string; reason?: string }
           | undefined;
+
         if (active && draft?.data) {
           setData(draft.data);
           setPerformedOn(draft.performedOn ?? '');
           setLateReason(draft.lateReason ?? '');
           setReason(draft.reason ?? '');
+
           if (draft.performedOn || draft.lateReason) {
             setShowLate(true);
           }
+
           setEdited(true);
         }
+
         if (active) {
           setReady(true);
         }
@@ -175,26 +194,32 @@ export const WardActionSheet = ({
           );
         }
       });
+
     return () => {
       active = false;
     };
   }, [session.id]);
+
   useEffect(() => {
     if (!ready) {
       return;
     }
+
     const timer = window.setTimeout(() => {
       void writeDraft(owner, 'ward_form', latest.current).catch(() =>
         setError('The draft could not be saved. Keep this form open and try again.'),
       );
     }, 250);
+
     return () => window.clearTimeout(timer);
   }, [data, performedOn, lateReason, reason, ready]);
+
   const close = async () => {
     try {
       if (ready && edited) {
         await writeDraft(owner, 'ward_form', latest.current);
       }
+
       onClose();
     } catch {
       setError('Your draft could not be saved. Keep this form open.');
@@ -203,42 +228,54 @@ export const WardActionSheet = ({
 
   const problems = (): string[] => {
     const found: string[] = [];
+
     if (action === 'note' && !data.complaint.note.trim()) {
       found.push('Write the progress note');
     } else if (action !== 'note') {
       found.push(...stepProblems(step, data));
     }
+
     if (NEEDS_REASON.includes(action) && reason.trim().length < 3) {
       found.push(`Add the ${REASON_LABEL[action]!.toLowerCase()}`);
     }
+
     if (ended && (!performedOn || lateReason.trim().length < 3)) {
       found.push('Say when this care happened and why it is recorded late');
     }
+
     return found;
   };
+
   const check = () => {
     const found = problems();
+
     if (found.length) {
       setError(found.join('. '));
       toast(found[0], { tone: 'error' });
+
       return;
     }
+
     setError('');
     setReviewing(true);
   };
+
   const sign = async () => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     const options = {
       performedOn: performedOn
         ? zonedInstant(performedOn, facility?.timeZone ?? 'Africa/Lagos')
         : undefined,
       lateReason: lateReason.trim() || undefined,
     };
+
     try {
       if (NEEDS_REASON.includes(action)) {
         await saveWardStep(
@@ -249,18 +286,28 @@ export const WardActionSheet = ({
           options,
         );
       }
+
       await saveWardStep(session, step, toStepValues(step, data), context, {
         ...options,
         changeOrder: step === 'prescription' ? changeOrder : undefined,
       });
+
       // A doctor activity holds just this one decision, so it is closed now; nursing activities close themselves.
       if (session.purpose === 'review' && !ended) {
         await saveWardEvent(session, { kind: 'complete' }, context);
       }
+
       await discardDraft(owner, 'ward_form');
-      toast(
-        ended ? 'Kept for independent review' : changeOrder ? 'Medicine changed' : DONE[action],
-      );
+
+      const doneMessage = () => {
+        if (ended) {
+          return 'Kept for independent review';
+        }
+
+        return changeOrder ? 'Medicine changed' : DONE[action];
+      };
+
+      toast(doneMessage());
       onSaved();
       onClose();
     } catch (cause) {
@@ -268,6 +315,7 @@ export const WardActionSheet = ({
         cause,
         'This care could not be saved. Your entries are kept; try again.',
       );
+
       setError(message);
       toast(message, { tone: 'error' });
       setReviewing(false);

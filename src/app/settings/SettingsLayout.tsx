@@ -19,6 +19,7 @@ export const SettingsLayout = () => {
   useEffect(() => {
     document.title = 'Settings · Geneus Health';
   }, []);
+
   if (!tabs.length) {
     return (
       <main className="p-4">
@@ -27,13 +28,17 @@ export const SettingsLayout = () => {
       </main>
     );
   }
+
   const active = tabs.find((t) => pathname === t.to || pathname.startsWith(t.to + '/'));
+
   if (!active) {
     return <Navigate to={tabs[0].sub?.[0].to ?? tabs[0].to} replace />;
   }
+
   if (active.sub && pathname === active.to) {
     return <Navigate to={active.sub[0].to} replace />;
   }
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 md:px-8">
       <header>
@@ -85,15 +90,20 @@ export const SaveStatus = () => {
   useEffect(() => {
     const on = (event: Event) => setState((event as CustomEvent<ConfigurationSaveState>).detail);
     window.addEventListener(CONFIGURATION_SAVE_EVENT, on);
+
     return () => window.removeEventListener(CONFIGURATION_SAVE_EVENT, on);
   }, []);
+
   useEffect(() => {
     if (state?.phase === 'arrived' && !state.message) {
       const t = window.setTimeout(() => setState(undefined), 4000);
+
       return () => window.clearTimeout(t);
     }
   }, [state]);
+
   const online = sync.connected || (typeof navigator !== 'undefined' && navigator.onLine);
+
   const renderSaveState = () => {
     if (!state) {
       return null;

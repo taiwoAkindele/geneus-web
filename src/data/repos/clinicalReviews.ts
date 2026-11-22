@@ -23,6 +23,7 @@ import { CLINICAL_REVIEWS_TABLE } from '../tables';
 import { envelope, findRecord, insertRecord, insertRecords, newId, type NewRecord } from '../db';
 import { ClinicalReviewRequired, clinicalPayloadHash, prepareClinical } from '../workforceClinical';
 import { loadWorkforce, ownProof } from './workforce';
+
 export type ClinicalReviewBundle = {
   id: string;
   semanticKey: string;
@@ -31,6 +32,7 @@ export type ClinicalReviewBundle = {
   records: NewRecord[];
   proof: AuthoritySnapshot;
 };
+
 const sourceOf = (records: readonly NewRecord[]) =>
   records
     .map((r) => r.record as AnyDocument)
@@ -38,9 +40,11 @@ const sourceOf = (records: readonly NewRecord[]) =>
       (r) =>
         r.type === 'encounter_entry' || r.type === 'clinical_event' || r.type === 'ward_care_event',
     );
+
 /** Normalize generated cross-references only, preserving all literal clinical content. */
 const semantics = (records: readonly NewRecord[]) => {
   const ids = new Map(records.map((r, i) => [(r.record as AnyDocument).id, `new-record-${i}`]));
+
   const normalize = (value: unknown, depth: number, key = ''): unknown => {
     if (typeof value === 'string') {
       return [
@@ -55,9 +59,11 @@ const semantics = (records: readonly NewRecord[]) => {
         ? ids.get(value) || value
         : value;
     }
+
     if (Array.isArray(value)) {
       return value.map((v) => normalize(v, depth + 1, key === 'chargeIds' ? 'id' : key));
     }
+
     if (value && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value)
@@ -78,23 +84,29 @@ const semantics = (records: readonly NewRecord[]) => {
           .map(([k, v]) => [k, normalize(v, depth + 1, k)]),
       );
     }
+
     return value;
   };
+
   return records.map((r) => ({
     type: r.type,
     permission: r.permission,
     record: normalize(r.record, 1),
   }));
 };
+
 export const listClinicalReviews = async (
   context: AuthorizationContext,
 ): Promise<ClinicalReviewBundle[]> => {
   assertAllowed(context, 'encounter:record');
+
   const rows = await getDatabase().getAll<{
     data: string;
   }>(`SELECT data FROM ${CLINICAL_REVIEWS_TABLE} WHERE facilityId = ?`, [context.facilityId]);
+
   return rows.map((r) => JSON.parse(r.data) as ClinicalReviewBundle);
 };
+
 export const prepareClinicalBundle = async (
   records: readonly NewRecord[],
   context: AuthorizationContext,
@@ -103,9 +115,11 @@ export const prepareClinicalBundle = async (
   reviewId?: string;
 }> => {
   const source = sourceOf(records);
+
   if (!source) {
     return { records: [...records] };
   }
+
   if (
     records.filter((r) => ['encounter_entry', 'clinical_event', 'ward_care_event'].includes(r.type))
       .length === 1 &&
@@ -113,7 +127,9 @@ export const prepareClinicalBundle = async (
   ) {
     return { records: [...records] };
   }
+
   const enforcing = workforceEnforcementActive((await getFacility())?.workforcePolicy, Date.now());
+
   if (
     !enforcing &&
     !(await getDatabase().getOptional(
@@ -123,24 +139,31 @@ export const prepareClinicalBundle = async (
   ) {
     return { records: [...records] };
   }
+
   const semanticKey = await clinicalPayloadHash({
     actor: context.userId,
     records: semantics(records),
   });
+
   const row = await getDatabase().getOptional<{
     data: string;
   }>(`SELECT data FROM ${CLINICAL_REVIEWS_TABLE} WHERE id = ?`, [
     JSON.stringify([context.facilityId, context.deviceId, context.userId, semanticKey]),
   ]);
+
   const captured = row ? (JSON.parse(row.data) as ClinicalReviewBundle) : undefined;
+
   if (!enforcing) {
     if (captured) {
       throw new ClinicalReviewRequired(sourceOf(captured.records)!, captured.proof, true);
     }
+
     return { records: [...records] };
   }
+
   const prepared: NewRecord[] = [];
   const required: ClinicalReviewRequired[] = [];
+
   for (const record of captured?.records || records) {
     try {
       prepared.push({
@@ -156,9 +179,11 @@ export const prepareClinicalBundle = async (
       }
     }
   }
+
   if (required.length) {
     const candidate = required[0];
     const id = JSON.stringify([context.facilityId, context.deviceId, context.userId, semanticKey]);
+
     const bundle: ClinicalReviewBundle = {
       id,
       semanticKey,
@@ -167,14 +192,18 @@ export const prepareClinicalBundle = async (
       records: prepared,
       proof: candidate.proof,
     };
+
     await getDatabase().execute(
       `INSERT OR REPLACE INTO ${CLINICAL_REVIEWS_TABLE}(id,facilityId,staffId,semanticKey,data) VALUES(?,?,?,?,?)`,
       [id, context.facilityId, context.userId, semanticKey, JSON.stringify(bundle)],
     );
+
     throw candidate;
   }
+
   return { records: prepared, reviewId: captured?.id };
 };
+
 export const clearClinicalReview = async (id: string) =>
   getDatabase().execute(`DELETE FROM ${CLINICAL_REVIEWS_TABLE} WHERE id = ?`, [id]);
 
@@ -186,12 +215,15 @@ export const retainClinicalDraftForReview = async (
 ): Promise<never> => {
   const workforce = await loadWorkforce();
   const proof = await ownProof(context, workforce);
+
   if (!proof) {
     throw new Error(
       'Independent late-care review requires accepted personal clinical scope. Your private form remains available.',
     );
   }
+
   const prepared: NewRecord[] = [];
+
   for (const item of records) {
     try {
       prepared.push({ ...item, record: await prepareClinical(item.record, context) });
@@ -203,15 +235,20 @@ export const retainClinicalDraftForReview = async (
       }
     }
   }
+
   const source = sourceOf(prepared);
+
   if (!source) {
     throw new Error('The original reported care is missing');
   }
+
   const semanticKey = await clinicalPayloadHash({
     actor: context.userId,
     records: semantics(prepared),
   });
+
   const id = JSON.stringify([context.facilityId, context.deviceId, context.userId, semanticKey]);
+
   const bundle: ClinicalReviewBundle = {
     id,
     semanticKey,
@@ -220,12 +257,15 @@ export const retainClinicalDraftForReview = async (
     records: prepared,
     proof: proof.snapshot,
   };
+
   await getDatabase().execute(
     `INSERT OR REPLACE INTO ${CLINICAL_REVIEWS_TABLE}(id,facilityId,staffId,semanticKey,data) VALUES(?,?,?,?,?)`,
     [id, context.facilityId, context.userId, semanticKey, JSON.stringify(bundle)],
   );
+
   throw new ClinicalReviewRequired(source, proof.snapshot, true);
 };
+
 export const acknowledgeClinicalReview = async (
   bundle: ClinicalReviewBundle,
   context: AuthorizationContext,
@@ -236,15 +276,19 @@ export const acknowledgeClinicalReview = async (
   const worker = data.staff.find((s) => s.staffId === context.userId);
   const proof = await ownProof(context, data);
   const candidate = sourceOf(bundle.records);
+
   if (!candidate || !worker || !proof || candidate.createdBy === context.userId) {
     throw new Error(
       'A different independently qualified staff member must acknowledge this source',
     );
   }
+
   const parsed = parseDocument(candidate);
+
   if (!parsed.success) {
     throw new Error('The original review draft is no longer valid');
   }
+
   if (
     candidate.type !== 'encounter_entry' &&
     candidate.type !== 'clinical_event' &&
@@ -252,23 +296,29 @@ export const acknowledgeClinicalReview = async (
   ) {
     throw new Error('Select a clinical source');
   }
+
   const offeringId = candidate.actorContext?.offeringId;
+
   if (!offeringId) {
     throw new Error('The source service is missing');
   }
+
   const original =
     candidate.type === 'encounter_entry' && candidate.amends
       ? await findRecord<EncounterEntry>('encounter_entry', candidate.amends)
       : undefined;
+
   const actions = clinicalRecordActions(candidate, original);
   const digest = await clinicalPayloadHash(parsed.data);
   const at = new Date().toISOString();
   const audits: NewRecord[] = [];
+
   for (const action of actions) {
     const required =
       kind === 'checker' && ['record_result', 'perform_test'].includes(action)
         ? 'verify_result'
         : action;
+
     if (
       clinicalActivityIssues(
         worker,
@@ -280,6 +330,7 @@ export const acknowledgeClinicalReview = async (
     ) {
       continue;
     }
+
     audits.push({
       type: 'audit_event',
       permission: 'encounter:record',
@@ -304,17 +355,21 @@ export const acknowledgeClinicalReview = async (
       },
     });
   }
+
   if (!audits.length) {
     throw new Error('You do not have independent accepted scope for any activity in this request');
   }
+
   await insertRecords(context, audits);
 };
+
 export const resubmitHistoricalReview = async (
   rejection: SyncRejection,
   reason: string,
   context: AuthorizationContext,
 ): Promise<void> => {
   const parsed = parseDocument(rejection.refusedRecord);
+
   if (
     !parsed.success ||
     !['encounter_entry', 'clinical_event', 'ward_care_event'].includes(parsed.data.type) ||
@@ -322,11 +377,14 @@ export const resubmitHistoricalReview = async (
   ) {
     throw new Error('The original clinical source is not available for exact resubmission');
   }
+
   const data = await loadWorkforce();
   const worker = data.staff.find((s) => s.staffId === context.userId);
+
   if (!worker) {
     throw new Error('Your active staff identity is required');
   }
+
   const trusted = withReviewerAuthority(context, worker, await ownProof(context, data), Date.now());
   assertAllowed(trusted, 'clinical_capability:review');
   await reviewHistoricalCare(context, rejection.id, reason, parsed.data);
@@ -334,6 +392,7 @@ export const resubmitHistoricalReview = async (
     replaceSame: true,
   });
 };
+
 /** A retained unsigned draft can receive independent review before its first upload. */
 export const submitReviewedClinicalDraft = async (
   bundle: ClinicalReviewBundle,
@@ -341,22 +400,28 @@ export const submitReviewedClinicalDraft = async (
   context: AuthorizationContext,
 ): Promise<void> => {
   const source = sourceOf(bundle.records);
+
   if (!source) {
     throw new Error('The original clinical source is missing');
   }
+
   const data = await loadWorkforce();
   const worker = data.staff.find((s) => s.staffId === context.userId);
+
   if (!worker) {
     throw new Error('Active reviewer identity required');
   }
+
   const trusted = withReviewerAuthority(context, worker, await ownProof(context, data), Date.now());
   assertAllowed(trusted, 'clinical_capability:review');
   await reviewHistoricalDraft(context, source, reason);
+
   const records = bundle.records.map((item) =>
     item.type === source.type
       ? { ...item, permission: 'clinical_capability:review' as const }
       : { ...item, record: { ...(item.record as AnyDocument), ...envelope(context) } },
   );
+
   await insertRecords(trusted, records);
   await clearClinicalReview(bundle.id);
 };

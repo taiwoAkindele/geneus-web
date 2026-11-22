@@ -32,6 +32,7 @@ const load = async () => {
     listAppointments(),
     allOfType<ServiceOffering>('service_offering'),
   ]);
+
   return {
     encounters,
     entries,
@@ -45,4 +46,5 @@ const load = async () => {
     offerings,
   };
 };
+
 export const useMonthlyReport = () => useLiveQuery(load);

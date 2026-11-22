@@ -62,16 +62,19 @@ const TAB_COPY: Record<Tab, { searchLabel: string; placeholder: string; empty: s
     empty: 'No answer lists yet.',
   },
 };
+
 type Panel =
   | 'standard'
   | 'copy'
   | { kind: 'part'; part?: ResultPartDefinition }
   | { kind: 'list'; list?: AnswerList };
+
 const TABS = [
   { value: 'templates', label: 'Result templates' },
   { value: 'parts', label: 'Result parts library' },
   { value: 'answers', label: 'Answer lists' },
 ] as const;
+
 const updated = (record: { updatedOn?: string; createdOn: string }) =>
   new Date(record.updatedOn ?? record.createdOn).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -89,23 +92,29 @@ const StandardTemplatesSheet = ({ onClose }: { onClose: () => void }) => {
   const [result, setResult] = useState<{ added: string[]; skipped: string[] }>();
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
+
   // Searches template names and the tests each serves; ticks are kept while the list is filtered.
   const shown = (templates ?? []).filter(
     (t) => !needle || [t.name, ...t.testNames].some((text) => text.toLowerCase().includes(needle)),
   );
+
   const toggle = (key: string) =>
     setPicked((current) => {
       const next = new Set(current);
+
       if (next.has(key)) {
         next.delete(key);
       } else {
         next.add(key);
       }
+
       return next;
     });
+
   const add = async () => {
     setBusy(true);
     setError('');
+
     try {
       setResult(await adoptStandardTemplates([...picked], context));
       setPicked(new Set());
@@ -116,6 +125,7 @@ const StandardTemplatesSheet = ({ onClose }: { onClose: () => void }) => {
       setBusy(false);
     }
   };
+
   const renderStandardTemplates = () => {
     if (standards.error) {
       return (
@@ -241,9 +251,11 @@ const StandardTemplatesSheet = ({ onClose }: { onClose: () => void }) => {
 const CopySheet = ({ onClose }: { onClose: () => void }) => {
   const context = useAuthorizationContext();
   const navigate = useNavigate();
+
   const settings = useLiveQuery(
     useCallback(() => loadResultTemplateSettings(), [context.facilityId]),
   );
+
   return (
     <Sheet title="Copy one of your templates" placement="side" onClose={onClose}>
       <div className="space-y-2">
@@ -291,6 +303,7 @@ const AnswerListSheet = ({ list, onClose }: { list?: AnswerList; onClose: () => 
   const [active, setActive] = useState(list?.active ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const save = async () => {
     const draft = AnswerListDraft.safeParse({
       name: name.trim(),
@@ -300,12 +313,16 @@ const AnswerListSheet = ({ list, onClose }: { list?: AnswerList; onClose: () => 
         .filter(Boolean),
       active,
     });
+
     if (!draft.success) {
       setError(draft.error.issues[0]?.message ?? 'Check the answer list');
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await saveAnswerList(draft.data, context, list);
       onClose();
@@ -315,6 +332,7 @@ const AnswerListSheet = ({ list, onClose }: { list?: AnswerList; onClose: () => 
       setBusy(false);
     }
   };
+
   return (
     <Sheet
       title={list ? list.name : 'New answer list'}
@@ -389,6 +407,7 @@ const LibraryPartSheet = ({
   const context = useAuthorizationContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   return (
     <PartSheet
       part={shared?.part}
@@ -418,15 +437,19 @@ export const CatalogueSettingsScreen = () => {
   const context = useAuthorizationContext();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+
   const tab = (
     TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'templates'
   ) as Tab;
+
   const query = params.get('q') ?? '';
   const page = Math.max(0, Number(params.get('page')) || 0);
+
   const set = (changes: Record<string, string>) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
+
         for (const [key, value] of Object.entries(changes)) {
           if (value) {
             next.set(key, value);
@@ -434,32 +457,39 @@ export const CatalogueSettingsScreen = () => {
             next.delete(key);
           }
         }
+
         return next;
       },
       { replace: true },
     );
+
   const templates = useLiveQuery(
     useCallback(
       () => loadTemplatePage(context, { query, page }),
       [context.facilityId, query, page],
     ),
   );
+
   const parts = useLiveQuery(
     useCallback(() => loadPartPage(context, { query, page }), [context.facilityId, query, page]),
   );
+
   const lists = useLiveQuery(
     useCallback(
       () => loadAnswerListPage(context, { query, page }),
       [context.facilityId, query, page],
     ),
   );
+
   const allLists = useLiveQuery(
     useCallback(() => loadResultTemplateSettings().then((s) => s.lists), [context.facilityId]),
   );
+
   const [panel, setPanel] = useState<Panel>();
   useEffect(() => {
     document.title = 'Catalogue settings · Geneus Health';
   }, []);
+
   const close = () => {
     setPanel(undefined);
     templates.reload();
@@ -535,6 +565,7 @@ export const CatalogueSettingsScreen = () => {
       ),
     },
   ];
+
   const partColumns: TableColumn<{ part: ResultPartDefinition; uses: number }>[] = [
     {
       key: 'name',
@@ -579,6 +610,7 @@ export const CatalogueSettingsScreen = () => {
       ),
     },
   ];
+
   const listColumns: TableColumn<{ list: AnswerList; uses: number }>[] = [
     {
       key: 'name',
@@ -612,11 +644,13 @@ export const CatalogueSettingsScreen = () => {
       ),
     },
   ];
+
   const createActions = [
     { label: 'Start from a standard template', onSelect: () => setPanel('standard') },
     { label: 'Copy one of your templates', onSelect: () => setPanel('copy') },
     { label: 'Start blank', onSelect: () => navigate('/laboratory/settings/templates/new') },
   ];
+
   const currentQueryFor = () => {
     if (tab === 'templates') {
       return templates;
@@ -628,6 +662,7 @@ export const CatalogueSettingsScreen = () => {
 
     return lists;
   };
+
   const current = currentQueryFor();
   const tabCopy = TAB_COPY[tab];
   const searchLabel = tabCopy.searchLabel;

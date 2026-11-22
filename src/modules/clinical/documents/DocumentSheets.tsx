@@ -19,7 +19,14 @@ import {
   updateVisitDocument,
   type ClinicalDocumentsData,
 } from '@/data/repos/clinicalDocuments';
+
+const TASK_LABELS: Record<string, string> = {
+  attach: 'Add visit document',
+  signed_copy: 'Upload signed copy',
+};
+
 export type LibraryTask = { action: LibraryDocument['action']; record?: LibraryDocument };
+
 export const LibraryDocumentSheet = ({
   task,
   onClose,
@@ -35,6 +42,7 @@ export const LibraryDocumentSheet = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const needsFile = task.action === 'upload' || task.action === 'replace';
+
   const label = {
     upload: 'Upload document',
     replace: 'Replace library file',
@@ -42,20 +50,26 @@ export const LibraryDocumentSheet = ({
     archive: 'Archive document',
     restore: 'Restore document',
   }[task.action];
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
+
     if (needsFile && !file) {
       setError('Choose a file');
+
       return;
     }
+
     setSaving(true);
     setError('');
+
     try {
       if (task.action === 'upload') {
         await uploadLibraryDocument(title, file!, context);
       } else if (task.record) {
         await changeLibraryDocument(task.record, task.action, context, file, title);
       }
+
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The document could not be saved');
@@ -63,6 +77,7 @@ export const LibraryDocumentSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title={label}
@@ -82,6 +97,7 @@ export const LibraryDocumentSheet = ({
             onChange={(event) => {
               const next = event.target.files?.[0];
               setFile(next);
+
               if (next && !title) {
                 setTitle(next.name.replace(/\.[^.]+$/, ''));
               }
@@ -139,6 +155,7 @@ type ReviewForm = {
   signedOn: string;
   note: string;
 };
+
 const emptyReview: ReviewForm = {
   signerName: '',
   signerKind: 'patient',
@@ -147,6 +164,7 @@ const emptyReview: ReviewForm = {
   signedOn: '',
   note: '',
 };
+
 const signature = (form: ReviewForm) =>
   SignatureSchema.parse({
     ...form,
@@ -155,10 +173,12 @@ const signature = (form: ReviewForm) =>
     signedOn: form.signedOn || undefined,
     note: form.note.trim() || undefined,
   });
+
 export type VisitDocumentTask = {
   action: 'attach' | 'signed_copy' | 'status';
   record?: VisitDocument;
 };
+
 export const VisitDocumentSheet = ({
   task,
   admission,
@@ -181,9 +201,11 @@ export const VisitDocumentSheet = ({
   const [templateId, setTemplateId] = useState('');
   const [file, setFile] = useState<File>();
   const [title, setTitle] = useState(task.record?.title ?? '');
+
   const [status, setStatus] = useState<DocumentSignatureStatus>(
     task.action === 'signed_copy' ? 'signed' : (task.record?.signatureStatus ?? 'unsigned'),
   );
+
   const [review, setReview] = useState<ReviewForm>({
     ...emptyReview,
     ...task.record?.signatureReview,
@@ -192,48 +214,58 @@ export const VisitDocumentSheet = ({
     signedOn: task.record?.signatureReview?.signedOn ?? '',
     note: task.record?.signatureReview?.note ?? '',
   });
+
   const [verified, setVerified] = useState(false);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
   const templates = data.libraryHeads.filter(
     (record) =>
       !record.archived &&
       data.libraryHeads.filter((other) => other.documentId === record.documentId).length === 1,
   );
+
   const template = templates.find((record) => record.id === templateId);
-  const label =
-    task.action === 'attach'
-      ? 'Add visit document'
-      : task.action === 'signed_copy'
-        ? 'Upload signed copy'
-        : 'Review signature status';
+  const label = TASK_LABELS[task.action] ?? 'Review signature status';
+
   const requiresFile =
     task.action === 'signed_copy' || (task.action === 'attach' && source === 'upload');
+
   const sourceTemplate = data.library.find(
     (record) => record.id === task.record?.templateVersionId,
   );
+
   const canMarkSigned =
     task.action === 'signed_copy' ||
     (task.action === 'attach'
       ? source === 'upload'
       : !sourceTemplate || task.record?.file.id !== sourceTemplate.file.id);
+
   const setReviewField = (key: keyof ReviewForm, value: string) =>
     setReview((current) => ({ ...current, [key]: value }));
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
+
     if (requiresFile && !file) {
       setError('Choose the patient-specific file');
+
       return;
     }
+
     if (status === 'signed' && !verified) {
       setError('Confirm that you checked the signature evidence');
+
       return;
     }
+
     setSaving(true);
+
     try {
       const signatureReview = status === 'signed' ? signature(review) : undefined;
+
       if (task.action === 'attach') {
         await attachVisitDocument(
           {
@@ -255,6 +287,7 @@ export const VisitDocumentSheet = ({
           changeReason: reason,
         });
       }
+
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The visit document could not be saved');
@@ -262,6 +295,7 @@ export const VisitDocumentSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title={label}
@@ -299,6 +333,7 @@ export const VisitDocumentSheet = ({
               value={source}
               onChange={(event) => {
                 setSource(event.target.value as 'library' | 'upload');
+
                 if (status === 'signed') {
                   setStatus('unsigned');
                 }
@@ -316,6 +351,7 @@ export const VisitDocumentSheet = ({
                 onChange={(event) => {
                   setTemplateId(event.target.value);
                   const next = templates.find((record) => record.id === event.target.value);
+
                   if (next) {
                     setTitle(next.title);
                   }
@@ -340,6 +376,7 @@ export const VisitDocumentSheet = ({
             onChange={(event) => {
               const next = event.target.files?.[0];
               setFile(next);
+
               if (next && !title) {
                 setTitle(next.name.replace(/\.[^.]+$/, ''));
               }

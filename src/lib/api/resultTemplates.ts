@@ -14,6 +14,7 @@ export type StandardTemplateOption = {
   tests: string[];
   added: boolean;
 };
+
 export type SavedRevision = { id: string; revision: number };
 
 export const listStandardTemplates = (actorStaffId: string) =>
@@ -21,12 +22,14 @@ export const listStandardTemplates = (actorStaffId: string) =>
     '/result-templates/standard',
     actorStaffId,
   );
+
 export const adoptStandardTemplates = (actorStaffId: string, keys: string[]) =>
   organizationRequest<{ added: string[]; skipped: string[] }>(
     '/result-templates/standard/adopt',
     actorStaffId,
     { keys },
   );
+
 export const saveResultTemplate = (
   actorStaffId: string,
   template: ResultTemplateDraft,
@@ -39,6 +42,7 @@ export const saveResultTemplate = (
         { expectedRevision: existing.revision, template },
       )
     : organizationRequest<SavedRevision>('/result-templates', actorStaffId, { template });
+
 export const saveResultPart = (
   actorStaffId: string,
   part: ResultPartDraft,
@@ -51,6 +55,7 @@ export const saveResultPart = (
         { expectedRevision: existing.revision, part },
       )
     : organizationRequest<SavedRevision>('/result-parts', actorStaffId, { part });
+
 export const saveAnswerList = (
   actorStaffId: string,
   list: AnswerListDraft,

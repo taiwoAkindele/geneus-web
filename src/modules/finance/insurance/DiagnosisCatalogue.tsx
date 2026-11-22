@@ -3,7 +3,7 @@ import { DiagnosisCatalogueImport, type DiagnosisCatalogueSummary } from '@share
 import {
   importDiagnosisCatalogue,
   listDiagnosisCatalogues,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import {
   columnName,
@@ -67,22 +67,27 @@ export const DiagnosisCatalogue = () => {
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [busy, setBusy] = useState(false);
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+
   const load = useCallback(async () => {
     try {
       setCatalogues((await listDiagnosisCatalogues(context)).catalogues);
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const sheet = file?.sheets[sheetIndex];
   const headers = sheet?.rows[headerRow] ?? [];
+
   const lines = useMemo(
     () => (sheet ? catalogueLines(mappedRows(sheet.rows, headerRow, mapping)) : []),
     [sheet, headerRow, mapping],
   );
+
   const parsed = useMemo(
     () =>
       file && lines.length
@@ -98,12 +103,15 @@ export const DiagnosisCatalogue = () => {
         : undefined,
     [file, lines, codeSystem, edition, licence, mode, requestKey],
   );
+
   const choose = async (chosen?: File) => {
     if (!chosen) {
       return;
     }
+
     setError('');
     setFile(undefined);
+
     try {
       const table = await readTableFile(chosen);
       const header = detectHeaderRow(table.sheets[0].rows, CATALOGUE_FIELDS);
@@ -113,29 +121,34 @@ export const DiagnosisCatalogue = () => {
       setMapping(suggestMapping(table.sheets[0].rows[header] ?? [], CATALOGUE_FIELDS));
       setRequestKey(crypto.randomUUID());
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   };
+
   const submit = async () => {
     if (!parsed?.success) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       const r = await importDiagnosisCatalogue(context, parsed.data);
       toast(
         `${r.codes} codes in your ${codeSystem} list: ${r.added} added, ${r.changed} changed, ${r.removed} removed.`,
       );
+
       setFile(undefined);
       setRequestKey(crypto.randomUUID());
       await load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   const renderCatalogues = () => {
     if (!catalogues) {
       return (
@@ -219,11 +232,13 @@ export const DiagnosisCatalogue = () => {
                   onChange={(e) =>
                     setMapping((m) => {
                       const n = { ...m };
+
                       if (e.target.value === '') {
                         delete n[f.key];
                       } else {
                         n[f.key] = Number(e.target.value);
                       }
+
                       return n;
                     })
                   }

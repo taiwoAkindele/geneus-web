@@ -52,6 +52,7 @@ export const FrontDeskPatientsScreen = () => {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const context = useAuthorizationContext();
+
   const directory = useLiveQuery(
     useCallback(
       () => loadPatientDirectory(context),
@@ -59,7 +60,9 @@ export const FrontDeskPatientsScreen = () => {
     ),
     DIRECTORY_TYPES,
   );
+
   const query = params.get('q') ?? params.get('visitQuery') ?? '';
+
   const change = (key: string, value: string) =>
     setParams(
       (current) => {
@@ -67,29 +70,36 @@ export const FrontDeskPatientsScreen = () => {
         next.delete('page');
         next.delete('visitPage');
         next.delete('visitQuery');
+
         if (value) {
           next.set(key, value);
         } else {
           next.delete(key);
         }
+
         return next;
       },
       { replace: true },
     );
+
   useEffect(() => {
     document.title = 'Patients · Geneus Health';
   }, []);
+
   const rows = directory.data ?? [];
+
   // Balances are financial facts: only staff who handle payments or fees see them.
   const canBill = context.permissions.some((permission) =>
     ['payment:receive', 'payment:waive', 'fee_item:manage'].includes(permission),
   );
+
   const balances = useLiveQuery(
     useCallback(
       async () =>
         canBill
           ? await (async () => {
               const charges = await listCharges();
+
               return chargeBalances(
                 charges,
                 await listPayments(),
@@ -113,7 +123,9 @@ export const FrontDeskPatientsScreen = () => {
       'cover_schedule',
     ],
   );
+
   const owed = (row: PatientDirectoryRow) => balanceOwed(row, balances.data ?? []);
+
   // The Show select replaces the old tabs and keeps their ?care= address; anything unknown (or hidden from this role) shows all patients.
   const views = [
     { value: 'all', label: 'All patients', count: rows.length },
@@ -138,8 +150,10 @@ export const FrontDeskPatientsScreen = () => {
       count: rows.filter((row) => !row.stay && row.lastVisit).length,
     },
   ];
+
   const careParam = params.get('care') ?? 'all';
   const care = views.some((view) => view.value === careParam) ? careParam : 'all';
+
   const found = useMemo(() => {
     const searchable = rows.flatMap((row) =>
       row.searchRecords.map((patient) => ({
@@ -147,9 +161,11 @@ export const FrontDeskPatientsScreen = () => {
         ...(!context.permissions.includes('patient:update') ? { nin: undefined } : {}),
       })),
     );
+
     const ids = new Set(
       searchPatients(searchable, query, context.facilityId).map((patient) => patient.patientId),
     );
+
     const matchesCare = (row: (typeof rows)[number]): boolean => {
       if (!care || care === 'all') {
         return true;
@@ -172,24 +188,31 @@ export const FrontDeskPatientsScreen = () => {
 
     return rows.filter((row) => row.ids.some((id) => ids.has(id)) && matchesCare(row));
   }, [rows, query, care, context.facilityId, context.permissions.join('|'), balances.data]);
+
   const open = (id: string) =>
     navigate(patientChartPath(id, 'details', { from: FRONT_DESK_PATIENTS + '?' + params }));
+
   const chart = (id: string) =>
     navigate(patientChartPath(id, 'now', { from: FRONT_DESK_PATIENTS + '?' + params }));
+
   const canEdit = context.permissions.includes('patient:update');
   const canChart = canReadPatientChart(context);
   const [editing, setEditing] = useState<Patient>();
+
   const contacts = useLiveQuery(
     useCallback(() => currentContactsByPatient(), []),
     ['patient_contact'],
   );
+
   const emailOf = (row: PatientDirectoryRow) => contacts.data?.get(row.patient.patientId)?.email;
   const page = Number(params.get('page') ?? 0);
   // Newest registrations first unless the user picks another sort.
   const sortKey = params.get('sort');
+
   const sort = ['patient', 'created'].includes(sortKey ?? '')
     ? { key: sortKey!, descending: params.get('descending') === '1' }
     : { key: 'created', descending: true };
+
   const renderDirectory = () => {
     if (directory.loading) {
       return <p role="status">Reading patients...</p>;
@@ -222,6 +245,7 @@ export const FrontDeskPatientsScreen = () => {
                 (current) => {
                   const next = new URLSearchParams(current);
                   next.set('page', String(value));
+
                   return next;
                 },
                 { replace: true },
@@ -235,6 +259,7 @@ export const FrontDeskPatientsScreen = () => {
                   next.set('sort', value.key);
                   next.set('descending', value.descending ? '1' : '0');
                   next.delete('page');
+
                   return next;
                 },
                 { replace: true },
@@ -324,6 +349,7 @@ export const FrontDeskPatientsScreen = () => {
                 sortValue: createdOn,
                 render: (row) => {
                   const created = new Date(createdOn(row));
+
                   return (
                     <>
                       {created.toLocaleDateString('en-GB', {

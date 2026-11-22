@@ -32,6 +32,7 @@ const patient = (overrides: Partial<Patient>): Patient => ({
 });
 
 const amaka = patient({});
+
 const mother = patient({
   id: 'OOE-PHC-000012-AB',
   patientId: 'OOE-PHC-000012-AB',
@@ -39,6 +40,7 @@ const mother = patient({
   ageYears: 58,
   createdOn: '2026-09-01T09:00:00Z',
 });
+
 const ibrahim = patient({
   id: 'OOE-PHC-000231-T4',
   patientId: 'OOE-PHC-000231-T4',
@@ -62,10 +64,12 @@ describe('the duplicate check', () => {
     expect(findLikelyMatches(registering({ identityStatus: 'provisional' }), [amaka], NOW)).toEqual(
       [],
     );
+
     expect(
       findLikelyMatches(registering({}), [{ ...amaka, identityStatus: 'provisional' }], NOW),
     ).toEqual([]);
   });
+
   it('flags the same name, sex and a close age as the same person', () => {
     const [match] = findLikelyMatches(registering({}), [amaka, ibrahim], NOW);
 
@@ -88,6 +92,7 @@ describe('the duplicate check', () => {
       [amaka],
       NOW,
     );
+
     expect(match.reasons).toContain('phone');
   });
 
@@ -124,6 +129,7 @@ describe('patient search', () => {
       legacyPaperRef: '2023/1187',
       nin: '12345678901',
     });
+
     expect(searchPatients([amaka, alias], '2023/1187', 'OOE-PHC')).toEqual([alias]);
     expect(searchPatients([amaka, alias], '12345678901', 'OOE-PHC')).toEqual([alias]);
     expect(searchPatients([amaka, alias], '47', 'OOE-PHC')).toHaveLength(2);

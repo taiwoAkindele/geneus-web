@@ -13,9 +13,12 @@ import { ApiError, readJsonBody } from './client';
  */
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8080';
 let session: OperatorSession | undefined;
+
 export const operatorSession = () =>
   session && Date.parse(session.expiresOn) > Date.now() ? session : undefined;
+
 export const OPERATOR_SESSION_EVENT = 'geneus:operatorSession';
+
 const changed = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(OPERATOR_SESSION_EVENT));
@@ -24,6 +27,7 @@ const changed = () => {
 
 const post = async <T>(path: string, body: unknown = {}): Promise<T> => {
   let response: Response;
+
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
@@ -40,15 +44,19 @@ const post = async <T>(path: string, body: unknown = {}): Promise<T> => {
       'Cannot reach the Geneus server — check the connection and try again',
     );
   }
+
   if (response.status === 204) {
     return undefined as T;
   }
+
   const payload = (await readJsonBody(response)) as
     { error?: string; message?: string; details?: unknown } | undefined;
+
   if (response.status === 401) {
     session = undefined;
     changed();
   }
+
   if (!response.ok) {
     throw new ApiError(
       payload?.error ?? 'request_failed',
@@ -57,16 +65,20 @@ const post = async <T>(path: string, body: unknown = {}): Promise<T> => {
       payload?.details,
     );
   }
+
   return payload as T;
 };
 
 export const requestOperatorCode = (email: string) =>
   post<{ sentTo: string }>('/operator/login/code', { email });
+
 export const operatorSignIn = async (email: string, code: string) => {
   session = await post<OperatorSession>('/operator/login', { email, code });
   changed();
+
   return session;
 };
+
 export const operatorSignOut = async () => {
   try {
     await post('/operator/logout');
@@ -78,10 +90,12 @@ export const operatorSignOut = async () => {
 
 export const operatorFacilities = () =>
   post<{ facilities: OperatorFacility[] }>('/operator/facilities');
+
 export const operatorFacilityInsurance = (facilityId: string) =>
   post<{ status: InsuranceSetupStatus; requests: InsuranceActivationRequest[] }>(
     `/operator/facilities/${encodeURIComponent(facilityId)}/insurance`,
   );
+
 export const decideActivationRequest = (
   requestId: string,
   decision: 'approve' | 'reject',
@@ -91,6 +105,7 @@ export const decideActivationRequest = (
     `/operator/insurance/requests/${encodeURIComponent(requestId)}/decide`,
     { decision, note },
   );
+
 export const setFacilityInsuranceState = (
   facilityId: string,
   state: 'off' | 'setup',
@@ -100,6 +115,7 @@ export const setFacilityInsuranceState = (
     `/operator/facilities/${encodeURIComponent(facilityId)}/insurance-state`,
     { state, reason },
   );
+
 export type PlatformOperator = {
   id: string;
   email: string;
@@ -108,11 +124,15 @@ export type PlatformOperator = {
   addedBy: string;
   addedOn: string;
 };
+
 export const listOperators = () => post<{ operators: PlatformOperator[] }>('/operator/operators');
+
 export const addOperator = (email: string, name: string) =>
   post<{ ok: true }>('/operator/operators/add', { email, name });
+
 export const removeOperator = (id: string) =>
   post<{ ok: true }>(`/operator/operators/${encodeURIComponent(id)}/remove`);
+
 export type OperatorEvent = {
   action: string;
   facilityId?: string;
@@ -121,4 +141,5 @@ export type OperatorEvent = {
   at: string;
   email: string;
 };
+
 export const operatorEvents = () => post<{ events: OperatorEvent[] }>('/operator/events');

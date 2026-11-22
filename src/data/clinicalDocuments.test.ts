@@ -24,13 +24,16 @@ import {
   loadClinicalDocuments,
 } from './repos/clinicalDocuments';
 import { allOfType } from './db';
+
 type Cached = Parameters<DocumentCacheStore['put']>[0];
+
 const context = () =>
   authorizationFor({
     staff: { staffId: 'staff:doctor', role: 'doctor', permission: 'read_write' },
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const base = () => ({
   facilityId: 'TEST',
   schemaVersion: 5,
@@ -38,8 +41,10 @@ const base = () => ({
   deviceId: 'device:one',
   createdOn: new Date().toISOString(),
 });
+
 const pdf = (text = 'Synthetic hospital form') =>
   new File([`%PDF-1.4\n${text}\n%%EOF`], 'Form.pdf', { type: 'application/pdf' });
+
 const admission = () =>
   InpatientEvent.parse({
     ...base(),
@@ -53,6 +58,7 @@ const admission = () =>
     receivingUnitId: 'unit:ward',
     actorRole: 'doctor',
   });
+
 describe('clinical document persistence and file transfer', () => {
   let storage: ReturnType<typeof sqliteTestDatabase>;
   let files: Map<string, Cached>;
@@ -73,6 +79,7 @@ describe('clinical document persistence and file transfer', () => {
         files.delete(key);
       },
     });
+
     rememberDocumentSupport(context(), 1);
     await storage.seed(
       Patient.parse({
@@ -86,6 +93,7 @@ describe('clinical document persistence and file transfer', () => {
         address: 'Test road',
       }),
     );
+
     await storage.seed(
       Encounter.parse({
         ...base(),
@@ -95,6 +103,7 @@ describe('clinical document persistence and file transfer', () => {
         openedOn: new Date().toISOString(),
       }),
     );
+
     await storage.seed(
       EncounterEntry.parse({
         ...base(),
@@ -107,6 +116,7 @@ describe('clinical document persistence and file transfer', () => {
         values: { ward: 'Ward' },
       }),
     );
+
     await storage.seed(
       Unit.parse({
         ...base(),
@@ -117,14 +127,17 @@ describe('clinical document persistence and file transfer', () => {
         active: true,
       }),
     );
+
     await storage.seed(admission());
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await storage.db.close();
     setDocumentCacheForTests();
     vi.unstubAllGlobals();
   });
+
   it('saves encrypted files and metadata offline, then preserves issued copies across library replacement', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
@@ -133,16 +146,19 @@ describe('clinical document persistence and file transfer', () => {
     expect(new TextDecoder().decode(stored.cipher)).not.toContain('Synthetic hospital form');
     expect(stored.remote).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
+
     const copy = await attachVisitDocument(
       { admission: admission(), title: 'Consent', template: original, signatureStatus: 'unsigned' },
       context(),
     );
+
     const updated = await changeLibraryDocument(
       original,
       'replace',
       context(),
       pdf('Updated hospital form'),
     );
+
     const data = await loadClinicalDocuments(context());
     expect(data.libraryHeads[0].id).toBe(updated.id);
     expect(data.visitHeads[0].file.id).toBe(original.file.id);
@@ -151,22 +167,27 @@ describe('clinical document persistence and file transfer', () => {
       new Uint8Array(await pdf().arrayBuffer()),
     );
   });
+
   it('requires an active inpatient visit and preserves unsigned originals when a reviewed signed copy is added', async () => {
     const original = await uploadLibraryDocument('Consent', pdf(), context());
+
     const copy = await attachVisitDocument(
       { admission: admission(), title: 'Consent', template: original, signatureStatus: 'unsigned' },
       context(),
     );
+
     const signed = await updateVisitDocument(copy, context(), {
       admission: admission(),
       input: pdf('Signed patient scan'),
       signatureStatus: 'signed',
       signatureReview: { signerName: 'Synthetic Patient', signerKind: 'patient' },
     });
+
     expect(signed.signatureStatus).toBe('signed');
     expect(
       (await allOfType('visit_document')).find((record) => record.id === copy.id),
     ).toMatchObject({ signatureStatus: 'unsigned', file: original.file });
+
     await storage.seed({
       ...admission(),
       id: 'stay:cancel',
@@ -174,6 +195,7 @@ describe('clinical document persistence and file transfer', () => {
       action: 'cancel' as const,
       note: 'Withdrawn',
     });
+
     await expect(
       attachVisitDocument(
         {
@@ -186,10 +208,12 @@ describe('clinical document persistence and file transfer', () => {
       ),
     ).rejects.toThrow(/active inpatient/);
   });
+
   it('checks library revisions under the same SQLite lock as insertion', async () => {
     const original = await uploadLibraryDocument('Original', pdf(), context());
     const transaction = storage.db.writeTransaction;
     let raced = false;
+
     storage.db.writeTransaction = async (callback) => {
       if (!raced) {
         raced = true;
@@ -202,22 +226,28 @@ describe('clinical document persistence and file transfer', () => {
           title: 'Other window',
         });
       }
+
       return transaction(callback);
     };
+
     await expect(
       changeLibraryDocument(original, 'rename', context(), undefined, 'Stale title'),
     ).rejects.toThrow(/changed/);
+
     expect(await allOfType('library_document')).toHaveLength(2);
   });
+
   it('releases only an unused staged copy when a local insert is refused', async () => {
     const original = await uploadLibraryDocument('Original', pdf(), context());
     await changeLibraryDocument(original, 'rename', context(), undefined, 'Current title');
     await expect(
       changeLibraryDocument(original, 'replace', context(), pdf('Unqueued replacement')),
     ).rejects.toThrow(/changed/);
+
     expect(files.size).toBe(1);
     expect(await cachedDocument(documentScope(context()), original.file)).toBeDefined();
   });
+
   it('removes refused versions and descendants from the effective list without deleting the file cache', async () => {
     const original = await uploadLibraryDocument('Original', pdf(), context());
     const updated = await changeLibraryDocument(original, 'replace', context(), pdf('Replacement'));
@@ -225,9 +255,11 @@ describe('clinical document persistence and file transfer', () => {
       'INSERT INTO workforce_upload_receipts(id,clientId,outcome) VALUES(?,?,?)',
       [updated.id, 1, 'rejected'],
     );
+
     expect((await loadClinicalDocuments(context())).libraryHeads[0].id).toBe(original.id);
     expect(files.size).toBe(2);
   });
+
   it('blocks unsupported servers and read-only mutations before caching or writing', async () => {
     rememberDocumentSupport(context());
     await expect(uploadLibraryDocument('Form', pdf(), context())).rejects.toThrow(/Connect once/);
@@ -236,8 +268,10 @@ describe('clinical document persistence and file transfer', () => {
     await expect(
       uploadLibraryDocument('Form', pdf(), { ...context(), permissions: [] }),
     ).rejects.toThrow();
+
     expect(await allOfType('library_document')).toHaveLength(0);
   });
+
   it('scopes cache reads to hospital, device and enrollment and detects modified ciphertext', async () => {
     const scope = documentScope(context());
     const file = await stageDocumentFile(scope, pdf());
@@ -249,16 +283,19 @@ describe('clinical document persistence and file transfer', () => {
     files.set(stored.key, { ...stored, cipher: bytes.buffer });
     await expect(cachedDocument(scope, file)).rejects.toThrow();
   });
+
   it('never replaces a cached file with bytes that fail its checksum', async () => {
     const scope = documentScope(context());
     const file = await stageDocumentFile(scope, pdf());
     await expect(
       cacheDocument(scope, file, new TextEncoder().encode('%PDF-1.4\nDifferent content')),
     ).rejects.toThrow(/do not match/);
+
     expect(new TextDecoder().decode((await cachedDocument(scope, file))!.bytes)).toContain(
       'Synthetic hospital form',
     );
   });
+
   it('preserves pending cache entries under storage pressure and evicts only remotely backed-up copies', async () => {
     const scope = documentScope(context());
     const file = await stageDocumentFile(scope, pdf());
@@ -272,8 +309,10 @@ describe('clinical document persistence and file transfer', () => {
     expect(files.size).toBe(1);
     expect(file.id).not.toBe([...files.values()][0].fileId);
   });
+
   it('leaves files pending on network failures and uploads them before metadata is sent', async () => {
     const file = await stageDocumentFile(documentScope(context()), pdf());
+
     const mutation = {
       clientId: 1,
       op: 'put' as const,
@@ -281,6 +320,7 @@ describe('clinical document persistence and file transfer', () => {
       id: 'library:new',
       data: { file, createdBy: context().userId },
     };
+
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -288,10 +328,13 @@ describe('clinical document persistence and file transfer', () => {
           new Response(JSON.stringify({ error: 'unavailable', message: 'Retry' }), { status: 503 }),
       ),
     );
+
     await expect(
       transferDocumentFiles('device.credential', documentScope(context()), [mutation]),
     ).rejects.toThrow('Retry');
+
     expect((await cachedDocument(documentScope(context()), file))?.remote).toBe(false);
+
     const fetch = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
@@ -304,6 +347,7 @@ describe('clinical document persistence and file transfer', () => {
           { status: 201 },
         ),
     );
+
     vi.stubGlobal('fetch', fetch);
     await transferDocumentFiles('device.credential', documentScope(context()), [mutation]);
     expect((await cachedDocument(documentScope(context()), file))?.remote).toBe(true);
@@ -314,6 +358,7 @@ describe('clinical document persistence and file transfer', () => {
       'x-actor-staff-id': 'staff:doctor',
     });
   });
+
   it('keeps file bytes recoverable on permanent refusal while allowing normal metadata reconciliation', async () => {
     const file = await stageDocumentFile(documentScope(context()), pdf());
     vi.stubGlobal(
@@ -325,6 +370,7 @@ describe('clinical document persistence and file transfer', () => {
           }),
       ),
     );
+
     await transferDocumentFiles('device.credential', documentScope(context()), [
       {
         clientId: 2,
@@ -334,6 +380,7 @@ describe('clinical document persistence and file transfer', () => {
         data: { file, createdBy: context().userId },
       },
     ]);
+
     expect((await cachedDocument(documentScope(context()), file))?.remote).toBe(false);
   });
 });

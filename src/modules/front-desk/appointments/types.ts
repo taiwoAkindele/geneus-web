@@ -12,6 +12,7 @@ import type {
  * "scheduled" when booked ahead.
  */
 export type { AppointmentStatus };
+
 export type AppointmentGroup =
   'today' | 'overdue' | 'upcoming' | 'completed' | 'cancelled' | 'no_show';
 

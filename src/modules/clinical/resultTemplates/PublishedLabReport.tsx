@@ -5,6 +5,7 @@ import { useAuthorizationContext } from '@/session';
 import { Button, Tag } from '@/ui';
 import { LabReportView } from './LabReportView';
 import { effectiveLabReport } from './reports';
+
 export { effectiveLabReport } from './reports';
 
 const PRINT_STYLE =
@@ -30,17 +31,22 @@ export const PublishedLabReport = ({
   const [error, setError] = useState('');
   const [opening, setOpening] = useState<string>();
   const report = effectiveLabReport(entry, entries);
+
   if (!report) {
     return null;
   }
+
   const corrected = report !== entry.labReport;
+
   const open = async (file: DocumentFile) => {
     setOpening(file.id);
     setError('');
     // The window opens on the click itself so the browser allows it; the file is read into it afterwards.
     const view = window.open('', '_blank');
+
     try {
       const url = URL.createObjectURL(await readDocumentFile(file, context));
+
       if (view) {
         view.opener = null;
         view.location.href = url;
@@ -54,12 +60,16 @@ export const PublishedLabReport = ({
       setOpening(undefined);
     }
   };
+
   const print = () => {
     const popup = window.open('', '_blank', 'width=900,height=700');
+
     if (!popup || !area.current) {
       setError('Allow the print window, then try again.');
+
       return;
     }
+
     popup.opener = null;
     popup.document.title = heading;
     const style = popup.document.createElement('style');
@@ -69,6 +79,7 @@ export const PublishedLabReport = ({
     popup.focus();
     popup.print();
   };
+
   return (
     <div className="space-y-2">
       <div ref={area}>

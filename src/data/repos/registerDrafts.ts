@@ -31,7 +31,9 @@ const Recovery = RegisterDefinition.pick({ name: true, category: true, descripti
     codes: z.array(z.string()),
   }).optional(),
 });
+
 export type RegisterRecovery = z.infer<typeof Recovery>;
+
 const idOf = (context: AuthorizationContext, key: string) =>
   [context.facilityId, context.userId, key].join('|');
 
@@ -40,12 +42,15 @@ export const readRegisterRecovery = async (
   key: string,
 ): Promise<RegisterRecovery | undefined> => {
   assertAllowed(context, 'register_definition:publish');
+
   const row = await getDatabase().getOptional<{ data: string }>(
     `SELECT data FROM ${REGISTER_DRAFTS_TABLE} WHERE id = ?`,
     [idOf(context, key)],
   );
+
   return row ? Recovery.parse(JSON.parse(row.data)) : undefined;
 };
+
 export const writeRegisterRecovery = async (
   context: AuthorizationContext,
   key: string,
@@ -59,6 +64,7 @@ export const writeRegisterRecovery = async (
     [idOf(context, key), context.userId, key, JSON.stringify(data), nowIso()],
   );
 };
+
 export const discardRegisterRecovery = async (
   context: AuthorizationContext,
   key: string,

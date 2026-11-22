@@ -56,6 +56,7 @@ export class ContractError extends Error {
 }
 
 export const nowIso = (): string => new Date().toISOString();
+
 export const todayIso = (): string => nowIso().slice(0, 10);
 
 /** Random so ids minted on two offline devices never collide (root §4.2). */
@@ -73,26 +74,31 @@ export const envelope = (context: AuthorizationContext, createdOn = nowIso()) =>
 
 const validate = <T extends AnyDocument>(record: unknown): T => {
   const result = parseDocument(record);
+
   if (!result.success) {
     throw new ContractError(
       result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
     );
   }
+
   return result.data as T;
 };
 
 const assertFacilityContext = (context: AuthorizationContext, record?: AnyDocument) => {
   const workspace = activeWorkspace();
+
   if (
     workspace &&
     (workspace.facilityId !== context.facilityId || workspace.deviceId !== context.deviceId)
   ) {
     throw new Error('The signed-in context belongs to another facility workspace');
   }
+
   if (record && record.facilityId !== context.facilityId) {
     throw new Error('A record cannot be written into another facility');
   }
 };
+
 const placeholders = (count: number): string => Array.from({ length: count }, () => '?').join(', ');
 
 /**
@@ -119,22 +125,30 @@ export const insertRecord = async <T extends AnyDocument>(
   assertAllowed(context, permission);
   assertFacilityContext(context);
   const { prepareClinicalBundle, clearClinicalReview } = await import('./repos/clinicalReviews');
+
   const bundle = await prepareClinicalBundle(
     [{ type, permission, record: validate(record) }],
     context,
   );
+
   const validated = validate<T>(bundle.records[0].record);
   assertFacilityContext(context, validated);
+
   // Configuration is saved online and confirmed by the server; it never enters the offline queue.
   if (isConfigurationWrite(type, 'put')) {
     await saveConfiguration(context, [{ op: 'put', type, record: validated }]);
+
     return validated;
   }
+
   const row = toRow(type, validated);
+
   if (options?.replaceSame) {
     const existing = await findRecord(type, validated.id);
+
     if (existing) {
       const { clinicalPayloadHash } = await import('./workforceClinical');
+
       if ((await clinicalPayloadHash(existing)) !== (await clinicalPayloadHash(validated))) {
         throw new Error(
           'A different clinical record already uses this identity. Review its existing history',
@@ -142,9 +156,11 @@ export const insertRecord = async <T extends AnyDocument>(
       }
     }
   }
+
   const columns = Object.keys(row);
   const statement = `INSERT ${options?.replaceSame ? 'OR REPLACE ' : ''}INTO ${TABLE_FOR[type]} (${columns.map(column).join(', ')}) VALUES (${placeholders(columns.length)})`;
   const parameters = columns.map((column) => row[column]);
+
   if (options?.checkUnderLock) {
     await getDatabase().writeTransaction(async (transaction) => {
       await options.checkUnderLock!(transaction);
@@ -153,9 +169,11 @@ export const insertRecord = async <T extends AnyDocument>(
   } else {
     await getDatabase().execute(statement, parameters);
   }
+
   if (bundle.reviewId) {
     await clearClinicalReview(bundle.reviewId);
   }
+
   return validated;
 };
 
@@ -172,34 +190,45 @@ export const insertRecords = async (
   checkUnderLock?: (transaction: Pick<LocalDatabase, 'execute' | 'getOptional'>) => Promise<void>,
 ): Promise<AnyDocument[]> => {
   assertFacilityContext(context);
+
   for (const { permission } of records) {
     assertAllowed(context, permission);
   }
+
   const { prepareClinicalBundle, clearClinicalReview } = await import('./repos/clinicalReviews');
+
   const bundle = await prepareClinicalBundle(
     records.map((r) => ({ ...r, record: validate(r.record) })),
     context,
   );
+
   const validated = bundle.records.map(({ type, record }) => ({ type, record: validate(record) }));
+
   for (const { record } of validated) {
     assertFacilityContext(context, record);
   }
+
   const configuration = validated.filter(({ type }) => isConfigurationWrite(type, 'put'));
+
   if (configuration.length) {
     // Settings and daily records are never mixed in one save: one goes online, the other offline.
     if (configuration.length !== validated.length) {
       throw new Error('Settings are saved on their own, online');
     }
+
     await saveConfiguration(
       context,
       validated.map(({ type, record }) => ({ op: 'put' as const, type, record })),
     );
+
     return validated.map(({ record }) => record);
   }
+
   await getDatabase().writeTransaction(async (transaction) => {
     if (checkUnderLock) {
       await checkUnderLock(transaction);
     }
+
     for (const { type, record } of validated) {
       const row = toRow(type, record);
       const columns = Object.keys(row);
@@ -209,9 +238,11 @@ export const insertRecords = async (
       );
     }
   });
+
   if (bundle.reviewId) {
     await clearClinicalReview(bundle.reviewId);
   }
+
   return validated.map(({ record }) => record);
 };
 
@@ -231,13 +262,16 @@ export const updateRecord = async <T extends AnyDocument>(
 ): Promise<T> => {
   assertAllowed(context, permission);
   const current = await findRecord<T>(type, id);
+
   if (!current) {
     throw new Error(`no ${type} ${id} to change`);
   }
+
   const stamped = { ...changes, updatedBy: context.userId, updatedOn: changedOn };
   const merged = validate<T>({ ...current, ...stamped });
   assertFacilityContext(context, merged);
   const revision = (changes as Record<string, unknown>).revision;
+
   const cas =
     typeof revision === 'number' &&
     [
@@ -251,36 +285,45 @@ export const updateRecord = async <T extends AnyDocument>(
       'result_part',
       'answer_list',
     ].includes(type);
+
   if (cas && revision !== Number((current as Record<string, unknown>).revision ?? 1) + 1) {
     throw new Error('This configuration changed. Reopen the current record before saving');
   }
+
   if (isConfigurationWrite(type, 'patch', Object.keys(changes))) {
     await saveConfiguration(context, [
       { op: 'patch', type, id, changes: stamped as Record<string, unknown>, current },
     ]);
+
     return merged;
   }
+
   const row = toRow(type, stamped);
   const columns = Object.keys(row);
   // `_metadata` is PowerSync's per-write note, not a contract field: it carries the
   // actor even when `updatedBy` is unchanged and therefore absent from the PATCH.
   const statement = `UPDATE ${TABLE_FOR[type]} SET ${columns.map((name) => `${column(name)} = ?`).join(', ')}, _metadata = ? WHERE id = ?${cas ? ' AND COALESCE("revision", 1) = ?' : ''}`;
+
   const parameters = [
     ...columns.map((name) => row[name]),
     context.userId,
     id,
     ...(cas ? [revision - 1] : []),
   ];
+
   if (type === 'patient' && current.type === 'patient') {
     await getDatabase().writeTransaction(async (transaction) => {
       const locked = await transaction.getOptional<Row>(
         `SELECT * FROM ${TABLE_FOR.patient} WHERE id = ?`,
         [id],
       );
+
       if (!locked) {
         throw new Error('The patient could not be read. Keep your changes and try again');
       }
+
       const live = fromRow<Patient>('patient', locked);
+
       const checked = new Set([
         ...Object.keys(changes),
         'identityStatus',
@@ -289,6 +332,7 @@ export const updateRecord = async <T extends AnyDocument>(
         'identifiedOn',
         'identificationNote',
       ]);
+
       if (
         [...checked].some(
           (key) =>
@@ -300,11 +344,14 @@ export const updateRecord = async <T extends AnyDocument>(
           'Patient details changed in another window. Review the current record before saving',
         );
       }
+
       const next = validate<Patient>({ ...live, ...stamped });
       const issues = patientIdentificationIssues(live, next, context.userId, changedOn);
+
       if (issues.length) {
         throw new Error(issues.join('; '));
       }
+
       await transaction.execute(statement, parameters);
     });
   } else if (cas) {
@@ -315,21 +362,25 @@ export const updateRecord = async <T extends AnyDocument>(
         `SELECT revision FROM ${TABLE_FOR[type]} WHERE id = ?`,
         [id],
       );
+
       if (!locked || Number(locked.revision ?? 1) !== revision - 1) {
         throw new Error(
           'This configuration changed in another window. Reopen its current details before saving',
         );
       }
+
       await transaction.execute(statement, parameters);
     });
   } else {
     await getDatabase().execute(statement, parameters);
   }
+
   return merged;
 };
 
 export const allOfType = async <T extends AnyDocument>(type: DocType): Promise<T[]> => {
   const rows = await getDatabase().getAll<Row>(`SELECT * FROM ${TABLE_FOR[type]}`);
+
   return rows.map((row) => fromRow<T>(type, row));
 };
 
@@ -347,10 +398,12 @@ export const allWhere = async <T extends AnyDocument>(
   if (!(field in fieldKindsFor(type))) {
     throw new Error(`${type} has no field ${field}`);
   }
+
   const rows = await getDatabase().getAll<Row>(
     `SELECT * FROM ${TABLE_FOR[type]} WHERE ${column(field)} = ?`,
     [value],
   );
+
   return rows.map((row) => fromRow<T>(type, row));
 };
 
@@ -362,6 +415,7 @@ export const findRecord = async <T extends AnyDocument>(
     `SELECT * FROM ${TABLE_FOR[type]} WHERE id = ?`,
     [id],
   );
+
   return row ? fromRow<T>(type, row) : undefined;
 };
 
@@ -373,9 +427,11 @@ export const fieldValuesOf = async (type: DocType, field: string): Promise<strin
   if (!(field in fieldKindsFor(type))) {
     throw new Error(`${type} has no field ${field}`);
   }
+
   const rows = await getDatabase().getAll<Record<string, unknown>>(
     `SELECT ${column(field)} FROM ${TABLE_FOR[type]}`,
   );
+
   return rows.flatMap((row) =>
     row[field] === null || row[field] === undefined ? [] : [String(row[field])],
   );

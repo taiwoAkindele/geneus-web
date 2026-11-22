@@ -25,11 +25,13 @@ export const pbkdf2Base64 = async (
     false,
     ['deriveBits'],
   );
+
   const bits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: base64ToBytes(saltBase64), iterations },
     key,
     HASH_BITS,
   );
+
   return bytesToBase64(new Uint8Array(bits));
 };
 
@@ -38,9 +40,12 @@ export const sameText = (a: string, b: string): boolean => {
   if (a.length !== b.length) {
     return false;
   }
+
   let difference = 0;
+
   for (let index = 0; index < a.length; index += 1) {
     difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
   }
+
   return difference === 0;
 };

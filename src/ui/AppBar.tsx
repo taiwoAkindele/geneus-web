@@ -20,6 +20,7 @@ type Props = {
  */
 export const AppBar = ({ title, onBack, right, variant = 'surface' }: Props) => {
   const brand = variant === 'brand';
+
   return (
     <header
       className={`sticky top-[var(--app-header-h,0px)] z-10 flex items-center gap-2 px-5 py-3 ${

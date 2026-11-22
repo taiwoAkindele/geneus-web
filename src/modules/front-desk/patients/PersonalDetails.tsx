@@ -46,7 +46,9 @@ export const PersonalDetails = ({
     useCallback(() => currentContact(patient.patientId), [patient.patientId]),
     ['patient_contact'],
   ).data;
+
   const stopped = stoppedChannelsNote(contact);
+
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -178,6 +180,7 @@ export const PersonalDetailsEditor = ({
   const navigate = useNavigate();
   const [matchingIds, setMatchingIds] = useState<string[]>([]);
   const [error, setError] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -185,33 +188,45 @@ export const PersonalDetailsEditor = ({
     setValue,
     formState: { isDirty, isSubmitting, errors },
   } = useForm<RegistrationValues>({ defaultValues: initial.current });
+
   const evidence = watch('identityEvidence');
+
   // The email lives on the patient's contact record, so it is edited beside the form rather than in it.
   const contact = useLiveQuery(
     useCallback(() => currentContact(patient.patientId), [patient.patientId]),
     ['patient_contact'],
   );
+
   const [email, setEmail] = useState<string>();
   const shownEmail = email ?? contact.data?.email ?? '';
+
   const emailChanged =
     email !== undefined && email.trim().toLowerCase() !== (contact.data?.email ?? '');
+
   const save = handleSubmit(async (form) => {
     setError('');
+
     try {
       const newEmail = tidyEmail(shownEmail);
+
       if (!form.age.trim() && !form.dateOfBirth) {
         throw new Error('Record an age or date of birth');
       }
+
       const latest = await getPatient(patient.patientId);
+
       if (!latest) {
         throw new Error('The patient could not be read. Your changes are still here.');
       }
+
       if (identifying && latest.identityStatus !== 'provisional') {
         throw new Error(
           'This patient has already been identified. Review the current details before making another change',
         );
       }
+
       const latestForm = fromPatient(latest);
+
       const identityFields = [
         'fullName',
         'sex',
@@ -222,33 +237,43 @@ export const PersonalDetailsEditor = ({
         'nin',
         'folder',
       ] as const;
+
       if (identifying && identityFields.some((key) => latestForm[key] !== initial.current[key])) {
         throw new Error(
           'Patient identity details changed while you were editing. Review the current record before identifying this patient',
         );
       }
+
       const merged = { ...latestForm };
+
       const changed = (Object.keys(form) as (keyof RegistrationValues)[]).filter(
         (key) => form[key] !== initial.current[key],
       );
+
       for (const key of changed) {
         if (latestForm[key] !== initial.current[key]) {
           throw new Error(
             'These details changed while you were editing. Keep your changes and review the current record before saving.',
           );
         }
+
         Object.assign(merged, { [key]: form[key] });
       }
+
       if (identifying) {
         merged.identityStatus = 'identified';
       }
+
       const details = toPatientDetails(merged);
+
       if (!changed.includes('religion')) {
         details.religion = latest.religion;
       }
+
       if (identifying) {
         const [patients, events] = await Promise.all([listPatients(), listIdentityEvents()]);
         const matches = unreviewedIdentityMatches(details, patient.patientId, patients, events);
+
         if (matches.length) {
           setMatchingIds(matches.map((match) => match.patient.patientId));
           throw new Error(
@@ -256,10 +281,13 @@ export const PersonalDetailsEditor = ({
           );
         }
       }
+
       await updatePatient(patient.patientId, details, context);
+
       if (emailChanged) {
         await saveContactEmail(patient.patientId, newEmail, context);
       }
+
       toast('Patient details updated on this device');
       onSaved();
       onClose();
@@ -269,6 +297,7 @@ export const PersonalDetailsEditor = ({
       );
     }
   });
+
   return (
     <Sheet
       title={identifying ? 'Identify patient' : 'Edit personal details'}
@@ -335,6 +364,7 @@ export const PersonalDetailsEditor = ({
           {...register('dateOfBirth', {
             onChange: (event) => {
               const date = String(event.target.value);
+
               if (date && date <= calendarDate()) {
                 setValue('age', String(yearsBetween(date, calendarDate())), { shouldDirty: true });
               }

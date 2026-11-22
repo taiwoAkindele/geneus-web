@@ -70,31 +70,37 @@ const lineTone = (state: { conflict?: unknown; complete?: unknown }) => {
 
   return 'amber';
 };
+
 type Action = {
   source: PharmacyPrescription;
   line: Line;
   kind: DispensingDetails['action'];
   original?: EncounterEntry;
 };
+
 export const QuantityDispense = () => {
   const [params] = useSearchParams();
   const context = useAuthorizationContext();
   const toast = useToast();
   const patientId = params.get('patient') ?? '';
   const encounterId = params.get('visit') ?? '';
+
   const query = useLiveQuery(
     useCallback(async () => {
       const [data, staff] = await Promise.all([
         loadPharmacy(patientId, encounterId, context),
         listStaff(),
       ]);
+
       return { ...data, staff };
     }, [patientId, encounterId, context.userId, context.permissions.join('|')]),
   );
+
   const [action, setAction] = useState<Action>();
   useEffect(() => {
     document.title = 'Supply medicines · Geneus Health';
   }, []);
+
   if (query.loading && !query.data) {
     return (
       <p role="status" className="p-6">
@@ -102,6 +108,7 @@ export const QuantityDispense = () => {
       </p>
     );
   }
+
   if (query.error || !query.data?.patient) {
     return (
       <div role="alert" className="space-y-3 p-6">
@@ -113,29 +120,38 @@ export const QuantityDispense = () => {
       </div>
     );
   }
+
   const data = query.data;
   const sources = [...data.entries].sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+
   const summaries =
     data.wardEvents?.filter(
       (e) => e.encounterId === encounterId && e.values.kind === 'discharge',
     ) ?? [];
+
   const requested = params.get('prescription');
+
   const source = requested
     ? [...sources, ...summaries].find((e) => e.id === requested)
     : (sources.find((e) => e.step === 'prescription') ??
       sources.find((e) => e.step === 'diagnosis') ??
       dischargeHeads(summaries)[0]);
+
   const revised =
     source?.type === 'ward_care_event' &&
     !dischargeHeads(
       data.wardEvents?.filter((e) => e.admissionId === source.admissionId) ?? [],
     ).some((e) => e.id === source.id);
+
   const lines = source ? prescriptionLines(source) : [];
+
   const canWrite =
     context.permissions.includes('encounter:record') &&
     context.permissions.includes('clinical:dispense');
+
   const who = (id: string) =>
     data.staff.find((s) => s.staffId === id)?.fullName ?? 'Recorded staff member';
+
   return (
     <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
       <RequestHeader
@@ -159,10 +175,13 @@ export const QuantityDispense = () => {
       ) : (
         lines.map((line) => {
           const state = supplyState(source!, line.lineId, data.entries);
+
           const refused = data.refusedSupplies.some((entry) => {
             const d = dispensingDetails(entry);
+
             return d?.prescriptionEntryId === source!.id && d.lineId === line.lineId;
           });
+
           const renderLineStatus = () => {
             if (state.conflict) {
               return 'Needs review';
@@ -265,17 +284,21 @@ export const QuantityDispense = () => {
                       .sort((a, b) => b.createdOn.localeCompare(a.createdOn))
                       .map((event) => {
                         const d = dispensingDetails(event)!;
+
                         const remaining =
                           d.action === 'supply' ? unreturnedQuantity(event, state.events) : 0;
+
                         const associated = allocatedQuantity(
                           data.serviceAllocations ?? [],
                           (a) => a.sourceEntryId === event.id,
                         );
+
                         const unpriced =
                           d.action === 'supply' &&
                           d.billing === 'unpriced' &&
                           !supplyCharge(event.id, data) &&
                           remaining > associated + 0.000001;
+
                         const renderDecisionLabel = () => {
                           if (d.action === 'supply') {
                             return `Supplied ${d.quantity} ${d.unit}`;
@@ -421,6 +444,7 @@ const SupplySheet = ({
   const state = supplyState(source, line.lineId, data.entries);
   const priorSupply = original && dispensingDetails(original);
   const stock = data.items.filter((s) => ['drug', 'vaccine', 'fp_commodity'].includes(s.category));
+
   const [form, setForm] = useState(() => ({
     source: stock.length ? 'stock' : 'untracked',
     stockItemId: '',
@@ -435,6 +459,7 @@ const SupplySheet = ({
     restock: false,
     previousEntryId: state.heads[0]?.id,
   }));
+
   const [ready, setReady] = useState(false);
   const [reviewing, setReviewing] = useState<DispensingDetails>();
   const [error, setError] = useState('');
@@ -444,36 +469,44 @@ const SupplySheet = ({
   const requestId = useRef(`encounter_entry:${crypto.randomUUID()}`);
   const latest = useRef(form);
   latest.current = form;
+
   const owner = {
     staffId: context.userId!,
     patientId: source.patientId,
     encounterKey: `pharmacy:${source.id}:${line.lineId}:${kind}:${original?.id ?? ''}`,
   };
+
   useEffect(() => {
     let active = true;
     readDrafts(owner)
       .then((drafts) => {
         const saved = drafts.find((d) => d.step === 'pharmacy_supply')?.data as
           { form?: typeof form; requestId?: string } | undefined;
+
         if (active) {
           if (saved?.form) {
             setForm(saved.form);
           }
+
           if (saved?.requestId) {
             requestId.current = saved.requestId;
           }
+
           setReady(true);
         }
       })
       .catch(() => setError('The private draft could not be restored. Close and retry.'));
+
     return () => {
       active = false;
     };
   }, []);
+
   useEffect(() => {
     if (!ready) {
       return;
     }
+
     const timer = window.setTimeout(() => {
       if (!completed.current) {
         void writeDraft(owner, 'pharmacy_supply', {
@@ -482,19 +515,25 @@ const SupplySheet = ({
         }).catch(() => setError('The draft could not be saved. Keep this form open and retry.'));
       }
     }, 250);
+
     return () => window.clearTimeout(timer);
   }, [form, ready]);
+
   const set = (changes: Partial<typeof form>) => {
     setForm((f) => ({ ...f, ...changes }));
     setError('');
     setReviewing(undefined);
   };
+
   const item = data.items.find((s) => s.id === form.stockItemId);
   const fee = data.fees.find((f) => f.id === form.feeItemId && f.active);
+
   const existingMedicineBill = Boolean(
     fee && manualBillCandidates(data.charges, source.patientId, fee.id, source.encounterId).length,
   );
+
   const quantity = Number(form.quantity);
+
   // Returns and billing reuse the unit of the original supply; stock uses the item's unit.
   const unitFor = () => {
     if (kind === 'return' || kind === 'price') {
@@ -507,15 +546,19 @@ const SupplySheet = ({
 
     return form.unit;
   };
+
   const unit = unitFor();
+
   const price =
     fee && quantity > 0 && Number.isSafeInteger(Math.round(fee.amountMinor * quantity))
       ? supplyPrice(fee, quantity, data.patient!, new Date().toISOString(), data.visitType)
       : undefined;
+
   const remaining =
     line.quantity === undefined
       ? undefined
       : Math.max(0, line.quantity - state.supplied - (Number.isFinite(quantity) ? quantity : 0));
+
   const close = async () => {
     try {
       if (ready) {
@@ -524,19 +567,23 @@ const SupplySheet = ({
           requestId: requestId.current,
         });
       }
+
       onClose();
     } catch {
       setError('Your draft could not be saved. Keep this form open.');
     }
   };
+
   const build = (): DispensingDetails => {
     const base = {
       prescriptionEntryId: source.id,
       lineId: line.lineId,
       previousEntryId: form.previousEntryId,
     };
+
     const complete =
       kind === 'supply' && line.quantity !== undefined ? remaining === 0 : form.complete === 'true';
+
     if (
       ((kind === 'supply' && line.quantity === undefined) ||
         kind === 'note' ||
@@ -545,20 +592,25 @@ const SupplySheet = ({
     ) {
       throw new Error('Choose whether more of this medicine is still needed');
     }
+
     if (kind === 'note') {
       return { ...base, action: kind, complete, reason: form.reason };
     }
+
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
       throw new Error('Enter a quantity greater than zero, up to 1,000,000');
     }
+
     if (existingMedicineBill && form.checkedExistingBill && form.reason.trim().length < 3) {
       throw new Error('Explain why this is an additional supply to bill');
     }
+
     if (kind === 'price' && existingMedicineBill && !form.checkedExistingBill) {
       throw new Error(
         'An existing manual bill needs review before this supply receives another charge',
       );
     }
+
     if (
       kind === 'supply' &&
       line.quantity !== undefined &&
@@ -566,6 +618,7 @@ const SupplySheet = ({
     ) {
       throw new Error('Giving now exceeds the quantity still needed');
     }
+
     if (
       kind === 'supply' &&
       form.source === 'stock' &&
@@ -577,6 +630,7 @@ const SupplySheet = ({
     ) {
       throw new Error('This exceeds recorded stock. Check the stock item and physical count');
     }
+
     if (
       kind === 'return' &&
       original &&
@@ -584,9 +638,11 @@ const SupplySheet = ({
     ) {
       throw new Error('The returned quantity exceeds this original supply');
     }
+
     if (fee && !price) {
       throw new Error('The bill total is too large. Check the quantity and price');
     }
+
     if (kind === 'return') {
       return {
         ...base,
@@ -600,10 +656,13 @@ const SupplySheet = ({
         reason: form.reason,
       };
     }
+
     if (kind === 'price' && !fee) {
       throw new Error('Select the configured selling price');
     }
+
     const reviewExisting = existingMedicineBill && !form.checkedExistingBill;
+
     // An existing manual bill must be reviewed before this supply may add a charge.
     const billingFor = () => {
       if (kind === 'supply' && form.source === 'outside') {
@@ -616,7 +675,9 @@ const SupplySheet = ({
 
       return 'unpriced';
     };
+
     const billing = billingFor();
+
     const defaultReason = () => {
       if (reviewExisting) {
         return 'Review existing manual bill; this supply creates no additional charge and payment coverage is not assumed';
@@ -628,6 +689,7 @@ const SupplySheet = ({
 
       return undefined;
     };
+
     return {
       ...base,
       ...(billingCatalogueEnabled(context) && (!fee || fee.priceEvidenceVersion === 1)
@@ -659,18 +721,23 @@ const SupplySheet = ({
       reason: form.reason.trim() || defaultReason(),
     };
   };
+
   const save = async () => {
     if (busy.current || !ready) {
       return;
     }
+
     setError('');
+
     try {
       if (!reviewing) {
         const details = build();
         const { DispensingDetails } = await import('@shared');
         setReviewing(DispensingDetails.parse(details));
+
         return;
       }
+
       busy.current = true;
       setSaving(true);
       await saveDispensing(
@@ -680,6 +747,7 @@ const SupplySheet = ({
         context,
         requestId.current,
       );
+
       completed.current = true;
       // The supply is saved; failing to tidy up its draft must not report the save as failed.
       await discardDraft(owner, 'pharmacy_supply').catch(() => undefined);
@@ -696,8 +764,10 @@ const SupplySheet = ({
       setSaving(false);
     }
   };
+
   const copy = KIND_COPY[kind];
   const title = copy.title;
+
   const renderSheetBody = () => {
     if (!ready) {
       return <p role="status">Restoring private draft…</p>;
@@ -705,6 +775,7 @@ const SupplySheet = ({
 
     if (reviewing) {
       const creditCharge = original ? supplyCharge(original.id, data) : undefined;
+
       const returnCreditText = () => {
         if (reviewing.creditMinor && creditCharge) {
           return `Patient credit: ${formatMoney(reviewing.creditMinor, creditCharge.currency)}`;
@@ -1000,6 +1071,7 @@ const SupplySheet = ({
                   ? { quantity: String(unreturnedQuantity(original, state.events)) }
                   : {}),
               }));
+
               setReviewing(undefined);
               requestId.current = `encounter_entry:${crypto.randomUUID()}`;
               setError('');

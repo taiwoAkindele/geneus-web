@@ -117,19 +117,25 @@ export const LAB_STEPS: readonly StepKey[] = ['lab_results'];
  */
 export const stepsFor = (data: EncounterData): StepDef[] => {
   const keys: StepKey[] = ['vitals', 'complaint', 'investigation_review'];
+
   if (data.investigation_review.decision === 'ordered' || data.lab_order.tests.length) {
     keys.push('lab_order');
   }
+
   if (data.lab_order.tests.length) {
     keys.push('lab_results', 'result_review');
   }
+
   keys.push('diagnosis', 'prescription', 'injection_order', 'disposition');
+
   if (data.prescription.rx.length || data.diagnosis.rx.length) {
     keys.push('dispense');
   }
+
   if (data.injection_order.required) {
     keys.push('injection');
   }
+
   return keys.map((key) => STEP_DEFS[key]);
 };
 

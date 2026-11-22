@@ -10,15 +10,18 @@ import { Button } from '@/ui';
 export const PatientIdentityPanel = ({ patientId }: { patientId: string }) => {
   const navigate = useNavigate();
   const context = useAuthorizationContext();
+
   const data = useLiveQuery(
     useCallback(async () => {
       const events = await listIdentityEvents();
+
       return {
         events,
         patients: await Promise.all(linkedPatientIds(patientId, events).map(getPatient)),
       };
     }, [patientId]),
   );
+
   if (data.error) {
     return (
       <p role="alert" className="my-3 text-sm text-danger">
@@ -26,12 +29,16 @@ export const PatientIdentityPanel = ({ patientId }: { patientId: string }) => {
       </p>
     );
   }
+
   const events = data.data?.events ?? [];
   const ids = linkedPatientIds(patientId, events);
+
   if (ids.length < 2) {
     return null;
   }
+
   const primary = canonicalPatientId(patientId, events);
+
   return (
     <section className="my-4 space-y-2 rounded-card border border-outline bg-white p-4">
       <h2 className="font-bold">Linked patient records</h2>

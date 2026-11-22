@@ -14,6 +14,7 @@ const AGE_TOLERANCE_YEARS = 2;
 /** Nigerian numbers are written 0803…, 234803… or +234 803…; the last ten digits are the number. */
 export const phoneKey = (phone: string | undefined): string | undefined => {
   const digits = (phone ?? '').replace(/\D/g, '');
+
   return digits.length >= 7 ? digits.slice(-10) : undefined;
 };
 
@@ -30,22 +31,28 @@ const sameToken = (a: string, b: string): boolean => {
   if (a === b) {
     return true;
   }
+
   if (Math.min(a.length, b.length) < 5 || Math.abs(a.length - b.length) > 1) {
     return false;
   }
+
   let i = 0;
   let j = 0;
   let edits = 0;
+
   while (i < a.length && j < b.length) {
     if (a[i] === b[j]) {
       i += 1;
       j += 1;
       continue;
     }
+
     edits += 1;
+
     if (edits > 1) {
       return false;
     }
+
     if (a.length > b.length) {
       i += 1;
     } else if (b.length > a.length) {
@@ -55,6 +62,7 @@ const sameToken = (a: string, b: string): boolean => {
       j += 1;
     }
   }
+
   return edits + (a.length - i) + (b.length - j) <= 1;
 };
 
@@ -64,6 +72,7 @@ const sameToken = (a: string, b: string): boolean => {
  */
 export const namesMatch = (a: string, b: string): boolean => {
   const [shorter, longer] = [nameTokens(a), nameTokens(b)].sort((x, y) => x.length - y.length);
+
   return (
     shorter.length > 0 && shorter.every((token) => longer.some((other) => sameToken(token, other)))
   );
@@ -97,19 +106,25 @@ export const findLikelyMatches = (
   if (details.identityStatus === 'provisional') {
     return [];
   }
+
   const age = candidateAge(details, now);
   const phone = phoneKey(details.phone);
+
   return patients
     .filter((patient) => patient.identityStatus !== 'provisional')
     .map((patient): LikelyMatch => {
       const reasons: MatchReason[] = [];
+
       if (namesMatch(details.fullName, patient.fullName)) {
         reasons.push('name');
       }
+
       if (phone && phone === phoneKey(patient.phone)) {
         reasons.push('phone');
       }
+
       const theirs = currentAge(patient, now);
+
       if (
         age !== undefined &&
         theirs !== undefined &&
@@ -117,9 +132,11 @@ export const findLikelyMatches = (
       ) {
         reasons.push('age');
       }
+
       if (details.sex && details.sex === patient.sex) {
         reasons.push('sex');
       }
+
       if (
         nameTokens(details.address ?? '').some(
           (token) => token.length > 3 && nameTokens(patient.address ?? '').includes(token),
@@ -127,10 +144,12 @@ export const findLikelyMatches = (
       ) {
         reasons.push('address');
       }
+
       return { patient, reasons };
     })
     .filter(({ reasons }) => {
       const has = (reason: MatchReason) => reasons.includes(reason);
+
       return has('name') && (has('phone') || (has('age') && has('sex')));
     })
     .sort(
@@ -152,6 +171,7 @@ export const searchPatients = (
 ): Patient[] => {
   const text = query.trim();
   const newestFirst = [...patients].sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+
   if (!text) {
     return newestFirst;
   }
@@ -159,22 +179,28 @@ export const searchPatients = (
   const upper = text.toUpperCase();
   const digits = text.replace(/\D/g, '');
   const onlyDigits = /^[\d\s+()-]+$/.test(text);
+
   const rank = (patient: Patient): number | undefined => {
     if (patient.patientId === upper) {
       return 0;
     }
+
     if (patient.legacyPaperRef?.toUpperCase() === upper) {
       return 0;
     }
+
     if (onlyDigits && digits.length === 11 && patient.nin === digits) {
       return 0;
     }
+
     if (onlyDigits && digits && sequenceOf(patient.patientId, facilityCode) === Number(digits)) {
       return 1;
     }
+
     if (patient.patientId.includes(upper)) {
       return 2;
     }
+
     if (
       onlyDigits &&
       digits.length >= 4 &&
@@ -183,11 +209,14 @@ export const searchPatients = (
     ) {
       return 3;
     }
+
     if (!onlyDigits && namesMatchPrefix(text, patient.fullName)) {
       return 4;
     }
+
     return undefined;
   };
+
   return newestFirst
     .map((patient) => ({ patient, rank: rank(patient) }))
     .filter((entry): entry is { patient: Patient; rank: number } => entry.rank !== undefined)
@@ -199,5 +228,6 @@ export const searchPatients = (
 const namesMatchPrefix = (query: string, fullName: string): boolean => {
   const name = nameTokens(fullName);
   const typed = nameTokens(query);
+
   return typed.length > 0 && typed.every((token) => name.some((part) => part.startsWith(token)));
 };

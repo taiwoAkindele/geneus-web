@@ -40,6 +40,7 @@ export const factsFromForm = (
   today = new Date().toISOString().slice(0, 10),
 ): ExemptionFacts => {
   const typedAge = parseAge(values.age);
+
   // A valid date of birth wins over a typed age.
   const ageFor = () => {
     if (
@@ -56,7 +57,9 @@ export const factsFromForm = (
 
     return undefined;
   };
+
   const ageYears = ageFor();
+
   return {
     ageYears,
     sex: sexFromCode(values.sex),
@@ -88,6 +91,7 @@ export const newPatientFees = (
         fee.exemptions,
         withVisit ? facts : { ...facts, visitType: undefined },
       );
+
       return {
         feeId: fee.id,
         name: fee.name,
@@ -103,11 +107,13 @@ export const amountsDue = (
   lines: readonly Pick<FeeLine, 'amountMinor' | 'currency'>[],
 ): string[] => {
   const totals = new Map<string, number>();
+
   for (const line of lines) {
     if (line.amountMinor > 0) {
       totals.set(line.currency, (totals.get(line.currency) ?? 0) + line.amountMinor);
     }
   }
+
   return [...totals]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, amount]) => formatMoney(amount, currency));

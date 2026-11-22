@@ -16,12 +16,14 @@ import {
 import { allOfType } from './db';
 import { clinicalPatientRows, withAdmission } from '@/modules/clinical/inpatient/summary';
 import { summariseEncounter } from '@/modules/clinical/encounter/encounterSummary';
+
 const context = () =>
   authorizationFor({
     staff: { staffId: 'staff:doctor', role: 'doctor', permission: 'read_write' },
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const base = () => ({
   facilityId: 'TEST',
   schemaVersion: 5,
@@ -29,6 +31,7 @@ const base = () => ({
   deviceId: 'device:one',
   createdOn: new Date().toISOString(),
 });
+
 const request = () =>
   EncounterEntry.parse({
     ...base(),
@@ -40,6 +43,7 @@ const request = () =>
     step: 'admission',
     values: { ward: 'Ward A' },
   });
+
 const visit = () =>
   Encounter.parse({
     ...base(),
@@ -48,6 +52,7 @@ const visit = () =>
     patientId: 'TEST-000001-K2',
     openedOn: new Date().toISOString(),
   });
+
 describe('inpatient foundation against real SQLite', () => {
   let storage: ReturnType<typeof sqliteTestDatabase>;
   beforeEach(async () => {
@@ -69,6 +74,7 @@ describe('inpatient foundation against real SQLite', () => {
         ageYears: 30,
       }),
     );
+
     await storage.seed(visit());
     await storage.seed(request());
     await storage.seed(
@@ -81,6 +87,7 @@ describe('inpatient foundation against real SQLite', () => {
         active: true,
       }),
     );
+
     for (const record of [
       { id: 'ward:a', kind: 'ward' },
       { id: 'bed:1', kind: 'bed', parentId: 'ward:a' },
@@ -91,21 +98,25 @@ describe('inpatient foundation against real SQLite', () => {
       );
     }
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await storage.db.close();
     vi.unstubAllGlobals();
   });
+
   it('records an inpatient stay through departure and cleaning, preserving the signed source', async () => {
     const originalEntries = await allOfType('encounter_entry');
     expect((await loadInpatient()).requests).toHaveLength(1);
     const confirmed = await confirmAdmission(request(), 'unit:ward', '', context());
     expect((await loadInpatient()).active).toHaveLength(1);
     expect((await loadInpatient()).requests).toHaveLength(0);
+
     const reserved = await changeAdmission(confirmed, 'reserve', context(), {
       wardId: 'ward:a',
       bedId: 'bed:1',
     });
+
     const arrived = await changeAdmission(reserved, 'arrive', context());
     const ready = await changeAdmission(arrived, 'ready_for_discharge', context());
     expect((await loadInpatient()).active[0].action).toBe('ready_for_discharge');
@@ -114,10 +125,12 @@ describe('inpatient foundation against real SQLite', () => {
     await confirmBedReady('bed:1', departure.id, context());
     expect(await allOfType('encounter_entry')).toEqual(originalEntries);
   });
+
   it('checks the admission head under the insertion lock, including a concurrent local-window change', async () => {
     const confirmed = await confirmAdmission(request(), 'unit:ward', '', context());
     const original = storage.db.writeTransaction;
     let raced = false;
+
     storage.db.writeTransaction = async (callback) => {
       if (!raced) {
         raced = true;
@@ -129,55 +142,69 @@ describe('inpatient foundation against real SQLite', () => {
           note: 'Withdrawn',
         });
       }
+
       return original(callback);
     };
+
     await expect(
       changeAdmission(confirmed, 'reserve', context(), { wardId: 'ward:a', bedId: 'bed:1' }),
     ).rejects.toThrow(/changed/);
+
     expect(await allOfType('inpatient_event')).toHaveLength(2);
   });
+
   it('does not treat a rejected local reservation or its arrival as accepted bed state', async () => {
     const confirmed = await confirmAdmission(request(), 'unit:ward', '', context());
+
     const reserve = await changeAdmission(confirmed, 'reserve', context(), {
       wardId: 'ward:a',
       bedId: 'bed:1',
     });
+
     await changeAdmission(reserve, 'arrive', context());
     await storage.db.execute(
       'INSERT INTO workforce_upload_receipts(id,clientId,outcome) VALUES(?,?,?)',
       [reserve.id, 1, 'rejected'],
     );
+
     const data = await loadInpatient();
     expect(data.active[0].action).toBe('confirm');
     expect(data.events).toHaveLength(1);
   });
+
   it('requires an enrolled server capability and respects read-only and cashier access', async () => {
     rememberInpatientSupport(context());
     await expect(confirmAdmission(request(), 'unit:ward', '', context())).rejects.toThrow(
       /Connect once/,
     );
+
     rememberInpatientSupport(context(), 1);
     const readonly = { ...context(), permissions: [] };
     await expect(confirmAdmission(request(), 'unit:ward', '', readonly)).rejects.toThrow();
     expect(await allOfType('inpatient_event')).toHaveLength(0);
   });
+
   it('shows one clinical row per patient, preferring an active admission and retaining discharged history', async () => {
     const confirmed = await confirmAdmission(request(), 'unit:ward', '', context());
     const data = await loadInpatient();
     const summary = withAdmission(summariseEncounter(visit(), [request()]), data);
     expect(summary.careType).toBe('inpatient');
     expect(summary.admissionStatus).toBe('Awaiting bed');
+
     const later = {
       ...summary,
       id: 'later-visit',
       openedOn: '2099-01-01T00:00:00Z',
       careType: 'outpatient' as const,
     };
+
     expect(clinicalPatientRows([later, summary])).toEqual([summary]);
+
     const reserved = await changeAdmission(confirmed, 'reserve', context(), {
       wardId: 'ward:a',
       bedId: 'bed:1',
     });
+
     const arrived = await changeAdmission(reserved, 'arrive', context());
     const ready = await changeAdmission(arrived, 'ready_for_discharge', context());
     await changeAdmission(ready, 'discharge', context());

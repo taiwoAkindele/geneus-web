@@ -10,9 +10,11 @@ const explain = (cause: unknown): string => {
   if (cause instanceof ApiError && cause.code === 'invalid_code') {
     return 'That code is not valid — it may have expired (codes last 15 minutes) or been used. Ask for a new one.';
   }
+
   if (cause instanceof ApiError && cause.code === 'device_already_enrolled') {
     return 'This device is already enrolled. Sign in instead, or ask your admin to remove it first.';
   }
+
   return cause instanceof Error ? cause.message : 'Could not join the facility';
 };
 
@@ -37,8 +39,10 @@ export const JoinFacilityScreen = () => {
     if (!ready || joining) {
       return;
     }
+
     setJoining(true);
     setError(undefined);
+
     try {
       const device = await joinFacility(code, deviceId, label);
       // Waits (bounded) for the facility's records; sign-in shows the rest syncing if it is slow.

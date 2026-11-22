@@ -12,11 +12,14 @@ import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staf
 /** Every call here is made as the enrolled device; the server decides the facility from its credential. */
 const deviceCredential = (): string => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
   }
+
   return device.credential;
 };
+
 const asDevice = <T>(path: string, body?: unknown): Promise<T> => {
   try {
     return postAsDevice<T>(path, deviceCredential(), body);
@@ -42,13 +45,16 @@ const asProvenPerson = async <T>(
       staffSessionToken(context),
       body,
     );
+
     touchStaffSession();
+
     return result;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
       forgetStaffSession();
       throw new VerificationRequired();
     }
+
     throw cause;
   }
 };
@@ -99,9 +105,11 @@ export const confirmRecoveryEmail = (
 /* ---------------- Invitations (server-only state; these shapes are the server's answers) ---------------- */
 
 export type InvitationStatus = 'pending' | 'expired' | 'locked' | 'accepted' | 'revoked';
+
 /** `provider_accepted`: the email provider took it — not proof it arrived. `not_configured`: a development server only logged it. */
 export type InvitationDelivery =
   'sending' | 'provider_accepted' | 'provider_rejected' | 'not_configured';
+
 export type InvitationView = {
   id: string;
   channel: 'email';
@@ -116,12 +124,14 @@ export type InvitationView = {
   /** The link may set up one new device, as an administrator who may add devices chose. */
   allowsNewDevice: boolean;
 };
+
 export type ContactActivation = {
   email?: { address: string; verified: true };
   invitation?: InvitationView;
   activation: { serverPinDevices: number; lastPinRegisteredOn?: string };
   nextSendAllowedOn?: string;
 };
+
 export type StaffOnboardingSummary = {
   staffId: string;
   activated: boolean;
@@ -146,16 +156,19 @@ export const sendStaffInvitation = (
     ...(email ? { email } : {}),
     ...(allowNewDevice ? { allowNewDevice: true } : {}),
   });
+
 export const revokeStaffInvitation = (
   context: AuthorizationContext,
   staffId: string,
 ): Promise<{ revoked: true }> =>
   asProvenPerson(context, staffPath(staffId, 'invitations/revoke'), {});
+
 export const staffContactActivation = (
   context: AuthorizationContext,
   staffId: string,
 ): Promise<ContactActivation> =>
   asProvenPerson(context, staffPath(staffId, 'contact-activation'), {});
+
 export const staffOnboardingSummaries = (
   context: AuthorizationContext,
 ): Promise<{ staff: StaffOnboardingSummary[] }> =>

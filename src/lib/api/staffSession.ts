@@ -14,10 +14,12 @@ import { ApiError, staffRequest } from './client';
  */
 type Held = StaffSession & { deviceId: string; lastUsed: number };
 const TAB_KEY = 'geneus.staffSession';
+
 const restore = (): Held | undefined => {
   try {
     const raw: unknown = JSON.parse(sessionStorage.getItem(TAB_KEY) ?? 'null');
     const h = raw as Held | null;
+
     return h &&
       typeof h.token === 'string' &&
       typeof h.staffId === 'string' &&
@@ -31,6 +33,7 @@ const restore = (): Held | undefined => {
     return undefined;
   }
 };
+
 const persist = (value: Held | undefined) => {
   try {
     if (value) {
@@ -42,22 +45,29 @@ const persist = (value: Held | undefined) => {
     /* storage unavailable: the session lasts this page */
   }
 };
+
 let held: Held | undefined = typeof sessionStorage === 'undefined' ? undefined : restore();
+
 const hold = (value: Held | undefined) => {
   held = value;
   persist(value);
 };
+
 export const STAFF_SESSION_EVENT = 'geneus:staffSession';
+
 const changed = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(STAFF_SESSION_EVENT));
   }
 };
+
 const credential = () => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new Error('This device is not enrolled');
   }
+
   return device.credential;
 };
 
@@ -67,24 +77,32 @@ export const staffSessionToken = (
   if (!held || held.staffId !== context.userId || held.deviceId !== context.deviceId) {
     return undefined;
   }
+
   const now = Date.now();
+
   if (Date.parse(held.expiresOn) <= now || now - held.lastUsed > held.idleMinutes * 60_000) {
     hold(undefined);
     changed();
+
     return undefined;
   }
+
   return held.token;
 };
+
 export const staffSessionExpires = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>) =>
   staffSessionToken(context) ? held!.expiresOn : undefined;
+
 export const touchStaffSession = () => {
   if (held) {
     hold({ ...held, lastUsed: Date.now() });
   }
 };
+
 const keep = (session: StaffSession, deviceId: string) => {
   hold({ ...session, deviceId, lastUsed: Date.now() });
   changed();
+
   return session;
 };
 
@@ -122,11 +140,13 @@ export const endStaffSession = async () => {
   const ending = held;
   hold(undefined);
   changed();
+
   if (ending) {
     // Best effort: the session is already cleared on this device, and the server expires it anyway.
     await staffRequest('/staff/session/end', credential(), ending.token).catch(() => undefined);
   }
 };
+
 export const forgetStaffSession = () => {
   hold(undefined);
   changed();
@@ -138,16 +158,21 @@ export const forgetStaffSession = () => {
  * server must accept before the PIN is saved here at all.
  */
 const pendingCodes = new Map<string, { code: string; until: number; online: boolean }>();
+
 export const rememberSetupCode = (staffId: string, code: string, online = false) =>
   pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000, online });
+
 export const takeSetupCode = (staffId: string) => {
   const entry = pendingCodes.get(staffId);
   pendingCodes.delete(staffId);
+
   return entry && entry.until > Date.now() ? entry.code : undefined;
 };
+
 /** The invitation code waiting to be accepted online for this person, without using it up. */
 export const pendingInvitationCode = (staffId: string): string | undefined => {
   const entry = pendingCodes.get(staffId);
+
   return entry?.online && entry.until > Date.now() ? entry.code : undefined;
 };
 
@@ -159,8 +184,10 @@ export const openStaffSessionQuietly = async (
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return 'offline';
   }
+
   try {
     await openStaffSession(context, pin);
+
     return 'open';
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'pin_not_enrolled') {

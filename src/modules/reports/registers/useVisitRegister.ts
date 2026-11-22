@@ -18,6 +18,7 @@ export const useVisitRegister = (register: RegisterDef | undefined) => {
       listStaff(),
       listAppointments(),
     ]);
+
     return {
       encounters,
       entries,
@@ -26,7 +27,9 @@ export const useVisitRegister = (register: RegisterDef | undefined) => {
       staffNames: new Map(staff.map((member) => [member.staffId, member.fullName])),
     };
   }, []);
+
   const query = useLiveQuery(load);
+
   const rows = useMemo<VisitRegisterRow[]>(
     () =>
       register?.visitLink && query.data
@@ -37,5 +40,6 @@ export const useVisitRegister = (register: RegisterDef | undefined) => {
         : [],
     [register, query.data],
   );
+
   return { rows, loading: query.loading, error: query.error, reload: query.reload };
 };

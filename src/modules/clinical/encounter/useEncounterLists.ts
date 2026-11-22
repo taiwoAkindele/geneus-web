@@ -32,21 +32,26 @@ export const useEncounterList = (
     if (!enabled) {
       return { open: [], closed: [] };
     }
+
     const [encounters, entries] = await Promise.all([listEncounters(), listEncounterEntries()]);
     const byEncounter = new Map<string, typeof entries>();
+
     for (const entry of entries) {
       const group = byEncounter.get(entry.encounterId) ?? [];
       group.push(entry);
       byEncounter.set(entry.encounterId, group);
     }
+
     const summaries = encounters
       .filter((encounter) => !encounter.inpatientContext)
       .map((encounter) => summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []));
+
     return {
       open: summaries.filter((summary) => summary.status === 'Open').sort(newestFirst),
       closed: summaries.filter((summary) => summary.status !== 'Open').sort(newestFirst),
     };
   }, [enabled]);
+
   return useLiveQuery(load);
 };
 
@@ -56,6 +61,7 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
     const encounters = (
       await Promise.all((await patientIdentityIds(patientId)).map(encountersForPatient))
     ).flat();
+
     const summaries = await Promise.all(
       encounters
         .filter((encounter) => !encounter.inpatientContext)
@@ -63,20 +69,24 @@ export const usePatientEncounters = (patientId: string): LiveQuery<EncounterSumm
           summariseEncounter(encounter, await entriesForEncounter(encounter.id)),
         ),
     );
+
     return summaries.sort(newestFirst);
   }, [patientId]);
+
   return useLiveQuery(load);
 };
 
 /** The lab, results-ready and pharmacy queues, kept current as steps are saved on any device. */
 export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient[]>> => {
   const { facility, deviceId } = useDeviceContext();
+
   return useLiveQuery(
     useCallback(async () => {
       const [entries, summaries] = await Promise.all([
         entriesAtSteps(QUEUE_STEPS).then(usablePharmacyEntries),
         dischargePrescriptions(facility?.id, deviceId),
       ]);
+
       return stationQueues(entries, summaries);
     }, [facility?.id, deviceId]),
   );
@@ -85,6 +95,7 @@ export const useStationQueues = (): LiveQuery<Record<StationQueue, QueuedPatient
 /** Laboratory and pharmacy requests, open and completed, kept current as steps are saved on any device. */
 export const useRequestQueues = () => {
   const { facility, deviceId } = useDeviceContext();
+
   return useLiveQuery(
     useCallback(async () => {
       const [entries, summaries, allocations] = await Promise.all([
@@ -92,6 +103,7 @@ export const useRequestQueues = () => {
         dischargePrescriptions(facility?.id, deviceId),
         listServiceAllocations(),
       ]);
+
       return requestQueues(entries, summaries, allocations);
     }, [facility?.id, deviceId]),
   );

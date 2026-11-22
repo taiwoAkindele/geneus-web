@@ -37,6 +37,7 @@ import {
 } from '@/modules/finance/insurance/AccountCoverage';
 
 const loadServicePoints = () => allOfType<Location>('location');
+
 export const PatientAccount = ({
   patientId,
   transfer,
@@ -60,6 +61,7 @@ export const PatientAccount = ({
 }) => {
   const context = useAuthorizationContext();
   const identities = useLiveQuery(listIdentityEvents);
+
   const financialSummaries = useLiveQuery(
     useCallback(
       () =>
@@ -68,12 +70,16 @@ export const PatientAccount = ({
     ),
     ['coverage_financial_summary'],
   );
+
   const publicInsurance = (row: ChargeBalance) => {
     const estimate = row.coverage;
+
     if (!estimate || !('allocation' in estimate)) {
       return null;
     }
+
     const s = financialSummaries.data?.find((s) => s.allocationId === estimate.allocation.id);
+
     return s ? (
       <p className="text-sm">
         Signed contractual adjustment {formatMoney(s.contractAdjustmentMinor, s.currency)} ·
@@ -87,6 +93,7 @@ export const PatientAccount = ({
       <p className="text-xs">Confirmed insurer totals are awaiting synchronization.</p>
     );
   };
+
   const linkedIds = linkedPatientIds(patientId, identities.data ?? []);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [received, setReceived] = useState('');
@@ -107,11 +114,13 @@ export const PatientAccount = ({
   const [review, setReview] = useState<ReturnType<typeof preparePayment>>();
   const [leaving, setLeaving] = useState<() => void>();
   const [accounts, setAccounts] = useState<ReceivingAccount[]>();
+
   const [selfPay, setSelfPay] = useState<{
     row: ChargeBalance;
     cover: PatientCover;
     check?: CoverCheck;
   }>();
+
   const [refunding, setRefunding] = useState<ChargeBalance>();
   const toast = useToast();
   const errorSummary = useRef<HTMLDivElement>(null);
@@ -121,13 +130,16 @@ export const PatientAccount = ({
       errorSummary.current?.focus();
     }
   }, [error]);
+
   useEffect(() => {
     if (review) {
       reviewSection.current?.focus();
     }
   }, [review]);
+
   const saving = useRef(false);
   const requestId = useRef(crypto.randomUUID());
+
   const rows = billingRows(
     data.charges.filter(
       (c) => c.patientId === patientId && (!chargeIds || chargeIds.includes(c.id)),
@@ -136,10 +148,13 @@ export const PatientAccount = ({
     data.adjustments,
     data.coverage,
   );
+
   const patient = data.patients.find((p) => p.patientId === patientId);
+
   const dirty =
     Object.values(amounts).some((value) => Boolean(value.trim())) ||
     Boolean(received.trim() || feeId || adjusting || reduction || reason);
+
   const requestLeave = (action: () => void) => {
     if (dirty) {
       setLeaving(() => action);
@@ -147,14 +162,18 @@ export const PatientAccount = ({
       action();
     }
   };
+
   const capacity = useReceiptCapacity(transfer ? [transfer.id] : [], data.payments.length);
   const available = transfer ? capacity.sources[transfer.id]?.availableMinor : undefined;
+
   const checkPayment = () => {
     if (transfer && available === undefined) {
       throw new Error('Refresh verified availability before allocating this receipt');
     }
+
     return preparePayment(rows, amounts, transfer, available);
   };
+
   // One amount for the whole account, applied to the oldest payable charges first.
   // The split fills the per-charge boxes, which stay editable before the review.
   const payable = rows
@@ -169,60 +188,78 @@ export const PatientAccount = ({
         a.charge.createdOn.localeCompare(b.charge.createdOn) ||
         a.charge.id.localeCompare(b.charge.id),
     );
+
   const currency =
     new Set(payable.map((r) => r.charge.currency)).size === 1
       ? payable[0].charge.currency
       : undefined;
+
   const due = payable.reduce((total, r) => total + r.balanceMinor, 0);
+
   const splitReceived = (value: string) => {
     setReceived(value);
     setError('');
     setFieldError(undefined);
+
     if (!currency) {
       return;
     }
+
     let left: number;
+
     try {
       left = value.trim() ? parseAmount(value, currency) : 0;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Check the amount.');
+
       return;
     }
+
     const next: Record<string, string> = {};
+
     for (const r of payable) {
       if (left <= 0) {
         break;
       }
+
       const part = Math.min(left, r.balanceMinor);
       next[r.charge.id] = amountInput(part, currency);
       left -= part;
     }
+
     setAmounts(next);
+
     if (left > 0) {
       setError(
         `That is ${formatMoney(left, currency)} more than the amount due. Record only what is due; return the difference to the patient.`,
       );
     }
   };
+
   const reviewPayment = () => {
     setError('');
     setFieldError(undefined);
+
     try {
       setReview(checkPayment());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Check the payment amounts.');
+
       if (cause instanceof PaymentInputError) {
         setFieldError(cause.chargeId);
       }
     }
   };
+
   const perform = async (action: () => Promise<unknown>) => {
     if (saving.current) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       await action();
       onSaved();
@@ -233,24 +270,31 @@ export const PatientAccount = ({
       setBusy(false);
     }
   };
+
   const savePayment = () =>
     perform(async () => {
       const checked = checkPayment();
+
       if (!review || JSON.stringify(review) !== JSON.stringify(checked)) {
         setReview(undefined);
         throw new Error('The payment changed. Check the amounts and review it again.');
       }
+
       const { currency, allocations } = checked;
+
       const payment = transfer
         ? await matchTransfer(context, transfer.id, patientId, allocations, requestId.current)
         : await recordPayment({ patientId, method: 'cash', currency, allocations }, context);
+
       onReceipt(payment);
     });
+
   const addFee = () =>
     perform(async () => {
       if (!patient || !feeId) {
         throw new Error('Select a fee');
       }
+
       await createCharge(
         feeId,
         {
@@ -263,23 +307,31 @@ export const PatientAccount = ({
         },
         context,
       );
+
       setFeeId('');
     });
+
   const reduce = () =>
     perform(async () => {
       const row = rows.find((r) => r.charge.id === adjusting);
+
       if (!row) {
         throw new Error('Select a bill');
       }
+
       let amount =
         kind === 'waiver' ? row.balanceMinor : parseAmount(reduction, row.charge.currency);
+
       if (kind === 'discount' && percent) {
         const value = Number(reduction);
+
         if (!Number.isFinite(value) || value <= 0 || value > 100) {
           throw new Error('Enter a percentage from 0 to 100');
         }
+
         amount = Math.round((row.balanceMinor * value) / 100);
       }
+
       await adjustCharge(adjusting, kind, amount, reason, context);
       setAdjusting('');
       setReason('');
@@ -287,6 +339,7 @@ export const PatientAccount = ({
       setAmounts({});
       setReceived('');
     });
+
   if (statementOpen) {
     return (
       <PatientStatement
@@ -548,6 +601,7 @@ export const PatientAccount = ({
               const total = rows
                 .filter((r) => r.charge.currency === c)
                 .reduce((n, r) => n + r.undeterminedMinor, 0);
+
               return total ? (
                 <p key={c} className="font-mono text-lg font-bold">
                   {formatMoney(total, c)}

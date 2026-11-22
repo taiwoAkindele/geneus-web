@@ -6,18 +6,22 @@ export type RegistrationDraftSnapshot = {
   values: RegistrationValues;
   updatedOn?: string;
 };
+
 export const createRegistrationDraft = (
   onChange?: () => void,
   seed: readonly RegistrationDraftSnapshot[] = [],
 ) => {
   const drafts = new Map(seed.map((draft) => [draft.key, draft]));
   let activeKey = 'new';
+
   return {
     read: (key: string, seed: Partial<RegistrationValues> = {}): RegistrationValues => {
       activeKey = key;
+
       if (!drafts.has(key)) {
         drafts.set(key, { key, values: { ...EMPTY_REGISTRATION, ...seed } });
       }
+
       return drafts.get(key)!.values;
     },
     snapshot: () => [...drafts.values()],

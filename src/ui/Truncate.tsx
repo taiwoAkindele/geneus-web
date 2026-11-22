@@ -15,10 +15,12 @@ export const Truncate = ({
 }) => {
   const ref = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
+
   const check = () => {
     const el = ref.current;
     setCut(Boolean(el && el.scrollWidth > el.clientWidth));
   };
+
   return (
     <span
       ref={ref}

@@ -187,6 +187,7 @@ export const ReferralScreen = () => {
             {REFERRALS.map((r) => {
               const active = r.id === selectedId;
               const closed = r.status === 'Closed';
+
               return (
                 <button
                   key={r.id}

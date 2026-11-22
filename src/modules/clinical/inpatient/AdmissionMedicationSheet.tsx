@@ -25,20 +25,27 @@ export const AdmissionMedicationSheet = ({
   const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
   const save = async () => {
     if (busy.current) {
       return;
     }
+
     if (!note.trim()) {
       setError('Record your decision to use these instructions for ward care');
+
       return;
     }
+
     if (!reviewing) {
       setReviewing(true);
+
       return;
     }
+
     busy.current = true;
     setSaving(true);
+
     try {
       await saveWardEvent(
         session,
@@ -53,6 +60,7 @@ export const AdmissionMedicationSheet = ({
         context,
         { requestId: id.current, finish: true },
       );
+
       onSaved();
       onClose();
     } catch (cause) {
@@ -66,6 +74,7 @@ export const AdmissionMedicationSheet = ({
       setSaving(false);
     }
   };
+
   const renderSubmitLabel = () => {
     if (saving) {
       return 'Saving…';

@@ -1,12 +1,14 @@
 import { expect, it } from 'vitest';
 import { RegisterDefinition, RegisterEntry, Staff } from '@shared';
 import { projectRegisters } from './registerProjection';
+
 const base = {
   facilityId: 'TEST',
   createdBy: 'staff:one',
   createdOn: '2026-10-26T10:00:00Z',
   deviceId: 'device:one',
 };
+
 it('renders historic entries against their own saved schema and readable author', () => {
   const original = RegisterDefinition.parse({
     ...base,
@@ -19,12 +21,14 @@ it('renders historic entries against their own saved schema and readable author'
     status: 'published',
     fields: [{ id: 'old', type: 'text', label: 'Original question' }],
   });
+
   const newer = RegisterDefinition.parse({
     ...original,
     id: 'register:one:v2',
     version: 2,
     fields: [{ id: 'new', type: 'number', label: 'New question' }],
   });
+
   const entry = RegisterEntry.parse({
     ...base,
     type: 'register_entry',
@@ -34,6 +38,7 @@ it('renders historic entries against their own saved schema and readable author'
     entryDate: '2026-10-26',
     values: { old: 'Original answer' },
   });
+
   const staff = Staff.parse({
     ...base,
     type: 'staff',
@@ -42,6 +47,7 @@ it('renders historic entries against their own saved schema and readable author'
     fullName: 'Records Officer',
     role: 'records_officer',
   });
+
   const [register] = projectRegisters([original, newer], [entry], [staff]);
   expect(register.version).toBe(2);
   expect(register.rows[0]).toMatchObject({
@@ -51,6 +57,7 @@ it('renders historic entries against their own saved schema and readable author'
     values: { old: 'Original answer' },
   });
 });
+
 it('keeps a published register available while its newer draft is being prepared', () => {
   const published = RegisterDefinition.parse({
     ...base,
@@ -63,6 +70,7 @@ it('keeps a published register available while its newer draft is being prepared
     status: 'published',
     fields: [{ id: 'original', type: 'text', label: 'Original question' }],
   });
+
   const draft = RegisterDefinition.parse({
     ...published,
     id: 'daily:v2',
@@ -71,6 +79,7 @@ it('keeps a published register available while its newer draft is being prepared
     status: 'draft',
     fields: [],
   });
+
   const [register] = projectRegisters([published, draft], [], []);
   expect(register).toMatchObject({
     status: 'published',
@@ -78,6 +87,7 @@ it('keeps a published register available while its newer draft is being prepared
     name: 'Daily',
     hasDraft: true,
   });
+
   expect(register.fields[0].label).toBe('Original question');
   expect(register.configuration).toMatchObject({
     version: 2,

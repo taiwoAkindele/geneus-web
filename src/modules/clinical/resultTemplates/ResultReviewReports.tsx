@@ -23,6 +23,7 @@ export const ResultReviewReports = ({
         findRecord<Patient>('patient', patientId),
         allOfType<Staff>('staff'),
       ]);
+
       return {
         entries,
         patient,
@@ -30,14 +31,18 @@ export const ResultReviewReports = ({
       };
     }, [patientId]),
   );
+
   if (!data.data) {
     return <p role="status">Reading results…</p>;
   }
+
   const { entries, patient, names } = data.data;
   const results = entryIds.flatMap((id) => entries.filter((entry) => entry.id === id));
+
   if (!results.length) {
     return <p className="text-sm text-ink-soft">No results are waiting for review.</p>;
   }
+
   return (
     <div className="space-y-5">
       {results.map((entry) =>

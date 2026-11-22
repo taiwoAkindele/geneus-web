@@ -29,6 +29,7 @@ import type { HistoryView } from './patientRoutes';
 
 const time = (at: string) =>
   new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
 const Panel = ({
   title,
   action,
@@ -46,6 +47,7 @@ const Panel = ({
     {children}
   </section>
 );
+
 const TextAction = ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
   <button
     type="button"
@@ -55,6 +57,7 @@ const TextAction = ({ children, onClick }: { children: ReactNode; onClick: () =>
     {children}
   </button>
 );
+
 const Muted = ({ children }: { children: ReactNode }) => (
   <p className="text-sm leading-relaxed text-ink-soft">{children}</p>
 );
@@ -69,15 +72,20 @@ type Result = {
 /** Results recorded today, plus any earlier result still waiting for clinical review. */
 export const currentResults = (chart: PatientClinicalRecord, today = calendarDate()): Result[] => {
   const byEncounter = new Map<string, EncounterEntry[]>();
+
   for (const entry of chart.entries) {
     byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
   }
+
   const results: Result[] = [];
+
   for (const [encounterId, raw] of byEncounter) {
     const effective = effectiveEncounterEntries(raw);
     const unreviewed = new Set(outstandingResults(effective).unreviewed);
+
     for (const entry of effective.filter((candidate) => candidate.step === 'lab_results')) {
       const pending = unreviewed.has(entry.id);
+
       if (pending || calendarDate(entry.createdOn) === today) {
         results.push({
           entry,
@@ -88,6 +96,7 @@ export const currentResults = (chart: PatientClinicalRecord, today = calendarDat
       }
     }
   }
+
   return results.sort(
     (a, b) =>
       Number(b.critical) - Number(a.critical) || b.entry.createdOn.localeCompare(a.entry.createdOn),
@@ -146,26 +155,34 @@ export const PatientNow = ({
       </div>
     );
   }
+
   if (!chart) {
     return <>{chartUnavailable}</>;
   }
+
   const today = calendarDate();
+
   const observations = observationHistory(chart.entries).filter(
     (reading) => calendarDate(reading.recordedOn) === today,
   );
+
   const latest = observations[0];
   const results = currentResults(chart, today);
   const critical = results.filter((result) => result.critical && result.unreviewed);
+
   const notes = effectiveEncounterEntries(chart.entries)
     .filter((entry) => entry.step === 'complaint' && calendarDate(entry.createdOn) === today)
     .reverse();
+
   const pending = openVisits.flatMap((visit) =>
     outstandingResults(
       effectiveEncounterEntries(chart.entries.filter((entry) => entry.encounterId === visit.id)),
     ).pending.map((test) => ({ test, visit })),
   );
+
   const projected = (encounterId: string) => {
     const encounter = chart.encounters.find((candidate) => candidate.id === encounterId);
+
     return encounter
       ? projectEncounter({
           patientId,
@@ -177,9 +194,12 @@ export const PatientNow = ({
         }).data
       : EMPTY_ENCOUNTER_DATA;
   };
+
   const author = (entry: EncounterEntry) =>
     chart.staffNames.get(entry.createdBy) ?? entry.createdBy;
+
   const nothingToday = !latest && !results.length && !notes.length && !pending.length;
+
   return (
     <div>
       <h2 className="sr-only">Now</h2>
@@ -320,6 +340,7 @@ export const PatientNow = ({
             <div className="space-y-4">
               {results.map((result) => {
                 const report = effectiveLabReport(result.entry, chart.entries);
+
                 return (
                   <article
                     key={result.entry.id}
@@ -436,11 +457,14 @@ const Summary = ({
   const problems = chart.current.filter(
     (event) => event.kind === 'problem' && event.values.status !== 'resolved',
   );
+
   const medicines = chart.current.filter(
     (event) => event.kind === 'medication' && event.values.status === 'active',
   );
+
   const allergies = currentAllergies(chart.events, chart.patients);
   const last = history.find((visit) => visit.status !== 'Open');
+
   const next = appointments
     .filter(
       (appointment) =>
@@ -449,6 +473,7 @@ const Summary = ({
         appointment.at >= new Date().toISOString(),
     )
     .sort((a, b) => a.at.localeCompare(b.at))[0];
+
   return (
     <section aria-labelledby="now-summary" className="mt-8">
       <h3 id="now-summary" className="text-[22px] font-extrabold">

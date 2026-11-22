@@ -20,7 +20,11 @@ import {
   type CoverDraft,
 } from '@/data/repos/insurance';
 import { listFeeItems } from '@/data/repos/billing';
-import { listAuthorizations, saveAuthorization, describeInsuranceError } from '@/lib/api/insurance';
+import {
+  listAuthorizations,
+  saveAuthorization,
+  describeStaffActionError,
+} from '@/lib/api/insurance';
 import { useAuthorizationContext, StaffVerification } from '@/session';
 import { Button, SelectField, TextField, useToast } from '@/ui';
 import { useDeviceInsurance } from './CoverCard';
@@ -32,6 +36,7 @@ const OTHER_PLAN = '__other__';
 /* ------------------------------------------------------------------ */
 
 export type CoverFieldsValue = Omit<CoverDraft, 'patientId' | 'replaces'>;
+
 export const emptyCover = (): CoverFieldsValue => ({
   payerId: '',
   planCode: '',
@@ -42,6 +47,7 @@ export const emptyCover = (): CoverFieldsValue => ({
   validTo: '',
   active: true,
 });
+
 /** What is still missing before a cover can be recorded, or undefined when it is complete. */
 export const coverIssue = (cover: CoverFieldsValue): string | undefined => {
   if (!cover.payerId) {
@@ -90,11 +96,13 @@ export const CoverFields = ({
     ),
     ['payer', 'cover_schedule'],
   );
+
   const payers = data.data?.payers ?? [];
   const plans = plansOf(value.payerId, data.data?.schedules ?? []);
   const listed = plans.some((p) => p.code === value.planCode);
   const [typing, setTyping] = useState(false);
   const set = (patch: Partial<CoverFieldsValue>) => onChange({ ...value, ...patch });
+
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {payers.length === 0 ? (
@@ -199,9 +207,11 @@ export const RegistrationPayment = ({
 }) => {
   const context = useAuthorizationContext();
   const insurance = useDeviceInsurance();
+
   if (insurance === undefined || !context.permissions.includes('cover:record')) {
     return null;
   }
+
   return (
     <section
       aria-labelledby="registration-payment"
@@ -240,6 +250,7 @@ export type ApprovalItem = { feeItemId?: string; category: FeeCategory; name: st
 
 const useApprovalData = (patientId: string) => {
   const context = useAuthorizationContext();
+
   return useLiveQuery(
     useCallback(async () => {
       const [covers, schedules, payers, facility] = await Promise.all([
@@ -248,6 +259,7 @@ const useApprovalData = (patientId: string) => {
         listPayers(),
         findRecord<Facility>('facility', context.facilityId),
       ]);
+
       return {
         covers,
         schedules,
@@ -276,9 +288,11 @@ export const ApprovalWarning = ({
   const context = useAuthorizationContext();
   const insurance = useDeviceInsurance();
   const data = useApprovalData(patientId).data;
+
   if (!data || !patientId || insurance !== 'active' || !items.length) {
     return null;
   }
+
   const needed = items.flatMap((item) => {
     const notice = approvalNeeded({
       patientId,
@@ -287,13 +301,17 @@ export const ApprovalWarning = ({
       date: data.date,
       records: data,
     });
+
     return notice ? [{ item, notice }] : [];
   });
+
   if (!needed.length) {
     return null;
   }
+
   const payer =
     data.payers.find((p) => p.id === needed[0].notice.payerId)?.name ?? "The patient's payer";
+
   return (
     <div
       role="status"
@@ -325,9 +343,11 @@ export const PlanApprovalSummary = ({ patientId }: { patientId: string }) => {
   const insurance = useDeviceInsurance();
   const data = useApprovalData(patientId).data;
   const fees = useLiveQuery(listFeeItems).data ?? [];
+
   if (!data || insurance !== 'active') {
     return null;
   }
+
   const needs = coversOn(patientId, data.date, data.covers).flatMap((cover) => {
     const schedule = data.schedules
       .filter(
@@ -339,15 +359,19 @@ export const PlanApprovalSummary = ({ patientId }: { patientId: string }) => {
           (!s.endedOn || data.date < s.endedOn),
       )
       .sort((a, b) => b.contractVersion - a.contractVersion)[0];
+
     if (!schedule) {
       return [];
     }
+
     const items = Object.entries(schedule.items)
       .filter(([, l]) => l.status === 'covered' && l.approvalRequired)
       .map(([id]) => fees.find((f: FeeItem) => f.id === id)?.name ?? id);
+
     const categories = Object.entries(schedule.categories)
       .filter(([, l]) => l?.status === 'covered' && l.approvalRequired)
       .map(([c]) => `all ${c} services`);
+
     return items.length || categories.length
       ? [
           {
@@ -357,9 +381,11 @@ export const PlanApprovalSummary = ({ patientId }: { patientId: string }) => {
         ]
       : [];
   });
+
   if (!needs.length) {
     return null;
   }
+
   return (
     <div
       role="status"
@@ -393,9 +419,11 @@ const STATUS_LABELS: Record<ClaimAuthorization['status'], string> = {
 export const PatientAuthorizations = ({ patientId }: { patientId: string }) => {
   const context = useAuthorizationContext();
   const insurance = useDeviceInsurance();
+
   if (!insurance || insurance === 'history' || !context.permissions.includes('cover:verify')) {
     return null;
   }
+
   return (
     <section
       id="authorizations"
@@ -413,33 +441,40 @@ export const PatientAuthorizations = ({ patientId }: { patientId: string }) => {
 const AuthorizationsBody = ({ patientId }: { patientId: string }) => {
   const context = useAuthorizationContext();
   const toast = useToast();
+
   const covers =
     useLiveQuery(
       useCallback(() => coversForPatient(patientId), [patientId]),
       ['patient_cover'],
     ).data ?? [];
+
   const payers =
     useLiveQuery(
       useCallback(() => listPayers(), []),
       ['payer'],
     ).data ?? [];
+
   const fees = (useLiveQuery(listFeeItems).data ?? []).filter((f) => f.active);
   const [list, setList] = useState<ClaimAuthorization[]>();
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
+
   const load = useCallback(async () => {
     try {
       setList((await listAuthorizations(context, patientId)).authorizations);
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context, patientId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const today = new Date().toISOString().slice(0, 10);
   const payerIds = [...new Set(covers.map((c) => c.payerId))];
+
   const [form, setForm] = useState({
     payerId: '',
     kind: 'pre_authorization' as 'pre_authorization' | 'referral',
@@ -455,8 +490,10 @@ const AuthorizationsBody = ({ patientId }: { patientId: string }) => {
     note: '',
     replaces: '',
   });
+
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
   const live = (list ?? []).filter((a) => !a.replacedBy);
+
   const save = async () => {
     try {
       await saveAuthorization(context, {
@@ -479,14 +516,17 @@ const AuthorizationsBody = ({ patientId }: { patientId: string }) => {
         ...(form.note.trim() ? { note: form.note.trim() } : {}),
         ...(form.replaces ? { replaces: form.replaces } : {}),
       });
+
       toast('Recorded.');
       setAdding(false);
       await load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   };
+
   const feeName = (id: string) => fees.find((f) => f.id === id)?.name ?? id;
+
   const renderAuthorizations = () => {
     if (!list) {
       return (

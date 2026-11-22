@@ -34,29 +34,37 @@ export const AppointmentWorkspace = () => {
   useEffect(() => {
     document.title = 'Appointments · Geneus Health';
   }, []);
+
   const groupValue = params.get('group');
+
   // "All" is the default view; a named group (e.g. ?group=today from the dashboard) narrows it.
   const group: AppointmentGroup | 'all' =
     groupValue && Object.keys(APPOINTMENT_GROUP_LABELS).includes(groupValue)
       ? (groupValue as AppointmentGroup)
       : 'all';
+
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
   // Dates apply outside Today only; the old attendance filter is retired and its address parameter ignored.
   const dated = group !== 'today' && Boolean(from || to);
+
   const change = (key: string, value: string) =>
     setParams((current) => {
       const next = new URLSearchParams(current);
+
       if (value) {
         next.set(key, value);
       } else {
         next.delete(key);
       }
+
       return next;
     });
+
   const selected = query.appointments.find(
     (appointment) => appointment.id === params.get('booking'),
   );
+
   const shown = query.appointments.filter(
     (appointment) =>
       (group === 'all' || appointment.group === group) &&
@@ -65,10 +73,13 @@ export const AppointmentWorkspace = () => {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+
   const close = () => change('booking', '');
+
   const overdueCount = query.appointments.filter(
     (appointment) => appointment.group === 'overdue',
   ).length;
+
   const candidates =
     patients.data
       ?.filter((patient) =>
@@ -77,21 +88,26 @@ export const AppointmentWorkspace = () => {
           .includes(patientSearch.toLowerCase()),
       )
       .slice(0, 30) ?? [];
+
   const open = (appointment: BookedAppointment) => change('booking', appointment.id);
   const canUpdate = context.permissions.includes('appointment:update');
+
   // Arrival is routine: one tap, recorded with the actor and time in the booking history.
   // A mistaken arrival is corrected from the booking details (reschedule or cancel, with a reason).
   const arrive = async (booking: BookedAppointment) => {
     if (busyId) {
       return;
     }
+
     setBusyId(booking.id);
+
     try {
       const history = booking.activity ?? [];
       await query.change(booking.id, {
         action: 'arrived',
         expectedActivityId: history[history.length - 1]?.id,
       });
+
       toast(
         `${booking.patient.name} arrived. ${booking.paymentStatus === 'Awaiting payment' ? 'Fees are waiting at the cashier; care can still begin.' : 'Ready for the nurse station.'}`,
       );
@@ -103,15 +119,19 @@ export const AppointmentWorkspace = () => {
       setBusyId('');
     }
   };
+
   const canRecord = context.permissions.includes('encounter:record');
+
   const menu = (booking: BookedAppointment): RowMenuItem[] =>
     rowActionsFor(booking, { canUpdate, canRecord }).map((action) => {
       if (action === 'arrive') {
         return { label: 'Record arrival', icon: 'check', onSelect: () => void arrive(booking) };
       }
+
       if (action === 'rebook') {
         return { label: 'Rebook', icon: 'calendar', onSelect: () => setRebooking(booking) };
       }
+
       if (action === 'visit') {
         return {
           label: booking.encounterId ? 'Continue visit' : 'Start visit',
@@ -127,15 +147,18 @@ export const AppointmentWorkspace = () => {
             ),
         };
       }
+
       if (action === 'booking') {
         return { label: 'View booking', icon: 'clock', onSelect: () => open(booking) };
       }
+
       return {
         label: 'View patient details',
         icon: 'patients',
         onSelect: () => navigate(patientChartPath(booking.patient.id, 'details')),
       };
     });
+
   const renderResultCount = () => {
     if (!(!query.loading && !query.error)) {
       return null;
@@ -275,6 +298,7 @@ export const AppointmentWorkspace = () => {
                     initials: '',
                     allergy: '',
                   });
+
                   setChoosing(false);
                 }}
               >
@@ -350,6 +374,7 @@ export const AppointmentWorkspace = () => {
     if (group === 'today') {
       return (() => {
         const { expected, arrived } = splitToday(shown);
+
         return (
           <div className="space-y-5">
             <section aria-labelledby="expected-heading" className="space-y-2">
@@ -473,16 +498,19 @@ export const AppointmentWorkspace = () => {
               onChange={(nextFrom, nextTo) =>
                 setParams((current) => {
                   const next = new URLSearchParams(current);
+
                   if (nextFrom) {
                     next.set('from', nextFrom);
                   } else {
                     next.delete('from');
                   }
+
                   if (nextTo) {
                     next.set('to', nextTo);
                   } else {
                     next.delete('to');
                   }
+
                   return next;
                 })
               }

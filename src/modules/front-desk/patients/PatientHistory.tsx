@@ -14,6 +14,7 @@ import { PatientIdentityPanel } from './PatientIdentityPanel';
 import { HISTORY_VIEWS, type HistoryView } from './patientRoutes';
 
 export const HISTORY_PERIODS = { all: 'All dates', today: 'Today', '30d': 'Last 30 days' } as const;
+
 export type HistoryPeriod = keyof typeof HISTORY_PERIODS;
 
 /** Whether an ISO time falls in the chosen period, by the device's local calendar date. */
@@ -21,13 +22,17 @@ export const inPeriod = (at: string, period: HistoryPeriod, now = new Date()): b
   if (period === 'all') {
     return true;
   }
+
   const day = calendarDate(at);
   const today = calendarDate(now);
+
   if (period === 'today') {
     return day === today;
   }
+
   const from = new Date(now);
   from.setDate(from.getDate() - 29);
+
   return day >= calendarDate(from) && day <= today;
 };
 
@@ -86,6 +91,7 @@ export const PatientHistory = ({
   const dated = view === 'visits' || view === 'appointments';
   const visits = history.filter((visit) => inPeriod(visit.openedOn, period));
   const bookings = appointments.filter((appointment) => inPeriod(appointment.at, period));
+
   return (
     <div>
       <div className="mb-5">

@@ -8,22 +8,30 @@ export const projectRegisters = (
 ): RegisterDef[] => {
   const current = new Map<string, RegisterDefinition>();
   const published = new Map<string, RegisterDefinition>();
+
   const versions = new Map(
     definitions.map((definition) => [definition.registerId + '|' + definition.version, definition]),
   );
+
   const names = new Map(staff.map((member) => [member.staffId, member.fullName]));
+
   for (const definition of definitions) {
     const existing = current.get(definition.registerId);
+
     if (!existing || definition.version > existing.version) {
       current.set(definition.registerId, definition);
     }
+
     const live = published.get(definition.registerId);
+
     if (definition.status === 'published' && (!live || definition.version > live.version)) {
       published.set(definition.registerId, definition);
     }
   }
+
   return [...current.values()].map((configuration) => {
     const definition = published.get(configuration.registerId) ?? configuration;
+
     return {
       id: definition.registerId,
       name: definition.name,

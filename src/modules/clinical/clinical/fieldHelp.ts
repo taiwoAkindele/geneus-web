@@ -112,6 +112,7 @@ const COMMON: Record<string, FieldExplanation> = {
       'Optionally connect this medicine or care plan to an existing problem belonging to the same source patient record.',
   },
 };
+
 const STATUS: Record<ClinicalKind, FieldExplanation> = {
   problem: {
     purpose:
@@ -135,6 +136,7 @@ const STATUS: Record<ClinicalKind, FieldExplanation> = {
       'Mark whether this assessment and its follow-up remain active or have been completed. Record the outcome in the review field.',
   },
 };
+
 export const clinicalFieldHelp = (kind: ClinicalKind, key: string): FieldExplanation =>
   key === 'status' ? STATUS[kind] : COMMON[key];
 

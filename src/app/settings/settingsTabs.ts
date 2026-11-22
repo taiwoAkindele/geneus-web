@@ -17,12 +17,15 @@ export type SettingsTab = {
   navigation?: false;
   sub?: { key: string; label: string; to: string }[];
 };
+
 type Viewer = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
 const has = (context: Viewer, ...permissions: string[]) =>
   permissions.some((p) => context.permissions.includes(p as never));
+
 const isAdmin = (context: Viewer) =>
   context.role === 'facility_admin' || Boolean(context.roles?.includes('facility_admin'));
+
 /** Plans sign-in windows or service coverage for others (rather than only running intake). */
 export const schedulingPlanner = (context: Viewer) =>
   isAdmin(context) ||

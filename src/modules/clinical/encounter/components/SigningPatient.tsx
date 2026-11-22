@@ -15,6 +15,7 @@ export const SigningPatient = ({
 }) => {
   const patient = usePatient(patientId).data;
   const age = patient ? currentAge(patient) : undefined;
+
   return (
     <div
       aria-label={`${label}: ${patient?.fullName ?? patientId}`}

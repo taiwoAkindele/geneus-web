@@ -12,9 +12,12 @@ const SAMPLES: { value: string; label: string; facts: LabPatientFacts }[] = [
   { value: 'man', label: 'a man aged 30', facts: { sex: 'male', age: { years: 30 } } },
   { value: 'child', label: 'a child aged 8', facts: { sex: 'female', age: { years: 8 } } },
 ];
+
 const FLAGS = ['No flag', ...Object.values(RESULT_FLAG_LABELS)];
+
 const box =
   'min-h-[44px] w-full rounded-field border border-outline bg-surface px-3 text-sm text-ink-soft';
+
 const FlagSelect = ({ label }: { label: string }) => (
   <select disabled aria-label={`Flag for ${label}`} className={box}>
     {FLAGS.map((flag) => (
@@ -31,6 +34,7 @@ const FlagSelect = ({ label }: { label: string }) => (
 export const ResultPreview = ({ name, parts }: { name: string; parts: readonly ResultPart[] }) => {
   const [sample, setSample] = useState(SAMPLES[0].value);
   const facts = SAMPLES.find((s) => s.value === sample)!.facts;
+
   return (
     <div className="space-y-4">
       <label className="block text-sm font-bold">
@@ -65,6 +69,7 @@ export const ResultPreview = ({ name, parts }: { name: string; parts: readonly R
               {part.kind === 'number'
                 ? (() => {
                     const range = rangeFor(part, facts);
+
                     return (
                       <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
                         <input

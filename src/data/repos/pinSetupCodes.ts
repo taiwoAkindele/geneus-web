@@ -19,7 +19,9 @@ export const findMatchingCode = async (
   const candidates = (await allOfType<PinSetupCode>('pin_setup_code')).filter(
     (code) => code.staffId === staffId && isOpen(code, now),
   );
+
   const normalized = normalizePinSetupCode(typed);
+
   for (const code of candidates) {
     if (
       sameText(await pbkdf2Base64(normalized, code.codeSalt, code.codeIterations), code.codeHash)
@@ -27,6 +29,7 @@ export const findMatchingCode = async (
       return code;
     }
   }
+
   return undefined;
 };
 

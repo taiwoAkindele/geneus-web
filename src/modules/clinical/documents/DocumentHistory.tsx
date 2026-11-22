@@ -1,6 +1,7 @@
 import { type LibraryDocument, type VisitDocument, DOCUMENT_SIGNATURE_LABELS } from '@shared';
 import { Button, Sheet } from '@/ui';
 import type { DocumentPreviewTarget } from './DocumentPreview';
+
 export const DocumentHistory = ({
   records,
   onClose,

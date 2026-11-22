@@ -20,13 +20,16 @@ export const StockPriceSheet = ({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
+
   const save = async () => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await linkStockPrice(item.id, feeId || undefined, context);
       onSaved();
@@ -38,6 +41,7 @@ export const StockPriceSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title="Link Billing Item"

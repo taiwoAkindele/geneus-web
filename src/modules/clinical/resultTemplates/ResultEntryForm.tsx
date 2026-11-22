@@ -22,8 +22,10 @@ const FLAGS: { value: '' | ResultFlag; label: string }[] = [
     label: RESULT_FLAG_LABELS[value],
   })),
 ];
+
 const control =
   'min-h-[48px] w-full min-w-0 rounded-field border border-outline bg-white px-3 text-base';
+
 const blank: LabItemDraft = { values: {}, comment: '' };
 
 const FlagSelect = ({
@@ -62,10 +64,12 @@ const CultureInput = ({
   change: (patch: Partial<LabPartDraft>) => void;
 }) => {
   const organisms = draft.organisms ?? [];
+
   const setOrganism = (
     index: number,
     patch: Partial<NonNullable<LabPartDraft['organisms']>[number]>,
   ) => change({ organisms: organisms.map((o, i) => (i === index ? { ...o, ...patch } : o)) });
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -190,17 +194,22 @@ const ImagesInput = ({
   const files = draft.files ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const add = async (chosen: FileList | null) => {
     if (!chosen?.length) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       const staged = [];
+
       for (const file of [...chosen].slice(0, part.maxFiles - files.length)) {
         staged.push(await stageDocumentFile(documentScope(context), file));
       }
+
       change({ files: [...files, ...staged] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not keep this file');
@@ -208,6 +217,7 @@ const ImagesInput = ({
       setBusy(false);
     }
   };
+
   return (
     <div className="space-y-2">
       {files.length ? (
@@ -280,6 +290,7 @@ export const ResultEntryForm = ({
 }) => {
   const change = (key: string, patch: Partial<LabPartDraft>) =>
     onChange({ ...draft, values: { ...draft.values, [key]: { ...draft.values[key], ...patch } } });
+
   return (
     <section aria-label={test} className="space-y-4 rounded-card border border-outline-soft p-4">
       <div>
@@ -289,12 +300,14 @@ export const ResultEntryForm = ({
       {template.parts.map((part) => {
         const value = draft.values[part.key] ?? {};
         const set = (patch: Partial<LabPartDraft>) => change(part.key, patch);
+
         const heading = (
           <p className="text-sm font-bold">
             {part.label}
             {part.required ? <span className="font-normal text-ink-soft"> · required</span> : null}
           </p>
         );
+
         if (part.kind === 'culture') {
           return (
             <div key={part.key} className="space-y-2 border-t border-outline-soft pt-3">
@@ -303,6 +316,7 @@ export const ResultEntryForm = ({
             </div>
           );
         }
+
         if (part.kind === 'images') {
           return (
             <div key={part.key} className="space-y-2 border-t border-outline-soft pt-3">
@@ -311,6 +325,7 @@ export const ResultEntryForm = ({
             </div>
           );
         }
+
         if (part.kind === 'section') {
           return (
             <div key={part.key} className="border-t border-outline-soft pt-3">
@@ -323,7 +338,9 @@ export const ResultEntryForm = ({
             </div>
           );
         }
+
         const range = part.kind === 'number' ? rangeFor(part, facts) : undefined;
+
         return (
           <div key={part.key} className="space-y-2 border-t border-outline-soft pt-3">
             {heading}

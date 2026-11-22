@@ -34,6 +34,7 @@ export const ReconcileQueue = () => {
   const [busyId, setBusyId] = useState<string>();
   const canResolve = context.permissions.includes('sync_rejection:resolve');
   const rejections = open.data ?? [];
+
   const nameOf = (staffId: string) =>
     staff.data?.find((member) => member.staffId === staffId)?.fullName ?? staffId;
 
@@ -41,8 +42,10 @@ export const ReconcileQueue = () => {
     if (working.current) {
       return;
     }
+
     working.current = true;
     setBusyId(rejection.id);
+
     try {
       await work();
       toast(done);
@@ -50,6 +53,7 @@ export const ReconcileQueue = () => {
       if (!(cause instanceof AuthorizationError)) {
         console.error('reconcile action failed', cause);
       }
+
       toast(cause instanceof Error ? cause.message : 'Could not resolve this — please try again', {
         tone: 'error',
       });
@@ -62,6 +66,7 @@ export const ReconcileQueue = () => {
   if (open.loading) {
     return <div className="h-[80px] animate-pulse rounded-card bg-surface-muted" />;
   }
+
   if (open.error) {
     return (
       <div className="rounded-card bg-white p-4 text-[13px] text-danger-strong">
@@ -72,6 +77,7 @@ export const ReconcileQueue = () => {
       </div>
     );
   }
+
   if (rejections.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">

@@ -24,6 +24,7 @@ export const SelectField = forwardRef<HTMLSelectElement, Props>(function SelectF
   const selectId = id ?? props.name ?? generatedId;
   const helpId = `${selectId}-help`;
   const errorId = `${selectId}-error`;
+
   return (
     <div className="block">
       <FieldLabel

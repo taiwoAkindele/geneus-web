@@ -93,19 +93,24 @@ export const parsePrice = (value: string, currency: string): number => {
     .replace(/^(ngn|₦|n|usd|us\$|\$)\s*/i, '')
     .replace(/\s*(ngn|₦|usd)$/i, '')
     .replace(/[,\s]/g, '');
+
   if (!cleaned) {
     throw new Error('No price');
   }
+
   if (/^\(.*\)$|^-/.test(cleaned)) {
     throw new Error('A price cannot be negative');
   }
+
   if (!/^\d+(\.\d+)?$/.test(cleaned)) {
     throw new Error(`"${value}" is not a price`);
   }
+
   return parseAmount(cleaned, currency);
 };
 
 export type TariffRowStatus = 'ready' | 'needs_match' | 'error' | 'skipped';
+
 export type TariffRow = {
   sourceRow: number;
   source: { name: string; code: string; price: string; id: string };
@@ -115,6 +120,7 @@ export type TariffRow = {
   price: string;
   include: boolean;
 };
+
 export type CheckedRow = TariffRow & {
   status: TariffRowStatus;
   problem?: string;
@@ -136,6 +142,7 @@ export const buildTariffRows = (
       codes: tariff[f.id]?.payerCode ? [tariff[f.id].payerCode!] : [],
     })),
   );
+
   return rows.map((row) => {
     const source = {
       name: row.values.name ?? '',
@@ -143,7 +150,9 @@ export const buildTariffRows = (
       price: row.values.price ?? '',
       id: row.values.feeItemId ?? '',
     };
+
     const match = matchRecord(index, { id: source.id, code: source.code, name: source.name });
+
     return {
       sourceRow: row.sourceRow,
       source,
@@ -164,10 +173,12 @@ export const checkTariffRows = (
 ): CheckedRow[] => {
   const feeById = new Map(fees.map((f) => [f.id, f]));
   const firstRowFor = new Map<string, number>();
+
   return rows.map((row) => {
     if (!row.include) {
       return { ...row, status: 'skipped' as const };
     }
+
     if (!row.feeItemId) {
       return {
         ...row,
@@ -178,10 +189,13 @@ export const checkTariffRows = (
             : 'Choose the matching service, or skip this row',
       };
     }
+
     const fee = feeById.get(row.feeItemId);
+
     if (!fee) {
       return { ...row, status: 'error' as const, problem: 'This service is not available' };
     }
+
     if (fee.currency !== currency) {
       return {
         ...row,
@@ -189,7 +203,9 @@ export const checkTariffRows = (
         problem: `The service is priced in ${fee.currency}, the contract in ${currency}`,
       };
     }
+
     const earlier = firstRowFor.get(row.feeItemId);
+
     if (earlier !== undefined) {
       return {
         ...row,
@@ -197,8 +213,10 @@ export const checkTariffRows = (
         problem: `Row ${earlier} already prices this service`,
       };
     }
+
     firstRowFor.set(row.feeItemId, row.sourceRow);
     let unitMinor: number;
+
     try {
       unitMinor = parsePrice(row.price, currency);
     } catch (cause) {
@@ -208,7 +226,9 @@ export const checkTariffRows = (
         problem: cause instanceof Error ? cause.message : 'Check the price',
       };
     }
+
     const code = row.source.code.trim();
+
     if (code && formulaLike(code)) {
       return {
         ...row,
@@ -216,12 +236,15 @@ export const checkTariffRows = (
         problem: 'The code starts with =, +, @ or a control character',
       };
     }
+
     if (code.length > 60) {
       return { ...row, status: 'error' as const, problem: 'The code is longer than 60 characters' };
     }
+
     const previous = tariff[row.feeItemId];
     const payerCode = code || previous?.payerCode;
     const change = priceChange(previous, unitMinor, payerCode);
+
     return {
       ...row,
       status: 'ready' as const,

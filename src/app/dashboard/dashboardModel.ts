@@ -17,6 +17,7 @@ export const dashboardAccess = (
 ) => {
   const navigation = navigationFor(context);
   const roles = context.roles ?? [context.role];
+
   return {
     care:
       roles.some((role) => ['chew', 'nurse', 'doctor', 'supervisor'].includes(role)) ||
@@ -35,18 +36,22 @@ export const careSnapshot = (
   today: string,
 ) => {
   const byEncounter = new Map<string, EncounterEntry[]>();
+
   for (const entry of entries) {
     const group = byEncounter.get(entry.encounterId) ?? [];
     group.push(entry);
     byEncounter.set(entry.encounterId, group);
   }
+
   const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
+
   const visits = encounters
     .filter((encounter) => !encounter.inpatientContext)
     .map((encounter) => ({
       ...summariseEncounter(encounter, byEncounter.get(encounter.id) ?? []),
       patientName: names.get(encounter.patientId) ?? encounter.patientId,
     }));
+
   return {
     today: visits.filter((visit) => calendarDate(visit.openedOn) === today).length,
     // Open visits are unfinished work, not proof that a patient is physically waiting.
@@ -65,15 +70,19 @@ export const billingSnapshot = (
   coverage?: BalanceCoverage,
 ) => {
   const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
+
   const accounts = new Map<
     string,
     { patientId: string; name: string; currency: string; outstanding: number; oldest: string }
   >();
+
   for (const row of chargeBalances(charges, payments, adjustments, coverage)) {
     if (row.balanceMinor <= 0) {
       continue;
     }
+
     const key = row.charge.patientId + '|' + row.charge.currency;
+
     const account = accounts.get(key) ?? {
       patientId: row.charge.patientId,
       name: names.get(row.charge.patientId) ?? row.charge.patientId,
@@ -81,30 +90,39 @@ export const billingSnapshot = (
       outstanding: 0,
       oldest: row.charge.createdOn,
     };
+
     account.outstanding += row.balanceMinor;
+
     if (row.charge.createdOn < account.oldest) {
       account.oldest = row.charge.createdOn;
     }
+
     accounts.set(key, account);
   }
+
   const collected = new Map<string, number>();
+
   for (const payment of payments) {
     if (payment.method === 'waiver' || calendarDate(payment.createdOn) !== today) {
       continue;
     }
+
     collected.set(
       payment.currency,
       (collected.get(payment.currency) ?? 0) +
         (payment.reverses ? -payment.amountMinor : payment.amountMinor),
     );
   }
+
   // Refunds are money handed back today: collected is what the till actually kept.
   for (const refund of coverage?.refunds ?? []) {
     if (calendarDate(refund.createdOn) !== today) {
       continue;
     }
+
     collected.set(refund.currency, (collected.get(refund.currency) ?? 0) - refund.amountMinor);
   }
+
   return {
     accounts: [...accounts.values()].sort((a, b) => a.oldest.localeCompare(b.oldest)),
     collected: [...collected].sort(([a], [b]) => a.localeCompare(b)),

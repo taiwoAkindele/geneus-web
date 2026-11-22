@@ -21,11 +21,13 @@ export const ADMISSION_ACTION_LABELS: Record<InpatientAction, string> = {
   discharge: 'Confirm departure',
   cancel: 'Cancel admission',
 };
+
 export type AdmissionTask = {
   action: InpatientAction;
   admission?: InpatientEvent;
   request?: EncounterEntry;
 };
+
 export const AdmissionActionSheet = ({
   task,
   data,
@@ -50,6 +52,7 @@ export const AdmissionActionSheet = ({
   const allocation = task.action === 'reserve' || task.action === 'transfer';
   const wards = data.locations.filter((location) => location.kind === 'ward' && location.active);
   const bedStates = inpatientBedStates(data.events, data.ready);
+
   const beds = data.locations.filter(
     (location) =>
       location.kind === 'bed' &&
@@ -58,11 +61,14 @@ export const AdmissionActionSheet = ({
       (!bedStates.has(location.id) ||
         (location.id === task.admission?.bedId && task.action === 'reserve')),
   );
+
   const requiredNote = ['cancel', 'transfer', 'continue_care'].includes(task.action);
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
     setError('');
+
     try {
       if (task.action === 'confirm' && task.request) {
         await confirmAdmission(task.request, unit, note, context);
@@ -75,6 +81,7 @@ export const AdmissionActionSheet = ({
       } else {
         throw new Error('Reopen this request before saving');
       }
+
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The change could not be saved. Try again');
@@ -82,6 +89,7 @@ export const AdmissionActionSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       title={ADMISSION_ACTION_LABELS[task.action]}

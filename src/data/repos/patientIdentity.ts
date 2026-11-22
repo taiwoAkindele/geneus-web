@@ -2,6 +2,7 @@ import { linkedPatientIds, type AuthorizationContext, type PatientIdentityEvent 
 import { allOfType, envelope, insertRecord, newId, type NewRecord } from '../db';
 
 export const listIdentityEvents = () => allOfType<PatientIdentityEvent>('patient_identity_event');
+
 export const patientIdentityIds = async (patientId: string): Promise<string[]> =>
   linkedPatientIds(patientId, await listIdentityEvents());
 
@@ -10,6 +11,7 @@ export type RegistrationDecision = {
   outcome: 'registration_distinct' | 'review_requested';
   reason: string;
 };
+
 export const identityReviewRecords = (
   patientId: string,
   decision: RegistrationDecision | undefined,

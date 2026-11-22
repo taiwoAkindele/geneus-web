@@ -4,6 +4,7 @@ import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
 import { closeInboundReferral, loadReferrals, recordReferralArrival } from '@/data/repos/referrals';
 import { Button, SelectField } from '@/ui';
+
 export const FacilityReferralsScreen = () => {
   const context = useAuthorizationContext();
   const data = useLiveQuery(loadReferrals);
@@ -11,12 +12,15 @@ export const FacilityReferralsScreen = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const canReceive = context.permissions.includes('referral:update');
+
   const run = async (task: () => Promise<unknown>) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       await task();
       data.reload();
@@ -26,6 +30,7 @@ export const FacilityReferralsScreen = () => {
       setBusy(false);
     }
   };
+
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <h1 className="text-2xl font-extrabold">Facility referrals</h1>

@@ -16,6 +16,7 @@ const useOrganization = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
   const load = useCallback(async () => {
     try {
       setData(await currentOrganization(context.userId));
@@ -24,16 +25,20 @@ const useOrganization = () => {
       setError(cause instanceof Error ? cause.message : 'Could not load organization');
     }
   }, [context.userId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const run = async (operation: () => Promise<unknown>, success: string) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
     setMessage('');
+
     try {
       await operation();
       setMessage(success);
@@ -44,6 +49,7 @@ const useOrganization = () => {
       setBusy(false);
     }
   };
+
   return { context, data, busy, error, message, load, run };
 };
 
@@ -84,6 +90,7 @@ export const OutgoingStaffRequest = ({
   const { context, data, busy, error, message, load, run } = useOrganization();
   const [destination, setDestination] = useState('');
   const others = data?.organization?.facilities.filter((f) => f.id !== context.facilityId) ?? [];
+
   const renderAssignments = () => {
     if (!data && !error) {
       return (
@@ -165,9 +172,11 @@ export const IncomingStaffRequests = () => {
   const { context, data, busy, error, message, load, run } = useOrganization();
   const [role, setRole] = useState('nurse');
   const [permission, setPermission] = useState('read_only');
+
   if (data && !data.organization) {
     return null;
   }
+
   const renderFacilityList = () => {
     if (!data && !error) {
       return <p role="status">Loading requests…</p>;

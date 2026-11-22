@@ -16,10 +16,12 @@ describe('messages shown to staff', () => {
         fallback,
       ),
     ).toBe('A general receiving account is already linked. Select its existing bank details.');
+
     expect(userMessage(new Error('Enter an amount with at most 2 decimal places'), fallback)).toBe(
       'Enter an amount with at most 2 decimal places.',
     );
   });
+
   it('never shows setting names, code, addresses or database detail', () => {
     for (const leak of [
       'Paystack setup requires BILLING_ENCRYPTION_KEY on the server',
@@ -33,14 +35,17 @@ describe('messages shown to staff', () => {
       expect(userMessage(new Error(leak), fallback)).toBe(fallback);
     }
   });
+
   it('hides every server fault behind a general message', () => {
     expect(
       userMessage(new ApiError('internal', 'relation "x" does not exist', 500), fallback),
     ).toBe('Something went wrong on the server. Try again in a moment.');
+
     expect(userMessage(new ApiError('internal', 'Looks harmless', 503), fallback)).toBe(
       'Something went wrong on the server. Try again in a moment.',
     );
   });
+
   it('uses the action-specific message for a generic refusal, and known codes for common cases', () => {
     expect(
       userMessage(
@@ -48,12 +53,14 @@ describe('messages shown to staff', () => {
         'Check the WhatsApp number and try again.',
       ),
     ).toBe('Check the WhatsApp number and try again.');
+
     expect(
       userMessage(
         new ApiError('staff_session_required', 'Confirm your PIN to continue', 403),
         fallback,
       ),
     ).toBe('Confirm your PIN to continue.');
+
     expect(
       userMessage(
         new ApiError(
@@ -64,10 +71,12 @@ describe('messages shown to staff', () => {
         fallback,
       ),
     ).toBe('This needs server setup first. Ask your system administrator.');
+
     expect(
       userMessage(new ApiError('offline', 'Cannot reach the Geneus server', undefined), fallback),
     ).toBe("You're offline. Check the connection and try again.");
   });
+
   it('shows a payment provider’s refusal reason, still filtered', () => {
     expect(
       userMessage(
@@ -79,6 +88,7 @@ describe('messages shown to staff', () => {
         fallback,
       ),
     ).toBe('The provider refused this operation: Dedicated NUBAN not available for this business.');
+
     expect(
       userMessage(
         new ApiError(
@@ -91,6 +101,7 @@ describe('messages shown to staff', () => {
     ).toBe(
       "The provider refused this operation. Check the account's access and settings with the provider.",
     );
+
     expect(
       userMessage(
         new ApiError(
@@ -103,16 +114,19 @@ describe('messages shown to staff', () => {
     ).toBe(
       "The provider couldn't open an account at that bank right now. Choose another bank, or try again later.",
     );
+
     expect(
       userMessage(
         new ApiError('provider_unavailable', 'connect ECONNREFUSED 10.0.0.1', 502),
         fallback,
       ),
     ).toBe('The provider could not be reached. Try again in a moment.');
+
     expect(
       userMessage(new ApiError('provider_unexpected_reply', 'anything at all', 502), fallback),
     ).toBe("The provider's reply wasn't in the expected form. Try again, or contact support.");
   });
+
   it('falls back for anything that is not an error message', () => {
     expect(userMessage(undefined, fallback)).toBe(fallback);
     expect(userMessage({ code: 42 }, fallback)).toBe(fallback);

@@ -17,7 +17,7 @@ import {
   type OutstandingClaim,
   type OutstandingTotals,
   type RemittanceView,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { formatMoney, parseAmount } from '@/lib/money';
 import {
@@ -37,18 +37,23 @@ import { Button, SelectField, TextField, useToast } from '@/ui';
 import { useDeviceInsurance } from './CoverCard';
 
 const today = () => new Date().toISOString().slice(0, 10);
+
 const toMinor = (value: string, currency = 'NGN'): number | undefined => {
   const v = value.replace(/[,\s₦]/g, '');
+
   if (!v) {
     return undefined;
   }
+
   try {
     return parseAmount(v, currency);
   } catch {
     return undefined;
   }
 };
+
 const typed = (value: string) => value.replace(/[^\d.]/g, '');
+
 const METHOD_LABELS: Record<string, string> = {
   transfer: 'Bank transfer',
   cheque: 'Cheque',
@@ -118,6 +123,7 @@ export const remittanceRows = (
       const approved = amount('approvedAmount');
       const deducted = amount('deductedAmount');
       const paid = amount('paidAmount');
+
       return {
         sourceRow: r.sourceRow,
         ...(v.claimNumber?.trim() ? { claimNumber: v.claimNumber.trim() } : {}),
@@ -140,6 +146,7 @@ export const PayerPaymentsWorkspace = () => {
   useEffect(() => {
     document.title = 'Payer payments · Geneus Health';
   }, []);
+
   if (insurance !== 'active' && insurance !== 'history') {
     return (
       <main className="p-4">
@@ -148,6 +155,7 @@ export const PayerPaymentsWorkspace = () => {
       </main>
     );
   }
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4">
       <header>
@@ -166,16 +174,19 @@ export const PayerPaymentsWorkspace = () => {
 
 const Body = () => {
   const context = useAuthorizationContext();
+
   const payers =
     useLiveQuery(
       useCallback(() => listPayers(), []),
       ['payer'],
     ).data ?? [];
+
   const [tab, setTab] = useState<'outstanding' | 'payments' | 'import'>('outstanding');
   const [error, setError] = useState('');
   const [claims, setClaims] = useState<OutstandingClaim[]>();
   const [totals, setTotals] = useState<OutstandingTotals>({});
   const [remittances, setRemittances] = useState<RemittanceView[]>();
+
   const load = useCallback(async () => {
     try {
       const [o, r] = await Promise.all([outstandingClaims(context), listRemittances(context)]);
@@ -184,13 +195,16 @@ const Body = () => {
       setRemittances(r.remittances);
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const payerName = (id: string) => payers.find((p) => p.id === id)?.name ?? id;
+
   return (
     <div className="space-y-5">
       {error ? (
@@ -252,14 +266,17 @@ const Outstanding = ({
 }) => {
   const [status, setStatus] = useState('');
   const [payer, setPayer] = useState('');
+
   if (!claims) {
     return <p role="status">Loading…</p>;
   }
+
   const shown = claims.filter(
     (c) =>
       (!status || (status === 'overdue' ? c.settlement.overdue : c.settlement.status === status)) &&
       (!payer || c.payerId === payer),
   );
+
   const save = () =>
     downloadTable(`payer-balances-${today()}.xlsx`, 'Payer balances', [
       [
@@ -299,12 +316,14 @@ const Outstanding = ({
         c.settlement.overdue ? 'Yes' : '',
       ]),
     ]);
+
   return (
     <div className="space-y-4">
       <section aria-label="Totals by payer" className="grid gap-3 md:grid-cols-2">
         {Object.entries(totals).map(([key, t]) => {
           const [payerId, currency] = key.split('|');
           const m = (n: number) => formatMoney(n, currency);
+
           return (
             <article
               key={key}
@@ -448,6 +467,7 @@ const AllocationInputs = ({
         const v = values[c.id] ?? '';
         const minor = toMinor(v, currency);
         const over = minor !== undefined && minor > c.settlement.outstandingMinor;
+
         return (
           <div key={c.id} className="flex flex-wrap items-end gap-2 text-sm">
             <span className="min-w-[220px] flex-1">
@@ -478,9 +498,11 @@ const AllocationInputs = ({
       })}
     </div>
   );
+
 const allocationsFrom = (values: Record<string, string>, currency: string) =>
   Object.entries(values).flatMap(([claimId, v]) => {
     const n = toMinor(v, currency);
+
     return n && n > 0 ? [{ claimId, amountMinor: n }] : [];
   });
 
@@ -521,8 +543,10 @@ const Payments = ({
   const allocations = allocationsFrom(values, currency);
   const total = toMinor(amount, currency) ?? 0;
   const allocated = allocations.reduce((n, a) => n + a.amountMinor, 0);
+
   const record = async () => {
     setBusy('record');
+
     try {
       const r = await recordRemittance(context, {
         payerId,
@@ -537,9 +561,11 @@ const Payments = ({
         allocations,
         requestKey,
       });
+
       toast(
         `Payment recorded: ${formatMoney(r.allocatedMinor, currency)} allocated${r.unallocatedMinor ? `, ${formatMoney(r.unallocatedMinor, currency)} still to match` : ''}.`,
       );
+
       setReference('');
       setAmount('');
       setValues({});
@@ -547,11 +573,12 @@ const Payments = ({
       setRequestKey(crypto.randomUUID());
       await onChanged();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     } finally {
       setBusy('');
     }
   };
+
   const renderRemittances = () => {
     if (!remittances) {
       return <p role="status">Loading…</p>;
@@ -652,7 +679,7 @@ const Payments = ({
                       setAllocating('');
                       await onChanged();
                     },
-                    (cause) => onError(describeInsuranceError(cause)),
+                    (cause) => onError(describeStaffActionError(cause)),
                   )
                   .finally(() => setBusy(''));
               }}
@@ -672,7 +699,7 @@ const Payments = ({
                   setReversing('');
                   await onChanged();
                 },
-                (cause) => onError(describeInsuranceError(cause)),
+                (cause) => onError(describeStaffActionError(cause)),
               );
             }}
           >
@@ -847,24 +874,32 @@ const ImportAdvice = ({
   const [templateName, setTemplateName] = useState('');
   const sheet = file?.sheets[sheetIndex];
   const headers = sheet?.rows[headerRow] ?? [];
+
   const rows = useMemo(
     () => (sheet ? remittanceRows(mappedRows(sheet.rows, headerRow, mapping)) : []),
     [sheet, headerRow, mapping],
   );
+
   const byId = new Map(claims.map((c) => [c.id, c]));
+
   const choose = async (chosen?: File) => {
     if (!chosen) {
       return;
     }
+
     setReview(undefined);
     setFile(undefined);
+
     try {
       const table = await readTableFile(chosen);
       const target = table.sheets[0];
+
       const templates = (await listImportTemplates(context, 'remittance')).templates.filter(
         (t) => !t.payerId || t.payerId === payerId,
       );
+
       const fitting = templates.find((t) => templateFits(t, target.rows));
+
       if (fitting) {
         setHeaderRow(fitting.headerRow);
         setMapping(fitting.mapping);
@@ -875,18 +910,21 @@ const ImportAdvice = ({
         setMapping(suggestMapping(target.rows[header] ?? [], REMITTANCE_COLUMNS));
         setTemplateName(`${payers.find((p) => p.id === payerId)?.name ?? 'Payer'} payment advice`);
       }
+
       setFile(table);
       setSheetIndex(0);
       setRequestKey(crypto.randomUUID());
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   };
+
   const match = async () => {
     try {
       const { matches } = await matchRemittance(context, payerId, rows);
       setReview(matches.map((m) => ({ ...m, accept: m.confidence === 'exact' })));
       setAmount((matches.reduce((n, m) => n + (m.paidMinor ?? 0), 0) / 100).toFixed(2));
+
       if (templateName.trim()) {
         await saveImportTemplate(context, {
           kind: 'remittance',
@@ -898,15 +936,18 @@ const ImportAdvice = ({
         }).catch(() => undefined);
       }
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   };
+
   const [incomingTransferId, setIncomingTransfer] = useState('');
   const accepted = (review ?? []).filter((r) => r.accept && r.claimId && r.paidMinor);
   const total = toMinor(amount) ?? 0;
   const allocated = accepted.reduce((n, r) => n + (r.paidMinor ?? 0), 0);
+
   const record = async () => {
     setBusy(true);
+
     try {
       const result = await recordRemittance(context, {
         payerId,
@@ -920,14 +961,18 @@ const ImportAdvice = ({
         source: { fileName: file!.fileName, sha256: file!.sha256, rows: rows.length },
         requestKey,
       });
+
       // The advice's approved amounts become the payer's recorded decisions, only for confirmed rows.
       let decided = 0;
+
       if (decisions) {
         for (const r of accepted.filter((x) => x.approvedMinor !== undefined)) {
           const claim = byId.get(r.claimId!);
+
           if (!claim || claim.settlement.approvedMinor !== undefined) {
             continue;
           }
+
           const full = r.approvedMinor! >= claim.settlement.expectedMinor;
           await recordPayerDecision(context, {
             claimId: claim.id,
@@ -950,20 +995,23 @@ const ImportAdvice = ({
           );
         }
       }
+
       toast(
         `Payment recorded: ${accepted.length} claim${accepted.length === 1 ? '' : 's'} paid${result.unallocatedMinor ? `, ${formatMoney(result.unallocatedMinor, 'NGN')} unallocated` : ''}${decided ? `, ${decided} decision${decided === 1 ? '' : 's'} recorded` : ''}.`,
       );
+
       setReview(undefined);
       setFile(undefined);
       setReference('');
       setRequestKey(crypto.randomUUID());
       await onChanged();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <section
       aria-label="Import a payment advice"
@@ -1029,11 +1077,13 @@ const ImportAdvice = ({
                 onChange={(e) =>
                   setMapping((m) => {
                     const n = { ...m };
+
                     if (e.target.value === '') {
                       delete n[f.key];
                     } else {
                       n[f.key] = Number(e.target.value);
                     }
+
                     return n;
                   })
                 }

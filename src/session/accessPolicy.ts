@@ -2,7 +2,9 @@ import { hasRole, type RosterShift, type Staff } from '@shared';
 
 /** Every staff session expires after inactivity, independently of sign-in hours. */
 export const SESSION_IDLE_MS = 30 * 60_000;
+
 export type Access = 'shift' | 'always' | 'admin';
+
 type StaffLogin = Pick<Staff, 'role' | 'additionalRoles' | 'loginAccess'>;
 
 export const accessFor = (staff: StaffLogin): Access => {
@@ -23,6 +25,7 @@ export const accessLabel = (access: Access): string => ACCESS_LABELS[access];
 
 export const shiftEnd = (shift: RosterShift): number =>
   new Date(shift.extendedUntil ?? shift.endsAt).getTime();
+
 export const covers = (shift: RosterShift, at: number): boolean =>
   new Date(shift.startsAt).getTime() <= at && at < shiftEnd(shift);
 

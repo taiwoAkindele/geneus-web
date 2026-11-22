@@ -29,7 +29,7 @@ import {
   saveContractDraft,
   savePayer,
   type DeviceBlocker,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { ApiError } from '@/lib/api/client';
 import { amountInput, parseAmount } from '@/lib/money';
@@ -46,6 +46,7 @@ const ARRANGEMENT_LABELS: Record<Arrangement, string> = {
   per_diem: 'Per day (not calculated yet)',
   package: 'Package (not calculated yet)',
 };
+
 const BASIS_LABELS: Record<string, string> = {
   per_unit: 'per unit',
   per_charge: 'per charge (not calculated yet)',
@@ -53,6 +54,7 @@ const BASIS_LABELS: Record<string, string> = {
   per_visit: 'per visit (not calculated yet)',
   per_claim: 'per claim (not calculated yet)',
 };
+
 const KIND_LABELS: Record<PayerKind, string> = {
   national_scheme: 'National scheme',
   state_scheme: 'State scheme',
@@ -60,6 +62,7 @@ const KIND_LABELS: Record<PayerKind, string> = {
   company: 'Company',
   other: 'Other',
 };
+
 const blankPlan = (): ContractPlan => ({
   planCode: '',
   name: '',
@@ -77,6 +80,7 @@ export const ContractsWorkspace = () => {
   useEffect(() => {
     document.title = 'Payers & contracts · Geneus Health';
   }, []);
+
   if (!supported) {
     return (
       <main className="p-4">
@@ -91,7 +95,9 @@ export const ContractsWorkspace = () => {
       </main>
     );
   }
+
   const canRead = context.permissions.includes('insurance_contract:read');
+
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4">
       <header>
@@ -111,6 +117,7 @@ export const ContractsWorkspace = () => {
 const ContractsBody = ({ canRead }: { canRead: boolean }) => {
   const context = useAuthorizationContext();
   const toast = useToast();
+
   const local = useLiveQuery(
     useCallback(async () => {
       const [payers, fees, facilities] = await Promise.all([
@@ -118,10 +125,12 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
         listFeeItems(),
         allOfType<Facility>('facility'),
       ]);
+
       return { payers, fees: fees.filter((f) => f.active), timeZone: facilities[0]?.timeZone };
     }, []),
     ['payer', 'fee_item', 'facility'],
   );
+
   const [versions, setVersions] = useState<PayerContractVersion[]>();
   const [error, setError] = useState('');
   // A readiness link can open one payer directly (?payer=…).
@@ -129,6 +138,7 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
   const [payerId, setPayerId] = useState(() => params.get('payer') ?? '');
   const [editingPayer, setEditingPayer] = useState<Payer | 'new'>();
   const canActivate = context.permissions.includes('insurance_contract:activate');
+
   const reload = useCallback(async () => {
     try {
       // Staff who only activate or end versions get them without prices.
@@ -153,23 +163,30 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
           ),
         );
       }
+
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [canRead, canActivate, context]);
+
   useEffect(() => {
     void reload();
   }, [reload]);
+
   if (!local.data) {
     return <p role="status">Loading…</p>;
   }
+
   const { payers, fees, timeZone } = local.data;
   const selected = payers.find((p) => p.id === payerId);
+
   const mine = (versions ?? [])
     .filter((v) => v.terms.payerId === payerId)
     .sort((a, b) => b.version - a.version);
+
   const canManage = context.permissions.includes('insurance_contract:manage');
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -227,6 +244,7 @@ const ContractsBody = ({ canRead }: { canRead: boolean }) => {
             existing={editingPayer === 'new' ? undefined : editingPayer}
             onDone={(saved) => {
               setEditingPayer(undefined);
+
               if (saved) {
                 toast(`${saved.name} saved. Devices receive it with the next sync.`);
               }
@@ -313,6 +331,7 @@ const PayerForm = ({ existing, onDone }: { existing?: Payer; onDone: (saved?: Pa
   const [active, setActive] = useState(existing?.active ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   return (
     <form
       className="space-y-3 rounded-card border border-outline-soft bg-white p-4"
@@ -321,7 +340,7 @@ const PayerForm = ({ existing, onDone }: { existing?: Payer; onDone: (saved?: Pa
         setBusy(true);
         setError('');
         savePayer(context, { id: existing?.id, name, code, kind, active })
-          .then(onDone, (cause) => setError(describeInsuranceError(cause)))
+          .then(onDone, (cause) => setError(describeStaffActionError(cause)))
           .finally(() => setBusy(false));
       }}
     >
@@ -393,6 +412,7 @@ const RuleFields = ({
 }) => {
   const coverage = rule?.coverage ?? '';
   const copay = rule?.coverage === 'covered' ? rule.copay : undefined;
+
   return (
     <fieldset className="grid gap-2 rounded-field border border-outline-soft p-2 sm:grid-cols-4">
       <legend className="px-1 text-sm font-semibold">{label}</legend>
@@ -527,6 +547,7 @@ const ContractEditor = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const currency = fees[0]?.currency ?? 'NGN';
+
   const start = (draft ?? base)?.terms ?? {
     payerId: payer.id,
     effectiveFrom: '',
@@ -535,19 +556,23 @@ const ContractEditor = ({
     tariff: {},
     plans: [blankPlan()],
   };
+
   const [terms, setTerms] = useState<PayerContractTerms>(start as PayerContractTerms);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [unsupported, setUnsupported] = useState<UnsupportedTerm[]>([]);
   const set = (patch: Partial<PayerContractTerms>) => setTerms((t) => ({ ...t, ...patch }));
+
   const setPlan = (index: number, plan: ContractPlan) =>
     set({ plans: terms.plans.map((p, i) => (i === index ? plan : p)) });
+
   const gaps = useMemo(
     () =>
       terms.plans.flatMap((plan) =>
         plan.planCode
           ? fees.flatMap((fee) => {
               const line = scheduleLineFor(terms, plan, fee.id, fee.category);
+
               return line.status === 'not_configured' || line.status === 'unsupported'
                 ? [
                     {
@@ -565,15 +590,18 @@ const ContractEditor = ({
       ),
     [terms, fees],
   );
+
   const save = async () => {
     setBusy(true);
     setError('');
+
     try {
       const parsed = PayerContractTerms.safeParse({
         ...terms,
         effectiveTo: terms.effectiveTo || undefined,
         note: terms.note || undefined,
       });
+
       if (!parsed.success) {
         throw new Error(
           parsed.error.issues
@@ -581,18 +609,21 @@ const ContractEditor = ({
             .join('; '),
         );
       }
+
       const saved = await saveContractDraft(context, parsed.data, draft?.revision);
       setUnsupported(saved.unsupported);
       toast(
         `Draft version ${saved.version.version} saved. Nothing changes for patients until it is activated.`,
       );
+
       onSaved();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   const renderVersionLabel = () => {
     if (draft) {
       return `Edit draft version ${draft.version}`;
@@ -690,6 +721,7 @@ const ContractEditor = ({
                 onChange={(e) => {
                   const value = e.target.value.trim();
                   const tariff = { ...terms.tariff };
+
                   if (!value) {
                     delete tariff[fee.id];
                   } else {
@@ -702,6 +734,7 @@ const ContractEditor = ({
                       return;
                     }
                   }
+
                   set({ tariff });
                 }}
               />
@@ -730,11 +763,13 @@ const ContractEditor = ({
                 ]}
                 onChange={(e) => {
                   const items = { ...terms.arrangements.items };
+
                   if (e.target.value) {
                     items[fee.id] = e.target.value as Arrangement;
                   } else {
                     delete items[fee.id];
                   }
+
                   set({ arrangements: { ...terms.arrangements, items } });
                 }}
               />
@@ -765,11 +800,13 @@ const ContractEditor = ({
               rule={plan.rules.categories[c]}
               onChange={(rule) => {
                 const categories = { ...plan.rules.categories };
+
                 if (rule) {
                   categories[c] = rule;
                 } else {
                   delete categories[c];
                 }
+
                 setPlan(index, { ...plan, rules: { ...plan.rules, categories } });
               }}
             />
@@ -786,11 +823,13 @@ const ContractEditor = ({
                 rule={plan.rules.items[fee.id]}
                 onChange={(rule) => {
                   const items = { ...plan.rules.items };
+
                   if (rule) {
                     items[fee.id] = rule;
                   } else {
                     delete items[fee.id];
                   }
+
                   setPlan(index, { ...plan, rules: { ...plan.rules, items } });
                 }}
               />
@@ -869,17 +908,21 @@ const Activation = ({
   const [unsupported, setUnsupported] = useState<UnsupportedTerm[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const check = async () => {
     setError('');
+
     try {
       setDevices((await activationReadiness(context)).devices);
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   };
+
   useEffect(() => {
     void check();
   }, [version.id]);
+
   const blocking = (devices ?? []).filter(
     (d) =>
       !(
@@ -888,31 +931,38 @@ const Activation = ({
         accepted.includes(d.deviceId)
       ),
   );
+
   const activate = async () => {
     setBusy(true);
     setError('');
+
     try {
       await activateContract(context, {
         contractVersionId: version.id,
         acknowledgeUnsupported: acknowledge,
         acceptRevokedDevices: accepted,
       });
+
       toast(
         `Version ${version.version} is active. Devices receive the patient amounts with their next sync.`,
       );
+
       onDone();
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'unsupported_arrangements') {
         setUnsupported((cause.details as { unsupported: UnsupportedTerm[] }).unsupported);
       }
+
       if (cause instanceof ApiError && cause.code === 'devices_not_ready') {
         setDevices((cause.details as { devices: DeviceBlocker[] }).devices);
       }
-      setError(describeInsuranceError(cause));
+
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   const label: Record<string, string> = {
     no_insurance_support: 'needs the current app',
     unsent_changes: 'has unsent work',
@@ -920,6 +970,7 @@ const Activation = ({
     never_reported: 'has never synced',
     revoked_with_unsent_changes: 'revoked with unsent work',
   };
+
   const renderBlockingDevices = () => {
     if (devices === undefined) {
       return <p role="status">Checking devices…</p>;
@@ -1023,6 +1074,7 @@ const EndContract = ({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   if (!open) {
     return (
       <Button variant="ghost" fullWidth={false} onClick={() => setOpen(true)}>
@@ -1030,6 +1082,7 @@ const EndContract = ({
       </Button>
     );
   }
+
   return (
     <div className="mt-2 space-y-2">
       <p className="text-xs text-ink-muted">
@@ -1064,7 +1117,7 @@ const EndContract = ({
                   setOpen(false);
                   onDone();
                 },
-                (cause) => setError(describeInsuranceError(cause)),
+                (cause) => setError(describeStaffActionError(cause)),
               )
               .finally(() => setBusy(false));
           }}

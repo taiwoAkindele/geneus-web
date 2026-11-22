@@ -25,6 +25,11 @@ import { useAuthorizationContext, useSession } from '@/session';
 import { Button, SelectField, Sheet, SheetCancelButton, TextAreaField, useToast } from '@/ui';
 import { PublishedLabReport, effectiveLabReport } from '@/modules/clinical/resultTemplates';
 
+const CARE_PREFIXES: Record<string, string> = {
+  inpatient: 'Inpatient · ',
+  past_inpatient: 'Hospital stay · ',
+};
+
 const GROUPS: Record<string, { label: string; steps?: string[] }> = {
   summary: { label: 'Summary' },
   vitals: { label: 'Vitals', steps: ['vitals'] },
@@ -77,10 +82,17 @@ export const VisitRecord = ({
   const [editor, setEditor] = useState<EncounterEntry>();
   const printContent = useRef<HTMLDivElement>(null);
   const card = summary ?? summariseEncounter(encounter, entries);
-  const visitStatusLabel = (status: EncounterSummary['status']) =>
-    card.admissionStatus
-      ? `${card.careType === 'inpatient' ? 'Inpatient · ' : card.careType === 'past_inpatient' ? 'Hospital stay · ' : ''}${card.admissionStatus}`
-      : consultationStatusLabel(status);
+
+  const visitStatusLabel = (status: EncounterSummary['status']) => {
+    if (!card.admissionStatus) {
+      return consultationStatusLabel(status);
+    }
+
+    const carePrefix = (card.careType && CARE_PREFIXES[card.careType]) || '';
+
+    return `${carePrefix}${card.admissionStatus}`;
+  };
+
   const state = projectEncounter({
     patientId: encounter.patientId,
     encounter,
@@ -89,6 +101,7 @@ export const VisitRecord = ({
     skippedNow: [],
     staffNames,
   });
+
   const stepOrder = [
     'vitals',
     'complaint',
@@ -100,45 +113,56 @@ export const VisitRecord = ({
     'admission',
     'follow_up',
   ];
+
   const saved = effectiveEncounterEntries(entries).sort(
     (a, b) =>
       stepOrder.indexOf(a.step) - stepOrder.indexOf(b.step) ||
       a.createdOn.localeCompare(b.createdOn) ||
       a.id.localeCompare(b.id),
   );
+
   const target = entries.find((entry) => entry.id === targetId && entry.step !== 'amendment');
   const panel = params.get('panel');
+
   const selectedGroup = Object.keys(GROUPS).includes(params.get('visitSection') ?? '')
     ? params.get('visitSection')!
     : 'summary';
+
   const group = GROUPS[selectedGroup] ?? GROUPS.summary;
   const visible = group.steps ? saved.filter((entry) => group.steps?.includes(entry.step)) : saved;
   const author = (entry: EncounterEntry) => staffNames.get(entry.createdBy) ?? entry.createdBy;
+
   const showPanel = (value?: string) => {
     setError('');
     setParams((current) => {
       const next = new URLSearchParams(current);
+
       if (value) {
         next.set('panel', value);
       } else {
         next.delete('panel');
       }
+
       return next;
     });
   };
+
   const addAmendment = (entry: EncounterEntry) => {
     setTargetId(entry.id);
     setNote('');
     setReviewing(false);
     showPanel('amend');
   };
+
   const save = async () => {
     if (!target || !note.trim() || busy.current || !canRecord) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
     setError('');
+
     try {
       await amendEntry(target, note, context);
       toast('Amendment signed and saved on this device');
@@ -155,27 +179,35 @@ export const VisitRecord = ({
       setSaving(false);
     }
   };
+
   const print = () => {
     const popup = window.open('', '_blank', 'width=900,height=700');
+
     if (!popup || !printContent.current) {
       setError('Allow the print window, then try again.');
+
       return;
     }
+
     popup.opener = null;
     popup.document.title = 'Geneus visit summary';
     const style = popup.document.createElement('style');
     style.textContent =
       'body{font:14px system-ui,sans-serif;color:#111;margin:24px}h1{font-size:24px}h2{font-size:18px}section{break-inside:avoid;border-top:1px solid #ccc;padding:12px 0}dl>div{margin:6px 0}dt{font-weight:600}dd{margin:2px 0;white-space:pre-wrap}p{white-space:pre-wrap;overflow-wrap:anywhere}button{display:none}';
+
     popup.document.head.append(style);
     popup.document.body.append(printContent.current.cloneNode(true));
     popup.focus();
     popup.print();
   };
+
   const entryBody = (entry: EncounterEntry, interactive: boolean) => {
     const amendments = entries.filter(
       (candidate) => candidate.step === 'amendment' && candidate.amends === entry.id,
     );
+
     const original = entries.find((candidate) => candidate.id === entry.id);
+
     return (
       <section
         key={entry.id}
@@ -263,6 +295,7 @@ export const VisitRecord = ({
       </section>
     );
   };
+
   const renderVisitEntries = () => {
     if (selectedGroup === 'summary') {
       return (
@@ -372,6 +405,7 @@ export const VisitRecord = ({
                 (current) => {
                   const next = new URLSearchParams(current);
                   next.set('visitSection', key);
+
                   return next;
                 },
                 { replace: true },

@@ -16,11 +16,13 @@ import { useWorkforce, OwnershipPanel } from '@/modules/operations/workforce';
 
 const timeOf = (at: string) =>
   new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
 export const UnitQueueScreen = () => (
   <PatientChartAccess>
     <UnitQueueContent />
   </PatientChartAccess>
 );
+
 const UnitQueueContent = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -35,23 +37,30 @@ const UnitQueueContent = () => {
   useEffect(() => {
     document.title = 'Unit queue · Geneus Health';
   }, []);
+
   const busy = useRef(false);
   const active = (units.data ?? []).filter(unitIsRoutable);
   const unit = units.data?.find((candidate) => candidate.id === unitId);
+
   const unitName = (id: string) =>
     units.data?.find((candidate) => candidate.id === id)?.name ?? 'another unit';
+
   const patientName = (id: string) =>
     patients.data?.find((patient) => patient.patientId === id)?.fullName ?? id;
+
   const choose = (id: string) => {
     setUnitId(id);
     rememberDeviceUnit(id);
   };
+
   const mark = async (handoff: Handoff, status: 'received' | 'done') => {
     if (busy.current) {
       return;
     }
+
     busy.current = true;
     setBusyId(handoff.id);
+
     try {
       await markHandoff(handoff, status, context);
       toast(status === 'received' ? 'Marked as arrived' : 'Marked as done');
@@ -64,6 +73,7 @@ const UnitQueueContent = () => {
       setBusyId(undefined);
     }
   };
+
   const actions = (handoff: Handoff) => (
     <div className="flex flex-wrap gap-2">
       {workforce.data ? (
@@ -112,6 +122,7 @@ const UnitQueueContent = () => {
       </Button>
     </div>
   );
+
   const list = incoming.data ?? [];
 
   const renderSelectedUnit = () => {

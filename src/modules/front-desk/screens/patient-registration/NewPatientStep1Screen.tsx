@@ -48,6 +48,7 @@ import {
 
 const todayIso = (): string => calendarDate();
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
+
 const REASON_LABEL: Record<MatchReason, string> = {
   name: 'Name',
   phone: 'Phone',
@@ -63,7 +64,9 @@ const typedDetails = (values: FormValues): PatientDetails | undefined => {
   if (values.identityStatus === 'provisional' || values.fullName.trim().length < 3) {
     return undefined;
   }
+
   const age = parseAge(values.age);
+
   return {
     fullName: values.fullName.trim(),
     sex: sexFromCode(values.sex),
@@ -114,21 +117,25 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ defaultValues: values });
+
   const live = watch();
   const provisional = live.identityStatus === 'provisional';
   const visitType = !editing && !provisional && canBook && withVisit ? care.visitType : undefined;
 
   useEffect(() => {
     const subscription = watch((partial) => keep(partial));
+
     return () => subscription.unsubscribe();
   }, [watch, keep]);
 
   const typed = typedDetails(live);
+
   const matches = useMemo(
     () =>
       !editing && typed && patients.data ? findLikelyMatches(typed, patients.data).slice(0, 2) : [],
     [editing, JSON.stringify(typed), patients.data],
   );
+
   const lines = newPatientFees(fees.data ?? [], factsFromForm(live, visitType), Boolean(visitType));
   const due = amountsDue(lines);
 
@@ -136,8 +143,10 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     if (opening) {
       return;
     }
+
     setOpening(true);
     setSaveError('');
+
     try {
       await recordExistingSelection(patientId, context);
       await clear();
@@ -157,23 +166,30 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     const complete: RegistrationValues = { ...values, ...form };
     const visit = visitType ? visitFor(visitType, care.offeringId) : undefined;
     const insured = !editing && !provisional && payment === 'insurance' ? cover : undefined;
+
     if (insured && coverIssue(insured)) {
       setSaveError(coverIssue(insured)!);
+
       return;
     }
+
     try {
       if (provisional || editing) {
         return await savePatient(complete, state.patientId);
       }
+
       const found = findLikelyMatches(toPatientDetails(complete), await listPatients());
+
       if (found.length > 0) {
         const duplicate: DuplicateNavState = {
           matchIds: found.map((match) => match.patient.patientId),
           visit,
           ...(insured ? { cover: insured } : {}),
         };
+
         return navigate('/patients/duplicate', { state: duplicate });
       }
+
       return await savePatient(complete, undefined, undefined, visit, insured);
     } catch (cause) {
       setSaveError(
@@ -214,6 +230,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     // Money due goes to the cashier first; otherwise straight to the nurse station.
     return due.length ? 'Register & send to cashier' : 'Register & send to nurse station';
   };
+
   const submitLabel = submitLabelFor();
 
   const optional = (label: string) => `${label} (optional)`;
@@ -401,6 +418,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
                     validate: (value) => {
                       try {
                         tidyEmail(value ?? '');
+
                         return true;
                       } catch (cause) {
                         return (cause as Error).message;
@@ -710,6 +728,7 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
 
 export const NewPatientStep1Screen = () => {
   const state = (useLocation().state as RegistrationNavState) ?? {};
+
   return (
     <RegistrationRecoveryGate key={state.patientId ?? 'new'} draftKey={state.patientId ?? 'new'}>
       <RegistrationForm key={state.patientId ?? 'new'} state={state} />

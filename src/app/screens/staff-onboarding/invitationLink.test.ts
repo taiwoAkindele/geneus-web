@@ -13,6 +13,7 @@ const view = (over: Partial<InvitationLinkView> = {}): InvitationLinkView => ({
   newDevice: 'not_allowed',
   ...over,
 });
+
 const token = 'aB3_-'.repeat(9);
 
 describe('invitation links', () => {
@@ -22,34 +23,42 @@ describe('invitation links', () => {
     expect(invitationTokenFromHash('#token=short')).toBeUndefined();
     expect(invitationTokenFromHash('#token=has spaces and <tags> in it ok')).toBeUndefined();
   });
+
   it('goes straight to the PIN on a device of the same facility', () => {
     expect(invitationStep(view(), { facilityId: 'QA-PHC', workspaceFacilityIds: ['QA-PHC'] })).toBe(
       'pin',
     );
   });
+
   it('sets up a new device only when the invitation allows it', () => {
     expect(invitationStep(view({ newDevice: 'allowed' }), { workspaceFacilityIds: [] })).toBe(
       'new_device',
     );
+
     expect(invitationStep(view({ newDevice: 'used' }), { workspaceFacilityIds: [] })).toBe(
       'needs_device',
     );
+
     expect(invitationStep(view(), { workspaceFacilityIds: [] })).toBe('needs_device');
   });
+
   it('switches to a facility the browser already holds, or adds one when allowed', () => {
     expect(
       invitationStep(view(), { facilityId: 'OTHER', workspaceFacilityIds: ['OTHER', 'QA-PHC'] }),
     ).toBe('switch_facility');
+
     expect(
       invitationStep(view({ newDevice: 'allowed' }), {
         facilityId: 'OTHER',
         workspaceFacilityIds: ['OTHER'],
       }),
     ).toBe('add_facility');
+
     expect(invitationStep(view(), { facilityId: 'OTHER', workspaceFacilityIds: ['OTHER'] })).toBe(
       'needs_device',
     );
   });
+
   it('does nothing more for an accepted or unusable invitation', () => {
     expect(
       invitationStep(view({ status: 'accepted' }), {
@@ -57,6 +66,7 @@ describe('invitation links', () => {
         workspaceFacilityIds: [],
       }),
     ).toBe('done');
+
     for (const status of ['expired', 'revoked', 'locked'] as const) {
       expect(
         invitationStep(view({ status, newDevice: 'allowed' }), { workspaceFacilityIds: [] }),

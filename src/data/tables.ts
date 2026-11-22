@@ -1,8 +1,11 @@
 import type { DocType } from '@shared';
 
 export const REGISTER_DRAFTS_TABLE = 'register_builder_drafts';
+
 export const WORKFORCE_DRAFTS_TABLE = 'workforce_editor_drafts';
+
 export const WORKFORCE_RECEIPTS_TABLE = 'workforce_upload_receipts';
+
 export const CLINICAL_REVIEWS_TABLE = 'clinical_review_drafts';
 
 /**

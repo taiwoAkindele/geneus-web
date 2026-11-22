@@ -40,28 +40,35 @@ export const ActionMenu = ({
   const openedBy = useRef<'hover' | 'click'>('click');
   const closeTimer = useRef<number>();
   const cancelClose = () => window.clearTimeout(closeTimer.current);
+
   const hoverOpen = (event: ReactPointerEvent) => {
     if (!openOnHover || event.pointerType !== 'mouse') {
       return;
     }
+
     cancelClose();
+
     if (!open) {
       openedBy.current = 'hover';
       setOpen(true);
     }
   };
+
   const hoverLeave = (event: ReactPointerEvent) => {
     if (!openOnHover || event.pointerType !== 'mouse' || openedBy.current !== 'hover') {
       return;
     }
+
     cancelClose();
     closeTimer.current = window.setTimeout(() => setOpen(false), 180);
   };
+
   useEffect(() => cancelClose, []);
   useLayoutEffect(() => {
     if (!open || !trigger.current || !menu.current) {
       return;
     }
+
     const rect = trigger.current.getBoundingClientRect();
     const height = menu.current.getBoundingClientRect().height;
     setPosition({
@@ -71,14 +78,17 @@ export const ActionMenu = ({
           ? rect.bottom + 4
           : Math.max(8, rect.top - height - 4),
     });
+
     if (openedBy.current === 'click') {
       menu.current.querySelector<HTMLButtonElement>('button')?.focus();
     }
   }, [open]);
+
   useEffect(() => {
     if (!open) {
       return;
     }
+
     const dismiss = (event: PointerEvent) => {
       if (
         !menu.current?.contains(event.target as Node) &&
@@ -87,16 +97,19 @@ export const ActionMenu = ({
         setOpen(false);
       }
     };
+
     const scroll = () => setOpen(false);
     document.addEventListener('pointerdown', dismiss);
     window.addEventListener('scroll', scroll, true);
     window.addEventListener('resize', scroll);
+
     return () => {
       document.removeEventListener('pointerdown', dismiss);
       window.removeEventListener('scroll', scroll, true);
       window.removeEventListener('resize', scroll);
     };
   }, [open]);
+
   return (
     <>
       <button
@@ -110,11 +123,14 @@ export const ActionMenu = ({
         onPointerLeave={hoverLeave}
         onClick={() => {
           cancelClose();
+
           if (open && openedBy.current === 'hover') {
             openedBy.current = 'click';
             menu.current?.querySelector<HTMLButtonElement>('button')?.focus();
+
             return;
           }
+
           openedBy.current = 'click';
           setOpen(!open);
         }}
@@ -144,14 +160,18 @@ export const ActionMenu = ({
                 const buttons = [
                   ...(menu.current?.querySelectorAll<HTMLButtonElement>('button') ?? []),
                 ];
+
                 const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+
                 if (event.key === 'Escape' || event.key === 'Tab') {
                   if (event.key === 'Escape') {
                     event.preventDefault();
                   }
+
                   setOpen(false);
                   trigger.current?.focus();
                 }
+
                 if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
                   event.preventDefault();
                   buttons[nextFocusIndex(event.key, at, buttons.length, 'ArrowDown')]?.focus();

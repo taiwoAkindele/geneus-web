@@ -40,18 +40,23 @@ export const StaffForm = ({
   const [fullName, setFullName] = useState(initial?.fullName ?? '');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(initial ? rolesFor(initial) : []);
   const [primaryRole, setPrimaryRole] = useState<Role>(initial?.role ?? 'chew');
+
   const [additionalPermissions, setAdditionalPermissions] = useState<AssignablePermission[]>(
     initial?.additionalPermissions ?? [],
   );
+
   const [loginAccess, setLoginAccess] = useState<NonNullable<Staff['loginAccess']>>(
     initial?.loginAccess ?? 'shift',
   );
+
   const [permission, setPermission] = useState<Staff['permission']>(
     initial?.permission ?? 'read_write',
   );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   const inherited = new Set(selectedRoles.flatMap((role) => ROLE_PERMISSIONS[role]));
+
   const effective = selectedRoles.length
     ? staffPermissions({
         role: primaryRole,
@@ -60,7 +65,9 @@ export const StaffForm = ({
         permission,
       })
     : [];
+
   const extraGrants = additionalPermissions.filter((item) => !inherited.has(item));
+
   const signInLabel =
     selectedRoles.includes('facility_admin') || loginAccess === 'always'
       ? '24-hour access'
@@ -71,18 +78,23 @@ export const StaffForm = ({
     if (!split) {
       return;
     }
+
     const dock = document.querySelector('nav[aria-label$="mobile navigation"]')?.parentElement;
+
     if (!dock) {
       return;
     }
+
     const update = () =>
       form.current?.style.setProperty(
         '--staff-nav-offset',
         `${Math.ceil(dock.getBoundingClientRect().height)}px`,
       );
+
     update();
     const observer = new ResizeObserver(update);
     observer.observe(dock);
+
     return () => observer.disconnect();
   }, [split]);
 
@@ -90,26 +102,36 @@ export const StaffForm = ({
     const next = selectedRoles.includes(role)
       ? selectedRoles.filter((item) => item !== role)
       : [...selectedRoles, role];
+
     setSelectedRoles(next);
+
     if (!next.includes(primaryRole)) {
       setPrimaryRole(next[0] ?? 'chew');
     }
   };
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
+
     if (saving) {
       return;
     }
+
     if (!fullName.trim()) {
       setError('Enter the staff member’s full name');
+
       return;
     }
+
     if (!selectedRoles.length) {
       setError('Choose at least one role');
+
       return;
     }
+
     setSaving(true);
     setError(undefined);
+
     try {
       await onSave({
         fullName: fullName.trim(),
@@ -271,6 +293,7 @@ export const StaffForm = ({
                   const checked =
                     (selectedRoles.includes('facility_admin') ? 'always' : loginAccess) ===
                     option.value;
+
                   return (
                     <label
                       key={option.value}
@@ -327,6 +350,7 @@ export const StaffForm = ({
               </p>
               {AssignablePermission.options.map((item) => {
                 const included = inherited.has(item);
+
                 return (
                   <label
                     key={item}

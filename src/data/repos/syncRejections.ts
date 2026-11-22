@@ -78,20 +78,25 @@ const changePermission = (
   changes: Record<string, unknown>,
 ): Permission | undefined => {
   const columns = Object.keys(changes);
+
   if (type === 'staff') {
     if (columns.includes('permission')) {
       return 'staff:permission';
     }
+
     if (changes.active === false) {
       return 'staff:deactivate';
     }
+
     return 'staff:manage';
   }
+
   if (type === 'roster_shift') {
     return columns.every((column) => column === 'extendedUntil')
       ? 'roster:extend'
       : 'roster:assign';
   }
+
   return UPDATE_PERMISSION[type];
 };
 
@@ -100,9 +105,11 @@ const permissionToApply = (rejection: SyncRejection): Permission | undefined => 
   if (rejection.operation === 'put' && rejection.refusedRecord) {
     return CREATE_PERMISSION[rejection.entityType];
   }
+
   if (rejection.operation === 'patch' && rejection.refusedChanges) {
     return changePermission(rejection.entityType, rejection.refusedChanges);
   }
+
   return undefined;
 };
 
@@ -118,31 +125,40 @@ export const applyAgainBlocker = (
   if (['library_document', 'visit_document'].includes(rejection.entityType)) {
     return 'Open the retained file, then review the current library version or inpatient chart before recording a corrected version. Document history cannot be overwritten from here.';
   }
+
   if (
     ['encounter_entry', 'clinical_event', 'ward_care_event'].includes(rejection.entityType) &&
     rejection.refusedRecord?.actorContext
   ) {
     return 'Use independent clinical review to preserve the original author, authority and performance time';
   }
+
   if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') {
     return 'Review the current register configuration and save a new draft version. The refused snapshot is kept here; an existing version cannot be overwritten.';
   }
+
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') {
     return 'Review this booking in Appointments and record the intended action against its current history. Saved booking history cannot be overwritten.';
   }
+
   if (!rejection.refusedRecord && !rejection.refusedChanges) {
     return 'Nothing was kept to apply again — this can only be discarded.';
   }
+
   const permission = permissionToApply(rejection);
+
   if (!permission) {
     return 'This kind of record cannot be applied again from here.';
   }
+
   if (!context.permissions.includes('sync_rejection:resolve')) {
     return 'A records officer or facility admin resolves this.';
   }
+
   if (!context.permissions.includes(permission)) {
     return 'Your role cannot make this change — someone whose role can must apply it again.';
   }
+
   return undefined;
 };
 
@@ -160,9 +176,11 @@ export const applyAgain = async (
 ): Promise<void> => {
   const blocker = applyAgainBlocker(rejection, context);
   const permission = permissionToApply(rejection);
+
   if (blocker || !permission) {
     throw new Error(blocker ?? 'This cannot be applied again');
   }
+
   assertAllowed(context, 'sync_rejection:resolve');
   assertAllowed(context, permission);
   const type = rejection.entityType;
@@ -173,7 +191,9 @@ export const applyAgain = async (
         'This record is already on the device — it may still be syncing. Try again in a moment.',
       );
     }
+
     const { updatedBy: _updatedBy, updatedOn: _updatedOn, ...original } = rejection.refusedRecord;
+
     const record = {
       ...original,
       type,
@@ -188,6 +208,7 @@ export const applyAgain = async (
         ? { actorRole: context.role }
         : {}),
     };
+
     await insertRecords(context, [{ permission, type, record }]);
   } else if (rejection.refusedChanges) {
     if (!(await findRecord(type, rejection.entityId))) {
@@ -195,8 +216,10 @@ export const applyAgain = async (
         'The record this changes is not on this device — apply or discard its creation first.',
       );
     }
+
     await updateRecord(context, permission, type, rejection.entityId, rejection.refusedChanges);
   }
+
   await resolveRejection(rejection, 'Applied again', context);
 };
 
@@ -211,19 +234,24 @@ export const applyDeviceValues = async (
   context: AuthorizationContext,
 ) => {
   const permission = UPDATE_PERMISSION[rejection.entityType];
+
   if (!permission) {
     throw new Error(`${rejection.entityType} changes cannot be re-applied here`);
   }
+
   // Both writes are checked before the first: a person who may edit the record
   // but not reconcile must not leave the value changed and the rejection open.
   assertAllowed(context, 'sync_rejection:resolve');
   assertAllowed(context, permission);
+
   const chosen = (rejection.conflicts ?? []).filter((conflict) =>
     columns.includes(conflict.column),
   );
+
   const changes = Object.fromEntries(
     chosen.map((conflict) => [conflict.column, conflict.deviceValue]),
   );
+
   await updateRecord(context, permission, rejection.entityType, rejection.entityId, changes);
   await resolveRejection(
     rejection,
@@ -303,6 +331,7 @@ export const planRestore = (
   mintId: (type: DocType) => string = newId,
 ): { type: DocType; record: Record<string, unknown> }[] => {
   const patient = patientRejection.refusedRecord;
+
   if (!patient) {
     throw new Error('this rejection kept no record to restore');
   }
@@ -314,27 +343,35 @@ export const planRestore = (
         String(a.record.createdOn).localeCompare(String(b.record.createdOn)) ||
         (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9),
     );
+
   const records: typeof pending = [];
+
   // Restore dependencies before their revisions even if an offline clock moved backwards.
   while (pending.length) {
     const index = pending.findIndex(({ record }) => {
       const values = record.values as Record<string, unknown> | undefined;
+
       const links = [
         ...LINKS.map((key) => record[key]),
         values?.appointmentId,
         values?.problemId,
         values?.previousAmendmentId,
       ];
+
       return !links.some(
         (link) => link !== record.id && pending.some((candidate) => candidate.record.id === link),
       );
     });
+
     if (index < 0) {
       throw new Error('The held records have circular links. Review them before restoring');
     }
+
     records.push(...pending.splice(index, 1));
   }
+
   const renamed = new Map<string, string>([[patientRejection.entityId, newPatientId]]);
+
   for (const { type, record } of records) {
     renamed.set(String(record.id), mintId(type));
   }
@@ -354,12 +391,15 @@ export const planRestore = (
         patientId: newPatientId,
         deviceId,
       };
+
       for (const link of LINKS) {
         if (restored[link] !== undefined) {
           restored[link] = relink(restored[link]);
         }
       }
+
       const values = restored.values as Record<string, unknown> | undefined;
+
       if (values) {
         restored.values = {
           ...values,
@@ -370,6 +410,7 @@ export const planRestore = (
             : {}),
         };
       }
+
       return { type, record: restored };
     }),
   ];
@@ -389,10 +430,12 @@ export const reRegisterPatient = async (
   const held = heldFor(patientRejection, open);
   const edits = heldEditsFor(patientRejection, open);
   const patients = await listPatients();
+
   const newPatientId = mintPatientId(
     context.facilityId,
     patients.map((patient) => patient.patientId),
   );
+
   const plan = planRestore(
     withHeldEdits(patientRejection, edits),
     held,
@@ -405,11 +448,14 @@ export const reRegisterPatient = async (
     type,
     record,
   }));
+
   const [patient] = (await insertRecords(context, records)) as [Patient];
 
   const resolution = `Re-registered as ${newPatientId}`;
+
   for (const rejection of [patientRejection, ...held, ...edits]) {
     await resolveRejection(rejection, resolution, context);
   }
+
   return patient;
 };

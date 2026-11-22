@@ -3,13 +3,16 @@ import { reservationMatchesAppointment } from '@shared';
 import { useLiveQuery } from '@/data';
 import { reservationForAppointment } from '@/data/repos/appointments';
 import { Tag } from '@/ui';
+
 export const ReservationStatus = ({ appointmentId }: { appointmentId: string }) => {
   const load = useCallback(() => reservationForAppointment(appointmentId), [appointmentId]);
   const query = useLiveQuery(load);
   const booking = query.data?.booking;
+
   if (!booking?.allocation) {
     return null;
   }
+
   if (query.error) {
     return (
       <p role="alert" className="text-sm text-danger">
@@ -20,8 +23,10 @@ export const ReservationStatus = ({ appointmentId }: { appointmentId: string }) 
       </p>
     );
   }
+
   const latest = query.data?.reservations.sort((a, b) => b.revision - a.revision)[0];
   const accepted = latest && reservationMatchesAppointment(latest, booking);
+
   return (
     <section className="my-3 rounded-field border border-outline-soft p-3 text-sm">
       <h3 className="mb-2 font-bold">Service resource reservation</h3>

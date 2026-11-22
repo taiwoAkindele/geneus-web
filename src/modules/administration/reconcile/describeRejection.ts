@@ -33,24 +33,31 @@ export const rejectionAdvice = (rejection: SyncRejection): string => {
   if (rejection.category === 'dependency') {
     return 'Resolve the linked records first, then resubmit this original proposal. Its contents have been retained.';
   }
+
   if (rejection.reason.startsWith('held:')) {
     return 'Review the patient registration first. Related records remain held with it.';
   }
+
   if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') {
     return 'Another configuration version arrived first. Sync and open the current register configuration before preparing a new draft. This refused snapshot remains available in the details.';
   }
+
   if (rejection.entityType === 'appointment' && rejection.operation === 'patch') {
     return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';
   }
+
   if (rejection.category === 'validation') {
     return 'Some details do not meet the server’s requirements. A records officer should review the record and check that the app and server versions agree before retrying.';
   }
+
   if (rejection.category === 'authorization') {
     return 'The server did not allow this action for its author. Ask an authorized staff member to review the change before applying it in their name.';
   }
+
   if (rejection.category === 'identity') {
     return 'The server could not confirm the device or staff identity. Ask a facility administrator to check access.';
   }
+
   return 'Another saved record conflicts with this change. Compare the values before deciding which should stand.';
 };
 
@@ -84,22 +91,27 @@ export const kindOf = (
   if (rejection.reason.startsWith('held:')) {
     const patientId =
       rejection.entityType === 'patient' ? rejection.entityId : rejection.refusedRecord?.patientId;
+
     const clashOpen = open.some(
       (candidate) =>
         isPatientIdClash(candidate) &&
         candidate.entityId === patientId &&
         candidate.deviceId === rejection.deviceId,
     );
+
     if (clashOpen) {
       return 'held';
     }
   }
+
   if (rejection.category === 'conflict' && rejection.conflicts?.length) {
     return 'column_conflict';
   }
+
   if (isPatientIdClash(rejection)) {
     return 'patient_id_clash';
   }
+
   return rejection.refusedRecord || rejection.refusedChanges ? 'refused_write' : 'nothing_kept';
 };
 
@@ -130,11 +142,14 @@ export const shownValue = (value: unknown): string => {
   if (value === undefined || value === null || value === '') {
     return '—';
   }
+
   if (Array.isArray(value)) {
     return value.join(', ') || '—';
   }
+
   if (typeof value === 'object') {
     return JSON.stringify(value);
   }
+
   return String(value);
 };

@@ -10,8 +10,10 @@ export const useWardForm = (initial?: EncounterData) => {
   const [data, setData] = useState<EncounterData>(() =>
     structuredClone(initial ?? EMPTY_ENCOUNTER_DATA),
   );
+
   const setField: StepFormController['setField'] = (step, field, value) =>
     setData((d) => ({ ...d, [step]: { ...d[step], [field]: value } }));
+
   const ctl: StepFormController = {
     enc: { data },
     setField,
@@ -60,5 +62,6 @@ export const useWardForm = (initial?: EncounterData) => {
         dispense: { ...d.dispense, done: { ...d.dispense.done, [index]: !d.dispense.done[index] } },
       })),
   };
+
   return { data, setData, ctl };
 };

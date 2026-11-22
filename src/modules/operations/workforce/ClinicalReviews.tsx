@@ -17,6 +17,7 @@ import { PrivateAccess } from './PrivateAccess';
 import { useWorkforce } from './useWorkforce';
 import { humanize } from './presentation';
 import { WorkspaceLoading } from './Workspaces';
+
 /** Shows a recorded clinical value of any shape: lists, labelled groups, or plain text. */
 const valuesView = (value: unknown): ReactNode => {
   if (Array.isArray(value)) {
@@ -46,19 +47,23 @@ const valuesView = (value: unknown): ReactNode => {
 
   return String(value ?? 'Not recorded');
 };
+
 export const ClinicalReviews = () => {
   const context = useAuthorizationContext();
   const workforce = useWorkforce();
+
   const load = useCallback(
     async () => ({ bundles: await listClinicalReviews(context), patients: await listPatients() }),
     [context.userId],
   );
+
   const query = useLiveQuery(load);
   const [reviewing, setReviewing] = useState<ClinicalReviewBundle>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [held, setHeld] = useState<SyncRejection>();
   const [reason, setReason] = useState('');
+
   if (query.loading || !query.data || query.error || !workforce.data) {
     return (
       <WorkspaceLoading
@@ -70,22 +75,28 @@ export const ClinicalReviews = () => {
       />
     );
   }
+
   const data = workforce.data;
+
   const act = async (kind: 'supervisor' | 'checker' | 'withdraw') => {
     if (!reviewing || busy) {
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       if (kind === 'withdraw') {
         if (reviewing.staffId !== context.userId) {
           throw new Error('Only the original author can withdraw an unsigned draft');
         }
+
         await clearClinicalReview(reviewing.id);
       } else {
         await acknowledgeClinicalReview(reviewing, context, kind);
       }
+
       setReviewing(undefined);
       query.reload();
     } catch (cause) {
@@ -94,6 +105,7 @@ export const ClinicalReviews = () => {
       setBusy(false);
     }
   };
+
   return (
     <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 md:px-8">
       <h1 className="text-2xl font-extrabold">Clinical reviews & co-signatures</h1>
@@ -108,6 +120,7 @@ export const ClinicalReviews = () => {
             const record = bundle.records
               .map((r) => r.record as import('@shared').AnyDocument)
               .find((r) => r.id === bundle.sourceId);
+
             const renderContributionLabel = () => {
               if (record && 'step' in record) {
                 return humanize(String(record.step));
@@ -233,6 +246,7 @@ export const ClinicalReviews = () => {
                 disabled={busy || !reason.trim()}
                 onClick={async () => {
                   setBusy(true);
+
                   try {
                     await resubmitHistoricalReview(held, reason, context);
                     setHeld(undefined);
@@ -278,6 +292,7 @@ export const ClinicalReviews = () => {
             )
             .map((r) => {
               const record = r.record as import('@shared').EncounterEntry;
+
               return (
                 <div key={record.id}>
                   <p className="mb-3 text-sm font-bold">
@@ -343,6 +358,7 @@ export const ClinicalReviews = () => {
                   onClick={async () => {
                     setBusy(true);
                     setError('');
+
                     try {
                       await submitReviewedClinicalDraft(reviewing, reason, context);
                       setReviewing(undefined);

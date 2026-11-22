@@ -12,10 +12,12 @@ type Props = {
   onChange: (value: string) => void;
 };
 const CUSTOM = '__custom_entry__';
+
 /** Known choices speed up entry; custom and historical wording are always preserved. */
 export const SelectOrTextField = ({ label, name, value, options, help, onChange }: Props) => {
   const [custom, setCustom] = useState(false);
   const isCustom = custom || Boolean(value && !options.some((option) => option.value === value));
+
   return (
     <div className="space-y-2">
       <SelectField
@@ -31,6 +33,7 @@ export const SelectOrTextField = ({ label, name, value, options, help, onChange 
         onChange={(event) => {
           const next = event.target.value;
           setCustom(next === CUSTOM);
+
           if (next !== CUSTOM) {
             onChange(next);
           }

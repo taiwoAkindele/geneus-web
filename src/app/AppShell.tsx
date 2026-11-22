@@ -1,8 +1,10 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+
 const CareContext = lazy(() =>
   import('@/modules/operations/workforce/CareContext').then((m) => ({ default: m.CareContext })),
 );
+
 import { Avatar, Icon, Sheet } from '@/ui';
 import { useAuth, useAuthorizationContext, useSession } from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
@@ -132,17 +134,22 @@ const ModuleNav = ({ tone, onNavigate }: { tone: 'dark' | 'light'; onNavigate?: 
       setOpen(current.id);
     }
   }, [current?.id]);
+
   const dark = tone === 'dark';
   const theme = dark ? 'dark' : 'light';
+
   const row = (active: boolean) =>
     `flex min-h-[48px] w-full items-center gap-3 rounded-field px-3 py-2.5 text-left text-sm ${NAV_ROW_TONES[theme][active ? 'active' : 'idle']}`;
+
   const iconTone = (active: boolean) =>
     `h-5 w-5 shrink-0 ${NAV_ICON_TONES[theme][active ? 'active' : 'idle']}`;
+
   // Choosing a page inside a module keeps that module current, including pages several modules share.
   const enter = (id: WorkspaceId) => {
     rememberWorkspace(context.facilityId, context.userId, id);
     onNavigate?.();
   };
+
   return (
     <nav aria-label="Modules" className="space-y-1">
       <Link
@@ -157,8 +164,10 @@ const ModuleNav = ({ tone, onNavigate }: { tone: 'dark' | 'light'; onNavigate?: 
       {available.map((workspace) => {
         const here = current?.id === workspace.id;
         const activeKey = here ? activeWorkspaceLink(workspace, pathname, search) : undefined;
+
         if (workspace.links.length === 1) {
           const only = workspace.links[0];
+
           return (
             <Link
               key={workspace.id}
@@ -172,8 +181,10 @@ const ModuleNav = ({ tone, onNavigate }: { tone: 'dark' | 'light'; onNavigate?: 
             </Link>
           );
         }
+
         const expanded = open === workspace.id;
         const panel = `module-pages-${workspace.id}`;
+
         return (
           <div key={workspace.id}>
             <button
@@ -197,6 +208,7 @@ const ModuleNav = ({ tone, onNavigate }: { tone: 'dark' | 'light'; onNavigate?: 
               >
                 {workspace.links.map((item) => {
                   const active = item.key === activeKey;
+
                   return (
                     <li key={item.key}>
                       <Link
@@ -237,10 +249,12 @@ const MoreSheet = ({
   unread: number;
 }) => {
   const navigate = useNavigate();
+
   const go = (to: string) => {
     onClose();
     navigate(to);
   };
+
   return (
     <Sheet title="Menu" eyebrow="Modules and pages" onClose={onClose}>
       <ModuleNav tone="light" onNavigate={onClose} />
@@ -276,6 +290,7 @@ const BottomBar = ({ onMore }: { onMore: () => void }) => {
   // Home, the current module's two main pages, then More for everything else.
   const primary = current?.links.slice(0, 2) ?? [];
   const moreActive = Boolean(activeKey && !primary.some((item) => item.key === activeKey));
+
   return (
     <nav
       aria-label={`${current?.label ?? 'App'} mobile navigation`}
@@ -353,6 +368,7 @@ const BottomBar = ({ onMore }: { onMore: () => void }) => {
 
 const MobileNotificationSheet = ({ onClose }: { onClose: () => void }) => {
   const { notifications, notificationsLoading, notificationsError } = useSession();
+
   return (
     <Sheet title="Notifications" onClose={onClose}>
       <NotificationList
@@ -373,11 +389,13 @@ export const AppShell = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [pathname]);
+
   const { unreadCount, markAllRead, shift, user, facility } = useSession();
   const { search } = useLocation();
   useEffect(() => {
     rememberPlace(user.staffId, facility.code, pathname + search);
   }, [user.staffId, facility.code, pathname, search]);
+
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);

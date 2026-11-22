@@ -36,28 +36,34 @@ export const readJsonBody = async (response: Response): Promise<unknown> => {
 /** Binary documents use the same API origin/error boundary; bytes never enter JSON or logs. */
 export const binaryRequest = async (path: string, init: RequestInit): Promise<Response> => {
   let response: Response;
+
   try {
     response = await fetch(`${BASE_URL}${path}`, init);
   } catch (cause) {
     if (cause instanceof Error && cause.name === 'AbortError') {
       throw cause;
     }
+
     throw new ApiError('offline', OFFLINE_MESSAGE);
   }
+
   if (!response.ok) {
     const detail = (await readJsonBody(response)) as
       { error?: string; message?: string } | undefined;
+
     throw new ApiError(
       detail?.error ?? 'request_failed',
       detail?.message ?? `The document request was refused (${response.status})`,
       response.status,
     );
   }
+
   return response;
 };
 
 const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   let response: Response;
+
   try {
     response = await fetch(`${BASE_URL}${path}`, init);
   } catch {
@@ -65,6 +71,7 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   }
 
   const payload = await readJsonBody(response);
+
   if (!response.ok) {
     const detail = payload as { error?: string; message?: string; details?: unknown } | undefined;
     throw new ApiError(
@@ -74,6 +81,7 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
       detail?.details,
     );
   }
+
   return payload as T;
 };
 
@@ -137,6 +145,7 @@ export const staffHeaders = (
   ...(session ? { 'x-staff-session': session } : {}),
   ...(actor ? { 'x-actor-staff-id': actor } : {}),
 });
+
 /** An online action by the signed-in person: the device credential plus who is acting. */
 export const staffRequest = <T>(
   path: string,

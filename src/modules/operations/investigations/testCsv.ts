@@ -1,6 +1,7 @@
 import type { OwnTest } from '@/lib/api/investigations';
 
 export const TEST_CSV_HEADERS = ['Test name', 'Specimen', 'Classification', 'Other names'] as const;
+
 /** A ready-to-fill file: the header row plus one example a facility can overwrite. */
 export const TEST_CSV_TEMPLATE = `${TEST_CSV_HEADERS.join(',')}\nAntenatal booking panel,Blood and urine,Antenatal,ANC panel; Booking bloods\n`;
 
@@ -10,8 +11,10 @@ const csvRows = (text: string): string[][] => {
   let row: string[] = [];
   let field = '';
   let quoted = false;
+
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
+
     if (quoted) {
       if (c === '"' && text[i + 1] === '"') {
         field += '"';
@@ -30,6 +33,7 @@ const csvRows = (text: string): string[][] => {
       if (c === '\r' && text[i + 1] === '\n') {
         i++;
       }
+
       row.push(field);
       rows.push(row);
       row = [];
@@ -38,10 +42,12 @@ const csvRows = (text: string): string[][] => {
       field += c;
     }
   }
+
   if (field || row.length) {
     row.push(field);
     rows.push(row);
   }
+
   return rows.filter((cells) => cells.some((cell) => cell.trim()));
 };
 
@@ -54,15 +60,20 @@ export type CsvIssue = { line: number; message: string };
  */
 export const parseTestCsv = (text: string): { tests: OwnTest[]; issues: CsvIssue[] } => {
   const [header, ...body] = csvRows(text.replace(/^﻿/, ''));
+
   if (!header) {
     return { tests: [], issues: [{ line: 1, message: 'The file is empty' }] };
   }
+
   const index = (name: string) =>
     header.findIndex((cell) => cell.trim().toLowerCase() === name.toLowerCase());
+
   const [name, specimen, classification, others] = TEST_CSV_HEADERS.map(index);
+
   const missing = TEST_CSV_HEADERS.slice(0, 3).filter(
     (_, i) => [name, specimen, classification][i] < 0,
   );
+
   if (missing.length) {
     return {
       tests: [],
@@ -74,11 +85,13 @@ export const parseTestCsv = (text: string): { tests: OwnTest[]; issues: CsvIssue
       ],
     };
   }
+
   const tests: OwnTest[] = [];
   const issues: CsvIssue[] = [];
   body.forEach((cells, at) => {
     const line = at + 2;
     const value = (i: number) => (i < 0 ? '' : (cells[i] ?? '')).trim();
+
     const blank = [
       ['Test name', name],
       ['Specimen', specimen],
@@ -86,13 +99,16 @@ export const parseTestCsv = (text: string): { tests: OwnTest[]; issues: CsvIssue
     ]
       .filter(([, i]) => !value(i as number))
       .map(([label]) => label);
+
     if (blank.length) {
       issues.push({
         line,
         message: `${blank.join(', ')} ${blank.length > 1 ? 'are' : 'is'} empty`,
       });
+
       return;
     }
+
     tests.push({
       name: value(name),
       specimen: value(specimen),
@@ -103,5 +119,6 @@ export const parseTestCsv = (text: string): { tests: OwnTest[]; issues: CsvIssue
         .filter(Boolean),
     });
   });
+
   return { tests, issues };
 };

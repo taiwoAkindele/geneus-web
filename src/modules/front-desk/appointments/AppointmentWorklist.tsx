@@ -21,6 +21,7 @@ type Props = {
 
 const Status = ({ booking }: { booking: BookedAppointment }) => {
   const status = bookingStatus(booking);
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <Tag tone={status.tone}>{status.label}</Tag>
@@ -36,6 +37,7 @@ const Status = ({ booking }: { booking: BookedAppointment }) => {
 /** The care service booked, or the visit type for bookings made before care services. */
 const visitLabel = (booking: BookedAppointment, care?: CareServiceRecords) =>
   careServiceName(care, booking.offeringId) ?? VISIT_TYPE_LABELS[booking.visitType ?? 'general'];
+
 const Menu = ({ booking, actions }: { booking: BookedAppointment; actions: Props['actions'] }) => (
   <ActionMenu
     compact
@@ -53,6 +55,7 @@ const Menu = ({ booking, actions }: { booking: BookedAppointment; actions: Props
  */
 export const AppointmentWorklist = ({ appointments, actions }: Props) => {
   const care = useLiveQuery(loadCareServices, CARE_SERVICE_WATCH).data;
+
   return (
     <>
       <ul className="space-y-2 lg:hidden" aria-label="Appointments">

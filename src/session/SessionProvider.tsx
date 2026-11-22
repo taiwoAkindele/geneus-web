@@ -71,7 +71,9 @@ export type SessionUser = {
   roles: Staff['role'][];
   canWrite: boolean;
 };
+
 export type Facility = { name: string; code: string };
+
 export type Shift = {
   label: string;
   endsAtLabel: string;
@@ -81,6 +83,7 @@ export type Shift = {
 };
 
 export type NotificationKind = 'referral' | 'conflict' | 'shift' | 'result';
+
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
@@ -145,8 +148,10 @@ const ACTIVITY_WRITE_MS = 15_000;
 
 const readLastActivity = (): number | undefined => {
   const stored = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
+
   return Number.isFinite(stored) && stored > 0 ? stored : undefined;
 };
+
 const EXTENSION_MINUTES = 240;
 
 const initialsOf = (fullName: string): string =>
@@ -173,23 +178,28 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [facilityIdentity, setFacilityIdentity] = useState(pendingFacilityIdentity);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const rejections = useLiveQuery(listOpenRejections);
+
   // Results back from the laboratory for tests this clinician ordered; each alert ends once the result is reviewed.
   const results = useLiveQuery(
     useCallback(async () => {
       if (!staffId) {
         return [];
       }
+
       const [entries, patients] = await Promise.all([
         entriesAtSteps(RESULT_ALERT_STEPS),
         listPatients(),
       ]);
+
       const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
+
       return resultAlerts(entries, staffId).map((alert) => ({
         ...alert,
         name: names.get(alert.patientId) ?? alert.patientId,
       }));
     }, [staffId]),
   );
+
   const notifications = useMemo<AppNotification[]>(
     () => [
       ...(results.data ?? []).map((alert) => ({
@@ -213,16 +223,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     ],
     [results.data, rejections.data, readIds],
   );
+
   useEffect(() => setReadIds(new Set()), [staffId]);
   const [now, setNow] = useState(() => Date.now());
   const lastActivity = useRef<number | undefined>(readLastActivity());
 
   const load = useCallback(async () => {
     const [staff, shifts] = await Promise.all([listStaff(), listShifts()]);
+
     return { staff: staff.filter((member) => member.active), shifts };
   }, []);
 
   const { data, loading, error: rosterError, reload: reloadRoster } = useLiveQuery(load);
+
   const roster = useMemo<RosterEntry[]>(
     () =>
       (data?.staff ?? []).map((member) => ({
@@ -237,12 +250,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   // A phone wakes from sleep with timers far behind; re-check at once rather than up to 30 s later.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000);
+
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         setNow(Date.now());
       }
     };
+
     document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
@@ -254,9 +270,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!staffId) {
       return;
     }
+
     let written = 0;
+
     const touched = (event: Event) => {
       const at = Date.now();
+
       if (
         lastActivity.current === undefined ||
         at - lastActivity.current >= SESSION_IDLE_MS ||
@@ -265,6 +284,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if ((event.type === 'pointerdown' || event.type === 'keydown') && event.cancelable) {
           event.preventDefault();
         }
+
         event.stopImmediatePropagation();
         localStorage.removeItem(SIGNED_IN_KEY);
         localStorage.removeItem(LAST_ACTIVITY_KEY);
@@ -273,19 +293,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         // The idle lock ends the server session too, not only the local sign-in.
         void endStaffSession();
         setNow(at);
+
         return;
       }
+
       lastActivity.current = at;
+
       if (at - written < ACTIVITY_WRITE_MS) {
         return;
       }
+
       written = at;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
     };
+
     window.addEventListener('pointerdown', touched, true);
     window.addEventListener('keydown', touched, true);
     window.addEventListener('wheel', touched, { passive: true });
     window.addEventListener('touchmove', touched, { passive: true });
+
     return () => {
       window.removeEventListener('pointerdown', touched, true);
       window.removeEventListener('keydown', touched, true);
@@ -295,6 +321,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [staffId]);
 
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
+
   // `now` is a coarse display tick. Input can update lastActivity between
   // ticks, so comparing it with `now` mistakes fresh activity for a clock
   // rollback when a database/sync refresh renders this provider again.
@@ -306,6 +333,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (isWorkspaceSwitching()) {
       return;
     }
+
     void clearFacilityIdentity();
     setFacilityIdentity(undefined);
     localStorage.removeItem(SIGNED_IN_KEY);
@@ -322,17 +350,23 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!facilityIdentity || loading || !data || !facility?.code) {
       return;
     }
+
     let cancelled = false;
+
     void (async () => {
       try {
         if (!activeWorkspace()?.prepared && !(await waitForFirstSync(getDatabase()))) {
           throw new Error('First sync is required');
         }
+
         const snapshot = await load();
+
         const member = snapshot.staff.find(
           (candidate) => candidate.staffId === facilityIdentity.staffId,
         );
+
         const shift = findShift(snapshot.shifts, facilityIdentity.staffId, Date.now());
+
         const accepted =
           member &&
           canContinueFacilitySession(facilityIdentity, {
@@ -347,18 +381,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             shift &&
             (await checkShiftSignature(shift)) === 'invalid'
           );
+
         if (cancelled) {
           return;
         }
+
         if (!accepted) {
           signOut();
+
           return;
         }
+
         if (!entry) {
           reloadRoster();
+
           return;
         }
+
         await clearFacilityIdentity();
+
         if (!cancelled) {
           setFacilityIdentity(undefined);
         }
@@ -368,6 +409,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -394,27 +436,36 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const signIn = useCallback(
     async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
       const candidate = roster.find((member) => member.staff.staffId === candidateId);
+
       if (!candidate) {
         return { reason: 'unknown-staff' };
       }
+
       if (isFrozen(lastServerContactOn())) {
         return { reason: 'sync-required' };
       }
+
       const pinCheck = await checkPin(candidateId, pin);
+
       if (!pinCheck.ok) {
         return pinCheck.reason === 'locked'
           ? { reason: 'locked', retryAt: pinCheck.retryAt }
           : { reason: 'wrong-pin' };
       }
+
       if (needsLongerPin(candidateId)) {
         // The right old PIN is itself the approval to replace it.
         approvePinSetup(candidateId);
+
         return { reason: 'pin-upgrade' };
       }
+
       const currentShift = findShift(data?.shifts ?? [], candidateId, Date.now());
+
       if (!maySignIn({ staff: candidate.staff, shift: currentShift }, Date.now())) {
         return { reason: 'off-shift' };
       }
+
       if (
         accessFor(candidate.staff) === 'shift' &&
         currentShift &&
@@ -422,6 +473,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       ) {
         return { reason: 'shift-altered' };
       }
+
       const signedInAt = Date.now();
       lastActivity.current = signedInAt;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(signedInAt));
@@ -438,6 +490,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             openStaffSessionQuietly({ userId: candidateId, deviceId }, pin),
           )
         : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
+
       return undefined;
     },
     [roster, data, deviceId],
@@ -470,6 +523,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!entry?.shift) {
       throw new Error('There is no active shift to extend');
     }
+
     await persistExtension(
       entry.shift,
       new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(),
@@ -486,8 +540,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!entry || !active) {
       return null;
     }
+
     const { staff, shift } = entry;
     const access = accessFor(staff);
+
     return {
       user: {
         staffId: staff.staffId,
@@ -544,9 +600,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = (): AuthValue => {
   const auth = useContext(AuthContext);
+
   if (!auth) {
     throw new Error('useAuth must be used within a SessionProvider');
   }
+
   return auth;
 };
 
@@ -559,6 +617,7 @@ export const useAuthorizationContext = (): AuthorizationContext => {
   const session = useContext(SessionContext);
   const { facility, deviceId } = useDeviceContext();
   const contact = lastServerContactOn();
+
   return useMemo(
     () => freshAuthorization(session?.authorization ?? nobody(facility?.code ?? '', deviceId)),
     [session?.authorization, facility?.code, deviceId, contact],
@@ -568,8 +627,10 @@ export const useAuthorizationContext = (): AuthorizationContext => {
 /** Only valid behind the shift guard — screens outside it have no signed-in staff. */
 export const useSession = (): SessionValue => {
   const session = useContext(SessionContext);
+
   if (!session) {
     throw new Error('useSession requires signed-in staff (render inside RequireShift)');
   }
+
   return session;
 };

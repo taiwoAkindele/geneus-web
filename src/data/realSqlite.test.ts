@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 // The server and sync are stood in for: an accepted configuration save lands in local SQLite as sync would deliver it.
 vi.mock('./configurationSave', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./configurationSave')>()),
   saveConfiguration: (await import('./configurationSave.localDouble')).saveConfigurationLocally,
 }));
+
 import type { AuthorizationContext, DocType, EncounterEntry, Staff } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { fieldKindsFor } from './contractShape';
@@ -107,35 +109,45 @@ const { DatabaseSync } = (await import(/* @vite-ignore */ NODE_SQLITE)) as NodeS
  */
 const sqliteDatabase = (): LocalDatabase & { close: () => Promise<void> } => {
   const sqlite = new DatabaseSync(':memory:');
+
   for (const [type, table] of Object.entries(TABLE_FOR) as [DocType, string][]) {
     const columns = Object.keys(fieldKindsFor(type)).filter((field) => field !== 'id');
     sqlite.exec(
       `CREATE TABLE "${table}" ("id" TEXT PRIMARY KEY, ${[...columns, '_metadata'].map((name) => `"${name}"`).join(', ')})`,
     );
   }
+
   sqlite.exec(
     `CREATE TABLE "${DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "patientId", "encounterKey", "step", "data", "updatedOn")`,
   );
+
   sqlite.exec(
     `CREATE TABLE "${REGISTER_DRAFTS_TABLE}" ("id" TEXT PRIMARY KEY, "staffId", "registerKey", "data", "updatedOn")`,
   );
+
   sqlite.exec(
     `CREATE TABLE "${CLINICAL_REVIEWS_TABLE}" ("id" TEXT PRIMARY KEY, "facilityId", "staffId", "semanticKey", "data")`,
   );
+
   type Bindable = string | number | null;
+
   const bind = (parameters: unknown[]) =>
     parameters.map((value) => (value === undefined ? null : value)) as Bindable[];
+
   return {
     ...fakeDatabase(),
     writeTransaction: async (callback) => {
       sqlite.exec('BEGIN');
+
       try {
         const result = await callback({
           execute: async (sql, parameters = []) => sqlite.prepare(sql).run(...bind(parameters)),
           getOptional: async <T>(sql: string, parameters: unknown[] = []) =>
             (sqlite.prepare(sql).get(...bind(parameters)) as T) || null,
         });
+
         sqlite.exec('COMMIT');
+
         return result;
       } catch (error) {
         sqlite.exec('ROLLBACK');
@@ -180,6 +192,7 @@ describe('the write path against a real SQLite', () => {
       identityStatus: 'provisional' as const,
       provisionalReason: 'Identity unknown on arrival',
     };
+
     it('opens care for distinct unknown patients and retains their ID and care after identification', async () => {
       const context = contextFor('doctor');
       const first = await registerPatient(toPatientDetails(unknown), context);
@@ -189,10 +202,12 @@ describe('the write path against a real SQLite', () => {
       expect(first.sex).toBeUndefined();
       expect(first.ageYears).toBeUndefined();
       expect(first.address).toBeUndefined();
+
       const entry = await saveStep(
         { patientId: first.patientId, step: 'vitals', values: { pulseBpm: 96 } },
         context,
       );
+
       const resolved = await updatePatient(
         first.patientId,
         toPatientDetails({
@@ -206,6 +221,7 @@ describe('the write path against a real SQLite', () => {
         }),
         context,
       );
+
       expect(resolved.patientId).toBe(first.patientId);
       expect(resolved.provisionalReason).toBe(unknown.provisionalReason);
       expect(resolved.identifiedBy).toBe(context.userId);
@@ -214,20 +230,25 @@ describe('the write path against a real SQLite', () => {
       expect(
         chart?.entries.some((item) => item.id === entry.id && item.patientId === first.patientId),
       ).toBe(true);
+
       expect((await getPatient(second.patientId))?.identityStatus).toBe('provisional');
+
       const partlyKnown = await updatePatient(
         second.id,
         toPatientDetails({ ...fromPatient(second), sex: 'M' }),
         context,
       );
+
       expect(partlyKnown.fullName).toBe(second.fullName);
       expect(partlyKnown.identityStatus).toBe('provisional');
       expect(partlyKnown.sex).toBe('male');
+
       const cleared = await updatePatient(
         second.id,
         toPatientDetails({ ...fromPatient(partlyKnown), sex: '' }),
         context,
       );
+
       expect(cleared.sex).toBeUndefined();
       expect(cleared.identityStatus).toBe('provisional');
       await expect(
@@ -241,6 +262,7 @@ describe('the write path against a real SQLite', () => {
         ),
       ).rejects.toThrow(/history/);
     });
+
     it('refuses an incomplete identification and preserves the provisional record', async () => {
       const context = contextFor('doctor');
       const patient = await registerPatient(toPatientDetails(unknown), context);
@@ -251,20 +273,25 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow();
+
       expect((await getPatient(patient.id))?.identityStatus).toBe('provisional');
     });
+
     it('does not overwrite demographics changed in another local window during identification', async () => {
       const context = contextFor('doctor');
       const patient = await registerPatient(toPatientDetails(unknown), context);
       const originalTransaction = db.writeTransaction;
       let raced = false;
+
       db.writeTransaction = async (callback) => {
         if (!raced) {
           raced = true;
           await db.execute('UPDATE patients SET sex = ? WHERE id = ?', ['female', patient.id]);
         }
+
         return originalTransaction(callback);
       };
+
       await expect(
         updatePatient(
           patient.id,
@@ -280,6 +307,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow(/another window/);
+
       const retained = await getPatient(patient.id);
       expect(retained?.identityStatus).toBe('provisional');
       expect(retained?.sex).toBe('female');
@@ -289,6 +317,7 @@ describe('the write path against a real SQLite', () => {
 
   it('stops identification when an unchanged demographic was edited in another window', async () => {
     const context = contextFor('doctor');
+
     const patient = await registerPatient(
       toPatientDetails({
         ...EMPTY_REGISTRATION,
@@ -299,15 +328,19 @@ describe('the write path against a real SQLite', () => {
       }),
       context,
     );
+
     const originalTransaction = db.writeTransaction;
     let raced = false;
+
     db.writeTransaction = async (callback) => {
       if (!raced) {
         raced = true;
         await db.execute('UPDATE patients SET phone = ? WHERE id = ?', ['08000000002', patient.id]);
       }
+
       return originalTransaction(callback);
     };
+
     await expect(
       updatePatient(
         patient.id,
@@ -322,6 +355,7 @@ describe('the write path against a real SQLite', () => {
         context,
       ),
     ).rejects.toThrow(/changed/);
+
     const retained = await getPatient(patient.id);
     expect(retained?.identityStatus).toBe('provisional');
     expect(retained?.phone).toBe('08000000002');
@@ -331,6 +365,7 @@ describe('the write path against a real SQLite', () => {
   describe('staff sign-in access and full-day rosters', () => {
     it('persists 24-hour access without changing roles or write capabilities', async () => {
       const admin = contextFor('facility_admin');
+
       const staff = await createStaff(
         {
           fullName: 'Always Available',
@@ -340,24 +375,29 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       const loaded = (await listStaff()).find((item) => item.id === staff.id)!;
       expect(loaded.loginAccess).toBe('always');
       expect(
         authorizationFor({ staff: loaded, facilityId: admin.facilityId, deviceId: admin.deviceId })
           .permissions,
       ).toEqual(['payment:receive', 'coverage:elect_self_pay', 'charge:associate']);
+
       const delegate = authorizationFor({
         staff: { ...loaded, additionalPermissions: ['staff:manage'] },
         facilityId: admin.facilityId,
         deviceId: admin.deviceId,
       });
+
       await expect(
         editStaff(loaded, { ...loaded, loginAccess: 'shift' }, delegate),
       ).rejects.toThrow(/role doesn't allow/);
+
       expect((await listStaff()).find((item) => item.id === staff.id)?.loginAccess).toBe('always');
       await editStaff(loaded, { ...loaded, loginAccess: 'shift' }, admin);
       expect((await listStaff()).find((item) => item.id === staff.id)?.loginAccess).toBe('shift');
     });
+
     it('keeps a full-day shift after midnight and resets an earlier extension on reassignment', async () => {
       const admin = contextFor('facility_admin');
       await assignShift(
@@ -369,6 +409,7 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       let shifts = await listShifts();
       const id = shifts[0].id;
       await extendShift(shifts[0], '2026-10-24T20:00:00Z', admin);
@@ -382,6 +423,7 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       shifts = await listShifts();
       expect(shifts).toHaveLength(1);
       expect(shifts[0]).toMatchObject({
@@ -389,6 +431,7 @@ describe('the write path against a real SQLite', () => {
         endsAt: '2026-10-25T08:00:00Z',
         extendedUntil: '2026-10-25T08:00:00Z',
       });
+
       expect(findShift(shifts, 'staff:nurse', Date.parse('2026-10-25T07:00:00Z'))?.id).toBe(id);
       await expect(
         assignShift(
@@ -408,6 +451,7 @@ describe('the write path against a real SQLite', () => {
   describe('staff edits and combined access', () => {
     it('keeps staff identity while editing names, roles and individual grants', async () => {
       const admin = contextFor('facility_admin');
+
       const staff = await createStaff(
         {
           fullName: 'Test Nurse',
@@ -418,11 +462,13 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       await editStaff(
         staff,
         { ...staff, fullName: 'Updated Nurse', additionalRoles: ['cashier', 'supervisor'] },
         admin,
       );
+
       const saved = (await listStaff())[0];
       expect(saved).toMatchObject({
         id: staff.id,
@@ -433,11 +479,13 @@ describe('the write path against a real SQLite', () => {
         additionalPermissions: ['fee_item:manage'],
         updatedBy: admin.userId,
       });
+
       const context = authorizationFor({
         staff: saved,
         facilityId: admin.facilityId,
         deviceId: admin.deviceId,
       });
+
       expect(context.permissions).toEqual(
         expect.arrayContaining([
           'encounter:record',
@@ -446,6 +494,7 @@ describe('the write path against a real SQLite', () => {
           'roster:extend',
         ]),
       );
+
       await expect(
         createFeeItem(
           {
@@ -460,16 +509,19 @@ describe('the write path against a real SQLite', () => {
         ),
       ).resolves.toHaveProperty('name', 'Combined-role fee');
     });
+
     it('checks all required permissions before applying any part of an edit', async () => {
       const staff = await createStaff(
         { fullName: 'Original Name', role: 'nurse', permission: 'read_write' },
         contextFor('facility_admin'),
       );
+
       const manager = authorizationFor({
         staff: { ...staff, additionalPermissions: ['staff:manage'] },
         facilityId: 'OOE-PHC',
         deviceId: 'device-1',
       });
+
       await expect(
         editStaff(
           staff,
@@ -477,6 +529,7 @@ describe('the write path against a real SQLite', () => {
           manager,
         ),
       ).rejects.toThrow(/role doesn't allow/);
+
       expect((await listStaff())[0].fullName).toBe('Original Name');
       await editStaff(staff, { ...staff, fullName: 'Renamed by delegate' }, manager);
       expect((await listStaff())[0].fullName).toBe('Renamed by delegate');
@@ -486,8 +539,10 @@ describe('the write path against a real SQLite', () => {
           manager,
         ),
       ).rejects.toThrow(/role doesn't allow/);
+
       expect(await listStaff()).toHaveLength(1);
     });
+
     it('blocks every mutation for read-only staff even with combined grants', async () => {
       const staff = await createStaff(
         {
@@ -499,15 +554,19 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('facility_admin'),
       );
+
       const context = authorizationFor({ staff, facilityId: 'OOE-PHC', deviceId: 'device-1' });
       expect(context.permissions).toEqual(['patient_chart:read']);
       await expect(
         editStaff(staff, { ...staff, permission: 'read_write' }, context),
       ).rejects.toThrow(/role doesn't allow/);
+
       expect((await listStaff())[0].permission).toBe('read_only');
     });
+
     it('retains a working admin, including an admin assigned as an additional role', async () => {
       const admin = contextFor('facility_admin');
+
       const secondary = await createStaff(
         {
           fullName: 'Secondary Admin',
@@ -517,14 +576,17 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       await expect(
         editStaff(secondary, { ...secondary, additionalRoles: [] }, admin),
       ).rejects.toThrow(/at least one active facility administrator/);
+
       expect((await listStaff())[0].additionalRoles).toEqual(['facility_admin']);
       await createStaff(
         { fullName: 'Backup Admin', role: 'facility_admin', permission: 'read_write' },
         admin,
       );
+
       await editStaff(secondary, { ...secondary, additionalRoles: [] }, admin);
       expect((await listStaff()).find((item) => item.id === secondary.id)?.additionalRoles).toEqual(
         [],
@@ -542,6 +604,7 @@ describe('the write path against a real SQLite', () => {
       { patientId: patient.patientId, step: 'vitals', values: { temperatureC: 38.9 } },
       contextFor('nurse'),
     );
+
     await amendEntry(vitals, 'Temperature was 37.9', contextFor('nurse'));
 
     const entries = await entriesForEncounter(vitals.encounterId);
@@ -568,6 +631,7 @@ describe('the write path against a real SQLite', () => {
 
   it('clears optional fields through real SQLite and preserves the original age anchor on unrelated edits', async () => {
     const context = contextFor('records_officer');
+
     const patient = await registerPatient(
       {
         fullName: 'Test Patient',
@@ -580,12 +644,15 @@ describe('the write path against a real SQLite', () => {
       },
       context,
     );
+
     const form = fromPatient(patient);
+
     const updated = await updatePatient(
       patient.id,
       toPatientDetails({ ...form, phone: '', nin: '', address: 'New address' }),
       context,
     );
+
     expect(updated.ageYears).toBe(30);
     expect(updated.ageObservedOn).toBe('2020-06-01');
     expect(updated.phone).toBeUndefined();
@@ -595,10 +662,12 @@ describe('the write path against a real SQLite', () => {
 
   it('persists registration review decisions with the patient and resolves aliases only after server confirmation', async () => {
     const context = contextFor('records_officer');
+
     const first = await registerPatient(
       { fullName: 'Test Patient', address: 'Test', sex: 'female', ageYears: 30 },
       context,
     );
+
     const second = await registerPatient(
       { fullName: 'Test Patient', address: 'Test', sex: 'female', ageYears: 30 },
       context,
@@ -613,6 +682,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
     );
+
     expect((await listIdentityEvents())[0].otherPatientId).toBe(first.id);
     expect(await patientIdentityIds(second.id)).toEqual([second.id]);
     // A downloaded server event, inserted directly to stand in for sync, not a local mutation.
@@ -632,19 +702,23 @@ describe('the write path against a real SQLite', () => {
         1,
       ],
     );
+
     expect((await patientIdentityIds(second.id)).sort()).toEqual([first.id, second.id].sort());
   });
 
   it('recognises linked registration fees at booking and keeps collect-later attribution on the original appointment', async () => {
     const context = contextFor('records_officer');
+
     const primary = await registerPatient(
       { fullName: 'Linked Patient', address: 'Test', sex: 'female', ageYears: 30 },
       context,
     );
+
     const alias = await registerPatient(
       { fullName: 'Linked Patient', address: 'Test', sex: 'female', ageYears: 30 },
       context,
     );
+
     const fee = await createFeeItem(
       {
         name: 'Registration',
@@ -656,11 +730,13 @@ describe('the write path against a real SQLite', () => {
       },
       contextFor('facility_admin'),
     );
+
     const charge = await createCharge(
       fee.id,
       { patientId: primary.id, facts: { sex: 'female', ageYears: 30 } },
       context,
     );
+
     await db.execute(
       'INSERT INTO patient_identity_events (id, facilityId, schemaVersion, createdBy, createdOn, deviceId, patientId, otherPatientId, outcome, reason, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -677,6 +753,7 @@ describe('the write path against a real SQLite', () => {
         1,
       ],
     );
+
     const appointment = await book({ patientId: alias.id, reason: 'Review' }, context);
     expect(await chargesForPatient(alias.id)).toEqual([]);
     expect(appointment.chargeIds).toEqual([charge.id]);
@@ -691,6 +768,7 @@ describe('the write path against a real SQLite', () => {
         contextFor('nurse'),
       ),
     ).rejects.toThrow(/collect later/);
+
     const entry = await saveStep(
       {
         patientId: alias.id,
@@ -701,6 +779,7 @@ describe('the write path against a real SQLite', () => {
       },
       contextFor('nurse'),
     );
+
     expect(entry.patientId).toBe(alias.id);
     expect((await getPatient(primary.id))?.patientId).toBe(primary.id);
   });
@@ -708,6 +787,7 @@ describe('the write path against a real SQLite', () => {
   it('registers and books a first visit in one write, with the registration fee on the booking', async () => {
     const context = contextFor('records_officer');
     const admin = contextFor('facility_admin');
+
     const registration = await createFeeItem(
       {
         name: 'Registration',
@@ -719,6 +799,7 @@ describe('the write path against a real SQLite', () => {
       },
       admin,
     );
+
     const consultation = await createFeeItem(
       {
         name: 'Consultation',
@@ -730,6 +811,7 @@ describe('the write path against a real SQLite', () => {
       },
       admin,
     );
+
     const patient = await registerPatient(
       { fullName: 'Kemi Afolabi', address: 'Ring Road', sex: 'female', ageYears: 29 },
       context,
@@ -740,6 +822,7 @@ describe('the write path against a real SQLite', () => {
           created,
         ),
     );
+
     const [appointment] = await listAppointments();
     const charges = await chargesForPatient(patient.id);
     expect(appointment).toMatchObject({
@@ -747,6 +830,7 @@ describe('the write path against a real SQLite', () => {
       visitType: 'antenatal',
       status: 'pending',
     });
+
     expect(
       charges.map((charge) => [charge.feeItemId, charge.amountMinor, charge.exemptionReason]),
     ).toEqual(
@@ -755,6 +839,7 @@ describe('the write path against a real SQLite', () => {
         [consultation.id, 0, 'Antenatal policy'],
       ]),
     );
+
     expect([...(appointment.chargeIds ?? [])].sort()).toEqual(
       charges.map((charge) => charge.id).sort(),
     );
@@ -774,6 +859,7 @@ describe('the write path against a real SQLite', () => {
           ),
       ),
     ).rejects.toThrow();
+
     expect(await listPatients()).toEqual([]);
     expect(await listAppointments()).toEqual([]);
   });
@@ -798,10 +884,12 @@ describe('the write path against a real SQLite', () => {
       { fullName: 'Amaka', address: 'Ring Road', sex: 'female', ageYears: 32 },
       contextFor('records_officer'),
     );
+
     const booking = await book(
       { patientId: patient.patientId, reason: 'Consultation' },
       contextFor('records_officer'),
     );
+
     const entry = await saveStep(
       {
         patientId: patient.patientId,
@@ -811,19 +899,23 @@ describe('the write path against a real SQLite', () => {
       },
       contextFor('nurse'),
     );
+
     const row = await db.getOptional<{ appointmentId: string }>(
       'SELECT appointmentId FROM encounters WHERE id = ?',
       [entry.encounterId],
     );
+
     expect(row?.appointmentId).toBe(booking.id);
   });
 
   it('keeps the same booking, fees and attributed history through rescheduling, cancellation and reopening', async () => {
     const context = contextFor('records_officer');
+
     const patient = await registerPatient(
       { fullName: 'Booked Patient', address: 'Test road', sex: 'female', ageYears: 35 },
       context,
     );
+
     const fee = await createFeeItem(
       {
         name: 'Consultation',
@@ -835,9 +927,11 @@ describe('the write path against a real SQLite', () => {
       },
       contextFor('facility_admin'),
     );
+
     const booking = await book({ patientId: patient.id, reason: 'Review' }, context);
     const chargesBefore = await chargesForPatient(patient.id);
     expect(chargesBefore.some((charge) => charge.feeItemId === fee.id)).toBe(true);
+
     const moved = await changeAppointment(
       booking.id,
       {
@@ -847,6 +941,7 @@ describe('the write path against a real SQLite', () => {
       },
       context,
     );
+
     const cancelled = await changeAppointment(
       booking.id,
       {
@@ -856,6 +951,7 @@ describe('the write path against a real SQLite', () => {
       },
       context,
     );
+
     await expect(
       saveStep(
         {
@@ -867,9 +963,11 @@ describe('the write path against a real SQLite', () => {
         contextFor('nurse'),
       ),
     ).rejects.toThrow(/Reopen/);
+
     await expect(
       changeAppointment(booking.id, { action: 'reopened', reason: 'Can attend' }, context),
     ).rejects.toThrow(/changed/);
+
     const reopened = await changeAppointment(
       booking.id,
       {
@@ -879,12 +977,14 @@ describe('the write path against a real SQLite', () => {
       },
       context,
     );
+
     expect((await listAppointments()).map((appointment) => appointment.id)).toEqual([booking.id]);
     expect(reopened.activity?.map((event) => event.action)).toEqual([
       'rescheduled',
       'cancelled',
       'reopened',
     ]);
+
     expect(reopened.activity?.every((event) => event.recordedBy === context.userId)).toBe(true);
     expect(reopened.updatedOn).toBe(reopened.activity?.[2].recordedOn);
     expect(await chargesForPatient(patient.id)).toEqual(chargesBefore);
@@ -892,10 +992,12 @@ describe('the write path against a real SQLite', () => {
 
   it('guards no-shows, readonly changes and duplicate or inactive linked visits before writing', async () => {
     const context = contextFor('records_officer');
+
     const patient = await registerPatient(
       { fullName: 'Arrival Patient', address: 'Test road', sex: 'female', ageYears: 25 },
       context,
     );
+
     const booking = await book({ patientId: patient.id, reason: 'Consultation' }, context);
     const readonly = { ...context, permissions: [] };
     await expect(changeAppointment(booking.id, { action: 'arrived' }, readonly)).rejects.toThrow();
@@ -907,6 +1009,7 @@ describe('the write path against a real SQLite', () => {
         context,
       ),
     ).rejects.toThrow(/due booking/);
+
     const saved = await saveStep(
       {
         patientId: patient.id,
@@ -916,6 +1019,7 @@ describe('the write path against a real SQLite', () => {
       },
       contextFor('nurse'),
     );
+
     expect(saved.encounterId).toBeTruthy();
     await expect(
       changeAppointment(
@@ -928,6 +1032,7 @@ describe('the write path against a real SQLite', () => {
         context,
       ),
     ).rejects.toThrow(/Care has already started/);
+
     await expect(
       saveStep(
         {
@@ -943,14 +1048,18 @@ describe('the write path against a real SQLite', () => {
 
   it('keeps immediate booking actions attributable when the device clock has not advanced', async () => {
     const context = contextFor('records_officer');
+
     const patient = await registerPatient(
       { fullName: 'Immediate Actions', address: 'Test road', sex: 'female', ageYears: 25 },
       context,
     );
+
     const booking = await book({ patientId: patient.id, reason: 'Consultation' }, context);
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(booking.createdOn));
+
     try {
       const arrival = await changeAppointment(booking.id, { action: 'arrived' }, context);
+
       const cancelled = await changeAppointment(
         booking.id,
         {
@@ -960,6 +1069,7 @@ describe('the write path against a real SQLite', () => {
         },
         context,
       );
+
       expect(Date.parse(cancelled.updatedOn!)).toBeGreaterThan(Date.parse(arrival.updatedOn!));
       expect(cancelled.updatedOn).toBe(cancelled.activity?.[1].recordedOn);
       expect((await listAppointments())[0].activity).toHaveLength(2);
@@ -972,18 +1082,21 @@ describe('the write path against a real SQLite', () => {
     const context = contextFor('records_officer');
     const values = { name: 'Daily record', category: 'General', description: '', fields: [] };
     const initial = await saveDraftDefinition(values, null, context, 0);
+
     const published = await publishDefinition(
       { ...values, fields: [{ id: 'name', type: 'text', label: 'Patient name', required: true }] },
       initial.registerId,
       context,
       1,
     );
+
     await saveDraftDefinition(
       { ...values, name: 'Work in progress' },
       initial.registerId,
       context,
       2,
     );
+
     expect(
       (
         await addEntry(
@@ -992,24 +1105,29 @@ describe('the write path against a real SQLite', () => {
         )
       ).saved,
     ).toBe(true);
+
     expect((await listEntries())[0]).toMatchObject({
       registerVersion: published.version,
       values: { name: 'Example patient' },
     });
+
     expect((await listDefinitions()).map((definition) => definition.status)).toEqual([
       'draft',
       'published',
       'draft',
     ]);
+
     await expect(saveDraftDefinition(values, initial.registerId, context, 2)).rejects.toThrow(
       /newer register version/,
     );
+
     const republished = await publishDefinition(
       { ...values, fields: published.fields },
       initial.registerId,
       context,
       3,
     );
+
     expect(republished.version).toBe(4);
     expect((await listEntries())[0].registerVersion).toBe(2);
   });
@@ -1017,12 +1135,14 @@ describe('the write path against a real SQLite', () => {
   it('recovers incomplete register typing privately, validates writes and never queues it for sync', async () => {
     const context = contextFor('records_officer');
     const other = contextFor('facility_admin');
+
     const incomplete = {
       name: '',
       category: 'General',
       description: 'Half-written instructions',
       fields: [{ id: 'field:one', type: 'text' as const, label: '', required: false }],
     };
+
     await writeRegisterRecovery(context, 'new', incomplete, 0);
     await writeRegisterRecovery(context, 'new', { ...incomplete, name: 'Work in progress' }, 0);
     expect((await readRegisterRecovery(context, 'new'))?.name).toBe('Work in progress');
@@ -1032,6 +1152,7 @@ describe('the write path against a real SQLite', () => {
     await expect(
       writeRegisterRecovery({ ...context, permissions: [] }, 'new', incomplete, 0),
     ).rejects.toThrow();
+
     await discardRegisterRecovery(context, 'new');
     expect(await readRegisterRecovery(context, 'new')).toBeUndefined();
   });
@@ -1041,14 +1162,17 @@ describe('the write path against a real SQLite', () => {
       const admin = contextFor('facility_admin');
       const patientId = 'OOE-PHC-000047-K2';
       const facts = { sex: 'female' as const, ageYears: 30 };
+
       const first = await createFeeItem(
         feeDraftFromForm({ name: 'First', category: 'laboratory', amount: '100' }),
         admin,
       );
+
       const second = await createFeeItem(
         feeDraftFromForm({ name: 'Second', category: 'procedure', amount: '200' }),
         admin,
       );
+
       const charges = await createBill(
         [
           { feeId: first.id, quantity: 1, amountMinor: first.amountMinor },
@@ -1057,6 +1181,7 @@ describe('the write path against a real SQLite', () => {
         { patientId, facts },
         admin,
       );
+
       expect(charges[0].billId).toMatch(/^[a-f0-9-]{36}$/);
       expect(charges[1].billId).toBe(charges[0].billId);
       await updateCatalogueItem(
@@ -1064,9 +1189,11 @@ describe('the write path against a real SQLite', () => {
         { name: first.name, category: first.category, amountMinor: 15000 },
         admin,
       );
+
       expect((await chargesForPatient(patientId)).map((c) => c.amountMinor).sort()).toEqual([
         10000, 20000,
       ]);
+
       await expect(
         createBill(
           [{ feeId: first.id, quantity: 1, amountMinor: first.amountMinor }],
@@ -1074,6 +1201,7 @@ describe('the write path against a real SQLite', () => {
           admin,
         ),
       ).rejects.toThrow(/price changed/);
+
       await expect(
         createBill(
           [{ feeId: second.id, quantity: 1 }],
@@ -1082,10 +1210,12 @@ describe('the write path against a real SQLite', () => {
         ),
       ).rejects.toThrow();
     });
+
     it('rolls back every new bill line if an intentional first-visit fee already exists', async () => {
       const admin = contextFor('facility_admin');
       const patientId = 'OOE-PHC-000047-K2';
       const facts = { sex: 'female' as const, ageYears: 30 };
+
       const automatic = await createFeeItem(
         {
           name: 'Registration',
@@ -1097,11 +1227,14 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       await createCharge(automatic.id, { patientId, facts }, admin);
+
       const manual = await createFeeItem(
         feeDraftFromForm({ name: 'Manual', category: 'procedure', amount: '200' }),
         admin,
       );
+
       await expect(
         createBill(
           [
@@ -1112,35 +1245,43 @@ describe('the write path against a real SQLite', () => {
           admin,
         ),
       ).rejects.toThrow();
+
       const charges = await chargesForPatient(patientId);
       expect(charges).toHaveLength(1);
       expect(charges[0].feeItemId).toBe(automatic.id);
     });
+
     it('does not charge newly created catalogue items at registration or booking, but allows direct billing offline', async () => {
       const fee = await createFeeItem(
         feeDraftFromForm({ name: 'Selected test', category: 'laboratory', amount: '500' }),
         contextFor('facility_admin'),
       );
+
       const patient = await registerPatient(
         { fullName: 'Synthetic patient', address: 'Test', sex: 'female', ageYears: 30 },
         contextFor('records_officer'),
       );
+
       await book(
         { patientId: patient.id, reason: 'Unrelated consultation', visitType: 'general' },
         contextFor('records_officer'),
       );
+
       expect(await chargesForPatient(patient.id)).toEqual([]);
+
       const bill = await createCharge(
         fee.id,
         { patientId: patient.id, facts: { ageYears: 30, sex: 'female' } },
         contextFor('records_officer'),
       );
+
       expect(bill).toMatchObject({
         feeItemId: fee.id,
         category: 'laboratory',
         listPriceMinor: 50000,
         amountMinor: 50000,
       });
+
       await recordPayment(
         {
           patientId: patient.id,
@@ -1150,6 +1291,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('cashier'),
       );
+
       expect(chargeBalances([bill], await paymentsForPatient(patient.id))[0].balanceMinor).toBe(
         30000,
       );
@@ -1157,6 +1299,7 @@ describe('the write path against a real SQLite', () => {
 
     it('edits basic fields and policies separately without changing hidden configuration or existing bills', async () => {
       const admin = contextFor('facility_admin');
+
       const fee = await createFeeItem(
         {
           name: 'Existing visit',
@@ -1169,21 +1312,25 @@ describe('the write path against a real SQLite', () => {
         },
         admin,
       );
+
       const bill = await createCharge(
         fee.id,
         { patientId: 'OOE-PHC-000047-K2', facts: { ageYears: 30, sex: 'female' } },
         contextFor('records_officer'),
       );
+
       await updateFeePolicy(
         fee,
         { chargeWhen: 'first_visit', exemptions: [{ reason: 'Under ten', ageUnderYears: 10 }] },
         admin,
       );
+
       await updateCatalogueItem(
         fee,
         { name: 'Updated visit', category: fee.category, amountMinor: 200000 },
         admin,
       );
+
       const changed = (await listFeeItems()).find((row) => row.id === fee.id)!;
       expect(changed).toMatchObject({
         id: fee.id,
@@ -1193,6 +1340,7 @@ describe('the write path against a real SQLite', () => {
         amountMinor: 200000,
         exemptions: [{ reason: 'Under ten', ageUnderYears: 10 }],
       });
+
       expect((await chargesForPatient(bill.patientId))[0]).toEqual(bill);
       expect(() =>
         updateCatalogueItem(
@@ -1205,6 +1353,7 @@ describe('the write path against a real SQLite', () => {
 
     const patientId = 'OOE-PHC-000047-K2';
     const otherPatientId = 'OOE-PHC-000048-AB';
+
     const draft = (extra: Partial<FeeDraft> = {}): FeeDraft => ({
       name: 'Consultation',
       category: 'consultation',
@@ -1214,8 +1363,10 @@ describe('the write path against a real SQLite', () => {
       exemptions: [{ reason: 'Under-5 policy', ageUnderYears: 5 }],
       ...extra,
     });
+
     const charge = async (extra: Partial<FeeDraft> = {}, patient = patientId) => {
       const fee = await createFeeItem({ ...draft(), ...extra }, contextFor('facility_admin'));
+
       return createCharge(
         fee.id,
         {
@@ -1234,6 +1385,7 @@ describe('the write path against a real SQLite', () => {
         'price:previous',
         fee.id,
       ]);
+
       const changed = await updateFeeItem(fee.id, draft({ amountMinor: 200000 }), admin);
       expect(changed.priceVersion).toBeUndefined();
       const reread = (await listFeeItems()).find((item) => item.id === fee.id)!;
@@ -1248,11 +1400,13 @@ describe('the write path against a real SQLite', () => {
         active: true,
         exemptions: draft().exemptions,
       });
+
       await setFeeItemActive(fee.id, false, contextFor('facility_admin'));
       expect((await listFeeItems())[0].active).toBe(false);
       await expect(
         createCharge(fee.id, { patientId, facts: { sex: 'female' } }, contextFor('nurse')),
       ).rejects.toThrow(/retired/);
+
       expect(await chargesForPatient(patientId)).toEqual([]);
       await setFeeItemActive(fee.id, true, contextFor('facility_admin'));
       expect((await listFeeItems())[0].active).toBe(true);
@@ -1265,34 +1419,41 @@ describe('the write path against a real SQLite', () => {
         { ...draft(), name: 'New consultation', amountMinor: 200000 },
         contextFor('facility_admin'),
       );
+
       const second = await createCharge(
         first.feeItemId,
         { patientId, facts: { sex: 'female' } },
         contextFor('nurse'),
       );
+
       expect(
         (await chargesForPatient(patientId)).find((bill) => bill.id === first.id),
       ).toMatchObject({ description: 'Consultation', amountMinor: 150000 });
+
       expect(second).toMatchObject({ description: 'New consultation', amountMinor: 200000 });
     });
 
     it('records an exemption at zero, but never assumes an unknown age qualifies', async () => {
       const fee = await createFeeItem(draft(), contextFor('facility_admin'));
+
       const exempt = await createCharge(
         fee.id,
         { patientId, facts: { ageYears: 4, sex: 'female' } },
         contextFor('nurse'),
       );
+
       const unknownAge = await createCharge(
         fee.id,
         { patientId, facts: { sex: 'female' } },
         contextFor('nurse'),
       );
+
       expect(exempt).toMatchObject({
         listPriceMinor: 150000,
         amountMinor: 0,
         exemptionReason: 'Under-5 policy',
       });
+
       expect(unknownAge).toMatchObject({ amountMinor: 150000, exemptionReason: undefined });
     });
 
@@ -1311,6 +1472,7 @@ describe('the write path against a real SQLite', () => {
           contextFor('nurse'),
         ),
       ).rejects.toThrow(/role/);
+
       await expect(
         recordPayment(
           {
@@ -1323,6 +1485,7 @@ describe('the write path against a real SQLite', () => {
           contextFor('cashier'),
         ),
       ).rejects.toThrow(/role/);
+
       expect(await paymentsForPatient(patientId)).toEqual([]);
     });
 
@@ -1330,6 +1493,7 @@ describe('the write path against a real SQLite', () => {
       const bill = await charge();
       const card = await charge({ name: 'Card', category: 'card', amountMinor: 50000 });
       expect(isAppointmentConfirmed('appointment:1', [], [])).toBe(true);
+
       const part = await recordPayment(
         {
           patientId,
@@ -1339,6 +1503,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('cashier'),
       );
+
       expect(isAppointmentConfirmed('appointment:1', [bill, card], [part])).toBe(false);
       await recordPayment(
         {
@@ -1352,6 +1517,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('cashier'),
       );
+
       expect(
         isAppointmentConfirmed(
           'appointment:1',
@@ -1359,6 +1525,7 @@ describe('the write path against a real SQLite', () => {
           await paymentsForPatient(patientId),
         ),
       ).toBe(true);
+
       expect((await paymentsForPatient(patientId)).map((payment) => payment.receiptNumber)).toEqual(
         [expect.stringMatching(/^OOE-PHC-R-000001-/), expect.stringMatching(/^OOE-PHC-R-000002-/)],
       );
@@ -1367,6 +1534,7 @@ describe('the write path against a real SQLite', () => {
     it('preserves an overpayment as credit and keeps currencies separate', async () => {
       const bill = await charge();
       const usd = await charge({ currency: 'USD', amountMinor: 2500 });
+
       for (let i = 0; i < 2; i += 1) {
         await recordPayment(
           {
@@ -1378,6 +1546,7 @@ describe('the write path against a real SQLite', () => {
           contextFor('cashier'),
         );
       }
+
       const payments = await paymentsForPatient(patientId);
       expect(chargeBalances([bill], payments)[0].balanceMinor).toBe(-150000);
       expect(balancesByCurrency([bill, usd], payments)).toEqual(
@@ -1386,12 +1555,14 @@ describe('the write path against a real SQLite', () => {
           ['USD', 2500],
         ]),
       );
+
       expect(isAppointmentConfirmed('appointment:1', [bill, usd], payments)).toBe(false);
     });
 
     it('refuses allocations to another patient, a missing charge or another currency', async () => {
       const bill = await charge();
       const other = await charge({}, otherPatientId);
+
       for (const bad of [
         { chargeId: other.id, currency: 'NGN' },
         { chargeId: 'charge:missing', currency: 'NGN' },
@@ -1409,6 +1580,7 @@ describe('the write path against a real SQLite', () => {
           ),
         ).rejects.toThrow();
       }
+
       expect(await paymentsForPatient(patientId)).toEqual([]);
     });
 
@@ -1421,17 +1593,20 @@ describe('the write path against a real SQLite', () => {
           contextFor('cashier'),
         ),
       ).rejects.toThrow(/Allocate to each charge once/);
+
       await expect(
         recordPayment(
           { patientId, method: 'waiver', currency: 'NGN', allocations: [allocation] },
           contextFor('supervisor'),
         ),
       ).rejects.toThrow(/reason/);
+
       expect(await paymentsForPatient(patientId)).toEqual([]);
     });
 
     it('settles a fee by waiver, with the supervisor and reason kept', async () => {
       const bill = await charge();
+
       const waiver = await recordPayment(
         {
           patientId,
@@ -1442,16 +1617,19 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('supervisor'),
       );
+
       expect(waiver).toMatchObject({
         method: 'waiver',
         reason: 'Indigent patient',
         createdBy: 'staff:supervisor',
       });
+
       expect(isAppointmentConfirmed('appointment:1', [bill], [waiver])).toBe(true);
     });
 
     it('reverses by adding an exact copy of the allocations and restores the debt', async () => {
       const bill = await charge();
+
       const original = await recordPayment(
         {
           patientId,
@@ -1462,17 +1640,21 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('cashier'),
       );
+
       await expect(
         reversePayment(original.id, 'Wrong patient', contextFor('cashier')),
       ).rejects.toThrow(/role/);
+
       await expect(reversePayment(original.id, ' ', contextFor('supervisor'))).rejects.toThrow(
         /reason/,
       );
+
       const reversal = await reversePayment(
         original.id,
         'Payment returned',
         contextFor('supervisor'),
       );
+
       expect(reversal).toMatchObject({
         reverses: original.id,
         allocations: original.allocations,
@@ -1480,15 +1662,18 @@ describe('the write path against a real SQLite', () => {
         reference: 'BANK-1',
         method: 'transfer',
       });
+
       const payments = await paymentsForPatient(patientId);
       expect(payments.find((payment) => payment.id === original.id)).toEqual(original);
       expect(chargeBalances([bill], payments)[0].balanceMinor).toBe(150000);
       await expect(reversePayment(original.id, 'Again', contextFor('supervisor'))).rejects.toThrow(
         /already been reversed/,
       );
+
       await expect(reversePayment(reversal.id, 'Undo', contextFor('supervisor'))).rejects.toThrow(
         /cannot itself/,
       );
+
       expect(await paymentsForPatient(patientId)).toHaveLength(2);
     });
 
@@ -1496,6 +1681,7 @@ describe('the write path against a real SQLite', () => {
       await expect(
         createFeeItem({ ...draft(), amountMinor: 2147483648 }, contextFor('facility_admin')),
       ).rejects.toThrow(/supported range/);
+
       expect(await listFeeItems()).toEqual([]);
     });
 
@@ -1504,6 +1690,7 @@ describe('the write path against a real SQLite', () => {
       await expect(
         adjustCharge(bill.id, 'discount', 20000, 'Not authorised', contextFor('cashier')),
       ).rejects.toThrow(/role/);
+
       await adjustCharge(bill.id, 'discount', 20000, 'Staff concession', contextFor('supervisor'));
       await recordPayment(
         {
@@ -1514,6 +1701,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('cashier'),
       );
+
       await adjustCharge(
         bill.id,
         'waiver',
@@ -1521,6 +1709,7 @@ describe('the write path against a real SQLite', () => {
         'Approved remaining balance',
         contextFor('supervisor'),
       );
+
       const payments = await paymentsForPatient(patientId);
       const adjustments = await adjustmentsForPatient(patientId);
       expect(chargeBalances([bill], payments, adjustments)[0]).toMatchObject({
@@ -1529,12 +1718,15 @@ describe('the write path against a real SQLite', () => {
         dueMinor: 100000,
         balanceMinor: 0,
       });
+
       expect((await chargesForPatient(patientId)).find((c) => c.id === bill.id)?.amountMinor).toBe(
         150000,
       );
+
       await expect(
         adjustCharge(bill.id, 'discount', 1, 'Too much', contextFor('supervisor')),
       ).rejects.toThrow(/unpaid balance/);
+
       expect(adjustments.map((a) => a.createdBy)).toEqual(['staff:supervisor', 'staff:supervisor']);
     });
 
@@ -1549,6 +1741,7 @@ describe('the write path against a real SQLite', () => {
         }),
         contextFor('facility_admin'),
       );
+
       await createFeeItem(
         draft({
           name: 'Consultation',
@@ -1558,20 +1751,25 @@ describe('the write path against a real SQLite', () => {
         }),
         contextFor('facility_admin'),
       );
+
       const patient = await registerPatient(
         { fullName: 'New Patient', address: 'Test road', sex: 'female', ageYears: 30 },
         contextFor('records_officer'),
       );
+
       const initial = await chargesForPatient(patient.patientId);
       expect(initial).toHaveLength(1);
+
       const first = await book(
         { patientId: patient.patientId, reason: 'Consultation', visitType: 'general' },
         contextFor('records_officer'),
       );
+
       const second = await book(
         { patientId: patient.patientId, reason: 'Review', visitType: 'follow_up' },
         contextFor('records_officer'),
       );
+
       const charges = await chargesForPatient(patient.patientId);
       expect(charges.filter((c) => c.category === 'registration')).toHaveLength(1);
       expect(charges.filter((c) => c.category === 'consultation')).toHaveLength(2);
@@ -1583,6 +1781,7 @@ describe('the write path against a real SQLite', () => {
     it('rolls back a whole multi-record save when SQLite rejects a later insert', async () => {
       const { insertRecords } = await import('./db');
       const fee = await createFeeItem(draft(), contextFor('facility_admin'));
+
       const bill = {
         ...envelope(contextFor('records_officer')),
         id: 'charge:duplicate',
@@ -1595,12 +1794,14 @@ describe('the write path against a real SQLite', () => {
         amountMinor: 10000,
         currency: 'NGN',
       };
+
       await expect(
         insertRecords(contextFor('records_officer'), [
           { type: 'charge', permission: 'charge:create', record: bill },
           { type: 'charge', permission: 'charge:create', record: bill },
         ]),
       ).rejects.toThrow();
+
       expect(await chargesForPatient(patientId)).toEqual([]);
     });
 
@@ -1614,15 +1815,19 @@ describe('the write path against a real SQLite', () => {
         }),
         contextFor('facility_admin'),
       );
+
       const patient = await registerPatient(
         { fullName: 'ANC Patient', address: 'Test road', sex: 'female', ageYears: 30 },
         contextFor('records_officer'),
       );
+
       expect(await chargesForPatient(patient.patientId)).toEqual([]);
+
       const appointment = await book(
         { patientId: patient.patientId, reason: 'ANC', visitType: 'antenatal' },
         contextFor('records_officer'),
       );
+
       const bills = await chargesForPatient(patient.patientId);
       expect(bills).toHaveLength(1);
       expect(bills[0]).toMatchObject({
@@ -1630,6 +1835,7 @@ describe('the write path against a real SQLite', () => {
         listPriceMinor: 150000,
         exemptionReason: 'Antenatal programme',
       });
+
       expect(isAppointmentConfirmed(appointment.id, bills, [], [], appointment.chargeIds)).toBe(
         true,
       );
@@ -1641,6 +1847,7 @@ describe('the write path against a real SQLite', () => {
     const values = { label: 'Hypertension', status: 'active', certainty: 'confirmed' };
     it('saves and resolves a problem as an attributed append-only chain', async () => {
       const original = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
+
       const revision = await saveClinicalRecord(
         patientId,
         'problem',
@@ -1648,6 +1855,7 @@ describe('the write path against a real SQLite', () => {
         contextFor('doctor'),
         original,
       );
+
       const record = await patientClinicalRecord(patientId, contextFor('doctor'));
       expect(record.events).toHaveLength(2);
       expect(record.current).toEqual([revision]);
@@ -1656,21 +1864,27 @@ describe('the write path against a real SQLite', () => {
         saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'), original),
       ).rejects.toThrow(/changed/);
     });
+
     it('refuses unauthorized, malformed and cross-patient clinical writes', async () => {
       await expect(
         saveClinicalRecord(patientId, 'problem', values, contextFor('cashier')),
       ).rejects.toThrow();
+
       await expect(
         saveClinicalRecord(patientId, 'allergy', values, contextFor('doctor')),
       ).rejects.toThrow();
+
       const original = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
       await expect(
         saveClinicalRecord('OOE-PHC-000048-K2', 'problem', values, contextFor('doctor'), original),
       ).rejects.toThrow(/original patient/);
+
       expect(await clinicalEventsForPatient(patientId)).toHaveLength(1);
     });
+
     it('links a care plan to this patient’s problem and retains review outcomes', async () => {
       const problem = await saveClinicalRecord(patientId, 'problem', values, contextFor('doctor'));
+
       const plan = await saveClinicalRecord(
         patientId,
         'care_plan',
@@ -1683,6 +1897,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('doctor'),
       );
+
       const reviewed = await saveClinicalRecord(
         patientId,
         'care_plan',
@@ -1690,6 +1905,7 @@ describe('the write path against a real SQLite', () => {
         contextFor('doctor'),
         plan,
       );
+
       expect(reviewed.previousId).toBe(plan.id);
       await expect(
         saveClinicalRecord(
@@ -1700,11 +1916,13 @@ describe('the write path against a real SQLite', () => {
         ),
       ).rejects.toThrow(/belonging/);
     });
+
     it('records repeated vitals and structured corrections without rewriting saved entries', async () => {
       const original = await saveStep(
         { patientId, step: 'vitals', values: { temperatureC: 39 } },
         contextFor('nurse'),
       );
+
       const repeat = await saveStep(
         {
           patientId,
@@ -1714,6 +1932,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('nurse'),
       );
+
       const correction = await amendEntry(
         original,
         'Transcription correction',
@@ -1721,11 +1940,13 @@ describe('the write path against a real SQLite', () => {
         { temperatureC: 37 },
         null,
       );
+
       expect(await entriesForEncounter(original.encounterId)).toHaveLength(3);
       expect(correction.values.correctedValues).toEqual({ temperatureC: 37 });
       await expect(
         amendEntry(original, 'Stale correction', contextFor('nurse'), { temperatureC: 36 }, null),
       ).rejects.toThrow(/corrected while/);
+
       // The visit closes only by a disposition, after every earlier decision in order.
       await expect(
         saveStep(
@@ -1733,6 +1954,7 @@ describe('the write path against a real SQLite', () => {
           contextFor('doctor'),
         ),
       ).rejects.toThrow(/explicit disposition/);
+
       for (const [step, values] of [
         ['complaint', { complaints: ['Fever'] }],
         ['investigation_review', { decision: 'none_required' }],
@@ -1746,6 +1968,7 @@ describe('the write path against a real SQLite', () => {
           contextFor('doctor'),
         );
       }
+
       await expect(
         saveStep(
           {
@@ -1758,6 +1981,7 @@ describe('the write path against a real SQLite', () => {
         ),
       ).rejects.toThrow(/closed/);
     });
+
     it('protects dispositions and the current dispensed prescription before an offline correction is written', async () => {
       // A visit recorded in the retired order, already on the device: its diagnosis carries the prescription.
       const doctor = contextFor('doctor');
@@ -1769,6 +1993,7 @@ describe('the write path against a real SQLite', () => {
         patientId,
         openedOn: envelope(doctor).createdOn,
       });
+
       const original = await insertRecord<EncounterEntry>(
         doctor,
         'encounter:record',
@@ -1787,10 +2012,12 @@ describe('the write path against a real SQLite', () => {
           },
         },
       );
+
       const correctedPrescription = {
         diagnosis: 'Reviewed',
         prescription: [{ drug: 'Reviewed medicine', dose: '1 tablet' }],
       };
+
       const revision = await amendEntry(
         original,
         'Reviewed before dispensing',
@@ -1798,6 +2025,7 @@ describe('the write path against a real SQLite', () => {
         correctedPrescription,
         null,
       );
+
       await saveStep(
         {
           patientId,
@@ -1807,6 +2035,7 @@ describe('the write path against a real SQLite', () => {
         },
         contextFor('nurse'),
       );
+
       await expect(
         amendEntry(
           original,
@@ -1816,6 +2045,7 @@ describe('the write path against a real SQLite', () => {
           revision.id,
         ),
       ).rejects.toThrow(/disposition/);
+
       await expect(
         amendEntry(
           original,
@@ -1825,6 +2055,7 @@ describe('the write path against a real SQLite', () => {
           revision.id,
         ),
       ).rejects.toThrow(/dispensed/);
+
       const textCorrection = await amendEntry(
         original,
         'Clarify diagnosis only',
@@ -1832,6 +2063,7 @@ describe('the write path against a real SQLite', () => {
         { ...correctedPrescription, diagnosis: 'Clarified diagnosis' },
         revision.id,
       );
+
       expect(textCorrection.values.previousAmendmentId).toBe(revision.id);
       expect(await entriesForEncounter(original.encounterId)).toHaveLength(4);
       await expect(
@@ -1885,8 +2117,10 @@ describe('the write path against a real SQLite', () => {
       expect(await readDrafts(nurse)).toEqual([]);
     });
   });
+
   describe('care services on bookings and visits', () => {
     const admin = () => contextFor('facility_admin');
+
     /** The hospital's own care services, as setup leaves them, and one lab test (an offering too). */
     const seedServices = async () => {
       const a = admin();
@@ -1901,6 +2135,7 @@ describe('the write path against a real SQLite', () => {
         kind: 'unit',
         revision: 1,
       } as never);
+
       await insertRecord(a, 'location:manage', 'location', {
         ...env,
         id: 'location:c1',
@@ -1910,6 +2145,7 @@ describe('the write path against a real SQLite', () => {
         active: true,
         revision: 1,
       } as never);
+
       const service = async (
         key: string,
         name: string,
@@ -1931,6 +2167,7 @@ describe('the write path against a real SQLite', () => {
             ? { investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] } }
             : {}),
         } as never);
+
         await insertRecord(a, 'service:manage', 'service_offering', {
           ...env,
           id: `offering:${key}`,
@@ -1949,12 +2186,14 @@ describe('the write path against a real SQLite', () => {
           visitTypes,
         } as never);
       };
+
       await service('opd', 'General outpatient consultation', ['general', 'follow_up']);
       await service('anc', 'Antenatal care', ['antenatal']);
       await service('ward', 'Inpatient care', []);
       await service('hb', 'Haemoglobin', ['general'], true);
       await service('old', 'Old clinic', ['general'], false, 'retired');
     };
+
     const visits = () =>
       db.getAll<{ id: string; offeringId: string | null; visitType: string }>(
         `SELECT id, "offeringId", "visitType" FROM ${TABLE_FOR.encounter}`,
@@ -1963,10 +2202,12 @@ describe('the write path against a real SQLite', () => {
     it('books the chosen care service with its visit kind, and refuses a lab test, non-visit care or a retired service', async () => {
       await seedServices();
       const context = contextFor('records_officer');
+
       const patient = await registerPatient(
         { fullName: 'Ada Care', address: 'Ring Road', sex: 'female', ageYears: 30 },
         context,
       );
+
       const booked = await book(
         {
           patientId: patient.patientId,
@@ -1976,6 +2217,7 @@ describe('the write path against a real SQLite', () => {
         },
         context,
       );
+
       expect(booked).toMatchObject({ offeringId: 'offering:opd', visitType: 'follow_up' });
       await expect(
         book(
@@ -1988,6 +2230,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow(/care service of this hospital/);
+
       await expect(
         book(
           {
@@ -1999,6 +2242,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow(/does not take booked/);
+
       await expect(
         book(
           {
@@ -2010,6 +2254,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow(/does not record this kind/);
+
       await expect(
         book(
           {
@@ -2021,6 +2266,7 @@ describe('the write path against a real SQLite', () => {
           context,
         ),
       ).rejects.toThrow(/not an active/);
+
       expect(
         (
           await book(
@@ -2034,6 +2280,7 @@ describe('the write path against a real SQLite', () => {
     it('registers a walk-in for a care service, and fee exemptions still follow the visit type', async () => {
       await seedServices();
       const context = contextFor('records_officer');
+
       const consultation = await createFeeItem(
         {
           name: 'Consultation',
@@ -2045,6 +2292,7 @@ describe('the write path against a real SQLite', () => {
         },
         admin(),
       );
+
       const patient = await registerPatient(
         { fullName: 'Kemi Care', address: 'Ring Road', sex: 'female', ageYears: 29 },
         context,
@@ -2055,6 +2303,7 @@ describe('the write path against a real SQLite', () => {
             created,
           ),
       );
+
       const [appointment] = await listAppointments();
       expect(appointment).toMatchObject({ offeringId: 'offering:anc', visitType: 'antenatal' });
       expect(
@@ -2066,10 +2315,12 @@ describe('the write path against a real SQLite', () => {
       await seedServices();
       const records = contextFor('records_officer');
       const doctor = contextFor('doctor');
+
       const patient = await registerPatient(
         { fullName: 'Bola Care', address: 'Ring Road', sex: 'male', ageYears: 40 },
         records,
       );
+
       const booking = await book(
         {
           patientId: patient.patientId,
@@ -2079,8 +2330,10 @@ describe('the write path against a real SQLite', () => {
         },
         records,
       );
+
       await changeAppointment(booking.id, { action: 'arrived' }, records);
       const chargesBefore = (await chargesForPatient(patient.id)).length;
+
       const entry = await saveStep(
         {
           patientId: patient.patientId,
@@ -2091,20 +2344,24 @@ describe('the write path against a real SQLite', () => {
         },
         doctor,
       );
+
       expect((await visits()).find((v) => v.id === entry.encounterId)).toMatchObject({
         offeringId: 'offering:opd',
         visitType: 'general',
       });
+
       expect((await chargesForPatient(patient.id)).length).toBe(chargesBefore);
     });
 
     it('records a care service chosen at the visit itself, and emergency care without one', async () => {
       await seedServices();
       const doctor = contextFor('doctor');
+
       const patient = await registerPatient(
         { fullName: 'Chidi Care', address: 'Ring Road', sex: 'male', ageYears: 50 },
         contextFor('records_officer'),
       );
+
       const chosen = await saveStep(
         {
           patientId: patient.patientId,
@@ -2115,6 +2372,7 @@ describe('the write path against a real SQLite', () => {
         },
         doctor,
       );
+
       const emergency = await saveStep(
         {
           patientId: patient.patientId,
@@ -2124,11 +2382,13 @@ describe('the write path against a real SQLite', () => {
         },
         doctor,
       );
+
       const all = await visits();
       expect(all.find((v) => v.id === chosen.encounterId)).toMatchObject({
         offeringId: 'offering:opd',
         visitType: 'follow_up',
       });
+
       expect(all.find((v) => v.id === emergency.encounterId)).toMatchObject({
         offeringId: null,
         visitType: 'emergency',

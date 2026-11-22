@@ -40,6 +40,7 @@ import { fromRow, type Row } from '../rows';
 /** Coverage and refunds for these charges, as this device holds them. */
 export const balanceCoverage = async (charges: readonly Charge[]): Promise<BalanceCoverage> => {
   const data = await loadCoverage(charges);
+
   return { estimates: estimatesFor(charges, data), refunds: data.refunds };
 };
 
@@ -56,6 +57,7 @@ export type FeeDraft = Pick<
 >;
 
 export const listFeeItems = () => allOfType<FeeItem>('fee_item');
+
 /** A hospital-wide local query. Category narrows a view, never staff access. */
 export const cataloguePage = async ({
   search = '',
@@ -74,6 +76,7 @@ export const cataloguePage = async ({
   const like = `%${search.trim().replace(/[\\%_]/g, (c) => '\\' + c)}%`;
   const where = `WHERE active=1 AND name LIKE ? ESCAPE '\\'${category ? ' AND category=?' : ''}${facilityId ? ' AND "facilityId"=?' : ''}`;
   const params = [like, ...(category ? [category] : []), ...(facilityId ? [facilityId] : [])];
+
   const [count, rows] = await Promise.all([
     db.getOptional<{ n: number }>(`SELECT COUNT(*) AS n FROM fee_items ${where}`, params),
     db.getAll<Row>(
@@ -81,22 +84,32 @@ export const cataloguePage = async ({
       [...params, pageSize, Math.max(0, page) * pageSize],
     ),
   ]);
+
   return { total: Number(count?.n ?? 0), items: rows.map((r) => fromRow<FeeItem>('fee_item', r)) };
 };
+
 export const chargesForPatient = (patientId: string) =>
   allWhere<Charge>('charge', 'patientId', patientId).then(usablePharmacyEffects);
+
 export const paymentsForPatient = (patientId: string) =>
   allWhere<Payment>('payment', 'patientId', patientId);
+
 export const adjustmentsForPatient = (patientId: string) =>
   allWhere<BillingAdjustment>('billing_adjustment', 'patientId', patientId).then(
     usablePharmacyEffects,
   );
+
 export const listCharges = () => allOfType<Charge>('charge').then(usablePharmacyEffects);
+
 export const listPayments = () => allOfType<Payment>('payment');
+
 export const listAdjustments = () =>
   allOfType<BillingAdjustment>('billing_adjustment').then(usablePharmacyEffects);
+
 export const listIncomingTransfers = () => allOfType<IncomingTransfer>('incoming_transfer');
+
 export const listBillingDepartments = () => allOfType<BillingDepartment>('billing_department');
+
 export const patientBillingFacts = (
   patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'sex'> &
     Partial<Pick<Patient, 'createdOn' | 'ageObservedOn'>>,
@@ -106,8 +119,10 @@ export const patientBillingFacts = (
     ...patient,
     createdOn: patient.createdOn ?? new Date().toISOString(),
   });
+
   return { sex: patient.sex, ageYears, visitType };
 };
+
 export const createBillingDepartment = (name: string, context: AuthorizationContext) =>
   insertRecord<BillingDepartment>(context, 'fee_item:manage', 'billing_department', {
     ...envelope(context),
@@ -126,20 +141,25 @@ export const adjustCharge = async (
 ) => {
   assertAllowed(context, 'payment:waive');
   const charge = await findRecord<Charge>('charge', chargeId);
+
   if (!charge || charge.facilityId !== context.facilityId) {
     throw new Error('This bill is not available');
   }
+
   const [payments, adjustments, coverage] = await Promise.all([
     paymentsForPatient(charge.patientId),
     adjustmentsForPatient(charge.patientId),
     balanceCoverage([charge]),
   ]);
+
   // The payer's part, or an undetermined one, is never reduced on the patient's account.
   const [{ balanceMinor }] = chargeBalances([charge], payments, adjustments, coverage);
   assertAmountMinor(amountMinor);
+
   if (amountMinor <= 0 || amountMinor > balanceMinor) {
     throw new Error('The reduction must fit the unpaid balance');
   }
+
   return insertRecord<BillingAdjustment>(context, 'payment:waive', 'billing_adjustment', {
     ...envelope(context),
     id: newId('billing_adjustment'),
@@ -154,6 +174,7 @@ export const adjustCharge = async (
 
 const feeValues = (draft: FeeDraft): FeeDraft => {
   assertAmountMinor(draft.amountMinor);
+
   return {
     name: draft.name.trim(),
     description: draft.description?.trim() || undefined,
@@ -201,6 +222,7 @@ const saveFeeChanges = async (
   await saveConfiguration(context, [
     { op: 'patch', type: 'fee_item', id: fee.id, changes: stamped, current: fee },
   ]);
+
   return updated;
 };
 
@@ -214,7 +236,9 @@ export const updateCatalogueItem = (
       'This item’s category is protected until its insurance impact can be reviewed.',
     );
   }
+
   assertAmountMinor(draft.amountMinor);
+
   return saveFeeChanges(
     fee,
     {
@@ -257,28 +281,35 @@ export const newCharge = (
   if (fee.facilityId !== context.facilityId) {
     throw new Error('This fee belongs to another facility');
   }
+
   if (!fee.active) {
     throw new Error('This fee has been retired');
   }
+
   assertAmountMinor(fee.amountMinor);
   const evidence = fee.priceEvidenceVersion === 1 && billingCatalogueEnabled(context);
   const quantity = draft.quantity ?? 1;
+
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) {
     throw new Error('Enter a valid quantity');
   }
+
   if (quantity !== 1 && !evidence) {
     throw new Error(
       'Connect once to receive verified quantity-price support. Existing single-unit billing remains available',
     );
   }
+
   if (draft.servicePointId && !evidence) {
     throw new Error(
       'Service-point attribution is waiting for catalogue compatibility. Leave it blank to continue existing billing',
     );
   }
+
   const total = Math.round(fee.amountMinor * quantity);
   assertAmountMinor(total);
   const exemption = findExemption(fee.exemptions, draft.facts);
+
   return {
     ...envelope(context),
     // A previously downloaded legacy head remains usable during a delayed metadata sync.
@@ -319,9 +350,11 @@ export const createCharge = async (
 ) => {
   assertAllowed(context, 'charge:create');
   const fee = await findRecord<FeeItem>('fee_item', feeId);
+
   if (!fee) {
     throw new Error('This fee is no longer available');
   }
+
   return insertRecord<Charge>(context, 'charge:create', 'charge', newCharge(fee, draft, context));
 };
 
@@ -338,19 +371,25 @@ export const createBill = async (
   context: AuthorizationContext,
 ) => {
   assertAllowed(context, 'charge:create');
+
   if (!items.length || items.length > 100) {
     throw new Error('Select between 1 and 100 items');
   }
+
   if (new Set(items.map((i) => i.feeId)).size !== items.length) {
     throw new Error('Use quantity instead of adding the same item twice');
   }
+
   const billId = crypto.randomUUID();
+
   const charges = await Promise.all(
     items.map(async (item) => {
       const fee = await findRecord<FeeItem>('fee_item', item.feeId);
+
       if (!fee) {
         throw new Error('A selected price is no longer available');
       }
+
       if (
         (item.amountMinor !== undefined && fee.amountMinor !== item.amountMinor) ||
         (item.currency !== undefined && fee.currency !== item.currency) ||
@@ -360,12 +399,15 @@ export const createBill = async (
           'A selected price changed. Remove that item and select it again to review the current price.',
         );
       }
+
       return newCharge(fee, { ...draft, billId, quantity: item.quantity }, context);
     }),
   );
+
   if (new Set(charges.map((c) => c.currency)).size !== 1) {
     throw new Error('Use one currency per bill');
   }
+
   await insertRecords(
     context,
     charges.map((record) => ({
@@ -374,6 +416,7 @@ export const createBill = async (
       record,
     })),
   );
+
   return charges;
 };
 
@@ -392,6 +435,7 @@ const checkAllocations = async (
   for (const allocation of draft.allocations) {
     assertAmountMinor(allocation.amountMinor);
     const charge = await findRecord<Charge>('charge', allocation.chargeId);
+
     if (
       !charge ||
       charge.facilityId !== context.facilityId ||
@@ -399,6 +443,7 @@ const checkAllocations = async (
     ) {
       throw new Error("Every allocation must name this patient's own charge");
     }
+
     if (charge.currency !== draft.currency) {
       throw new Error('A payment and its charges must use the same currency');
     }
@@ -412,12 +457,15 @@ export const recordPayment = async (
 ): Promise<Payment> => {
   const permission = paymentPermission(draft);
   assertAllowed(context, permission);
+
   const amountMinor = draft.allocations.reduce(
     (total, allocation) => total + allocation.amountMinor,
     0,
   );
+
   assertAmountMinor(amountMinor);
   await checkAllocations(draft, context);
+
   return insertRecord<Payment>(context, permission, 'payment', {
     ...envelope(context),
     ...draft,
@@ -437,20 +485,27 @@ export const reversePayment = async (
   context: AuthorizationContext,
 ): Promise<Payment> => {
   assertAllowed(context, 'payment:reverse');
+
   if (!reason.trim()) {
     throw new Error('Give a reason for the reversal');
   }
+
   const original = await findRecord<Payment>('payment', paymentId);
+
   if (!original || original.facilityId !== context.facilityId) {
     throw new Error('This payment is not available at this facility');
   }
+
   if (original.reverses) {
     throw new Error('A reversal cannot itself be reversed');
   }
+
   const payments = await paymentsForPatient(original.patientId);
+
   if (payments.some((payment) => payment.reverses === original.id)) {
     throw new Error('This payment has already been reversed');
   }
+
   return insertRecord<Payment>(context, 'payment:reverse', 'payment', {
     ...envelope(context),
     id: newId('payment'),
@@ -512,9 +567,11 @@ export const chargeBalances = (
   const settled = new Map<string, number>();
   const legacyWaivers = new Map<string, number>();
   const refunded = new Map<string, number>();
+
   for (const refund of coverage?.refunds ?? []) {
     for (const allocation of refund.allocations) {
       const charge = byId.get(allocation.chargeId);
+
       if (
         !charge ||
         charge.patientId !== refund.patientId ||
@@ -523,12 +580,15 @@ export const chargeBalances = (
       ) {
         continue;
       }
+
       refunded.set(charge.id, (refunded.get(charge.id) ?? 0) + allocation.amountMinor);
     }
   }
+
   for (const payment of payments) {
     for (const allocation of payment.allocations) {
       const charge = byId.get(allocation.chargeId);
+
       if (
         !charge ||
         charge.patientId !== payment.patientId ||
@@ -537,31 +597,40 @@ export const chargeBalances = (
       ) {
         continue;
       }
+
       const amount = allocation.amountMinor * (payment.reverses ? -1 : 1);
       const target = payment.method === 'waiver' ? legacyWaivers : settled;
       target.set(charge.id, (target.get(charge.id) ?? 0) + amount);
     }
   }
+
   return charges.map((charge) => {
     const settledMinor = settled.get(charge.id) ?? 0;
+
     const reductions = adjustments.filter(
       (a) =>
         a.chargeId === charge.id &&
         a.patientId === charge.patientId &&
         a.facilityId === charge.facilityId,
     );
+
     const discountMinor = reductions
       .filter((a) => a.kind === 'discount')
       .reduce((n, a) => n + a.amountMinor, 0);
+
     const waivedMinor =
       (legacyWaivers.get(charge.id) ?? 0) +
       reductions.filter((a) => a.kind === 'waiver').reduce((n, a) => n + a.amountMinor, 0);
+
     const estimate = coverage?.estimates.get(charge.id);
+
     const responsibility = estimate
       ? patientResponsibility(charge, estimate)
       : { baseMinor: charge.amountMinor, undeterminedMinor: 0, estimated: false, final: true };
+
     const refundedMinor = refunded.get(charge.id) ?? 0;
     const dueMinor = responsibility.baseMinor - discountMinor - waivedMinor;
+
     return {
       charge,
       settledMinor,
@@ -588,9 +657,11 @@ export const balancesByCurrency = (
   coverage?: BalanceCoverage,
 ): Map<string, number> => {
   const totals = new Map<string, number>();
+
   for (const { charge, balanceMinor } of chargeBalances(charges, payments, adjustments, coverage)) {
     totals.set(charge.currency, (totals.get(charge.currency) ?? 0) + balanceMinor);
   }
+
   return totals;
 };
 

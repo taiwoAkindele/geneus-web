@@ -16,6 +16,7 @@ export const PatientCard = ({
   const [error, setError] = useState('');
   const qr = qrcodegen.QrCode.encodeText(patient.patientId, qrcodegen.QrCode.Ecc.MEDIUM);
   let path = '';
+
   for (let y = 0; y < qr.size; y++) {
     for (let x = 0; x < qr.size; x++) {
       if (qr.getModule(x, y)) {
@@ -23,19 +24,24 @@ export const PatientCard = ({
       }
     }
   }
+
   const print = () => {
     const card = document.getElementById('patient-card-print');
     const popup = window.open('', '_blank', 'width=640,height=650');
+
     if (!popup || !card) {
       setError('Allow the print window, then try again');
+
       return;
     }
+
     popup.opener = null;
     popup.document.title = 'Geneus patient card';
     popup.document.body.append(card.cloneNode(true));
     popup.focus();
     popup.print();
   };
+
   return (
     <Sheet title="Patient card" onClose={onClose}>
       <div

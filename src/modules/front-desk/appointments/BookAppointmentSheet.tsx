@@ -26,6 +26,7 @@ const fmtDay = (iso: string) =>
         year: 'numeric',
       })
     : '';
+
 const DAY_CHOICES: readonly [number, string][] = [
   [0, 'Later today'],
   [1, 'Tomorrow'],
@@ -33,9 +34,11 @@ const DAY_CHOICES: readonly [number, string][] = [
   [14, 'In 2 weeks'],
   [28, 'In 4 weeks'],
 ];
+
 const dayFromToday = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
+
   return calendarDate(date);
 };
 
@@ -65,6 +68,7 @@ export const BookAppointmentSheet = ({
 
   const canBook = mode === 'now' || Boolean(date && time);
   const load = slotLoad(appointments, date);
+
   // An active booking of the same kind usually means this should be a reschedule, not a second booking.
   const existing = forPatient(patient.id).find(
     (booking) =>
@@ -80,16 +84,20 @@ export const BookAppointmentSheet = ({
     if (!canBook || booking) {
       return;
     }
+
     setBooking(true);
     setError('');
+
     try {
       if (mode === 'scheduled' && resource.error) {
         throw new Error(resource.error);
       }
+
       const scheduledFor =
         mode === 'scheduled'
           ? resource.scheduledFor || new Date(`${date}T${time}`).toISOString()
           : undefined;
+
       await book({
         patientId: patient.id,
         reason: reason || 'Consultation',
@@ -98,11 +106,13 @@ export const BookAppointmentSheet = ({
         offeringId: care.offeringId,
         allocation: mode === 'scheduled' ? resource.allocation : undefined,
       });
+
       toast(
         scheduledFor
           ? `Appointment saved on this device for ${fmtDay(date)}`
           : 'Appointment saved on this device for now',
       );
+
       onClose();
     } catch (cause) {
       setError(
@@ -110,6 +120,7 @@ export const BookAppointmentSheet = ({
           ? cause.message
           : 'Could not save the appointment — your entries are still here.',
       );
+
       setBooking(false);
     }
   };
@@ -141,6 +152,7 @@ export const BookAppointmentSheet = ({
             <div className="flex flex-wrap gap-2">
               {DAY_CHOICES.map(([days, label]) => {
                 const value = dayFromToday(days);
+
                 return (
                   <ChoiceChip
                     key={days}
@@ -176,6 +188,7 @@ export const BookAppointmentSheet = ({
                 {BOOKING_SLOTS.map((slot) => {
                   const past = new Date(`${date}T${slot}`).getTime() <= Date.now();
                   const count = load.get(slot) ?? 0;
+
                   return past ? null : (
                     <ChoiceChip key={slot} selected={time === slot} onClick={() => setTime(slot)}>
                       {slot}

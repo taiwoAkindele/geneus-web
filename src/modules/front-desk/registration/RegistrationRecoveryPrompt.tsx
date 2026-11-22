@@ -6,6 +6,7 @@ import { useRegistrationRecovery } from './RegistrationDraftProvider';
 
 export const RegistrationRecoveryStatus = () => {
   const { recovery, status } = useRegistrationRecovery();
+
   const renderRecoveryStatus = () => {
     if (status.error) {
       return (
@@ -56,6 +57,7 @@ export const RegistrationRecoveryGate = ({
   const [choosing, setChoosing] = useState(() => recovery.needsChoice(draftKey));
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState('');
+
   if (status.unreadable) {
     return (
       <div className="min-h-screen bg-surface">
@@ -73,9 +75,11 @@ export const RegistrationRecoveryGate = ({
       </div>
     );
   }
+
   if (!choosing) {
     return children;
   }
+
   return (
     <div className="min-h-screen bg-surface">
       <AppBar title="Unfinished registration" onBack={() => navigate('/frontdesk/patients')} />
@@ -101,6 +105,7 @@ export const RegistrationRecoveryGate = ({
           onClick={async () => {
             setDiscarding(true);
             setError('');
+
             try {
               await recovery.discard(draftKey);
               setChoosing(false);

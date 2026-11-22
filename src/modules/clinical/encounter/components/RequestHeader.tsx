@@ -17,6 +17,7 @@ export const RequestHeader = ({
   children?: ReactNode;
 }) => {
   const age = patientAge(patient);
+
   return (
     <header className="space-y-3 border-b border-outline-soft pb-4">
       <Link to={back.to} className="inline-flex min-h-[44px] items-center font-bold text-brand">

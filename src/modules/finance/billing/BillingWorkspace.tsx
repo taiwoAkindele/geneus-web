@@ -14,6 +14,7 @@ import { NewBill } from './NewBill';
 import { Receipt } from './Receipt';
 import { BillingReviewList } from './BillingReviewList';
 import { displayMoney } from './billingUi';
+
 const LegacyBillingWorkspace = lazy(() =>
   import('./LegacyBillingWorkspace').then((m) => ({ default: m.LegacyBillingWorkspace })),
 );
@@ -61,20 +62,25 @@ export const BillingWorkspace = () => {
   useEffect(() => {
     document.title = `${TITLES[tab] ?? 'Billing'} · Geneus Health`;
   }, [tab]);
+
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [selectedId, tab]);
+
   const allowed =
     user.roles.some((r) => ['cashier', 'facility_admin', 'supervisor'].includes(r)) ||
     context.permissions.some((p) =>
       ['charge:associate', 'fee_item:manage', 'payment:receive', 'payment:waive'].includes(p),
     );
+
   if (!allowed) {
     return <p className="p-5">Billing access has not been assigned to your account.</p>;
   }
+
   if (tab === 'fees') {
     return <Navigate to="/billing/prices" replace />;
   }
+
   if (tab === 'departments' || tab === 'categories') {
     return (
       <>
@@ -90,23 +96,28 @@ export const BillingWorkspace = () => {
       </>
     );
   }
+
   const bills = data ? billDocuments(data) : [];
   const selected = bills.find((b) => b.id === selectedId);
   const placed = placeQuestions(bills, questions.questions);
   const name = (id: string) => data?.patients.find((p) => p.patientId === id)?.fullName ?? id;
+
   const openBill = (id: string, transfer?: IncomingTransfer) => {
     setSource(transfer);
     setLinkSource(undefined);
     setParams({ tab: 'bills', bill: id });
   };
+
   const toBills = (extra: Record<string, string> = {}) => {
     setSource(undefined);
     setParams({ tab: 'bills', ...extra });
   };
+
   const reload = () => {
     query.reload();
     questions.reload();
   };
+
   const renderSelectedBill = (billingData: NonNullable<typeof data>) => {
     if (!selected) {
       return (

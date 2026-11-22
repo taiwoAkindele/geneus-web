@@ -59,6 +59,7 @@ export type SetupFacts = {
 
 /** One definition of care service versus lab test, shared with booking and the server. */
 export { careServiceOfferings, isLabTestOffering };
+
 export const SETUP_STEP_IDS = [
   'facility',
   'teams',
@@ -67,8 +68,11 @@ export const SETUP_STEP_IDS = [
   'prices',
   'staff',
 ] as const;
+
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
+
 export type SetupStepStatus = 'done' | 'started' | 'todo' | 'not_needed';
+
 export type SetupStep = {
   id: SetupStepId;
   label: string;
@@ -88,6 +92,7 @@ export const SETUP_WATCH = [
   'staff',
   'roster_shift',
 ] as const;
+
 export const loadSetupFacts = async (): Promise<SetupFacts> => {
   const [facility, units, locations, definitions, offerings, fees, stock, staff, shifts] =
     await Promise.all([
@@ -101,11 +106,13 @@ export const loadSetupFacts = async (): Promise<SetupFacts> => {
       allOfType<Staff>('staff'),
       allOfType<RosterShift>('roster_shift'),
     ]);
+
   return { facility, units, locations, definitions, offerings, fees, stock, staff, shifts };
 };
 
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
+
 const names = (items: readonly { name: string }[]) =>
   items
     .slice(0, 3)
@@ -119,18 +126,23 @@ export const setupSteps = (
 ): SetupStep[] => {
   const units = facts.units.filter((u) => u.active);
   const locations = facts.locations.filter((l) => l.active);
+
   const wardsWithoutBeds = locations.filter(
     (l) =>
       l.kind === 'ward' && !locations.some((bed) => bed.kind === 'bed' && bed.parentId === l.id),
   );
+
   // Lab tests are offerings for ordering and pricing, not care services: they are set up in the Lab catalogue.
   const care = careServiceOfferings(facts.offerings, facts.definitions);
   const offerings = care.filter((o) => o.configuration === 'active');
+
   const unfinished = care.filter(
     (o) => o.configuration === 'draft' || o.configuration === 'proposed',
   );
+
   const fees = facts.fees.filter((f) => f.active);
   const priced = new Set(fees.map((f) => f.id));
+
   // Optional operational links are separate from the central prices used for direct billing.
   const unpricedTests = facts.offerings.filter(
     (o) =>
@@ -138,11 +150,14 @@ export const setupSteps = (
       isLabTestOffering(o, facts.definitions) &&
       (!o.feeItemId || !priced.has(o.feeItemId)),
   );
+
   const unpricedStock = facts.stock.filter((s) => !s.feeItemId || !priced.has(s.feeItemId));
   const staff = facts.staff.filter((s) => s.active);
+
   const onRoster = new Set(
     facts.shifts.filter((s) => Date.parse(s.endsAt) > now).map((s) => s.staffId),
   );
+
   const unrostered = staff.filter((s) => !onRoster.has(s.staffId) && s.loginAccess !== 'always');
 
   const steps: (Omit<SetupStep, 'status'> & { done: boolean; started: boolean })[] = [
@@ -216,6 +231,7 @@ export const setupSteps = (
           : [],
     },
   ];
+
   return steps.map(({ done, started, ...step }) => ({
     ...step,
     status: stepStatus(done, notNeeded.has(step.id), started),
@@ -224,6 +240,7 @@ export const setupSteps = (
 
 export const setupProgress = (steps: readonly SetupStep[]) => {
   const settled = steps.filter((s) => s.status === 'done' || s.status === 'not_needed').length;
+
   return {
     settled,
     total: steps.length,
@@ -234,9 +251,11 @@ export const setupProgress = (steps: readonly SetupStep[]) => {
 
 /** Setting a step aside is a convenience on this device, not a facility record. */
 const notNeededKey = (facilityId: string) => `geneus.setupNotNeeded:${facilityId}`;
+
 export const readNotNeeded = (facilityId: string): Set<SetupStepId> => {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(notNeededKey(facilityId)) ?? '[]');
+
     return new Set(
       Array.isArray(raw)
         ? raw.filter((id): id is SetupStepId => (SETUP_STEP_IDS as readonly string[]).includes(id))
@@ -246,6 +265,7 @@ export const readNotNeeded = (facilityId: string): Set<SetupStepId> => {
     return new Set();
   }
 };
+
 export const writeNotNeeded = (facilityId: string, ids: ReadonlySet<SetupStepId>) => {
   try {
     localStorage.setItem(notNeededKey(facilityId), JSON.stringify([...ids]));

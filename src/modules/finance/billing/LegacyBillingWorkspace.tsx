@@ -34,6 +34,7 @@ export const LegacyBillingWorkspace = () => {
   useEffect(() => {
     document.title = 'Billing · Geneus Health';
   }, []);
+
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -49,25 +50,32 @@ export const LegacyBillingWorkspace = () => {
   const [reference, setReference] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
+
   const allowed =
     user.roles.some((r) => ['cashier', 'facility_admin', 'supervisor'].includes(r)) ||
     context.permissions.some((p) =>
       ['charge:associate', 'fee_item:manage', 'payment:receive', 'payment:waive'].includes(p),
     );
+
   const data = query.data;
+
   const receiptCapacity = useReceiptCapacity(
     (data?.transfers ?? []).slice(-200).map((t) => t.id),
     data?.payments.length,
   );
+
   const tab = params.get('tab') ?? 'collections';
   const category = params.get('category') ?? '';
+
   if (!allowed) {
     return <p className="p-5">Billing access has not been assigned to your account.</p>;
   }
+
   // The price list moved to Billing → Settings → Fees; earlier bookmarks follow it.
   if (tab === 'fees') {
     return <Navigate to="/billing/prices" replace />;
   }
+
   const activeFilterCount = [
     tab === 'departments' ? '' : search,
     from,
@@ -75,8 +83,10 @@ export const LegacyBillingWorkspace = () => {
     departmentId,
     ['collections', 'categories'].includes(tab) && status !== 'all' ? status : '',
   ].filter(Boolean).length;
+
   const go = (nextTab: string, nextCategory = '') =>
     setParams({ tab: nextTab, ...(nextCategory ? { category: nextCategory } : {}) });
+
   const currencies = [
     ...new Set([
       ...(data?.fees.map((f) => f.currency) ?? []),
@@ -84,17 +94,23 @@ export const LegacyBillingWorkspace = () => {
       ...(data?.transfers.map((t) => t.currency) ?? []),
     ]),
   ].sort();
+
   const currency = currencies.includes(currencyChoice) ? currencyChoice : (currencies[0] ?? 'NGN');
   const name = (id: string) => data?.patients.find((p) => p.patientId === id)?.fullName ?? id;
+
   const department = (id?: string) =>
     data?.departments.find((d) => d.id === id)?.name ?? 'Hospital / general';
+
   const departmentMatches = (id?: string) =>
     !departmentId || (departmentId === '__general__' ? !id : id === departmentId);
+
   const dateMatches = (at: string) =>
     (!from || calendarDate(at) >= from) && (!to || calendarDate(at) <= to);
+
   const allRows = data
     ? billingRows(data.charges, data.payments, data.adjustments, data.coverage)
     : [];
+
   const rows = allRows.filter(
     (r) =>
       r.charge.currency === currency &&
@@ -112,8 +128,10 @@ export const LegacyBillingWorkspace = () => {
           (r.waivedMinor > 0 || r.receipts.some((p) => p.method === 'waiver'))) ||
         (status === 'exempt' && Boolean(r.charge.exemptionReason))),
   );
+
   const totals = totalsFor(rows);
   const money = (n: number) => formatMoney(n, currency);
+
   const transfers =
     data?.transfers.filter(
       (t) =>
@@ -122,16 +140,20 @@ export const LegacyBillingWorkspace = () => {
         dateMatches(t.receivedOn) &&
         `${t.providerReference} ${t.payerName ?? ''}`.toLowerCase().includes(search.toLowerCase()),
     ) ?? [];
+
   const openPatient = (id: string) => {
     setPatientId(id);
     setChoosePatient(false);
   };
+
   const importTransfer = async () => {
     if (importing) {
       return;
     }
+
     setImporting(true);
     setImportError('');
+
     try {
       await billingRequest(context, 'transfers/import', { reference });
       setReference('');
@@ -142,6 +164,7 @@ export const LegacyBillingWorkspace = () => {
       setImporting(false);
     }
   };
+
   const renderBody = () => {
     if (query.loading) {
       return (
@@ -218,6 +241,7 @@ export const LegacyBillingWorkspace = () => {
                       r.charge.currency === currency &&
                       dateMatches(r.charge.createdOn),
                   );
+
                   const incoming = data.transfers.filter(
                     (t) =>
                       t.mode === 'live' &&
@@ -225,10 +249,13 @@ export const LegacyBillingWorkspace = () => {
                       t.currency === currency &&
                       dateMatches(t.receivedOn),
                   );
+
                   const received = incoming.reduce((n, t) => n + t.amountMinor, 0);
+
                   const unallocated = incoming.every((t) => Boolean(receiptCapacity.sources[t.id]))
                     ? incoming.reduce((n, t) => n + receiptCapacity.sources[t.id].availableMinor, 0)
                     : undefined;
+
                   return (
                     <button
                       key={d.id}
@@ -280,6 +307,7 @@ export const LegacyBillingWorkspace = () => {
                 {FeeCategory.options.map((c) => {
                   const group = rows.filter((r) => r.charge.category === c);
                   const total = totalsFor(group);
+
                   return (
                     <button
                       key={c}
@@ -351,6 +379,7 @@ export const LegacyBillingWorkspace = () => {
               transfers.slice(0, 100).map((t) => {
                 const source = receiptCapacity.sources[t.id];
                 const left = source?.availableMinor;
+
                 const renderMatchStatus = () => {
                   if (left === undefined) {
                     return 'Availability requires verification';

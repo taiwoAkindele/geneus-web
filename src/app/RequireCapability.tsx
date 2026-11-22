@@ -11,6 +11,7 @@ export const RequireCapability = ({
   children: ReactNode;
 }) => {
   const context = useAuthorizationContext();
+
   return permissions.some((permission) => context.permissions.includes(permission)) ? (
     children
   ) : (

@@ -22,8 +22,10 @@ export const fakeDatabase = (
   const statements: Statement[] = [];
   const rows = structuredClone(seed);
   const transactions: CrudTransaction[] = [];
+
   const getOptional = async <T>(sql: string, parameters: unknown[] = []) =>
     ((rows[tableOf(sql) ?? ''] ?? []).find((row) => row.id === parameters[0]) ?? null) as T | null;
+
   return {
     statements,
     rows,
@@ -41,10 +43,12 @@ export const fakeDatabase = (
     getAll: async <T>(sql: string, parameters: unknown[] = []) => {
       const table = rows[tableOf(sql) ?? ''] ?? [];
       const field = /WHERE\s+"?(\w+)"?\s*=\s*\?/i.exec(sql)?.[1];
+
       return (field ? table.filter((row) => row[field] === parameters[0]) : table) as T[];
     },
     getOptional: async <T>(sql: string, parameters: unknown[] = []) => {
       const table = rows[tableOf(sql) ?? ''] ?? [];
+
       return (table.find((row) => row.id === parameters[0]) ?? null) as T | null;
     },
     onChangeWithCallback: () => () => undefined,

@@ -5,6 +5,7 @@ import { maySignIn, SESSION_IDLE_MS } from './accessPolicy';
 import { isFrozen } from './signInChecks';
 
 const KEY = 'geneus.facilitySwitchIdentity';
+
 const Identity = z.object({
   sourceStaffId: z.string().min(1),
   facilityId: z.string().min(1),
@@ -13,17 +14,23 @@ const Identity = z.object({
   personId: z.string().min(1),
   createdOn: z.number().finite(),
 });
+
 export type FacilitySwitchIdentity = z.infer<typeof Identity>;
+
 export const pendingFacilityIdentity = () => {
   const raw = secureGet(KEY);
+
   return raw ? Identity.parse(JSON.parse(raw)) : undefined;
 };
+
 export const saveFacilityIdentity = (identity: FacilitySwitchIdentity) =>
   secureSet(KEY, JSON.stringify(Identity.parse(identity)));
+
 export const clearFacilityIdentity = () => secureRemove(KEY);
 
 export const assertSourceSession = (identity: FacilitySwitchIdentity, now = Date.now()) => {
   const lastActivity = Number(localStorage.getItem('geneus.lastActivityOn'));
+
   if (
     localStorage.getItem('geneus.signedInStaffId') !== identity.sourceStaffId ||
     !Number.isFinite(lastActivity) ||
@@ -67,9 +74,11 @@ export const reuseAccountPin = (
 ) => {
   const source = sourceRaw ? (JSON.parse(sourceRaw) as Record<string, unknown>) : {};
   const target = targetRaw ? (JSON.parse(targetRaw) as Record<string, unknown>) : {};
+
   if (!target[targetStaffId] && source[sourceStaffId]) {
     target[targetStaffId] = source[sourceStaffId];
   }
+
   return JSON.stringify(target);
 };
 
@@ -88,12 +97,15 @@ export const sharesAccountPin = (
     digits?: number;
     lockedUntil?: number;
   };
+
   const source = sourceRaw
     ? (JSON.parse(sourceRaw) as Record<string, Pin>)[sourceStaffId]
     : undefined;
+
   const target = targetRaw
     ? (JSON.parse(targetRaw) as Record<string, Pin>)[targetStaffId]
     : undefined;
+
   return Boolean(
     source?.salt &&
     source.hash &&

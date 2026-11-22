@@ -135,19 +135,24 @@ export const summarize = (
         label: t,
         value: data.lab_results[data.lab_order.items?.[index]?.id ?? t] || '—',
       }));
+
     case 'diagnosis': {
       const plan: string[] = [];
+
       if (data.diagnosis.injection) {
         plan.push('Give injection');
       }
+
       if (data.diagnosis.rx.length) {
         plan.push('Prescribe medication');
       }
+
       if (data.diagnosis.admit) {
         plan.push('Admit patient');
       } else {
         plan.push('Send home');
       }
+
       return [
         { label: 'Diagnosis', value: data.diagnosis.dx || '—' },
         ...(data.diagnosis.code || data.diagnosis.certainty
@@ -196,6 +201,7 @@ export const summarize = (
             ]),
       ];
     }
+
     case 'injection':
       return [
         { label: 'Drug', value: data.injection.drug || '—' },
@@ -211,9 +217,11 @@ export const summarize = (
         { label: 'Admitting diagnosis', value: data.diagnosis.dx || '—' },
         { label: 'Admitting note', value: data.admission.note || '—' },
       ];
+
     case 'dispense': {
       const rx = data.prescription.rx.length ? data.prescription.rx : data.diagnosis.rx;
       const { done, reasons } = data.dispense;
+
       return [
         {
           label: 'Dispensed',
@@ -233,6 +241,7 @@ export const summarize = (
         },
       ];
     }
+
     case 'follow_up':
       return [
         {
@@ -255,6 +264,7 @@ const REVIEW_HOUR = 9;
 
 /** How long typing must pause before the section being recorded is written to the device. */
 const DRAFT_PAUSE_MS = 800;
+
 const INVESTIGATION_DECISION_LABELS: Record<string, string> = {
   none_required: 'No investigations required',
   ordered: 'Investigations ordered',
@@ -276,6 +286,7 @@ const blankDraft = (value: unknown): boolean => {
 
   return false;
 };
+
 const NAVIGATION_DRAFT = '_navigation';
 /** Results being entered against templates, kept beside the lab results section's own draft. */
 const LAB_REPORT_DRAFT = '_lab_report';
@@ -294,9 +305,11 @@ const fitsSection = (step: string, data: unknown): data is EncounterData[StepKey
   if (!(step in STEP_DEFS) || typeof data !== 'object' || data === null) {
     return false;
   }
+
   if (step === 'lab_results') {
     return true;
   }
+
   return Object.keys(EMPTY_ENCOUNTER_DATA[step as StepKey]).every((field) => field in data);
 };
 
@@ -328,6 +341,7 @@ export const useEncounter = (
   // What a new visit is for: the care service and kind of visit; the booking's until staff choose.
   const [chosenCare, setCare] = useState<CareVisitChoice>();
   const chosenVisitType = chosenCare?.visitType;
+
   // Unsaved work (PRD §9.8.4) is kept per person: whoever is typing, for this patient and encounter.
   const owner = useMemo<DraftOwner>(
     () => ({
@@ -337,6 +351,7 @@ export const useEncounter = (
     }),
     [context.userId, patientId, currentId, appointmentId],
   );
+
   const [restoredFor, setRestoredFor] = useState<string>();
   const [draftRestoredAt, setDraftRestoredAt] = useState<string>();
   const pendingDraft = useRef<(() => Promise<unknown>) | undefined>(undefined);
@@ -346,12 +361,15 @@ export const useEncounter = (
   const load = useCallback(async (): Promise<Loaded> => {
     const [encounters, staff] = await Promise.all([encountersForPatient(patientId), listStaff()]);
     const staffNames = new Map(staff.map((member) => [member.staffId, member.fullName]));
+
     let encounter = currentId
       ? encounters.find((candidate) => candidate.id === currentId)
       : undefined;
+
     if (!currentId && appointmentId) {
       encounter = encounters.find((candidate) => candidate.appointmentId === appointmentId);
     }
+
     if (!currentId && !appointmentId) {
       for (const candidate of [...encounters].sort((a, b) =>
         b.openedOn.localeCompare(a.openedOn),
@@ -359,18 +377,22 @@ export const useEncounter = (
         if (candidate.inpatientContext) {
           continue;
         }
+
         const entries = await entriesForEncounter(candidate.id);
+
         if (!entries.some(closesEncounter)) {
           encounter = candidate;
           break;
         }
       }
     }
+
     if (currentId && !encounter) {
       throw new Error(
         'This visit is not available for this patient on this device. Return to the patient record or sync before continuing.',
       );
     }
+
     return {
       encounter,
       entries: encounter ? await entriesForEncounter(encounter.id) : [],
@@ -400,6 +422,7 @@ export const useEncounter = (
   );
 
   const savedSteps = Object.keys(enc.entries).sort().join(',');
+
   // Drafts are read once the encounter is known — named, found open, or confirmed new.
   const settled =
     !live.loading &&
@@ -410,6 +433,7 @@ export const useEncounter = (
     if (!settled || restoredFor === ownerKey(owner)) {
       return;
     }
+
     let cancelled = false;
     const saved = new Set(savedSteps.split(','));
     readDrafts(owner).then(
@@ -417,11 +441,14 @@ export const useEncounter = (
         if (cancelled) {
           return;
         }
+
         const navigation = drafts.find((stored) => stored.step === NAVIGATION_DRAFT)?.data;
+
         const skipped =
           typeof navigation === 'object' && navigation !== null && 'skipped' in navigation
             ? navigation.skipped
             : undefined;
+
         setSkippedNow(
           Array.isArray(skipped)
             ? skipped.filter(
@@ -433,10 +460,13 @@ export const useEncounter = (
               )
             : [],
         );
+
         const unsaved = drafts.filter(
           (stored) => !saved.has(stored.step) && fitsSection(stored.step, stored.data),
         );
+
         const labReport = drafts.find((stored) => stored.step === LAB_REPORT_DRAFT);
+
         if (
           labReport &&
           typeof labReport.data === 'object' &&
@@ -448,10 +478,12 @@ export const useEncounter = (
             lab_report: labReport.data as EncounterData['lab_report'],
           }));
         }
+
         if (unsaved.length > 0) {
           setDraft((current) =>
             unsaved.reduce((data, stored) => ({ ...data, [stored.step]: stored.data }), current),
           );
+
           setDraftRestoredAt(
             unsaved.reduce(
               (latest, stored) => (stored.updatedOn > latest ? stored.updatedOn : latest),
@@ -459,15 +491,18 @@ export const useEncounter = (
             ),
           );
         }
+
         setRestoredFor(ownerKey(owner));
       },
       (cause: unknown) => {
         keepDraftWarning(cause);
+
         if (!cancelled) {
           setRestoredFor(ownerKey(owner));
         }
       },
     );
+
     return () => {
       cancelled = true;
     };
@@ -478,6 +513,7 @@ export const useEncounter = (
     if (restoredFor !== ownerKey(owner) || enc.closed) {
       return;
     }
+
     (skippedNow.length
       ? writeDraft(owner, NAVIGATION_DRAFT, { skipped: skippedNow })
       : discardDraft(owner, NAVIGATION_DRAFT)
@@ -494,17 +530,22 @@ export const useEncounter = (
     if (!activeKey || restoredFor !== ownerKey(owner)) {
       return;
     }
+
     const section = draft[activeKey];
     const untouched = JSON.stringify(section) === JSON.stringify(EMPTY_ENCOUNTER_DATA[activeKey]);
+
     const keep = () => {
       pendingDraft.current = undefined;
       typedUnsaved.current = false;
+
       const kept = untouched
         ? discardDraft(owner, activeKey)
         : writeDraft(owner, activeKey, section);
+
       if (activeKey !== 'lab_results') {
         return kept;
       }
+
       return Promise.all([
         kept,
         Object.keys(draft.lab_report).length
@@ -512,11 +553,15 @@ export const useEncounter = (
           : discardDraft(owner, LAB_REPORT_DRAFT),
       ]);
     };
+
     pendingDraft.current = keep;
+
     if (!untouched) {
       typedUnsaved.current = true;
     }
+
     const timer = window.setTimeout(() => void keep().catch(keepDraftWarning), DRAFT_PAUSE_MS);
+
     return () => window.clearTimeout(timer);
   }, [draft, activeKey, owner, restoredFor]);
 
@@ -535,26 +580,32 @@ export const useEncounter = (
   useEffect(() => {
     const flush = () => {
       const keep = pendingDraft.current;
+
       if (keep) {
         void keep().catch(keepDraftWarning);
       }
     };
+
     const hidden = () => {
       if (document.visibilityState === 'hidden') {
         flush();
       }
     };
+
     const unload = (event: BeforeUnloadEvent) => {
       if (!pendingDraft.current || !typedUnsaved.current) {
         return;
       }
+
       flush();
       event.preventDefault();
       event.returnValue = '';
     };
+
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('pagehide', flush);
     window.addEventListener('beforeunload', unload);
+
     return () => {
       document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('pagehide', flush);
@@ -577,11 +628,13 @@ export const useEncounter = (
     setDraft((d) => {
       const arr = [...d[step][field]];
       const i = arr.indexOf(value);
+
       if (i < 0) {
         arr.push(value);
       } else {
         arr.splice(i, 1);
       }
+
       return { ...d, [step]: { ...d[step], [field]: arr } };
     });
   }, []);
@@ -637,6 +690,7 @@ export const useEncounter = (
     if (isClosingStep(key)) {
       return;
     }
+
     pendingDraft.current?.();
     setSkippedNow((keys) => (keys.includes(key) ? keys : [...keys, key]));
   }, []);
@@ -668,6 +722,7 @@ export const useEncounter = (
             !enc.entries[candidate] &&
             !blankDraft(draft[candidate]),
         );
+
         if (unsigned.length) {
           throw new Error(
             'Sign or clear these draft sections before completing: ' +
@@ -675,7 +730,9 @@ export const useEncounter = (
           );
         }
       }
+
       const followUpOn = key === 'disposition' ? enc.data.disposition.followUpOn : '';
+
       // A lab report carries its own values; a diagnosis is saved without the prescription,
       // which is signed separately.
       const stepValues = () => {
@@ -689,6 +746,7 @@ export const useEncounter = (
 
         return toStepValues(key, enc.data);
       };
+
       const entry = await saveStep(
         {
           encounterId,
@@ -714,13 +772,16 @@ export const useEncounter = (
         },
         context,
       );
+
       // Saved: the draft has become the record. Once the encounter closes, nothing typed for it can be saved.
       pendingDraft.current = undefined;
       discardDraft(owner, key).catch(keepDraftWarning);
+
       if (key === 'lab_results') {
         discardDraft(owner, LAB_REPORT_DRAFT).catch(keepDraftWarning);
         setDraft((current) => ({ ...current, lab_report: {} }));
       }
+
       if (closesEncounter(entry)) {
         discardDrafts({ ...owner, encounterKey: entry.encounterId }).catch(keepDraftWarning);
         discardDrafts({ ...owner, encounterKey: 'new' }).catch(keepDraftWarning);
@@ -729,12 +790,16 @@ export const useEncounter = (
         await writeDraft({ ...owner, encounterKey: entry.encounterId }, NAVIGATION_DRAFT, {
           skipped: skippedNow.filter((skipped) => skipped !== key),
         }).catch(keepDraftWarning);
+
         discardDraft(owner, NAVIGATION_DRAFT).catch(keepDraftWarning);
       }
+
       setSkippedNow((keys) =>
         closesEncounter(entry) ? [] : keys.filter((skipped) => skipped !== key),
       );
+
       setCurrentId(entry.encounterId);
+
       return entry;
     },
     [
@@ -760,8 +825,10 @@ export const useEncounter = (
     ) => {
       if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') {
         setSkippedNow((keys) => [...keys, key]);
+
         return;
       }
+
       await saveOne(key, enc.id, [], collectLaterReason, labSubmission);
       live.reload();
     },
@@ -778,27 +845,36 @@ export const useEncounter = (
     stoppedAt?: { key: StepKey; problems: string[] };
   } => {
     const keys: StepKey[] = [];
+
     for (const step of stepsFor(enc.data)) {
       const key = step.key;
+
       if (enc.sig[key] || skippedNow.includes(key)) {
         continue;
       }
+
       if (['lab_results', 'result_review', 'dispense', 'injection'].includes(key)) {
         break;
       }
+
       if (key === 'investigation_review' && enc.data.investigation_review.decision === 'ordered') {
         keys.push(key);
         continue;
       }
+
       const issues = stepProblems(key, enc.data);
+
       if (issues.length) {
         return { keys, stoppedAt: { key, problems: issues } };
       }
+
       keys.push(key);
+
       if (isClosingStep(key)) {
         break;
       }
     }
+
     return { keys };
   }, [enc.data, enc.sig, skippedNow]);
 
@@ -807,6 +883,7 @@ export const useEncounter = (
     async (keys: readonly StepKey[], collectLaterReason?: string): Promise<StepKey[]> => {
       let encounterId = enc.id;
       const signed: StepKey[] = [];
+
       try {
         for (const key of keys) {
           if (
@@ -816,6 +893,7 @@ export const useEncounter = (
             setSkippedNow((current) => (current.includes(key) ? current : [...current, key]));
             continue;
           }
+
           const entry = await saveOne(key, encounterId, signed, collectLaterReason);
           encounterId = entry.encounterId;
           signed.push(key);
@@ -830,6 +908,7 @@ export const useEncounter = (
       } finally {
         live.reload();
       }
+
       return signed;
     },
     [saveOne, enc.id, enc.data.investigation_review.decision, live.reload],
@@ -838,9 +917,11 @@ export const useEncounter = (
   const amendStep = useCallback(
     async (key: StepKey, note: string) => {
       const entry = enc.entries[key];
+
       if (!entry) {
         throw new Error(`${key} has not been saved, so there is nothing to amend`);
       }
+
       await amendEntry(entry, note, context);
     },
     [context, enc.entries],

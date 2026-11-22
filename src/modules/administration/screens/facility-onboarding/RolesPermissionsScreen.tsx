@@ -14,20 +14,26 @@ export const RolesPermissionsScreen = () => {
   useEffect(() => {
     document.title = 'Edit staff · Geneus Health';
   }, []);
+
   const { roster, loading, error, reload } = useAuth();
   const context = useAuthorizationContext();
+
   if (!staffId) {
     return <Navigate to="/admin/staff" replace />;
   }
+
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
+
   const save = async (details: StaffDetails) => {
     if (!entry) {
       return;
     }
+
     await editStaff(entry.staff, details, context);
     toast(`${details.fullName} updated`);
     navigate('/admin/staff/' + encodeURIComponent(entry.staff.staffId));
   };
+
   const renderStaffEditor = () => {
     if (loading) {
       return (

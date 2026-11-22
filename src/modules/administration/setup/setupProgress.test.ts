@@ -10,10 +10,13 @@ const empty: SetupFacts = {
   staff: [],
   shifts: [],
 };
+
 const facts = (patch: Record<string, unknown[] | object>) =>
   ({ ...empty, ...patch }) as unknown as SetupFacts;
+
 const status = (f: SetupFacts, notNeeded = new Set<never>()) =>
   Object.fromEntries(setupSteps(f, notNeeded).map((s) => [s.id, s.status]));
+
 const now = Date.parse('2026-11-15T10:00:00Z');
 
 describe('hospital setup progress', () => {
@@ -43,6 +46,7 @@ describe('hospital setup progress', () => {
         { staffId: 's2', active: true, loginAccess: 'always' },
       ],
     });
+
     const steps = setupSteps(f, new Set(), now);
     expect(steps.map((s) => s.status)).toEqual(['done', 'done', 'done', 'done', 'done', 'done']);
     expect(steps.flatMap((s) => s.notes)).toEqual(['1 person with no upcoming shift.']);
@@ -64,12 +68,14 @@ describe('hospital setup progress', () => {
         stock: [{ id: 'k1', name: 'Gauze', feeItemId: 'f2' }],
       }),
     );
+
     const byId = Object.fromEntries(steps.map((s) => [s.id, s]));
     expect(byId.places).toMatchObject({ status: 'done', notes: ['No beds yet in Female Ward.'] });
     expect(byId.services).toMatchObject({
       status: 'done',
       notes: ['1 care service still in draft or awaiting review.'],
     });
+
     expect(byId.prices.status).toBe('done');
     // A care service is charged through visit fees, so it is never reported as unpriced.
     expect(byId.prices.notes).toEqual([
@@ -83,6 +89,7 @@ describe('hospital setup progress', () => {
       { id: 'd-fbc', investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] } },
       { id: 'd-opd' },
     ];
+
     const test = (id: string, definition: string, extra = {}) => ({
       id,
       name: id,
@@ -102,6 +109,7 @@ describe('hospital setup progress', () => {
           fees: [{ id: 'f1', active: true }],
         }),
       );
+
       const services = steps.find((s) => s.id === 'services')!;
       expect(services).toMatchObject({
         label: 'Care services',
@@ -109,6 +117,7 @@ describe('hospital setup progress', () => {
         summary: 'No care services yet',
         notes: [],
       });
+
       expect(steps.find((s) => s.id === 'prices')!.notes).toEqual([
         '1 lab test without a linked Billing item. Link it in Laboratory when configuring ordering; direct Billing remains available.',
       ]);
@@ -125,6 +134,7 @@ describe('hospital setup progress', () => {
           ],
         }),
       ).find((s) => s.id === 'services')!;
+
       expect(services).toMatchObject({ status: 'done', summary: '1 active care service' });
     });
 
@@ -136,6 +146,7 @@ describe('hospital setup progress', () => {
           test('Eye clinic', 'd-opd', { configuration: 'draft' }),
         ],
       });
+
       expect(setupSteps(draftOnly).find((s) => s.id === 'services')!.status).toBe('started');
       expect(
         setupSteps(draftOnly, new Set(['services'])).find((s) => s.id === 'services')!.status,
@@ -171,6 +182,7 @@ describe('hospital setup progress', () => {
       facts({ facility: { timeZone: 'Africa/Lagos' } }),
       new Set(['facility', 'places', 'services', 'prices', 'staff']),
     );
+
     expect(steps.find((s) => s.id === 'facility')?.status).toBe('done');
     expect(steps.find((s) => s.id === 'places')?.status).toBe('not_needed');
     expect(setupProgress(steps)).toMatchObject({

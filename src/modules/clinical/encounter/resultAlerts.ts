@@ -32,14 +32,17 @@ export const resultAlerts = (
   staffId: string,
 ): ResultAlert[] => {
   const effective = effectiveEncounterEntries(entries);
+
   const orderedBy = new Map(
     effective.filter((e) => e.step === 'lab_order').map((e) => [e.encounterId, e.createdBy]),
   );
+
   const reviewed = new Set(
     effective
       .filter((e) => e.step === 'result_review')
       .flatMap((e) => e.values.resultEntryIds as string[]),
   );
+
   return (
     effective
       .filter(

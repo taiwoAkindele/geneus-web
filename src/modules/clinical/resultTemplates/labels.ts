@@ -11,6 +11,7 @@ export const STATUS_LABELS: Record<ResultTemplate['status'], string> = {
   draft: 'Draft',
   archived: 'Archived',
 };
+
 export const STATUS_TONES = {
   active: 'green',
   draft: 'amber',
@@ -19,7 +20,9 @@ export const STATUS_TONES = {
 
 const unitWord = (bound: AgeBound) =>
   bound.value === 1 ? bound.unit.replace(/s$/, '') : bound.unit;
+
 const bound = (b: AgeBound) => `${b.value} ${unitWord(b)}`;
+
 const AUDIENCE_WORDS: Record<string, string> = {
   female: 'Women',
   male: 'Men',
@@ -57,12 +60,15 @@ export const rangeSummary = (part: ResultPart): string => {
   if (part.kind !== 'number') {
     return '—';
   }
+
   if (!part.ranges.length) {
     return 'No range set';
   }
+
   if (part.ranges.length === 1) {
     return `${formatRange(part.ranges[0])} · ${rangeAudience(part.ranges[0])}`;
   }
+
   return `${part.ranges.length} ranges`;
 };
 
@@ -76,10 +82,13 @@ export const partKeyFor = (label: string, taken: readonly string[]): string => {
       .replace(/^_+|_+$/g, '')
       .replace(/^(\d)/, 'p_$1') || 'part'
   ).slice(0, 50);
+
   let key = base;
   let n = 2;
+
   while (taken.includes(key)) {
     key = `${base}_${n++}`;
   }
+
   return key;
 };

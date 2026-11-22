@@ -19,12 +19,15 @@ export const AmendSheet = ({
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
+
   const save = async () => {
     if (busy.current || !note.trim()) {
       return;
     }
+
     busy.current = true;
     setSaving(true);
+
     try {
       await onSave(note.trim());
     } finally {
@@ -32,6 +35,7 @@ export const AmendSheet = ({
       setSaving(false);
     }
   };
+
   return (
     <Sheet
       onClose={onClose}

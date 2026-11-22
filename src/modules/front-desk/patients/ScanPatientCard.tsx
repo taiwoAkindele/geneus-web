@@ -8,31 +8,41 @@ type BarcodeConstructor = new (options: { formats: string[] }) => Detector;
 export const ScanPatientCard = ({ onRead }: { onRead: (id: string) => void }) => {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
   const scan = async (file: File | undefined) => {
     if (!file) {
       return;
     }
+
     if (file.size > 10 * 1024 * 1024) {
       setMessage('This photo is too large. Use a smaller photo or enter the Patient ID.');
+
       return;
     }
+
     const DetectorClass = (globalThis as unknown as { BarcodeDetector?: BarcodeConstructor })
       .BarcodeDetector;
+
     if (!DetectorClass) {
       setMessage(
         'This browser cannot scan QR codes. Enter the full Patient ID printed on the card.',
       );
+
       return;
     }
+
     setBusy(true);
     setMessage('');
     let image: ImageBitmap | undefined;
+
     try {
       image = await createImageBitmap(file, { resizeWidth: 1200 });
       const results = await new DetectorClass({ formats: ['qr_code'] }).detect(image);
+
       const id = results
         .map((r) => r.rawValue.trim().toUpperCase())
         .find((value) => PATIENT_ID_RE.test(value));
+
       if (id) {
         onRead(id);
       } else {
@@ -47,9 +57,11 @@ export const ScanPatientCard = ({ onRead }: { onRead: (id: string) => void }) =>
       setBusy(false);
     }
   };
+
   if (!(globalThis as unknown as { BarcodeDetector?: BarcodeConstructor }).BarcodeDetector) {
     return null;
   }
+
   return (
     <div className="space-y-2">
       <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-field border border-outline bg-white px-4 text-sm font-bold">

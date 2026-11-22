@@ -20,6 +20,7 @@ const PIN_ITERATIONS = 100_000;
 
 /** Every PIN set from now on. */
 export const PIN_LENGTH = 6;
+
 /** PINs set before 6 digits; their holders choose a 6-digit one at their next sign-in. */
 const LEGACY_PIN_LENGTH = 4;
 
@@ -42,9 +43,11 @@ type Store = Record<string, Credential>;
 
 const read = (): Store => {
   const raw = secureGet(STORAGE_KEY);
+
   if (!raw) {
     return {};
   }
+
   try {
     return JSON.parse(raw) as Store;
   } catch {
@@ -57,6 +60,7 @@ const write = (store: Store): Promise<void> => secureSet(STORAGE_KEY, JSON.strin
 const update = (staffId: string, change: (credential: Credential) => Credential) => {
   const store = read();
   const credential = store[staffId];
+
   if (credential) {
     void write({ ...store, [staffId]: change(credential) });
   }
@@ -83,6 +87,7 @@ export const setPin = async (staffId: string, pin: string): Promise<void> => {
   if (pin.length !== PIN_LENGTH || !/^\d+$/.test(pin)) {
     throw new Error(`A PIN is ${PIN_LENGTH} digits`);
   }
+
   const salt = randomSalt();
   const hash = await pbkdf2Base64(pin, salt, PIN_ITERATIONS);
   await write({
@@ -119,9 +124,11 @@ export const checkPin = async (
   now = Date.now(),
 ): Promise<PinCheck> => {
   const credential = read()[staffId];
+
   if (!credential) {
     return { ok: false, reason: 'no-pin' };
   }
+
   if (credential.lockedUntil && credential.lockedUntil > now) {
     return { ok: false, reason: 'locked', retryAt: credential.lockedUntil };
   }
@@ -134,6 +141,7 @@ export const checkPin = async (
       failures,
       lockedUntil: lockout ? now + lockout : undefined,
     }));
+
     return lockout
       ? { ok: false, reason: 'locked', retryAt: now + lockout }
       : { ok: false, reason: 'wrong' };
@@ -147,6 +155,7 @@ export const checkPin = async (
     const hash = await pbkdf2Base64(pin, salt, PIN_ITERATIONS);
     update(staffId, () => ({ salt, hash, iterations: PIN_ITERATIONS }));
   }
+
   return { ok: true };
 };
 

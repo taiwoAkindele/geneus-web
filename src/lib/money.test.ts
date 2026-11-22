@@ -22,6 +22,7 @@ describe('money entered as decimal text', () => {
     for (const value of ['', '0.001', '1e3', '-1', '1,000', '21474836.48']) {
       expect(() => parseAmount(value, 'NGN')).toThrow();
     }
+
     expect(() => parseAmount('1.5', 'JPY')).toThrow();
     expect(() => parseAmount('1', 'N')).toThrow();
   });
@@ -36,6 +37,7 @@ describe('offline receipt numbers', () => {
         'OOE-PHC-000500-AB',
       ]),
     ).toMatch(/^OOE-PHC-R-000010-[A-HJ-NP-Z2-9]{2}$/);
+
     expect(mintReceiptNumber('OOE', ['OOE-PHC-R-000999-K2'])).toMatch(/^OOE-R-000001-/);
   });
 

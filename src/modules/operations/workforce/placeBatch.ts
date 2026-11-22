@@ -13,6 +13,7 @@ export type PlannedPlace = {
 
 const normalized = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const siblings = (locations: readonly Location[], parentId: string | undefined) =>
   locations.filter((l) => l.active && (l.parentId ?? '') === (parentId ?? ''));
 
@@ -23,10 +24,12 @@ export const nextPlaceNumber = (
   locations: readonly Location[],
 ): number => {
   const pattern = new RegExp(`^${escapeRegExp(normalized(prefix))} (\\d+)$`);
+
   const numbers = siblings(locations, parentId)
     .map((l) => pattern.exec(normalized(l.name))?.[1])
     .filter(Boolean)
     .map(Number);
+
   return numbers.length ? Math.max(...numbers) + 1 : 1;
 };
 
@@ -40,8 +43,10 @@ export const planPlaces = (input: {
 }): PlannedPlace[] => {
   const taken = new Set(siblings(input.locations, input.parentId).map((l) => normalized(l.name)));
   const prefix = input.prefix.trim().replace(/\s+/g, ' ');
+
   return Array.from({ length: input.count }, (_, index) => {
     const name = `${prefix} ${input.start + index}`;
+
     return { index, name, exists: taken.has(normalized(name)) };
   });
 };
@@ -51,8 +56,10 @@ export const placeBatchProblem = (count: number, start: number): string | undefi
   if (!Number.isInteger(count) || count < 1 || count > MAX_PLACES_PER_BATCH) {
     return `Choose between 1 and ${MAX_PLACES_PER_BATCH} places`;
   }
+
   if (!Number.isInteger(start) || start < 0) {
     return 'Start numbering at a whole number, 0 or more';
   }
+
   return undefined;
 };

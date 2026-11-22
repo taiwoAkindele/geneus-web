@@ -15,6 +15,7 @@ import { RecordEditor } from './RecordEditor';
 import { RecordList } from './Workspaces';
 import { humanize } from './presentation';
 import type { EditorKind } from './editorFields';
+
 /** The field that identifies one piece of private evidence across its revisions. */
 const EVIDENCE_ID_FIELDS: Record<string, string> = {
   credential: 'credentialId',
@@ -61,14 +62,17 @@ const PrivateContent = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [resolution, setResolution] = useState('');
+
   const [editing, setEditing] = useState<{
     kind: EditorKind;
     previous?: AnyDocument;
     preset?: Record<string, unknown>;
   }>();
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError('');
+
     try {
       await action();
     } catch (cause) {
@@ -77,6 +81,7 @@ const PrivateContent = ({
       setBusy(false);
     }
   };
+
   const load = async () => {
     const [groups, held] = await Promise.all([
       Promise.all(
@@ -86,30 +91,39 @@ const PrivateContent = ({
       ),
       readPrivateRejections(context),
     ]);
+
     setRecords(groups.flat());
     setRejections(held.records.filter((r) => !r.resolvedOn));
   };
+
   useEffect(() => {
     void run(load);
+
     return () => {
       setRecords([]);
       setRejections([]);
     };
   }, [context.userId, staffId]);
+
   const correct = (rejection: SyncRejection) => {
     const raw = rejection.refusedRecord as Record<string, unknown> | undefined;
+
     if (
       !raw ||
       !['credential', 'capability_decision', 'reviewer_delegation'].includes(String(raw.type))
     ) {
       return;
     }
+
     const key = EVIDENCE_ID_FIELDS[String(raw.type)];
+
     const head = currentFacilityRevisions(records as never).find(
       (r) => r.type === raw.type && (r as unknown as Record<string, unknown>)[key] === raw[key],
     );
+
     setEditing({ kind: raw.type as EditorKind, previous: head, preset: raw });
   };
+
   return (
     <div className="space-y-4">
       {error ? (
@@ -235,6 +249,7 @@ const PrivateContent = ({
     </div>
   );
 };
+
 export const PrivateEvidence = (props: {
   staffId: string;
   data: WorkforceData;
@@ -244,6 +259,7 @@ export const PrivateEvidence = (props: {
   const [epoch, setEpoch] = useState(0);
   const [capturing, setCapturing] = useState(false);
   useEffect(() => () => clearPrivateWorkforce(), []);
+
   return (
     <section className="space-y-4 rounded-card border border-outline-soft bg-white p-4 md:p-5">
       <h2 className="text-lg font-bold">Private professional evidence</h2>

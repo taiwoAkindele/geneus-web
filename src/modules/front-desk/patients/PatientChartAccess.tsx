@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { canReadPatientChart } from '@shared';
 import { useAuthorizationContext } from '@/session';
+
 export const PatientChartAccess = ({ children }: { children: ReactNode }) =>
   canReadPatientChart(useAuthorizationContext()) ? (
     children

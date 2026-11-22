@@ -8,7 +8,7 @@ import {
   SETTLEMENT_LABELS,
   writeOff,
   type DisputeView,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { formatMoney, parseAmount } from '@/lib/money';
 import { useAuthorizationContext } from '@/session';
@@ -21,19 +21,24 @@ export const DECISION_LABELS: Record<PayerDecisionKind, string> = {
   returned: 'Returned for correction',
   denied: 'Denied',
 };
+
 const today = () => new Date().toISOString().slice(0, 10);
+
 /** An amount typed by a person, in minor units; undefined when it is not a valid amount. */
 const toMinor = (value: string, currency = 'NGN'): number | undefined => {
   if (!value.trim()) {
     return undefined;
   }
+
   try {
     const n = parseAmount(value, currency);
+
     return n >= 0 ? n : undefined;
   } catch {
     return undefined;
   }
 };
+
 const typed = (value: string) => value.replace(/[^\d.]/g, '');
 
 /**
@@ -54,29 +59,36 @@ export const SettlementPanel = ({
   const toast = useToast();
   const s = claim.settlement;
   const [disputes, setDisputes] = useState<DisputeView[]>([]);
+
   const loadDisputes = useCallback(async () => {
     try {
       setDisputes(
         (await listDisputes(context)).disputes.filter((d) => d.claimNumber === claim.claimNumber),
       );
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   }, [context, claim.claimNumber, onError]);
+
   useEffect(() => {
     void loadDisputes();
   }, [loadDisputes]);
+
   if (!s) {
     return null;
   }
+
   const money = (n: number) => formatMoney(n, claim.currency);
+
   const live =
     !claim.supersededBy && (claim.state === 'submitted' || claim.state === 'acknowledged');
+
   const done = (message: string) => {
     toast(message);
     void loadDisputes();
     onChanged();
   };
+
   return (
     <section
       aria-label="Payer response and payment"
@@ -170,7 +182,7 @@ export const SettlementPanel = ({
                   ...(payerReference ? { payerReference } : {}),
                 }).then(
                   () => done('Dispute opened.'),
-                  (cause) => onError(describeInsuranceError(cause)),
+                  (cause) => onError(describeStaffActionError(cause)),
                 )
               }
             />
@@ -184,7 +196,7 @@ export const SettlementPanel = ({
               onSubmit={(amountMinor, reason) =>
                 writeOff(context, { claimId: claim.id, amountMinor, reason }).then(
                   () => done('Written off. The patient owes nothing more because of it.'),
-                  (cause) => onError(describeInsuranceError(cause)),
+                  (cause) => onError(describeStaffActionError(cause)),
                 )
               }
             />
@@ -215,6 +227,7 @@ const DecisionForm = ({
   const [total, setTotal] = useState('');
   const [lines, setLines] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
   if (!open) {
     return (
       <Button variant="outlined" fullWidth={false} onClick={() => setOpen(true)}>
@@ -222,8 +235,10 @@ const DecisionForm = ({
       </Button>
     );
   }
+
   const save = async () => {
     setBusy(true);
+
     try {
       const partial = decision === 'partially_approved';
       await recordPayerDecision(context, {
@@ -245,14 +260,16 @@ const DecisionForm = ({
             }
           : {}),
       });
+
       setOpen(false);
       onSaved();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <form
       aria-label="Payer decision"
@@ -361,10 +378,13 @@ const ResolveDispute = ({
   onError: (m: string) => void;
 }) => {
   const context = useAuthorizationContext();
+
   const [outcome, setOutcome] = useState<'payer_agreed' | 'payer_upheld' | 'withdrawn'>(
     'payer_agreed',
   );
+
   const [note, setNote] = useState('');
+
   return (
     <form
       className="mt-2 flex flex-wrap items-end gap-2"
@@ -372,7 +392,7 @@ const ResolveDispute = ({
         e.preventDefault();
         resolveDispute(context, { disputeId: dispute.id, outcome, note: note.trim() }).then(
           onSaved,
-          (cause) => onError(describeInsuranceError(cause)),
+          (cause) => onError(describeStaffActionError(cause)),
         );
       }}
     >
@@ -418,15 +438,18 @@ const AmountForm = ({
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState(false);
   const minor = toMinor(amount);
+
   return (
     <form
       aria-label={label}
       className="space-y-2 rounded-field border border-outline-soft p-3"
       onSubmit={(e) => {
         e.preventDefault();
+
         if (!minor) {
           return;
         }
+
         setBusy(true);
         void onSubmit(minor, reason.trim(), reference.trim() || undefined).finally(() => {
           setBusy(false);

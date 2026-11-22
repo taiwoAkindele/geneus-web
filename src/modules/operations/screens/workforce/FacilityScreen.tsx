@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FacilityWorkspace } from '@/modules/operations/workforce';
+
 export const FacilityScreen = () => (
   <>
     <nav aria-label="Facility administration" className="flex flex-wrap gap-4 px-4 py-3">

@@ -20,11 +20,13 @@ export const CATEGORY_LABELS: Record<FeeCategory, string> = {
   procedure: 'Procedure',
   other: 'General / Other',
 };
+
 export const CHARGE_WHEN_LABELS: Record<ChargeWhen, string> = {
   first_visit: 'First visit only',
   every_visit: 'Every visit',
   when_ordered: 'Only when selected',
 };
+
 export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   general: 'General',
   follow_up: 'Follow-up',
@@ -46,12 +48,14 @@ export type RuleForm = {
   sex: '' | ExemptionRule['sex'];
   visitTypes: VisitType[];
 };
+
 export type FeeForm = {
   description?: string;
   name: string;
   category: FeeCategory;
   amount: string;
 };
+
 export type FeePolicyForm = {
   chargeWhen: ChargeWhen;
   exemptions: RuleForm[];
@@ -140,6 +144,7 @@ const draftSchema = FeeItem.pick({
 /** Forms hold strings; the shared schema remains the authority for the saved shape. */
 export const feeDraftFromForm = (form: FeeForm, currencyCode = 'NGN'): FeeDraft => {
   const currency = currencyCode.trim().toUpperCase();
+
   const result = draftSchema.safeParse({
     name: form.name.trim(),
     description: form.description?.trim() || undefined,
@@ -150,9 +155,11 @@ export const feeDraftFromForm = (form: FeeForm, currencyCode = 'NGN'): FeeDraft 
     chargeWhen: 'when_ordered',
     exemptions: [],
   });
+
   if (!result.success) {
     throw new Error(result.error.issues.map((issue) => issue.message).join('. '));
   }
+
   return result.data;
 };
 
@@ -169,6 +176,7 @@ export const feePolicyFromForm = (
       visitTypes: rule.visitTypes.length > 0 ? rule.visitTypes : undefined,
     })),
   });
+
   if (!result.success) {
     throw new Error(
       result.error.issues
@@ -177,10 +185,12 @@ export const feePolicyFromForm = (
             issue.path[0] === 'exemptions' && typeof issue.path[1] === 'number'
               ? `Exemption ${issue.path[1] + 1}: `
               : '';
+
           return `${rule}${issue.message}`;
         })
         .join('. '),
     );
   }
+
   return result.data;
 };

@@ -29,43 +29,54 @@ export const PriceUpload = ({
   const saving = useRef(false);
   const picker = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
+
   /** Clears the chosen file and its preview, so another (or the same, edited) file can be chosen. */
   const remove = () => {
     if (picker.current) {
       picker.current.value = '';
     }
+
     setFileName('');
     setRows([]);
     setError('');
     setNotice('');
     writes.current = undefined;
   };
+
   const read = async (file?: File) => {
     if (!file) {
       return;
     }
+
     setFileName(file.name);
     setError('');
     setNotice('');
     setRows([]);
     writes.current = undefined;
     setBusy(true);
+
     try {
       if (file.size > 4 * 1024 * 1024) {
         throw new Error('Use a file smaller than 4 MB');
       }
+
       if (!/\.(csv|xlsx)$/i.test(file.name)) {
         throw new Error('Choose a CSV or Excel (.xlsx) file');
       }
+
       const XLSX = await import('xlsx');
       const book = XLSX.read(await file.arrayBuffer(), { type: 'array', cellFormula: true });
+
       if (book.SheetNames.length !== 1) {
         throw new Error('Use one worksheet per upload');
       }
+
       const sheet = book.Sheets[book.SheetNames[0]];
+
       if (Object.values(sheet).some((cell) => cell && typeof cell === 'object' && 'f' in cell)) {
         throw new Error('Replace spreadsheet formulas with values before uploading');
       }
+
       const result = previewPrices(
         XLSX.utils.sheet_to_json<unknown[]>(sheet, {
           header: 1,
@@ -76,38 +87,47 @@ export const PriceUpload = ({
         fees,
         currency,
       );
+
       if (!result.length) {
         throw new Error('No items found');
       }
+
       setRows(result);
     } catch (e) {
       const message = userMessage(
         e,
         'The file could not be read. Check it is a CSV or Excel price list.',
       );
+
       setError(message);
       toast(message, { tone: 'error' });
     } finally {
       setBusy(false);
     }
   };
+
   const save = async () => {
     if (saving.current) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       writes.current ??= preparePriceWrites(rows, context, currency);
       const result = await saveConfiguration(context, writes.current, { billingImport: true });
+
       {
         const done = result.arrived
           ? 'Prices imported.'
           : 'Prices saved. They appear on this device after it syncs.';
+
         setNotice(done);
         toast(done);
       }
+
       setRows([]);
       onSaved();
     } catch (e) {
@@ -119,6 +139,7 @@ export const PriceUpload = ({
       saving.current = false;
     }
   };
+
   return (
     <Sheet
       title="Upload prices"

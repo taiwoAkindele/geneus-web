@@ -20,8 +20,10 @@ const xlsx = (
   extra?.(sheet);
   const book = utils.book_new();
   utils.book_append_sheet(book, sheet, 'Tariff');
+
   return new Uint8Array(write(book, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer);
 };
+
 const csv = (text: string) => new TextEncoder().encode(text);
 
 /** A zip with only a central directory: enough for the guard, which never decompresses. */
@@ -33,6 +35,7 @@ const fakeZip = (
   const central: number[] = [];
   const u16 = (n: number) => [n & 0xff, (n >> 8) & 0xff];
   const u32 = (n: number) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+
   for (const e of entries) {
     const name = [...new TextEncoder().encode(e.name)];
     central.push(
@@ -55,6 +58,7 @@ const fakeZip = (
       ...name,
     );
   }
+
   return new Uint8Array([
     ...parts,
     ...central,
@@ -78,18 +82,22 @@ describe('reading spreadsheets safely', () => {
         sheet['!ref'] = 'A1:C4';
       },
     );
+
     const [sheet] = parseWorkbook(book, 'tariff.xlsx').sheets;
     expect(sheet.rows[1]).toEqual(['Consultation', '1500', '3']);
     expect(sheet.rows[3]).toEqual(['Malaria RDT', '0', '']);
     expect(JSON.stringify(sheet)).not.toContain('SUM');
   });
+
   it('keeps CSV text as text, so a formula-like value is only ever data', () => {
     const [sheet] = parseWorkbook(
       csv('Service,Code,Price\r\n"=HYPERLINK(""http://example.org"")",+A1,"1,500.00"\r\n'),
       'tariff.csv',
     ).sheets;
+
     expect(sheet.rows[1]).toEqual(['=HYPERLINK("http://example.org")', '+A1', '1,500.00']);
   });
+
   it('enforces row, column and cell limits instead of reading everything', () => {
     const limits = {
       maxRows: 3,
@@ -98,27 +106,33 @@ describe('reading spreadsheets safely', () => {
       maxSheets: 2,
       maxFileBytes: 1_000_000,
     };
+
     const [sheet] = parseWorkbook(
       xlsx([['a', 'b', 'c'], ['1', 'abcdefghij'], ['2'], ['3'], ['4'], ['5']]),
       'x.xlsx',
       limits,
     ).sheets;
+
     expect(sheet.rows.length).toBeLessThanOrEqual(4);
     expect([sheet.truncatedRows, sheet.truncatedColumns, sheet.longCells]).toEqual([true, true, 1]);
     expect(sheet.rows[1][1]).toBe('abcde');
     expect(() => parseWorkbook(new Uint8Array(2_000_000), 'x.csv', limits)).toThrow(TableFileError);
   });
+
   it('refuses old binary workbooks, unknown types and binary data posing as CSV', () => {
     expect(() =>
       parseWorkbook(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), 'old.xls'),
     ).toThrow(/xls/);
+
     expect(() => parseWorkbook(csv('hello'), 'notes.docx')).toThrow(/xlsx or \.csv/);
     expect(() => parseWorkbook(new Uint8Array([65, 0, 66]), 'x.csv')).toThrow(/not a text CSV/);
   });
+
   it('refuses zip bombs, macros and encryption before decompressing anything', () => {
     expect(
       inspectZip(fakeZip([{ name: 'xl/workbook.xml', compressed: 1_000, uncompressed: 5_000 }])).ok,
     ).toBe(true);
+
     expect(
       inspectZip(
         fakeZip([
@@ -126,6 +140,7 @@ describe('reading spreadsheets safely', () => {
         ]),
       ),
     ).toMatchObject({ ok: false, reason: expect.stringMatching(/unsafe size/) });
+
     expect(
       inspectZip(
         fakeZip(
@@ -137,14 +152,17 @@ describe('reading spreadsheets safely', () => {
         ),
       ),
     ).toMatchObject({ ok: false });
+
     expect(
       inspectZip(fakeZip([{ name: 'xl/vbaProject.bin', compressed: 10, uncompressed: 10 }])),
     ).toMatchObject({ ok: false, reason: expect.stringMatching(/macros/) });
+
     expect(
       inspectZip(
         fakeZip([{ name: 'xl/workbook.xml', compressed: 10, uncompressed: 10, flags: 1 }]),
       ),
     ).toMatchObject({ ok: false, reason: expect.stringMatching(/password/) });
+
     expect(() =>
       parseWorkbook(
         fakeZip([{ name: 'xl/vbaProject.bin', compressed: 10, uncompressed: 10 }]),
@@ -179,9 +197,11 @@ const lyingZip = async (content: Uint8Array, claimedSize: number) => {
         .pipeThrough(new CompressionStream('deflate-raw')),
     ).arrayBuffer(),
   );
+
   const name = new TextEncoder().encode('xl/worksheets/sheet1.xml');
   const u16 = (n: number) => [n & 0xff, (n >> 8) & 0xff];
   const u32 = (n: number) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+
   const local = [
     ...u32(0x04034b50),
     ...u16(20),
@@ -196,6 +216,7 @@ const lyingZip = async (content: Uint8Array, claimedSize: number) => {
     ...name,
     ...data,
   ];
+
   const central = [
     ...u32(0x02014b50),
     ...u16(20),
@@ -215,6 +236,7 @@ const lyingZip = async (content: Uint8Array, claimedSize: number) => {
     ...u32(0),
     ...name,
   ];
+
   return new Uint8Array([
     ...local,
     ...central,
@@ -239,6 +261,7 @@ describe('proving decompressed size instead of trusting it', () => {
         ]),
       ),
     ).toMatchObject({ ok: true });
+
     const parsed = await parseWorkbookSafely(
       xlsx([
         ['Service', 'Price'],
@@ -246,8 +269,10 @@ describe('proving decompressed size instead of trusting it', () => {
       ]),
       't.xlsx',
     );
+
     expect(parsed.sheets[0].rows[1]).toEqual(['Consultation', '1500']);
   });
+
   it('stops decompressing a part that produces more than it declared', async () => {
     const bomb = await lyingZip(new Uint8Array(20 * 1024 * 1024), 1_000);
     expect(inspectZip(bomb).ok).toBe(true);
@@ -255,8 +280,10 @@ describe('proving decompressed size instead of trusting it', () => {
       ok: false,
       reason: expect.stringMatching(/unsafe size/),
     });
+
     await expect(parseWorkbookSafely(bomb, 'bomb.xlsx')).rejects.toThrow(/unsafe size/);
   });
+
   it('stops at the total limit even when every part tells the truth', async () => {
     const honest = await lyingZip(new Uint8Array(3 * 1024 * 1024), 3 * 1024 * 1024);
     expect(
@@ -278,6 +305,7 @@ describe('mapping columns', () => {
     ['', '', '', ''],
     ['2', 'L-02', 'Malaria RDT', '1000'],
   ];
+
   it('finds the header row under a title and suggests a column for each field', () => {
     const header = detectHeaderRow(rows, FIELDS);
     expect(header).toBe(2);
@@ -289,17 +317,20 @@ describe('mapping columns', () => {
       { sourceRow: 6, values: { payerCode: 'L-02', name: 'Malaria RDT', price: '1000' } },
     ]);
   });
+
   it('reports a required field nothing matched', () => {
     expect(
       missingRequired(suggestMapping(['Item', 'Cost?'], FIELDS), FIELDS).map((f) => f.key),
     ).toEqual(['name', 'price']);
   });
+
   it('recognises a saved template only for the same layout', () => {
     const template = {
       headerRow: 2,
       headers: ['s n', 'hmo code', 'service description', 'approved tariff'],
       mapping: { payerCode: 1, name: 2, price: 3 },
     };
+
     expect(templateFits(template, rows)).toBe(true);
     expect(templateFits(template, [[], [], ['S/N', 'Description', 'Code', 'Tariff']])).toBe(false);
   });
@@ -313,23 +344,27 @@ describe('matching services', () => {
     { id: 'fee:twin-a', name: 'Dressing' },
     { id: 'fee:twin-b', name: 'dressing' },
   ]);
+
   it('matches exactly by id, recorded code or identical name', () => {
     expect(matchRecord(index, { id: 'fee:rdt', name: 'anything' })).toEqual({
       kind: 'exact',
       id: 'fee:rdt',
       by: 'id',
     });
+
     expect(matchRecord(index, { code: 'c-01', name: 'Consult' })).toEqual({
       kind: 'exact',
       id: 'fee:consult',
       by: 'code',
     });
+
     expect(matchRecord(index, { name: 'MALARIA  rdt.' })).toEqual({
       kind: 'exact',
       id: 'fee:rdt',
       by: 'name',
     });
   });
+
   it('only suggests a near or ambiguous name, never deciding for the person', () => {
     const near = matchRecord(index, { name: 'Full blood count (FBC)' });
     expect(near.kind).toBe('suggested');
@@ -339,6 +374,7 @@ describe('matching services', () => {
       'fee:twin-a',
       'fee:twin-b',
     ]);
+
     expect(matchRecord(index, { name: 'Appendicectomy' })).toEqual({ kind: 'none' });
   });
 });

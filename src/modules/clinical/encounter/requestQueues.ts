@@ -45,6 +45,7 @@ export type ServiceRequest = {
   partSupplied?: boolean;
   superseded?: boolean;
 };
+
 export type RequestQueue = { open: ServiceRequest[]; completed: ServiceRequest[] };
 
 export const REQUEST_STEPS: readonly EncounterStep[] = [
@@ -58,22 +59,29 @@ export const REQUEST_STEPS: readonly EncounterStep[] = [
 
 const latest = (entries: readonly EncounterEntry[], step: EncounterStep) =>
   entries.filter((e) => e.step === step).sort((a, b) => b.createdOn.localeCompare(a.createdOn))[0];
+
 const newestFirst = (a: ServiceRequest, b: ServiceRequest) =>
   (b.completedOn ?? b.requestedOn).localeCompare(a.completedOn ?? a.requestedOn);
+
 const oldestFirst = (a: ServiceRequest, b: ServiceRequest) =>
   a.requestedOn.localeCompare(b.requestedOn);
+
 const quantityRequest = (
   source: PharmacyPrescription,
   saved: readonly EncounterEntry[],
   allocations: readonly ServiceChargeAllocation[] = [],
 ): ServiceRequest => {
   const states = prescriptionLines(source).map((line) => supplyState(source, line.lineId, saved));
+
   const pending = states
     .filter((state) => !state.complete || state.conflict)
     .map((state) => state.line!.drug);
+
   const priced = new Set(saved.map((e) => dispensingDetails(e)?.priceFor).filter(Boolean));
+
   const billingPending = saved.filter((e) => {
     const d = dispensingDetails(e);
+
     return (
       d?.prescriptionEntryId === source.id &&
       d.action === 'supply' &&
@@ -83,8 +91,10 @@ const quantityRequest = (
         allocatedQuantity(allocations, (a) => a.sourceEntryId === e.id) + 0.000001
     );
   }).length;
+
   const billingReviews = saved.flatMap((e) => {
     const d = dispensingDetails(e);
+
     if (
       d?.prescriptionEntryId !== source.id ||
       d.action !== 'supply' ||
@@ -95,6 +105,7 @@ const quantityRequest = (
     ) {
       return [];
     }
+
     return [
       {
         id: e.id,
@@ -109,6 +120,7 @@ const quantityRequest = (
       },
     ];
   });
+
   return {
     id: source.id,
     encounterId: source.encounterId,
@@ -129,16 +141,21 @@ export const requestQueues = (
   allocations: readonly ServiceChargeAllocation[] = [],
 ): { lab: RequestQueue; pharmacy: RequestQueue } => {
   const byEncounter = new Map<string, EncounterEntry[]>();
+
   for (const entry of effectiveEncounterEntries(entries)) {
     byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
   }
+
   const lab: RequestQueue = { open: [], completed: [] };
   const pharmacy: RequestQueue = { open: [], completed: [] };
+
   for (const [encounterId, saved] of byEncounter) {
     const order = latest(saved, 'lab_order');
+
     for (const requested of saved.filter((e) => e.step === 'lab_order')) {
       const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(requested.values);
       const results = saved.filter((e) => e.step === 'lab_results');
+
       const done = new Set(
         results.flatMap((e) =>
           ENCOUNTER_STEP_VALUES.lab_results
@@ -146,7 +163,9 @@ export const requestQueues = (
             .results.map((r) => r.orderItemId ?? r.test),
         ),
       );
+
       const pending = tests.filter((test, index) => !done.has(items?.[index]?.id ?? test));
+
       const billingReviews = items
         ?.filter(
           (i) =>
@@ -165,9 +184,11 @@ export const requestQueues = (
           recordedBy: requested.createdBy,
           recordedOn: requested.createdOn,
         }));
+
       if (requested.id !== order?.id && !billingReviews?.length) {
         continue;
       }
+
       const request = {
         id: requested.id,
         encounterId,
@@ -179,6 +200,7 @@ export const requestQueues = (
         billingReviews,
         ...(requested.id !== order?.id ? { superseded: true } : {}),
       };
+
       if (pending.length && requested.id === order?.id) {
         lab.open.push(request);
       } else {
@@ -191,25 +213,32 @@ export const requestQueues = (
         });
       }
     }
+
     // A visit recorded in the retired order carried its prescription on the diagnosis.
     const medication = latest(saved, 'prescription') ?? latest(saved, 'diagnosis');
+
     if (medication) {
       for (const older of saved.filter(
         (e) => e.id !== medication.id && (e.step === 'prescription' || e.step === 'diagnosis'),
       )) {
         const prior = quantityRequest(older, saved, allocations);
+
         if (prior.billingPending) {
           pharmacy.completed.push({ ...prior, superseded: true, pending: [] });
         }
       }
+
       const { prescription } =
         medication.step === 'prescription'
           ? ENCOUNTER_STEP_VALUES.prescription.parse(medication.values)
           : ENCOUNTER_STEP_VALUES.diagnosis.parse(medication.values);
+
       if (prescription.length) {
         const quantityTracked = saved.some((e) => e.pharmacyVersion === 1);
+
         if (quantityTracked) {
           const request = quantityRequest(medication, saved, allocations);
+
           if (request.pending.length) {
             pharmacy.open.push(request);
           } else {
@@ -222,9 +251,12 @@ export const requestQueues = (
                 .slice(-1)[0],
             });
           }
+
           continue;
         }
+
         const dispensed = latest(saved, 'dispense');
+
         const request = {
           id: medication.id,
           encounterId,
@@ -233,6 +265,7 @@ export const requestQueues = (
           items: prescription.map((line) => line.drug),
           pending: [],
         };
+
         if (dispensed) {
           pharmacy.completed.push({ ...request, completedOn: dispensed.createdOn });
         } else {
@@ -241,12 +274,14 @@ export const requestQueues = (
       }
     }
   }
+
   for (const summary of wardEvents.filter(
     (e) => e.values.kind === 'discharge' && e.values.takeHome.length,
   )) {
     const saved = entries.filter((e) => e.encounterId === summary.encounterId);
     const request = quantityRequest(summary, saved, allocations);
     const current = dischargeHeads(wardEvents.filter((e) => e.admissionId === summary.admissionId));
+
     if (!current.some((e) => e.id === summary.id)) {
       pharmacy.completed.push({
         ...request,
@@ -267,9 +302,11 @@ export const requestQueues = (
       });
     }
   }
+
   for (const queue of [lab, pharmacy]) {
     queue.open.sort(oldestFirst);
     queue.completed.sort(newestFirst);
   }
+
   return { lab, pharmacy };
 };

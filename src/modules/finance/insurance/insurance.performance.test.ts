@@ -25,6 +25,7 @@ const base = {
   createdBy: 'staff:one',
   createdOn: '2026-11-12T09:00:00.000Z',
 };
+
 const terms = PayerContractTerms.parse({
   payerId: 'payer:a',
   effectiveFrom: '2026-01-01',
@@ -44,6 +45,7 @@ const terms = PayerContractTerms.parse({
     },
   ],
 });
+
 const schedule = CoverSchedule.parse({
   ...base,
   id: 's',
@@ -65,8 +67,10 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
   const covers: PatientCover[] = [];
   const checks: CoverCheck[] = [];
   const payments: Payment[] = [];
+
   for (let p = 0; p < patients; p++) {
     const patientId = `QA-${String(p).padStart(6, '0')}-K2`;
+
     if (p % Math.round(1 / insuredShare) === 0) {
       covers.push(
         PatientCover.parse({
@@ -81,6 +85,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
           active: true,
         }),
       );
+
       checks.push(
         CoverCheck.parse({
           ...base,
@@ -95,6 +100,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
         }),
       );
     }
+
     for (let c = 0; c < chargesPerPatient; c++) {
       const id = `charge:${p}:${c}`;
       charges.push(
@@ -111,6 +117,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
           currency: 'NGN',
         }),
       );
+
       if (c === 0) {
         payments.push(
           Payment.parse({
@@ -128,6 +135,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
       }
     }
   }
+
   const data: CoverageData = {
     covers,
     checks,
@@ -140,6 +148,7 @@ const build = (patients: number, chargesPerPatient: number, insuredShare: number
     timeZone: 'Africa/Lagos',
     billingPeriods: [{ from: '2000-01-01T00:00:00.000Z' }],
   };
+
   return { charges, payments, data };
 };
 
@@ -154,6 +163,7 @@ describe('billing performance with insurance', () => {
     console.log(
       `estimates: ${estimated.toFixed(0)} ms; estimates + balances: ${total.toFixed(0)} ms for ${charges.length} charges, ${data.covers.length} covers`,
     );
+
     expect(rows.filter((r) => r.coverage).length).toBe(data.covers.length * 3);
     expect(estimated).toBeLessThan(1_500);
   });

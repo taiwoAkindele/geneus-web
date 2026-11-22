@@ -19,9 +19,12 @@ import { zonedInput, zonedInstant } from '@/lib/workforceTime';
 import { editorFields, type EditorKind, type Field, type Values } from './editorFields';
 import { humanize, recordName } from './presentation';
 import { nextPlaceNumber, placeBatchProblem, planPlaces, type PlannedPlace } from './placeBatch';
+
 const text = (values: Values, key: string) => String(values[key] ?? '').trim();
+
 const list = (values: Values, key: string) =>
   Array.isArray(values[key]) ? (values[key] as string[]) : [];
+
 /** What a new record of this kind starts as. */
 const DEFAULT_RECORD_KINDS: Partial<Record<EditorKind, string>> = {
   unit: 'unit',
@@ -75,12 +78,14 @@ const defaults = (
 ): Values => {
   const raw = { ...record, ...preset } as Record<string, unknown>;
   record = raw as AnyDocument;
+
   const zone = String(
     raw.timeZone ||
       data.offerings.find((o) => o.id === raw.offeringId)?.timeZone ||
       data.facility?.timeZone ||
       'Africa/Lagos',
   );
+
   const values: Values = {
     active: true,
     kind: DEFAULT_RECORD_KINDS[kind] ?? 'room',
@@ -100,6 +105,7 @@ const defaults = (
     scopeKind: 'offerings',
     timeZone: zone,
   };
+
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === 'boolean' || typeof value === 'string') {
       values[key] = value;
@@ -109,6 +115,7 @@ const defaults = (
       values[key] = value;
     }
   }
+
   for (const key of ['unitId', 'organizationUnitId', ...(kind === 'unit' ? ['parentId'] : [])]) {
     if (typeof raw[key] === 'string') {
       values[key] =
@@ -116,36 +123,44 @@ const defaults = (
         (raw[key] as string);
     }
   }
+
   for (const key of ['startsAt', 'endsAt']) {
     if (typeof raw[key] === 'string') {
       values[key] = zonedInput(raw[key] as string, zone);
     }
   }
+
   if (record?.type === 'practitioner_profile') {
     values.professionCode = record.profession.code;
     values.professionLabel = record.profession.label;
     values.specialties = record.specialties.map((s) => s.label).join('\n');
   }
+
   if (record?.type === 'service_session') {
     values.participants = record.participants.map(
       (p) =>
         data.assignments.find((a) => a.assignmentId === p.assignmentId && a.staffId === p.staffId)
           ?.id ?? '',
     );
+
     for (const p of record.participants) {
       values[`commitment:${p.assignmentId}`] = p.commitment;
     }
+
     values.resources = record.resources.map((r) => r.locationId);
+
     for (const r of record.resources) {
       values[`mode:${r.locationId}`] = r.mode;
       values[`units:${r.locationId}`] = String(r.units);
     }
   }
+
   if (record?.type === 'capability_decision') {
     values.scopeKind = record.scope.kind;
     values.actions = record.scope.actions;
     values.offeringIds = record.scope.kind === 'offerings' ? record.scope.offeringIds : [];
   }
+
   if (record?.type === 'reviewer_delegation') {
     values.scopeKind = record.scopes.length === 1 ? record.scopes[0].kind : 'offerings';
     values.actions = [...new Set(record.scopes.flatMap((s) => s.actions))];
@@ -153,8 +168,10 @@ const defaults = (
       ...new Set(record.scopes.flatMap((s) => (s.kind === 'offerings' ? s.offeringIds : []))),
     ];
   }
+
   return values;
 };
+
 export const RecordEditor = ({
   kind,
   data,
@@ -182,6 +199,7 @@ export const RecordEditor = ({
   const errorBox = useRef<HTMLDivElement>(null);
   const definition = useRef<string>();
   const slot = `${kind}:${previous?.id || String(preset?.id || preset?.staffId || preset?.offeringId || 'new')}`;
+
   const {
     register,
     watch,
@@ -191,32 +209,43 @@ export const RecordEditor = ({
     handleSubmit,
     formState: { errors, isDirty },
   } = useForm<Values>({ defaultValues: defaults(kind, data, previous, preset) });
+
   /** The places a new-place batch would create, or undefined for a single place or any other record. Throws when the batch cannot be planned. */
   const batchPlan = (form: Values): PlannedPlace[] | undefined => {
     if (kind !== 'location' || previous) {
       return undefined;
     }
+
     const count = Number(text(form, 'placeCount') || '1');
+
     if (count === 1) {
       return undefined;
     }
+
     const parentId = text(form, 'parentId') || undefined;
     const prefix = text(form, 'name');
     const batchId = text(form, '_batchId');
+
     // Places this batch already saved are its own, not existing names to skip.
     const locations = batchId
       ? data.locations.filter((l) => !l.id.startsWith(`location:${batchId}:`))
       : data.locations;
+
     const start = text(form, 'placeStart')
       ? Number(text(form, 'placeStart'))
       : nextPlaceNumber(prefix, parentId, locations);
+
     const problem = placeBatchProblem(count, start);
+
     if (problem) {
       throw new Error(problem);
     }
+
     return planPlaces({ prefix, count, start, parentId, locations });
   };
+
   const values = watch();
+
   const fields = editorFields(kind, data, values, privateRecords, !previous).map((f) => {
     if (
       kind === 'credential' &&
@@ -226,25 +255,33 @@ export const RecordEditor = ({
     ) {
       return { ...f, options: f.options?.filter((o) => o.value === 'unverified') };
     }
+
     if (['capability_decision', 'reviewer_delegation'].includes(kind) && f.key === 'staffId') {
       return { ...f, options: f.options?.filter((o) => o.value !== context.userId) };
     }
+
     return f;
   });
+
   useEffect(() => {
     let alive = true;
     void (async () => {
       let actor = context;
       const worker = data.staff.find((s) => s.staffId === context.userId);
+
       if (worker) {
         actor = withReviewerAuthority(context, worker, await ownProof(context, data), Date.now());
       }
+
       const recovered = await readWorkforceDraft<Values>(actor, slot);
+
       if (alive) {
         setDraftContext(actor);
+
         if (recovered) {
           reset(recovered);
         }
+
         setReady(true);
       }
     })().catch((cause) => {
@@ -253,49 +290,62 @@ export const RecordEditor = ({
         setReady(true);
       }
     });
+
     return () => {
       alive = false;
     };
   }, [context.userId, slot]);
+
   useEffect(() => {
     if (!ready || !isDirty) {
       return;
     }
+
     const timer = setTimeout(() => {
       void writeWorkforceDraft(draftContext, slot, getValues()).catch(() =>
         setError('Draft recovery could not be saved. Keep this editor open until you save'),
       );
     }, 400);
+
     return () => clearTimeout(timer);
   }, [values, ready, isDirty, draftContext, slot, getValues]);
+
   useEffect(() => {
     if (error) {
       errorBox.current?.focus();
     }
   }, [error]);
+
   useEffect(() => {
     if (kind === 'unit' && values.kind === 'department' && values.routingEnabled) {
       setValue('routingEnabled', false);
     }
   }, [kind, values.kind, values.routingEnabled, setValue]);
+
   const save = handleSubmit(
     async (form) => {
       if (busy) {
         return;
       }
+
       let plan: PlannedPlace[] | undefined;
+
       try {
         plan = batchPlan(form);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'These places could not be planned');
+
         return;
       }
+
       if (plan?.every((place) => place.exists)) {
         setError(
           'Every one of these names is already used in this place. Change the name or the start number',
         );
+
         return;
       }
+
       // A batch is always previewed: the review lists every name before anything is written.
       const consequential =
         Boolean(plan) ||
@@ -310,18 +360,24 @@ export const RecordEditor = ({
             text(form, 'parentId') !==
               String((previous as Record<string, unknown>).parentId ?? '')),
         );
+
       if (consequential && !review) {
         setReview(true);
         setError('');
+
         return;
       }
+
       setBusy(true);
       setError('');
+
       try {
         const payload: Record<string, unknown> = {};
+
         for (const field of fields) {
           payload[field.key] = payloadValue(field, form);
         }
+
         for (const key of [
           'repeatCount',
           'placeCount',
@@ -333,32 +389,40 @@ export const RecordEditor = ({
         ]) {
           delete payload[key];
         }
+
         if (plan) {
           const batchId = text(form, '_batchId') || crypto.randomUUID();
           setValue('_batchId', batchId);
           await writeWorkforceDraft(draftContext, slot, getValues());
           let added = 0;
+
           for (const place of plan) {
             if (!place.exists) {
               await saveBatchPlace({ ...payload, name: place.name }, context, batchId, place.index);
               added++;
             }
+
             setValue('_completedOccurrences', String(place.index + 1));
             await writeWorkforceDraft(draftContext, slot, getValues());
           }
+
           await clearWorkforceDraft(draftContext, slot);
           toast(
             `${added} place${added === 1 ? '' : 's'} saved on this device. Server acceptance will appear after sync`,
           );
+
           onSaved?.();
           onClose();
+
           return;
         }
+
         const zone =
           text(form, 'timeZone') ||
           data.offerings.find((o) => o.id === form.offeringId)?.timeZone ||
           data.facility?.timeZone ||
           'Africa/Lagos';
+
         for (const key of ['startsAt', 'endsAt']) {
           if (text(form, key)) {
             payload[key] = zonedInstant(
@@ -368,6 +432,7 @@ export const RecordEditor = ({
             );
           }
         }
+
         if (kind === 'service_definition') {
           payload.concept =
             previous?.type === 'service_definition'
@@ -378,15 +443,18 @@ export const RecordEditor = ({
                   label: text(form, 'name'),
                 };
         }
+
         if (kind === 'service_definition') {
           payload.category = text(form, 'category');
         }
+
         if (kind === 'service_offering' && form.serviceDefinitionId === 'new') {
           if (text(form, '_definitionName') === text(form, 'name')) {
             definition.current = text(form, '_definitionId') || definition.current;
           } else if (text(form, '_definitionName')) {
             definition.current = undefined;
           }
+
           if (!definition.current) {
             const created = await saveWorkforce(
               'service_definition',
@@ -403,13 +471,16 @@ export const RecordEditor = ({
               },
               context,
             );
+
             definition.current = created.id;
             setValue('_definitionId', created.id);
             setValue('_definitionName', text(form, 'name'));
             await writeWorkforceDraft(draftContext, slot, getValues());
           }
+
           payload.serviceDefinitionId = definition.current;
         }
+
         if (kind === 'practitioner_profile') {
           payload.profession =
             previous?.type === 'practitioner_profile' &&
@@ -426,6 +497,7 @@ export const RecordEditor = ({
                       ? text(form, 'professionLabel')
                       : humanize(text(form, 'professionCode')),
                 };
+
           payload.specialties = text(form, 'specialties')
             .split(/\r?\n/)
             .map((s) => s.trim())
@@ -440,13 +512,16 @@ export const RecordEditor = ({
                 : { system: 'urn:geneus:local-specialty', code: s.toLowerCase(), label: s },
             );
         }
+
         if (kind === 'unit' && form.kind === 'department') {
           payload.routingEnabled = false;
         }
+
         if (kind === 'credential' && form.verification !== 'unverified') {
           payload.checkedBy = context.userId;
           payload.checkedOn = new Date().toISOString();
         }
+
         if (kind === 'capability_decision' || kind === 'reviewer_delegation') {
           const scope =
             form.scopeKind === 'facility'
@@ -456,9 +531,11 @@ export const RecordEditor = ({
                   offeringIds: list(form, 'offeringIds'),
                   actions: list(form, 'actions'),
                 };
+
           delete payload.scopeKind;
           delete payload.offeringIds;
           delete payload.actions;
+
           if (kind === 'capability_decision') {
             payload.scope = scope;
           } else {
@@ -469,34 +546,44 @@ export const RecordEditor = ({
                 : [scope];
           }
         }
+
         if (kind === 'service_session') {
           payload.participants = list(form, 'participants').map((id) => {
             const assignment = data.assignments.find((a) => a.id === id);
+
             if (!assignment) {
               throw new Error('A selected assignment is no longer available');
             }
+
             return {
               assignmentId: assignment.assignmentId,
               staffId: assignment.staffId,
               commitment: text(form, `commitment:${assignment.assignmentId}`) || 'exclusive',
             };
           });
+
           payload.resources = list(form, 'resources').map((locationId) => ({
             locationId,
             mode: text(form, `mode:${locationId}`) || 'exclusive',
             units: Number(text(form, `units:${locationId}`) || '1'),
           }));
         }
+
         const repeats = kind === 'service_session' && !previous ? Number(form.repeatCount || 1) : 1;
+
         if (!Number.isInteger(repeats) || repeats < 1 || repeats > 12) {
           throw new Error('Choose between one and twelve weekly occurrences');
         }
+
         const seriesId = repeats > 1 ? text(form, '_seriesId') || crypto.randomUUID() : undefined;
+
         // Check every wall-clock occurrence before writing any part of a finite series.
         const occurrences = Array.from({ length: repeats }, (_, index) => {
           const occurrence = { ...payload };
+
           if (seriesId) {
             occurrence.seriesId = seriesId;
+
             for (const key of ['startsAt', 'endsAt']) {
               const date = new Date(`${text(form, key)}:00Z`);
               date.setUTCDate(date.getUTCDate() + 7 * index);
@@ -507,24 +594,30 @@ export const RecordEditor = ({
               );
             }
           }
+
           return occurrence;
         });
+
         if (seriesId) {
           setValue('_seriesId', seriesId);
           await writeWorkforceDraft(draftContext, slot, getValues());
         }
+
         for (let index = 0; index < repeats; index++) {
           const occurrence = occurrences[index];
+
           if (seriesId) {
             await saveWeeklyOccurrence(occurrence, context, seriesId, index);
           } else {
             await saveWorkforce(kind, occurrence, context, previous);
           }
+
           if (seriesId) {
             setValue('_completedOccurrences', String(index + 1));
             await writeWorkforceDraft(draftContext, slot, getValues());
           }
         }
+
         await clearWorkforceDraft(draftContext, slot);
         toast('Saved on this device. Server acceptance will appear after sync');
         onSaved?.();
@@ -541,9 +634,11 @@ export const RecordEditor = ({
       setError('Complete the highlighted fields before continuing');
     },
   );
+
   const selectedAssignments = currentFacilityRevisions(data.assignments).filter((a) =>
     list(values, 'participants').includes(a.id),
   );
+
   const previewPlan = (() => {
     try {
       return review ? batchPlan(values) : undefined;
@@ -551,7 +646,9 @@ export const RecordEditor = ({
       return undefined;
     }
   })();
+
   const seriesNoun = kind === 'location' ? 'places' : 'occurrences';
+
   return (
     <Sheet
       title={`${previous ? 'Update' : 'Add'} ${humanize(kind).toLowerCase()}`}
@@ -635,11 +732,13 @@ export const RecordEditor = ({
             >
               {fields.map((f) => {
                 const message = errors[f.key] ? 'Complete this field' : undefined;
+
                 const locked =
                   (kind === 'practitioner_profile' && Boolean(previous) && f.key === 'staffId') ||
                   (previous?.type === 'reviewer_delegation' &&
                     previous.scopes.length > 1 &&
                     ['scopeKind', 'actions', 'offeringIds'].includes(f.key));
+
                 if (
                   kind === 'practitioner_profile' &&
                   previous?.type === 'practitioner_profile' &&
@@ -659,6 +758,7 @@ export const RecordEditor = ({
                     </div>
                   );
                 }
+
                 const props = {
                   ...register(f.key, {
                     required: !locked && f.required && f.kind !== 'boolean' ? 'Required' : false,
@@ -668,6 +768,7 @@ export const RecordEditor = ({
                   help: { purpose: f.help },
                   error: message,
                 };
+
                 if (f.kind === 'multi') {
                   return (
                     <fieldset key={f.key} className="rounded-field border border-outline-soft p-3">
@@ -697,6 +798,7 @@ export const RecordEditor = ({
                     </fieldset>
                   );
                 }
+
                 if (f.kind === 'boolean') {
                   return (
                     <label
@@ -715,6 +817,7 @@ export const RecordEditor = ({
                     </label>
                   );
                 }
+
                 if (f.kind === 'select') {
                   return (
                     <SelectField
@@ -727,9 +830,11 @@ export const RecordEditor = ({
                     />
                   );
                 }
+
                 if (f.kind === 'textarea') {
                   return <TextAreaField key={f.key} {...props} />;
                 }
+
                 return (
                   <TextField
                     key={f.key}
@@ -823,6 +928,7 @@ export const RecordEditor = ({
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);
+
                   try {
                     await clearWorkforceDraft(draftContext, slot);
                     toast('Saved sessions kept. Remaining series draft closed');

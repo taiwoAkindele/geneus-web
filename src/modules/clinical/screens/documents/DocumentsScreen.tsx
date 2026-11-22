@@ -24,6 +24,7 @@ export const documentSize = (size: number) =>
   size < 1024 * 1024
     ? `${Math.max(1, Math.round(size / 1024))} KB`
     : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+
 export const DocumentsScreen = () => {
   const context = useAuthorizationContext();
   const query = useClinicalDocuments();
@@ -39,6 +40,7 @@ export const DocumentsScreen = () => {
   useEffect(() => {
     document.title = 'Documents · Geneus Health';
   }, []);
+
   if (query.loading) {
     return (
       <p role="status" className="p-6">
@@ -46,6 +48,7 @@ export const DocumentsScreen = () => {
       </p>
     );
   }
+
   if (query.error || !query.data) {
     return (
       <div role="alert" className="p-6">
@@ -56,18 +59,23 @@ export const DocumentsScreen = () => {
       </div>
     );
   }
+
   const data = query.data;
   const supported = documentsSupported(context);
   const canWrite = context.permissions.includes('encounter:record') && supported;
+
   const library = data.libraryHeads.filter(
     (record) =>
       (archive === 'all' || (archive === 'archived' ? record.archived : !record.archived)) &&
       `${record.title} ${record.file.fileName}`.toLowerCase().includes(search.toLowerCase()),
   );
+
   const patientName = (id: string) =>
     data.patients.find((patient) => patient.patientId === id)?.fullName ?? id;
+
   const stay = (record: VisitDocument) =>
     data.inpatient.heads.find((event) => event.admissionId === record.admissionId);
+
   const visits = data.visitHeads.filter(
     (record) =>
       (!signature || record.signatureStatus === signature) &&
@@ -76,11 +84,14 @@ export const DocumentsScreen = () => {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+
   const location = (record: VisitDocument) => {
     const admission = stay(record);
+
     if (!admission) {
       return 'Stay location unavailable';
     }
+
     const place =
       [
         data.inpatient.locations.find((item) => item.id === admission.wardId)?.name,
@@ -88,8 +99,10 @@ export const DocumentsScreen = () => {
       ]
         .filter(Boolean)
         .join(' · ') || 'Awaiting bed';
+
     return admission.action === 'discharge' ? `${place} · Discharged` : place;
   };
+
   const file = (record: LibraryDocument | VisitDocument) => (
     <>
       <p className="font-bold">{record.title}</p>
@@ -103,8 +116,10 @@ export const DocumentsScreen = () => {
       ) : null}
     </>
   );
+
   const open = (record: LibraryDocument | VisitDocument, download = false) =>
     setPreview({ file: record.file, title: record.title, download });
+
   return (
     <div className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 md:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -203,90 +218,88 @@ export const DocumentsScreen = () => {
           </>
         )}
       </div>
-      {tab === 'library' ? (
-        library.length ? (
-          <WardTable
-            caption="Hospital document library"
-            rows={library}
-            rowKey={(record) => record.id}
-            columns={[
-              { key: 'document', label: 'Document', render: file },
-              {
-                key: 'updated',
-                label: 'Updated',
-                render: (record) => (
-                  <>
-                    <p>{new Date(record.createdOn).toLocaleDateString('en-GB')}</p>
-                    <p className="mt-1 text-sm text-ink-soft">
-                      {data.inpatient.staff.find((member) => member.staffId === record.createdBy)
-                        ?.fullName ?? record.createdBy}
-                    </p>
-                    {record.archived ? <Tag tone="slate">Archived</Tag> : null}
-                  </>
-                ),
-              },
-              {
-                key: 'actions',
-                label: 'Actions',
-                render: (record) => (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outlined" fullWidth={false} onClick={() => open(record)}>
-                      Preview
-                    </Button>
-                    <Button variant="ghost" fullWidth={false} onClick={() => open(record, true)}>
-                      Download
-                    </Button>
-                    <ActionMenu
-                      label={`Actions for ${record.title}`}
-                      actions={[
-                        {
-                          label: 'Version history',
-                          onSelect: () =>
-                            setHistory(
-                              data.library.filter((item) => item.documentId === record.documentId),
-                            ),
-                        },
-                        ...(canWrite &&
-                        data.libraryHeads.filter((item) => item.documentId === record.documentId)
-                          .length === 1
-                          ? [
-                              ...(!record.archived
-                                ? [
-                                    {
-                                      label: 'Replace file',
-                                      onSelect: () =>
-                                        setTask({ action: 'replace' as const, record }),
-                                    },
-                                    {
-                                      label: 'Rename',
-                                      onSelect: () =>
-                                        setTask({ action: 'rename' as const, record }),
-                                    },
-                                  ]
-                                : []),
-                              {
-                                label: record.archived ? 'Restore' : 'Archive',
-                                onSelect: () =>
-                                  setTask({
-                                    action: record.archived ? 'restore' : 'archive',
-                                    record,
-                                  }),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
-                  </div>
-                ),
-              },
-            ]}
-          />
-        ) : (
-          <p className="rounded-field border border-dashed border-outline p-6">
-            No library documents match this view.
-          </p>
-        )
-      ) : visits.length ? (
+      {tab === 'library' && library.length > 0 ? (
+        <WardTable
+          caption="Hospital document library"
+          rows={library}
+          rowKey={(record) => record.id}
+          columns={[
+            { key: 'document', label: 'Document', render: file },
+            {
+              key: 'updated',
+              label: 'Updated',
+              render: (record) => (
+                <>
+                  <p>{new Date(record.createdOn).toLocaleDateString('en-GB')}</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {data.inpatient.staff.find((member) => member.staffId === record.createdBy)
+                      ?.fullName ?? record.createdBy}
+                  </p>
+                  {record.archived ? <Tag tone="slate">Archived</Tag> : null}
+                </>
+              ),
+            },
+            {
+              key: 'actions',
+              label: 'Actions',
+              render: (record) => (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outlined" fullWidth={false} onClick={() => open(record)}>
+                    Preview
+                  </Button>
+                  <Button variant="ghost" fullWidth={false} onClick={() => open(record, true)}>
+                    Download
+                  </Button>
+                  <ActionMenu
+                    label={`Actions for ${record.title}`}
+                    actions={[
+                      {
+                        label: 'Version history',
+                        onSelect: () =>
+                          setHistory(
+                            data.library.filter((item) => item.documentId === record.documentId),
+                          ),
+                      },
+                      ...(canWrite &&
+                      data.libraryHeads.filter((item) => item.documentId === record.documentId)
+                        .length === 1
+                        ? [
+                            ...(!record.archived
+                              ? [
+                                  {
+                                    label: 'Replace file',
+                                    onSelect: () => setTask({ action: 'replace' as const, record }),
+                                  },
+                                  {
+                                    label: 'Rename',
+                                    onSelect: () => setTask({ action: 'rename' as const, record }),
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: record.archived ? 'Restore' : 'Archive',
+                              onSelect: () =>
+                                setTask({
+                                  action: record.archived ? 'restore' : 'archive',
+                                  record,
+                                }),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                </div>
+              ),
+            },
+          ]}
+        />
+      ) : null}
+      {tab === 'library' && library.length === 0 ? (
+        <p className="rounded-field border border-dashed border-outline p-6">
+          No library documents match this view.
+        </p>
+      ) : null}
+      {tab !== 'library' && visits.length > 0 ? (
         <WardTable
           caption="Visit document review"
           rows={visits}
@@ -343,11 +356,12 @@ export const DocumentsScreen = () => {
             },
           ]}
         />
-      ) : (
+      ) : null}
+      {tab !== 'library' && visits.length === 0 ? (
         <p className="rounded-field border border-dashed border-outline p-6">
           No visit documents match these filters.
         </p>
-      )}
+      ) : null}
       {tab === 'visits' ? (
         <p className="text-sm text-ink-soft">
           Add documents and signed copies from the patient chart for an active inpatient visit.

@@ -24,6 +24,7 @@ const context = (readOnly = false) =>
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const base = () => ({
   facilityId: 'TEST',
   schemaVersion: 5,
@@ -31,17 +32,20 @@ const base = () => ({
   deviceId: 'device:one',
   createdOn: new Date().toISOString(),
 });
+
 const patientId = 'TEST-000001-K2';
 
 describe('continuing inpatient care against real SQLite', () => {
   let storage: ReturnType<typeof sqliteTestDatabase>;
   let admissionId: string;
+
   const session = (purpose: WardSession['purpose'] = 'review'): WardSession => ({
     id: 'encounter:' + crypto.randomUUID(),
     admissionId,
     patientId,
     purpose,
   });
+
   beforeEach(async () => {
     vi.stubGlobal('localStorage', memoryStorage());
     resetSecureStorageForTests();
@@ -62,6 +66,7 @@ describe('continuing inpatient care against real SQLite', () => {
         ageYears: 30,
       }),
     );
+
     await storage.seed(
       Encounter.parse({
         ...base(),
@@ -71,6 +76,7 @@ describe('continuing inpatient care against real SQLite', () => {
         openedOn: new Date().toISOString(),
       }),
     );
+
     const request = EncounterEntry.parse({
       ...base(),
       id: 'entry:request',
@@ -81,6 +87,7 @@ describe('continuing inpatient care against real SQLite', () => {
       step: 'admission',
       values: { ward: 'Ward A', note: 'Recorded admission reason' },
     });
+
     await storage.seed(request);
     await storage.seed(
       Unit.parse({
@@ -92,9 +99,11 @@ describe('continuing inpatient care against real SQLite', () => {
         active: true,
       }),
     );
+
     await storage.seed(
       Location.parse({ ...base(), id: 'ward:a', type: 'location', kind: 'ward', name: 'Ward A' }),
     );
+
     await storage.seed(
       Location.parse({
         ...base(),
@@ -105,19 +114,24 @@ describe('continuing inpatient care against real SQLite', () => {
         parentId: 'ward:a',
       }),
     );
+
     const confirmed = await confirmAdmission(request, 'unit:ward', '', context());
     admissionId = confirmed.id;
+
     const reserved = await changeAdmission(confirmed, 'reserve', context(), {
       wardId: 'ward:a',
       bedId: 'bed:one',
     });
+
     await changeAdmission(reserved, 'arrive', context());
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await storage.db.close();
     vi.unstubAllGlobals();
   });
+
   const prescribe = async () => {
     const review = session();
     await saveWardStep(review, 'complaint', { note: 'Current ward assessment' }, context());
@@ -130,11 +144,14 @@ describe('continuing inpatient care against real SQLite', () => {
       },
       context(),
     );
+
     const order = (await readWardRecords(admissionId)).events.find(
       (e) => e.values.kind === 'medication',
     )!;
+
     return { review, order };
   };
+
   it('records nursing checks after the original consultation closes without creating outpatient attendances', async () => {
     await saveWardStep(
       session('nursing'),
@@ -142,6 +159,7 @@ describe('continuing inpatient care against real SQLite', () => {
       { note: 'Evening nursing review' },
       context(),
     );
+
     await saveWardStep(session('nursing'), 'vitals', { temperatureC: 36.8 }, context());
     const data = await readWardRecords(admissionId);
     expect(data.events.filter((e) => e.values.kind === 'complete')).toHaveLength(2);
@@ -149,6 +167,7 @@ describe('continuing inpatient care against real SQLite', () => {
       ward: 'Ward A',
       note: 'Recorded admission reason',
     });
+
     const report = monthlyReport(
       {
         encounters: [...data.encounters],
@@ -162,12 +181,15 @@ describe('continuing inpatient care against real SQLite', () => {
       },
       calendarDate().slice(0, 7),
     );
+
     expect(report.visits).toBe(1);
     expect(await allOfType('charge')).toHaveLength(0);
   });
+
   it('keeps original medication decisions and records actual doses and corrections separately', async () => {
     const { order } = await prescribe();
     const at = new Date().toISOString();
+
     const dose = await saveWardEvent(
       session('nursing'),
       {
@@ -180,6 +202,7 @@ describe('continuing inpatient care against real SQLite', () => {
       context(),
       { occurredOn: at },
     );
+
     await expect(
       saveWardEvent(
         session('nursing'),
@@ -188,6 +211,7 @@ describe('continuing inpatient care against real SQLite', () => {
         { occurredOn: at },
       ),
     ).rejects.toThrow(/already recorded/);
+
     await saveWardEvent(
       session('nursing'),
       {
@@ -201,21 +225,26 @@ describe('continuing inpatient care against real SQLite', () => {
       context(),
       { occurredOn: at },
     );
+
     const events = (await readWardRecords(admissionId)).events;
     expect(events.filter((e) => e.values.kind === 'administration')).toHaveLength(2);
     expect(events.find((e) => e.id === dose.id)?.values).toMatchObject({ outcome: 'given' });
     expect(await allOfType('stock_movement')).toHaveLength(0);
   });
+
   it('serializes order changes and refuses stale or stopped orders', async () => {
     const { order } = await prescribe();
+
     if (order.values.kind !== 'medication') {
       throw new Error('Expected order');
     }
+
     const stopped = await saveWardEvent(
       session(),
       { ...order.values, action: 'stop', previousId: order.id, note: 'Stopped after review' },
       context(),
     );
+
     await expect(
       saveWardEvent(
         session(),
@@ -223,6 +252,7 @@ describe('continuing inpatient care against real SQLite', () => {
         context(),
       ),
     ).rejects.toThrow(/changed/);
+
     await expect(
       saveWardEvent(
         session('nursing'),
@@ -231,9 +261,11 @@ describe('continuing inpatient care against real SQLite', () => {
       ),
     ).rejects.toThrow(/active medication/);
   });
+
   it('checks concurrent departure under the same write transaction, preserving the private proposal', async () => {
     const original = storage.db.writeTransaction;
     let raced = false;
+
     storage.db.writeTransaction = async (callback) => {
       if (!raced) {
         raced = true;
@@ -247,15 +279,19 @@ describe('continuing inpatient care against real SQLite', () => {
           departureException: 'Actual departure recorded elsewhere',
         });
       }
+
       return original(callback);
     };
+
     await expect(
       saveWardStep(session('nursing'), 'complaint', { note: 'Unaccepted proposal' }, context()),
     ).rejects.toThrow(/ended/);
+
     expect(
       (await allOfType<Encounter>('encounter')).filter((e) => e.inpatientContext),
     ).toHaveLength(0);
   });
+
   it('pins summary revisions, keeps the bed occupied until departure, and preserves the source history', async () => {
     await saveWardStep(session('nursing'), 'complaint', { note: 'Ward care' }, context());
     const records = await readWardRecords(admissionId);
@@ -264,6 +300,7 @@ describe('continuing inpatient care against real SQLite', () => {
     await expect(changeAdmission(head, 'ready_for_discharge', context())).rejects.toThrow(
       /summary/,
     );
+
     const values = {
       kind: 'discharge' as const,
       admissionReason: 'Recorded reason',
@@ -277,33 +314,41 @@ describe('continuing inpatient care against real SQLite', () => {
       patientIdentifier: patientId,
       admittedOn: original.createdOn,
     };
+
     const first = await saveWardEvent(session('discharge'), values, context());
+
     const revised = await saveWardEvent(
       session('discharge'),
       { ...values, previousId: first.id, instructions: 'Revised instructions' },
       context(),
     );
+
     await expect(
       saveWardEvent(session('discharge'), { ...values, previousId: first.id }, context()),
     ).rejects.toThrow(/changed/);
+
     const ready = await changeAdmission(head, 'ready_for_discharge', context());
     expect(ready.dischargeSummaryId).toBe(revised.id);
     expect(
       (await readWardRecords(admissionId)).events.find((e) => e.id === first.id)?.values,
     ).toMatchObject({ instructions: 'Reviewed instructions' });
+
     await changeAdmission(ready, 'discharge', context());
     await expect(
       saveWardStep(session(), 'complaint', { note: 'New work after departure' }, context()),
     ).rejects.toThrow(/ended/);
   });
+
   it('prevents read-only writes and refuses ward care before server support is negotiated', async () => {
     await expect(
       saveWardStep(session('nursing'), 'complaint', { note: 'Forbidden' }, context(true)),
     ).rejects.toThrow();
+
     rememberWardCareSupport(context());
     await expect(
       saveWardStep(session('nursing'), 'complaint', { note: 'Unsupported' }, context()),
     ).rejects.toThrow(/Connect once/);
+
     expect(await allOfType<WardCareEvent>('ward_care_event')).toHaveLength(0);
   });
 });

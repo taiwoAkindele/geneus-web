@@ -14,9 +14,12 @@ export const loadCareServices = async () => {
     allOfType<ServiceOffering>('service_offering'),
     allOfType<ServiceDefinition>('service_definition'),
   ]);
+
   return { offerings, definitions };
 };
+
 export type CareServiceRecords = Awaited<ReturnType<typeof loadCareServices>>;
+
 export const CARE_SERVICE_WATCH = ['service_offering', 'service_definition'] as const;
 
 /** What a booking, registration or visit records about its care: the service, when there is one, and the visit type. */
@@ -36,10 +39,12 @@ export const checkCareServiceChoice = async (
   if (!choice.offeringId) {
     return;
   }
+
   const issues = careServiceVisitIssues(
     { facilityId: context.facilityId, ...choice },
     await loadCareServices(),
   );
+
   if (issues.length) {
     throw new Error(issues.join('. '));
   }

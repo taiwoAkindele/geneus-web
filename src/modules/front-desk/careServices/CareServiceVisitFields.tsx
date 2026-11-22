@@ -18,6 +18,7 @@ export const defaultCareChoice = (
   visitType: VisitType,
 ): CareVisitChoice | undefined => {
   const service = services.find((s) => s.visitTypes.includes(visitType)) ?? services[0];
+
   return service
     ? {
         offeringId: service.id,
@@ -52,18 +53,22 @@ export const CareServiceVisitFields = ({
   const services = keep && !listed.some((s) => s.id === keep.id) ? [keep, ...listed] : listed;
   const selected = services.find((s) => s.id === value.offeringId);
   const emergencyListed = services.some((s) => s.visitTypes.includes('emergency'));
+
   const unset =
     query.data &&
     services.length > 0 &&
     !selected &&
     !(value.visitType === 'emergency' && !value.offeringId && !emergencyListed);
+
   // Pick a default only at the moment the choice becomes unset. `services` and `onChange`
   // are new on every render, so depending on them would keep re-applying the default.
   useEffect(() => {
     if (!unset) {
       return;
     }
+
     const start = defaultCareChoice(services, value.visitType);
+
     if (start) {
       onChange(start);
     }
@@ -79,6 +84,7 @@ export const CareServiceVisitFields = ({
       />
     );
   }
+
   if (!services.length) {
     return (
       <SelectField
@@ -94,6 +100,7 @@ export const CareServiceVisitFields = ({
     if (id === EMERGENCY) {
       return onChange({ visitType: 'emergency' });
     }
+
     const service = services.find((s) => s.id === id)!;
     onChange({
       offeringId: id,
@@ -102,6 +109,7 @@ export const CareServiceVisitFields = ({
         : service.visitTypes[0],
     });
   };
+
   return (
     <div className="space-y-3">
       <SelectField

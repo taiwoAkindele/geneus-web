@@ -27,6 +27,7 @@ describe('patient record tabs', () => {
     expect(patientChartPath('P-1', 'visits', { visit: 'v1' })).toBe(
       '/patients/profile?patient=P-1&tab=history&show=visits&visit=v1',
     );
+
     expect(patientChartPath('P-1', 'ward', { admission: 'a1' })).toBe(
       '/patients/profile?patient=P-1&tab=history&show=stays&admission=a1',
     );
@@ -37,10 +38,12 @@ describe('history period filter', () => {
   const now = new Date(2026, 10, 11, 12, 0);
   it('keeps everything for all dates', () =>
     expect(inPeriod(new Date(2020, 0, 1).toISOString(), 'all', now)).toBe(true));
+
   it('matches only the local calendar day for today', () => {
     expect(inPeriod(new Date(2026, 10, 11, 0, 5).toISOString(), 'today', now)).toBe(true);
     expect(inPeriod(new Date(2026, 10, 10, 23, 55).toISOString(), 'today', now)).toBe(false);
   });
+
   it('includes the last 30 calendar days including today', () => {
     expect(inPeriod(new Date(2026, 9, 13, 9, 0).toISOString(), '30d', now)).toBe(true);
     expect(inPeriod(new Date(2026, 9, 12, 9, 0).toISOString(), '30d', now)).toBe(false);

@@ -55,6 +55,7 @@ export const coverageLine = (
   if (!estimate) {
     return undefined;
   }
+
   switch (estimate.state) {
     case 'self_pay':
     case 'exempt':
@@ -92,6 +93,7 @@ export const CHECK_METHODS = [
   { value: 'letter', label: 'Letter' },
   { value: 'other', label: 'Other' },
 ] as const;
+
 export const CHECK_RESULTS = [
   { value: 'verified', label: 'Verified — cover is active' },
   { value: 'pending', label: 'Pending — waiting for the payer' },

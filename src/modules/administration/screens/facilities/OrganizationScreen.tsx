@@ -15,6 +15,7 @@ export const OrganizationScreen = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
   const load = useCallback(async () => {
     try {
       setData(await currentOrganization(context.userId));
@@ -23,16 +24,20 @@ export const OrganizationScreen = () => {
       setError(cause instanceof Error ? cause.message : 'Could not load organization');
     }
   }, [context.userId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const run = async (operation: () => Promise<unknown>, success: string) => {
     if (busy) {
       return;
     }
+
     setBusy(true);
     setError('');
     setMessage('');
+
     try {
       await operation();
       setMessage(success);
@@ -43,6 +48,7 @@ export const OrganizationScreen = () => {
       setBusy(false);
     }
   };
+
   const renderOrganization = () => {
     if (data?.organization) {
       return (
@@ -64,6 +70,7 @@ export const OrganizationScreen = () => {
                     '/organization/invitations',
                     context.userId,
                   );
+
                   setInvitation(
                     `${issued.code} · expires ${new Date(issued.expiresOn).toLocaleString()}`,
                   );

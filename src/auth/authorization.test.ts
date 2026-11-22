@@ -41,6 +41,7 @@ describe('assertAllowed', () => {
     expect(() => assertAllowed(contextFor(staff('nurse')), 'staff:manage')).toThrow(
       AuthorizationError,
     );
+
     try {
       assertAllowed(contextFor(staff('nurse')), 'staff:manage');
     } catch (cause) {
@@ -48,6 +49,7 @@ describe('assertAllowed', () => {
         kind: 'not_granted',
         permission: 'staff:manage',
       });
+
       expect((cause as AuthorizationError).message).toMatch(/role doesn't allow/);
     }
   });
@@ -65,6 +67,7 @@ describe('assertAllowed', () => {
     expect(isAllowed(admin, 'staff:manage')).toBe(false);
     expect(isAllowed(admin, 'device:enroll')).toBe(false);
     expect(isAllowed(admin, 'patient:update')).toBe(true);
+
     try {
       assertAllowed(admin, 'staff:manage');
     } catch (cause) {
@@ -90,6 +93,7 @@ describe('assertAllowed', () => {
     expect(anonymous.permissions).toEqual([]);
     expect(isAllowed(anonymous, 'patient:create')).toBe(false);
   });
+
   it('uses a newer trusted server contact when the signed-in context has an older snapshot', () => {
     const admin = contextFor(staff('facility_admin'), ago(2 * DAY));
     recordServerContact(ago(HOUR));
@@ -111,6 +115,7 @@ describe('authorizationFor', () => {
       deviceId: 'device-1',
       role: 'doctor',
     });
+
     expect(context.permissions).toContain('referral:update');
     expect(context.permissions).not.toContain('staff:manage');
     expect(context.policyVersion).toBeGreaterThan(0);

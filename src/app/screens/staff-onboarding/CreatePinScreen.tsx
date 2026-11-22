@@ -41,29 +41,39 @@ export const CreatePinScreen = () => {
     if (pin.length >= PIN_LENGTH || activating) {
       return;
     }
+
     const next = pin + digit;
+
     if (next.length < PIN_LENGTH) {
       setPin(next);
+
       return;
     }
+
     if (phase === 'choose') {
       setFirstPin(next);
       setPhase('confirm');
       setPin('');
       setError(false);
+
       return;
     }
+
     if (next !== firstPin) {
       setError(true);
       setPin('');
+
       return;
     }
+
     // An emailed invitation is accepted by the server first: only once it has checked the code,
     // the person and the facility is the PIN saved here. A code read aloud works offline as before.
     const invitationCode = pendingInvitationCode(staffId);
+
     if (invitationCode) {
       setActivating(true);
       setRefusal(undefined);
+
       try {
         await enrolStaffPin(staffId, deviceId, next, { setupCode: invitationCode });
         takeSetupCode(staffId);
@@ -73,17 +83,21 @@ export const CreatePinScreen = () => {
             ? 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.'
             : 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.',
         );
+
         setPin('');
         setFirstPin('');
         setPhase('choose');
+
         return;
       } finally {
         setActivating(false);
       }
     }
+
     if (takePinSetupApproval(staffId)) {
       await storePin(staffId, next);
     }
+
     navigate('/login', { replace: true });
   };
 

@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<AppointmentAction, string> = {
   rescheduled: 'Reschedule',
   reopened: 'Reopen booking',
 };
+
 const OUTCOME_LABELS: Record<AppointmentAction, string> = {
   arrived: 'Arrival recorded',
   cancelled: 'Booking cancelled',
@@ -33,6 +34,7 @@ const OUTCOME_LABELS: Record<AppointmentAction, string> = {
   rescheduled: 'Booking rescheduled',
   reopened: 'Booking reopened',
 };
+
 const timeOf = (at: string) =>
   new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -49,12 +51,15 @@ const ChangeSheet = ({
 }) => {
   const query = useAppointments();
   const toast = useToast();
+
   const [date, setDate] = useState(
     zone ? zonedInput(booking.at, zone).slice(0, 10) : calendarDate(booking.at),
   );
+
   const [time, setTime] = useState(
     zone ? zonedInput(booking.at, zone).slice(11) : timeOf(booking.at),
   );
+
   const [reason, setReason] = useState('');
   const [resource, setResource] = useState<AllocationProposal>({ allocation: booking.allocation });
   const [review, setReview] = useState<AppointmentChange>();
@@ -68,22 +73,30 @@ const ChangeSheet = ({
       reviewHeading.current?.focus();
     }
   }, [review]);
+
   useEffect(() => {
     if (error) {
       errorBox.current?.focus();
     }
   }, [error]);
+
   const prepare = () => {
     setError('');
+
     if (action !== 'arrived' && !reason.trim()) {
       setError('Explain the reason for this change.');
+
       return;
     }
+
     if (action === 'rescheduled' && resource.error) {
       setError(resource.error);
+
       return;
     }
+
     const target = new Date(resource.scheduledFor || `${date}T${time}`);
+
     if (
       action === 'rescheduled' &&
       (!date ||
@@ -93,8 +106,10 @@ const ChangeSheet = ({
         target.toISOString() === booking.scheduledFor)
     ) {
       setError('Choose a different future date and time.');
+
       return;
     }
+
     const history = booking.activity ?? [];
     setReview({
       action,
@@ -104,13 +119,16 @@ const ChangeSheet = ({
       expectedActivityId: history[history.length - 1]?.id,
     });
   };
+
   const save = async () => {
     if (!review || lock.current) {
       return;
     }
+
     lock.current = true;
     setSaving(true);
     setError('');
+
     try {
       await query.change(booking.id, review);
       toast(`${OUTCOME_LABELS[action]} on this device. Sync will send the change when connected.`);
@@ -126,6 +144,7 @@ const ChangeSheet = ({
       setSaving(false);
     }
   };
+
   const renderActionVerb = () => {
     if (action === 'arrived') {
       return 'arrival';
@@ -294,6 +313,7 @@ const ResourcesSheet = ({
   const [proposal, setProposal] = useState<AllocationProposal>({ allocation: booking.allocation });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   return (
     <Sheet
       title="Change booking resources"
@@ -323,6 +343,7 @@ const ResourcesSheet = ({
         onClick={async () => {
           setBusy(true);
           setError('');
+
           try {
             await reallocateAppointment(
               booking.id,
@@ -330,6 +351,7 @@ const ResourcesSheet = ({
               booking.allocation,
               context,
             );
+
             query.reload();
             onClose();
           } catch (cause) {
@@ -356,12 +378,15 @@ export const BookingChangeSheet = ({
   onClose: () => void;
 }) => {
   const workforce = useWorkforce();
+
   const zone = workforce.data?.offerings.find(
     (o) => o.id === booking.allocation?.offeringId,
   )?.timeZone;
+
   if (booking.allocation && !workforce.data) {
     return null;
   }
+
   return (
     <ChangeSheet
       key={`${booking.id}:${action}`}
@@ -378,13 +403,16 @@ export const AppointmentActions = ({ booking }: { booking: BookedAppointment }) 
   const context = useAuthorizationContext();
   const staff = useLiveQuery(listStaff);
   const workforce = useWorkforce();
+
   const zone = workforce.data?.offerings.find(
     (o) => o.id === booking.allocation?.offeringId,
   )?.timeZone;
+
   const [resources, setResources] = useState(false);
   const [action, setAction] = useState<AppointmentAction>();
   const inactive = bookingIsInactive(booking);
   const history = booking.activity ?? [];
+
   const actions: AppointmentAction[] = inactive
     ? ['reopened', 'rescheduled']
     : [
@@ -395,6 +423,7 @@ export const AppointmentActions = ({ booking }: { booking: BookedAppointment }) 
           ? ['no_show' as const]
           : []),
       ];
+
   return (
     <section
       className="mt-5 space-y-4 border-t border-outline-soft pt-5"

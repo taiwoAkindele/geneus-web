@@ -11,6 +11,7 @@ import { dispensePath } from './DispenseScreen';
 import { ModuleSettingsMenu } from '@/app/ModuleSettingsMenu';
 
 type Station = 'lab' | 'pharmacy';
+
 const COPY = {
   lab: {
     title: 'Laboratory',
@@ -58,10 +59,12 @@ const ServiceQueue = ({ station }: { station: Station }) => {
   useEffect(() => {
     document.title = `${copy.title} · Geneus Health`;
   }, [copy.title]);
+
   const set = (changes: Record<string, string>) =>
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
+
         for (const [key, value] of Object.entries(changes)) {
           if (value) {
             next.set(key, value);
@@ -69,15 +72,19 @@ const ServiceQueue = ({ station }: { station: Station }) => {
             next.delete(key);
           }
         }
+
         return next;
       },
       { replace: true },
     );
+
   const patient = useMemo(
     () => new Map((patients.data ?? []).map((p) => [p.patientId, p])),
     [patients.data],
   );
+
   const queue = queues.data?.[station];
+
   const rows = useMemo(
     () =>
       (tab === 'pricing'
@@ -94,6 +101,7 @@ const ServiceQueue = ({ station }: { station: Station }) => {
       ),
     [queue, tab, query, patient],
   );
+
   const openStatusText = (r: ServiceRequest) => {
     if (station === 'lab') {
       if (r.pending.length === r.items.length) {
@@ -201,6 +209,7 @@ const ServiceQueue = ({ station }: { station: Station }) => {
       label: 'Action',
       render: (r) => {
         const to = requestPath(r);
+
         return tab === 'open' ? (
           <Button fullWidth={false} className="px-3 text-sm" onClick={() => navigate(to)}>
             {copy.open}
@@ -218,6 +227,7 @@ const ServiceQueue = ({ station }: { station: Station }) => {
       },
     },
   ];
+
   const renderQueue = () => {
     if (queues.loading || patients.loading) {
       return <p role="status">Reading requests…</p>;

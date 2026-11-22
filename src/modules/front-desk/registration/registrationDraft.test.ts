@@ -13,6 +13,7 @@ describe('registration draft across steps', () => {
       address: 'Ring Road',
       phone: '0803',
     });
+
     const second = draft.read('new');
     draft.keep('new', { ...second, occupation: 'Teacher', religion: 'islam', folder: '2023/1187' });
     expect(draft.read('new', { fullName: '' })).toMatchObject({
@@ -31,6 +32,7 @@ describe('registration draft across steps', () => {
     expect(draft.read('patient:other', { fullName: 'Different patient', sex: 'F' }).fullName).toBe(
       'Different patient',
     );
+
     draft.clear('new');
     expect(draft.read('new')).toMatchObject({ fullName: '', sex: '' });
   });

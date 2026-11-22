@@ -14,6 +14,7 @@ const CHARGED: Record<FeeItem['chargeWhen'], string> = {
   every_visit: 'Every visit',
   first_visit: 'First visit',
 };
+
 type Status = 'active' | 'retired' | 'all';
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -49,6 +50,7 @@ export const FeeCatalog = ({
 
   const term = search.trim().toLowerCase();
   const matchesStatus = (fee: FeeItem, s: Status) => s === 'all' || fee.active === (s === 'active');
+
   const searched = fees.filter(
     (fee) =>
       !term ||
@@ -56,10 +58,13 @@ export const FeeCatalog = ({
         .toLowerCase()
         .includes(term),
   );
+
   const inStatus = searched.filter((fee) => matchesStatus(fee, status));
+
   const rows = inStatus
     .filter((fee) => !category || fee.category === category)
     .sort((a, b) => a.name.localeCompare(b.name));
+
   const categories = [...new Set(inStatus.map((fee) => fee.category))].sort((a, b) =>
     CATEGORY_LABELS[a].localeCompare(CATEGORY_LABELS[b]),
   );
@@ -67,13 +72,17 @@ export const FeeCatalog = ({
   const toggle = async (fee: FeeItem) => {
     if (!staffSessionToken(context)) {
       setNeedsSession(true);
+
       return;
     }
+
     if (lock.current) {
       return;
     }
+
     lock.current = true;
     setBusyId(fee.id);
+
     try {
       await setFeeItemActive(fee.id, !fee.active, context);
       toast(
@@ -81,6 +90,7 @@ export const FeeCatalog = ({
           ? `${fee.name} retired. Existing bills keep their prices.`
           : `${fee.name} restored.`,
       );
+
       onChanged();
     } catch (cause) {
       toast(userMessage(cause, 'This price could not be changed. Try again.'), { tone: 'error' });
@@ -89,12 +99,14 @@ export const FeeCatalog = ({
       setBusyId(undefined);
     }
   };
+
   const copyId = (fee: FeeItem) => {
     void navigator.clipboard?.writeText(fee.id).then(
       () => toast('Item ID copied'),
       () => toast(`Couldn't copy. The Item ID is ${fee.id}`, { tone: 'error' }),
     );
   };
+
   const menu = (fee: FeeItem) => (
     <span onClick={(e) => e.stopPropagation()}>
       <ActionMenu
@@ -116,6 +128,7 @@ export const FeeCatalog = ({
       />
     </span>
   );
+
   const charged = (fee: FeeItem) => (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <span>{CHARGED[fee.chargeWhen]}</span>
@@ -129,6 +142,7 @@ export const FeeCatalog = ({
       ) : null}
     </span>
   );
+
   const retiredTag = (fee: FeeItem) =>
     fee.active ? null : (
       <span className="ml-2 rounded-full border border-outline px-2 py-0.5 text-xs font-bold text-ink-muted">

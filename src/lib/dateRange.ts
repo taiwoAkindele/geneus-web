@@ -14,13 +14,17 @@ export const DATE_PRESET_LABELS: Record<DatePreset, string> = {
 
 const parse = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
+
   return new Date(y, m - 1, d);
 };
+
 const iso = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const shift = (day: string, days: number) => {
   const date = parse(day);
   date.setDate(date.getDate() + days);
+
   return iso(date);
 };
 
@@ -29,16 +33,21 @@ export const presetRange = (preset: DatePreset, today: string): { from: string; 
   if (preset === 'today') {
     return { from: today, to: today };
   }
+
   if (preset === 'last7') {
     return { from: shift(today, -6), to: today };
   }
+
   if (preset === 'next7') {
     return { from: today, to: shift(today, 6) };
   }
+
   if (preset === 'next30') {
     return { from: today, to: shift(today, 29) };
   }
+
   const start = parse(today);
+
   return {
     from: iso(new Date(start.getFullYear(), start.getMonth(), 1)),
     to: iso(new Date(start.getFullYear(), start.getMonth() + 1, 0)),
@@ -54,6 +63,7 @@ export const matchingPreset = (
 ): DatePreset | undefined =>
   presets.find((preset) => {
     const range = presetRange(preset, today);
+
     return range.from === from && range.to === to;
   });
 
@@ -69,15 +79,19 @@ export const formatRange = (from: string, to: string): string => {
   if (!from && !to) {
     return 'Any date';
   }
+
   if (from && !to) {
     return `From ${day(from, true)}`;
   }
+
   if (!from && to) {
     return `Until ${day(to, true)}`;
   }
+
   if (from === to) {
     return day(from, true);
   }
+
   return `${day(from, from.slice(0, 4) !== to.slice(0, 4))} – ${day(to, true)}`;
 };
 

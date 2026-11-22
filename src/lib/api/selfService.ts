@@ -16,11 +16,14 @@ import { VerificationRequired } from './insurance';
  */
 const credential = () => {
   const device = getDeviceCredential();
+
   if (!device) {
     throw new Error('This device is not enrolled');
   }
+
   return device.credential;
 };
+
 const send = async <T>(
   context: AuthorizationContext,
   path: string,
@@ -29,22 +32,27 @@ const send = async <T>(
 ): Promise<T> => {
   const token = staffSessionToken(context);
   void needsVerification; // The server checks who is acting and what they may do; no separate PIN step.
+
   try {
     const result = await staffRequest<T>(path, credential(), token, body, context.userId);
     touchStaffSession();
+
     return result;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
       forgetStaffSession();
       throw new VerificationRequired();
     }
+
     throw cause;
   }
 };
 
 export type TimeZoneChange = { from?: string; to: string; reason?: string; by: string; on: string };
+
 export const timeZoneHistory = (context: AuthorizationContext) =>
   send<{ changes: TimeZoneChange[] }>(context, '/facility/time-zone/history', {}, false);
+
 export const saveTimeZone = (context: AuthorizationContext, timeZone: string, reason?: string) =>
   send<{ timeZone: string; changed: boolean }>(
     context,
@@ -58,8 +66,10 @@ export const saveFacilityDetails = (
   context: AuthorizationContext,
   details: FacilityDetailsUpdate,
 ) => send<{ changed: string[] }>(context, '/facility/details', details, true);
+
 export const ownEmailStatus = (context: AuthorizationContext) =>
   send<OwnEmailStatus>(context, '/staff/me/email/status', { staffId: context.userId }, false);
+
 export const requestOwnEmailCode = (context: AuthorizationContext, email: string) =>
   send<{ sentTo: string; expiresOn: string }>(
     context,
@@ -67,6 +77,7 @@ export const requestOwnEmailCode = (context: AuthorizationContext, email: string
     { staffId: context.userId, email },
     false,
   );
+
 export const confirmOwnEmail = (context: AuthorizationContext, email: string, code: string) =>
   send<{ status: 'verified' }>(
     context,
@@ -74,8 +85,10 @@ export const confirmOwnEmail = (context: AuthorizationContext, email: string, co
     { staffId: context.userId, email, code },
     false,
   );
+
 export const listEmailRequests = (context: AuthorizationContext) =>
   send<{ requests: StaffEmailRequestView[] }>(context, '/staff/email-requests/list', {}, true);
+
 export const decideEmailRequest = (
   context: AuthorizationContext,
   id: string,
@@ -102,6 +115,7 @@ export type DeviceStatus = {
   blocking: string[];
   thisDevice: boolean;
 };
+
 export const deviceStatus = (context: AuthorizationContext) =>
   send<{ devices: DeviceStatus[] }>(
     context,

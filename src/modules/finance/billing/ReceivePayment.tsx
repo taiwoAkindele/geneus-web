@@ -15,20 +15,25 @@ import { displayMoney, whenText } from './billingUi';
 
 type Row = ReturnType<typeof billingRows>[number];
 type Method = 'cash' | 'bank';
+
 /** One amount applied to the oldest unpaid charges first, as before. Returns what is left over. */
 const split = (payable: readonly Row[], minor: number, currency: string) => {
   const amounts: Record<string, string> = {};
   let left = minor;
+
   for (const r of payable) {
     if (left <= 0) {
       break;
     }
+
     const part = Math.min(left, r.balanceMinor);
     amounts[r.charge.id] = amountInput(part, currency);
     left -= part;
   }
+
   return { amounts, left };
 };
+
 const parseOr = (value: string, currency: string) => {
   try {
     return value.trim() ? parseAmount(value, currency) : 0;
@@ -61,12 +66,14 @@ export const ReceivePayment = ({
   const context = useAuthorizationContext();
   const toast = useToast();
   const allowed = context.permissions.includes('payment:receive');
+
   const rows = billingRows(
     data.charges.filter((c) => c.patientId === patientId && chargeIds.includes(c.id)),
     data.payments,
     data.adjustments,
     data.coverage,
   );
+
   const patient = data.patients.find((p) => p.patientId === patientId);
   const [method, setMethod] = useState<Method>(given ? 'bank' : 'cash');
   const [transfer, setTransfer] = useState<IncomingTransfer | undefined>(given);
@@ -89,6 +96,7 @@ export const ReceivePayment = ({
   }, [error]);
 
   const bankTransfer = method === 'bank' ? transfer : undefined;
+
   const payable = rows
     .filter(
       (r) => r.balanceMinor > 0 && (!bankTransfer || bankTransfer.currency === r.charge.currency),
@@ -98,20 +106,24 @@ export const ReceivePayment = ({
         a.charge.createdOn.localeCompare(b.charge.createdOn) ||
         a.charge.id.localeCompare(b.charge.id),
     );
+
   const currency =
     new Set(payable.map((r) => r.charge.currency)).size === 1
       ? payable[0].charge.currency
       : undefined;
+
   const due = payable.reduce((n, r) => n + r.balanceMinor, 0);
   const money = (n: number) => displayMoney(n, currency ?? rows[0]?.charge.currency ?? 'NGN');
 
   const candidates = unlinkedTransfers(data.transfers, data.payments).filter(
     (t) => !currency || t.transfer.currency === currency,
   );
+
   const capacity = useReceiptCapacity(
     [...candidates.map((t) => t.transfer.id), ...(transfer ? [transfer.id] : [])],
     data.payments.length,
   );
+
   const available = bankTransfer ? capacity.sources[bankTransfer.id]?.availableMinor : undefined;
 
   // Until the cashier types, the amount is the whole amount due (or what the chosen transfer can still cover).
@@ -119,6 +131,7 @@ export const ReceivePayment = ({
     if (touched || !currency) {
       return;
     }
+
     let target = 0;
 
     if (method === 'cash') {
@@ -136,12 +149,15 @@ export const ReceivePayment = ({
 
   const typed = currency ? parseOr(received, currency) : undefined;
   const over = typed !== undefined && typed > due ? typed - due : 0;
+
   const cashNote = over
     ? `Cash · give back ${money(over)} as change. Saved on this device first, so it works offline.`
     : 'Cash · saved on this device first, so it works offline.';
+
   const availabilityPendingText = capacity.busy
     ? 'checking what is left…'
     : 'availability not checked yet';
+
   const total = Object.values(amounts).reduce(
     (n, v) => n + (currency ? (parseOr(v, currency) ?? 0) : 0),
     0,
@@ -153,16 +169,22 @@ export const ReceivePayment = ({
     setError('');
     setFieldError(undefined);
     setReview(undefined);
+
     if (!currency) {
       return;
     }
+
     const minor = parseOr(value, currency);
+
     if (minor === undefined) {
       setError('Enter the amount in numbers, for example 20500 or 20500.50.');
+
       return;
     }
+
     setAmounts(split(payable, minor, currency).amounts);
   };
+
   const choose = (next: Method) => {
     setMethod(next);
     setTouched(false);
@@ -170,6 +192,7 @@ export const ReceivePayment = ({
     setError('');
     setFieldError(undefined);
   };
+
   const pick = (t?: IncomingTransfer) => {
     setTransfer(t);
     requestId.current = crypto.randomUUID();
@@ -182,43 +205,53 @@ export const ReceivePayment = ({
     if (method === 'bank' && !bankTransfer) {
       throw new PaymentInputError('Choose the transfer the patient made.');
     }
+
     if (bankTransfer && available === undefined) {
       throw new PaymentInputError(
         'Checking how much of this transfer is still available. Try again in a moment.',
       );
     }
+
     return preparePayment(payable, amounts, bankTransfer, available);
   };
+
   const startReview = () => {
     setError('');
     setFieldError(undefined);
+
     try {
       setReview(check());
     } catch (cause) {
       const message = userMessage(cause, 'Check the payment amount.');
       setError(message);
       toast(message, { tone: 'error' });
+
       if (cause instanceof PaymentInputError && cause.chargeId) {
         setFieldError(cause.chargeId);
         setShowSplit(true);
       }
     }
   };
+
   const record = async () => {
     if (saving.current) {
       return;
     }
+
     saving.current = true;
     setBusy(true);
     setError('');
+
     try {
       const checked = check();
+
       if (!review || JSON.stringify(review) !== JSON.stringify(checked)) {
         setReview(undefined);
         throw new Error(
           'The bill changed while you were reviewing. Check the amount and review it again.',
         );
       }
+
       const payment = bankTransfer
         ? await matchTransfer(
             context,
@@ -236,11 +269,13 @@ export const ReceivePayment = ({
             },
             context,
           );
+
       toast(
         bankTransfer
           ? `${money(payment.amountMinor)} applied from the transfer`
           : `${money(payment.amountMinor)} cash recorded`,
       );
+
       onReceipt(payment);
       onSaved();
     } catch (cause) {
@@ -255,6 +290,7 @@ export const ReceivePayment = ({
 
   const description = (id: string) =>
     rows.find((r) => r.charge.id === id)?.charge.description ?? 'Charge';
+
   const pending = rows.reduce((n, r) => n + r.undeterminedMinor, 0);
 
   const renderPaymentForm = () => {
@@ -372,6 +408,7 @@ export const ReceivePayment = ({
                 {candidates.length ? (
                   candidates.slice(0, 12).map(({ transfer: t, applied }) => {
                     const left = capacity.sources[t.id]?.availableMinor ?? t.amountMinor - applied;
+
                     return (
                       <button
                         key={t.id}
@@ -410,6 +447,7 @@ export const ReceivePayment = ({
                           e,
                           'The account details could not be read. Try again.',
                         );
+
                         setError(message);
                         toast(message, { tone: 'error' });
                       },

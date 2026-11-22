@@ -23,12 +23,15 @@ export const fmtCell = (v: EntryValue | undefined): string => {
   if (Array.isArray(v)) {
     return v.length ? v.join(', ') : '—';
   }
+
   if (v === true) {
     return 'Yes';
   }
+
   if (v === false) {
     return 'No';
   }
+
   return v === undefined || v === '' ? '—' : String(v);
 };
 
@@ -66,8 +69,10 @@ export const RegisterEntrySheet = ({
       if (f.type === 'section') {
         return;
       }
+
       seed[f.id] = visit?.completion?.values[f.id] ?? emptyValueFor(f.type);
     });
+
     return seed;
   });
 
@@ -82,9 +87,11 @@ export const RegisterEntrySheet = ({
       summary.current?.focus();
     }
   }, [issues, reviewing]);
+
   const review = () => {
     const errors = validateRegisterEntry(fields, draft);
     setIssues(errors);
+
     if (!errors.length) {
       setReviewing(true);
     }
@@ -94,23 +101,29 @@ export const RegisterEntrySheet = ({
     if (savingRef.current || !reviewing) {
       return;
     }
+
     savingRef.current = true;
     setSaving(true);
+
     try {
       const issues = await addEntry(register.id, {
         values: draft,
         ...(visit ? { visit: { encounterId: visit.encounterId, patientId: visit.patientId } } : {}),
       });
+
       if (issues.length > 0) {
         setIssues(issues);
         setReviewing(false);
+
         return;
       }
+
       toast(
         visit
           ? `${inVisit ? register.name + ' details saved' : 'Visit row completed'} — recorded by ${user.name}`
           : `Entry saved & locked — recorded by ${user.name}`,
       );
+
       onClose();
     } catch (cause) {
       setIssues([cause instanceof Error ? cause.message : 'Could not save the entry. Try again.']);
@@ -193,6 +206,7 @@ export const RegisterEntrySheet = ({
                 const next = { ...draft, [f.id]: v };
                 setEdited(true);
                 setDraft(next);
+
                 if (issues.length) {
                   setIssues(validateRegisterEntry(fields, next));
                 }

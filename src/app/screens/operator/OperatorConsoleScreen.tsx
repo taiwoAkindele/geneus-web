@@ -56,9 +56,12 @@ export const OperatorConsoleScreen = () => {
     document.title = 'Geneus operator console';
     const on = () => refresh((n) => n + 1);
     window.addEventListener(OPERATOR_SESSION_EVENT, on);
+
     return () => window.removeEventListener(OPERATOR_SESSION_EVENT, on);
   }, []);
+
   const session = operatorSession();
+
   return (
     <div className="min-h-screen bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-soft bg-white px-4 py-3">
@@ -90,9 +93,11 @@ const SignIn = () => {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const run = async (step: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
+
     try {
       await step();
     } catch (cause) {
@@ -101,6 +106,7 @@ const SignIn = () => {
       setBusy(false);
     }
   };
+
   return (
     <section
       aria-label="Operator sign-in"
@@ -171,6 +177,7 @@ const SignIn = () => {
 
 const Console = () => {
   const [tab, setTab] = useState<'facilities' | 'operators' | 'history'>('facilities');
+
   const renderActiveTab = () => {
     if (tab === 'facilities') {
       return <Facilities />;
@@ -214,6 +221,7 @@ const Facilities = () => {
   const [facilities, setFacilities] = useState<OperatorFacility[]>();
   const [open, setOpen] = useState('');
   const [error, setError] = useState('');
+
   const load = useCallback(
     () =>
       operatorFacilities().then(
@@ -225,9 +233,11 @@ const Facilities = () => {
       ),
     [],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
   if (error) {
     return (
       <p role="alert" className="text-sm text-danger">
@@ -235,10 +245,13 @@ const Facilities = () => {
       </p>
     );
   }
+
   if (!facilities) {
     return <p role="status">Loading…</p>;
   }
+
   const waiting = facilities.filter((f) => f.openRequest).length;
+
   return (
     <section aria-label="Hospitals" className="space-y-3">
       <p className="text-sm">
@@ -290,6 +303,7 @@ const FacilityReview = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
+
   const load = useCallback(
     () =>
       operatorFacilityInsurance(facility.id).then(
@@ -301,13 +315,16 @@ const FacilityReview = ({
       ),
     [facility.id],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const act = async (work: () => Promise<unknown>, text: string) => {
     setBusy(true);
     setError('');
     setDone('');
+
     try {
       await work();
       setDone(text);
@@ -320,6 +337,7 @@ const FacilityReview = ({
       setBusy(false);
     }
   };
+
   if (!status) {
     return (
       <p role="status" className="mt-2 text-sm">
@@ -327,8 +345,10 @@ const FacilityReview = ({
       </p>
     );
   }
+
   const open = requests.find((r) => r.status === 'requested');
   const blocking = status.items.filter((i) => i.requiredFor === 'billing' && !i.ok);
+
   return (
     <div className="mt-3 space-y-3 border-t border-outline-soft pt-3 text-sm">
       <p>
@@ -340,6 +360,7 @@ const FacilityReview = ({
       <ul aria-label={`Readiness of ${facility.name}`} className="space-y-1">
         {status.items.map((item) => {
           const g = guideFor(item, { userId: '', permissions: [] });
+
           return (
             <li key={item.kind} className={requirementTone(item)}>
               {item.ok ? '✓' : '!'} <strong>{g.title}</strong>: {g.status}{' '}
@@ -467,6 +488,7 @@ const Operators = () => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const me = operatorSession()?.operator.id;
+
   const load = useCallback(
     () =>
       listOperators().then(
@@ -478,9 +500,11 @@ const Operators = () => {
       ),
     [],
   );
+
   useEffect(() => {
     void load();
   }, [load]);
+
   return (
     <section
       aria-label="Operators"
@@ -556,6 +580,7 @@ const History = () => {
       (cause) => setError(message(cause)),
     );
   }, []);
+
   if (error) {
     return (
       <p role="alert" className="text-sm text-danger">
@@ -563,6 +588,7 @@ const History = () => {
       </p>
     );
   }
+
   return (
     <ul
       aria-label="Decision history"

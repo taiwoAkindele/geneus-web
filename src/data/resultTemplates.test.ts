@@ -29,12 +29,14 @@ const base = {
   deviceId: 'device:one',
   createdOn: '2026-11-01T08:00:00Z',
 };
+
 const admin = () =>
   authorizationFor({
     staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
     facilityId: 'TEST',
     deviceId: 'device:one',
   });
+
 const hb = {
   key: 'haemoglobin',
   label: 'Haemoglobin',
@@ -45,6 +47,7 @@ const hb = {
   libraryPartId: 'result_part:hb',
   ranges: [{ sex: 'female', ageFrom: { value: 18, unit: 'years' }, low: 12, high: 15 }],
 } satisfies ResultPart;
+
 const rapid = {
   key: 'result',
   label: 'Result',
@@ -56,6 +59,7 @@ const rapid = {
 
 describe('result templates on the device', () => {
   let store: ReturnType<typeof sqliteTestDatabase>;
+
   const test = (name: string) =>
     ServiceDefinition.parse({
       ...base,
@@ -69,6 +73,7 @@ describe('result templates on the device', () => {
       revision: 1,
       investigation: { specimen: 'Blood', department: 'Haematology', aliases: [] },
     });
+
   const template = (
     id: string,
     name: string,
@@ -87,12 +92,14 @@ describe('result templates on the device', () => {
       source: 'own',
       revision: 1,
     });
+
   beforeEach(async () => {
     vi.stubGlobal('localStorage', memoryStorage());
     resetSecureStorageForTests();
     recordServerContact(new Date(Date.now() - 60_000).toISOString());
     store = sqliteTestDatabase();
     setDatabaseForTests(store.db);
+
     for (const name of [
       'Full blood count',
       'HIV rapid test',
@@ -101,9 +108,11 @@ describe('result templates on the device', () => {
     ]) {
       await store.seed(test(name));
     }
+
     await store.seed(
       template('result_template:fbc', 'Full blood count', [hb], ['Full blood count']),
     );
+
     await store.seed(
       template(
         'result_template:rapid',
@@ -112,6 +121,7 @@ describe('result templates on the device', () => {
         ['HIV rapid test', 'Hepatitis B surface antigen'],
       ),
     );
+
     await store.seed(
       template(
         'result_template:draft',
@@ -121,6 +131,7 @@ describe('result templates on the device', () => {
         'draft',
       ),
     );
+
     await store.seed(
       ResultPartDefinition.parse({
         ...base,
@@ -131,6 +142,7 @@ describe('result templates on the device', () => {
         revision: 1,
       }),
     );
+
     await store.seed(
       AnswerList.parse({
         ...base,
@@ -143,6 +155,7 @@ describe('result templates on the device', () => {
       }),
     );
   });
+
   afterEach(async () => {
     setDatabaseForTests(undefined);
     await store.db.close();
@@ -157,6 +170,7 @@ describe('result templates on the device', () => {
       'Obstetric ultrasound',
       'Rapid test: Reactive / Non-reactive',
     ]);
+
     expect(settings.parts[0].part).toEqual(hb);
     expect(settings.lists[0].answers).toEqual(['Non-reactive', 'Reactive']);
   });
@@ -168,10 +182,12 @@ describe('result templates on the device', () => {
       'HIV rapid test',
       'Hepatitis B surface antigen',
     ]);
+
     const byTest = await loadTemplatePage(admin(), { query: 'hepatitis' });
     expect(byTest.items.map((row) => row.template.name)).toEqual([
       'Rapid test: Reactive / Non-reactive',
     ]);
+
     expect((await loadTemplatePage(admin(), { pageSize: 2, page: 1 })).items).toHaveLength(1);
   });
 
@@ -188,6 +204,7 @@ describe('result templates on the device', () => {
       name: 'Full blood count',
       parts: 1,
     });
+
     expect(
       page.items.find((row) => row.definition.name === 'Widal test')?.template,
     ).toBeUndefined();
@@ -198,6 +215,7 @@ describe('result templates on the device', () => {
     expect(
       rangeAudience({ ageFrom: { value: 5, unit: 'years' }, ageTo: { value: 18, unit: 'years' } }),
     ).toBe('Anyone, 5 to 18 years');
+
     expect(rangeAudience({ ageTo: { value: 1, unit: 'months' } })).toBe('Anyone, under 1 month');
     expect(rangeSummary(hb)).toBe('12–15 · Women, 18 years and over');
     expect(rangeSummary(rapid)).toBe('—');

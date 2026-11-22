@@ -83,12 +83,15 @@ const COLUMN_FOR: Record<FieldKind, typeof column.text> = {
 
 const tableFor = (type: DocType): Table => {
   const columns: ColumnsType = {};
+
   for (const [field, kind] of Object.entries(fieldKindsFor(type))) {
     if (field === 'id') {
       continue;
     }
+
     columns[field] = COLUMN_FOR[kind];
   }
+
   return new Table(columns, {
     indexes: INDEXES[type] ?? {},
     // Previous values ride along with each local change, so the server can tell

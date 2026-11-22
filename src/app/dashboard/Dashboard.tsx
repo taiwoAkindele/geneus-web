@@ -37,6 +37,7 @@ const Section = ({
   children: ReactNode;
 }) => {
   const id = useId();
+
   const renderBody = () => {
     if (loading) {
       return (
@@ -90,9 +91,11 @@ const Section = ({
     </section>
   );
 };
+
 const Empty = ({ children }: { children: ReactNode }) => (
   <p className="p-5 text-sm leading-relaxed text-ink-muted">{children}</p>
 );
+
 const dateTime = (at: string) =>
   new Date(at).toLocaleString('en-GB', {
     day: 'numeric',
@@ -100,15 +103,18 @@ const dateTime = (at: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
 const statValue = (loading: boolean, error: Error | undefined, value: number | undefined) =>
   loading || error ? '—' : String(value ?? 0);
 
 const StockAttention = () => {
   const query = useStock();
   const low = query.data?.items.filter((item) => item.balance <= (item.reorderLevel ?? 0)) ?? [];
+
   if (!query.loading && !query.error && !low.length) {
     return null;
   }
+
   return (
     <Section
       title="Stock to review"
@@ -149,6 +155,7 @@ const UnitWork = () => {
   const incoming = useIncomingHandoffs(unitId);
   const unit = units.data?.find((candidate) => candidate.id === unitId && candidate.active);
   const names = new Map(patients.data?.map((patient) => [patient.patientId, patient.fullName]));
+
   const renderIncomingPatients = () => {
     if (!unit) {
       return (
@@ -206,6 +213,7 @@ const FacilityWork = () => {
   const { roster, loading, error, reload } = useAuth();
   const context = useAuthorizationContext();
   const units = useUnits();
+
   const canStaff =
     context.permissions.some((permission) =>
       ['staff:manage', 'staff:permission', 'staff:deactivate', 'roster:assign'].includes(
@@ -214,6 +222,7 @@ const FacilityWork = () => {
     ) ||
     context.roles?.includes('facility_admin') ||
     context.role === 'facility_admin';
+
   const actions = [
     ...(canStaff
       ? [
@@ -257,6 +266,7 @@ const FacilityWork = () => {
         ]
       : []),
   ];
+
   return (
     <Section
       title="Facility management"
@@ -323,16 +333,20 @@ export const Dashboard = () => {
   const billingFirst = access.billing && context.role === 'cashier';
   const { care, billing, today } = useDashboard(access);
   const appointments = useAppointments();
+
   const todayAppointments = appointments.appointments.filter(
     (appointment) => appointment.group === 'today',
   );
+
   const earlier = appointments.appointments.filter(
     (appointment) => appointment.group === 'overdue',
   ).length;
+
   const review = notifications.filter((notification) => notification.kind === 'conflict').length;
   useEffect(() => {
     document.title = 'Home · Geneus Health';
   }, []);
+
   const metrics = [
     ...(access.care
       ? [
@@ -422,6 +436,7 @@ export const Dashboard = () => {
       )}
     </Section>
   ) : null;
+
   const appointmentsPanel = access.appointments ? (
     <Section
       title="Today's appointments"
@@ -462,6 +477,7 @@ export const Dashboard = () => {
       )}
     </Section>
   ) : null;
+
   const billingPanel = access.billing ? (
     <Section
       title="Billing & collections"

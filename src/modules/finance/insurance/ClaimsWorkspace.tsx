@@ -40,7 +40,7 @@ import {
   type ClaimBatch,
   type ClaimExport,
   type ClaimSubmission,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { SettlementPanel } from './SettlementPanel';
 import { downloadTable } from '@/lib/tabular/exportTable';
@@ -56,6 +56,7 @@ const STATE_LABELS: Record<ClaimState, string> = {
   submitted: 'Submitted',
   acknowledged: 'Acknowledged',
 };
+
 const FIELD_LABELS: Record<ClaimExportField, string> = {
   claimNumber: 'Claim number',
   claimRevision: 'Revision',
@@ -84,6 +85,7 @@ const FIELD_LABELS: Record<ClaimExportField, string> = {
   listPrice: 'Hospital price',
   fulfilledOn: 'Date performed',
 };
+
 const EVIDENCE: Record<string, string> = {
   association: 'Associated clinical evidence',
   administrative: 'Administrative',
@@ -94,9 +96,11 @@ const EVIDENCE: Record<string, string> = {
   not_done: 'Not done',
   missing: 'No record it was done',
 };
+
 const today = () => new Date().toISOString().slice(0, 10);
 /** Final exports made on this screen, so a submission can name the exact files that were sent. */
 const recentExports: { exportId: string; format: string; claimIds: string[]; at: string }[] = [];
+
 const escapeHtml = (v: unknown) =>
   String(v ?? '').replace(
     /[&<>"']/g,
@@ -114,6 +118,7 @@ export const ClaimsWorkspace = () => {
   useEffect(() => {
     document.title = 'Claims · Geneus Health';
   }, []);
+
   if (insurance !== 'active' && insurance !== 'history') {
     return (
       <main className="p-4">
@@ -122,6 +127,7 @@ export const ClaimsWorkspace = () => {
       </main>
     );
   }
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4">
       <header>
@@ -141,11 +147,13 @@ export const ClaimsWorkspace = () => {
 const ClaimsBody = () => {
   const context = useAuthorizationContext();
   const toast = useToast();
+
   const payers =
     useLiveQuery(
       useCallback(() => listPayers(), []),
       ['payer'],
     ).data ?? [];
+
   const [tab, setTab] = useState<'claims' | 'batches' | 'layouts'>('claims');
   const [claims, setClaims] = useState<ClaimView[]>();
   const [error, setError] = useState('');
@@ -157,6 +165,7 @@ const ClaimsBody = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState('');
   const [templates, setTemplates] = useState<ImportTemplate[]>([]);
+
   const load = useCallback(async () => {
     try {
       setClaims(
@@ -167,28 +176,34 @@ const ClaimsBody = () => {
           })
         ).claims,
       );
+
       setTemplates((await listImportTemplates(context, 'claim_export')).templates);
       setError('');
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     }
   }, [context, payerId, state]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const payerName = (id: string) => payers.find((p) => p.id === id)?.name ?? id;
+
   const run = async (label: string, action: () => Promise<void>) => {
     setBusy(label);
     setError('');
+
     try {
       await action();
       await load();
     } catch (cause) {
-      setError(describeInsuranceError(cause));
+      setError(describeStaffActionError(cause));
     } finally {
       setBusy('');
     }
   };
+
   const chosen = (claims ?? []).filter((c) => selected.has(c.id));
 
   const renderClaims = () => {
@@ -231,6 +246,7 @@ const ClaimsBody = () => {
           <tbody>
             {claims.map((c) => {
               const blocking = c.issues.filter((i) => i.blocking).length;
+
               return (
                 <tr
                   key={c.id}
@@ -246,11 +262,13 @@ const ClaimsBody = () => {
                       onChange={(e) =>
                         setSelected((s) => {
                           const n = new Set(s);
+
                           if (e.target.checked) {
                             n.add(c.id);
                           } else {
                             n.delete(c.id);
                           }
+
                           return n;
                         })
                       }
@@ -377,6 +395,7 @@ const ClaimsBody = () => {
                       ...(from ? { from } : {}),
                       ...(to ? { to } : {}),
                     });
+
                     toast(
                       r.lines
                         ? `${r.lines} service${r.lines === 1 ? '' : 's'} added: ${r.created} new claim${r.created === 1 ? '' : 's'}, ${r.extended} extended.`
@@ -416,6 +435,7 @@ const ClaimsBody = () => {
                     context,
                     chosen.map((c) => c.id),
                   );
+
                   const ok = r.outcomes.filter((o) => o.outcome === 'ready').length;
                   toast(
                     `${ok} claim${ok === 1 ? '' : 's'} ready${r.outcomes.length > ok ? `; ${r.outcomes.length - ok} still blocked` : ''}.`,
@@ -486,10 +506,12 @@ const ExportControls = ({
   const [busy, setBusy] = useState(false);
   const draft = claims.some((c) => c.state === 'draft');
   const mixed = new Set(claims.map((c) => c.payerId)).size > 1;
+
   const go = async () => {
     // A print window must open on the click itself, before the server answers, or browsers block it.
     const printWindow = format === 'pdf' ? window.open('', '_blank') : null;
     setBusy(true);
+
     try {
       const result = await exportClaims(context, {
         ...(batchId ? { batchId } : { claimIds: claims.map((c) => c.id) }),
@@ -497,7 +519,9 @@ const ExportControls = ({
         format,
         ...(layout ? { templateId: layout } : {}),
       });
+
       const name = `${payerName(payerId ?? 'claims').replace(/[^\w-]+/g, '-')}-claims-${today()}${result.draft ? '-DRAFT' : ''}`;
+
       if (!result.draft) {
         recentExports.unshift({
           exportId: result.exportId,
@@ -506,6 +530,7 @@ const ExportControls = ({
           at: new Date().toISOString(),
         });
       }
+
       if (format === 'pdf') {
         printClaims(printWindow, result, payerName(payerId ?? ''));
       } else {
@@ -516,19 +541,22 @@ const ExportControls = ({
           format,
         );
       }
+
       toast(
         result.draft
           ? 'Draft exported: marked on every row, no claim changed.'
           : `${result.claims.length} claim${result.claims.length === 1 ? '' : 's'} exported. Record the submission when you send them.`,
       );
+
       onDone();
     } catch (cause) {
       printWindow?.close();
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="w-32">
@@ -573,11 +601,14 @@ const printClaims = (target: Window | null, result: ClaimExport, payer: string) 
   if (!target) {
     throw new Error('Allow pop-ups for Geneus to print claims');
   }
+
   const groups = new Map<string, (string | number)[][]>();
   const numberAt = result.headers.findIndex((h, i) => h === 'claimNumber' || i === 0);
+
   for (const row of result.rows) {
     groups.set(String(row[numberAt]), [...(groups.get(String(row[numberAt])) ?? []), row]);
   }
+
   const body = [...groups.entries()]
     .map(
       ([
@@ -587,6 +618,7 @@ const printClaims = (target: Window | null, result: ClaimExport, payer: string) 
     <tbody>${rows.map((r) => `<tr>${r.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`,
     )
     .join('');
+
   target.document.open();
   target.document
     .write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(payer)} claims</title><style>
@@ -595,6 +627,7 @@ const printClaims = (target: Window | null, result: ClaimExport, payer: string) 
     @media print{button{display:none}}</style></head><body><h1>${escapeHtml(payer)} — claims</h1>
     ${result.draft ? '<p class="draft">DRAFT — NOT FOR SUBMISSION</p>' : ''}<p>Export ${escapeHtml(result.exportId)} · checksum ${escapeHtml(result.payloadSha256.slice(0, 16))}</p>${body}
     <p><button onclick="window.print()">Print / Save as PDF</button></p></body></html>`);
+
   target.document.close();
 };
 
@@ -609,9 +642,11 @@ const downloadPackage = async (
   documents: InsuranceDocument[],
 ) => {
   const attached = documents.filter((d) => claim.attachments.some((a) => a.documentId === d.id));
+
   for (const d of attached) {
     await downloadInsuranceDocument(context, d);
   }
+
   await downloadTable(
     `${claim.claimNumber}-r${claim.revision}-documents.csv`,
     'Documents',
@@ -635,13 +670,17 @@ const downloadPackage = async (
 /** A cover sheet for claims delivered by hand: what is in the envelope, and a line for the receiving officer's signature. */
 const printCoverSheet = (claims: ClaimView[], payer: string, recipient?: string) => {
   const target = window.open('', '_blank');
+
   if (!target) {
     throw new Error('Allow pop-ups for Geneus to print');
   }
+
   const total = new Map<string, number>();
+
   for (const c of claims) {
     total.set(c.currency, (total.get(c.currency) ?? 0) + c.payerShareMinor);
   }
+
   target.document.open();
   target.document
     .write(`<!doctype html><html><head><meta charset="utf-8"><title>Claims delivery</title><style>body{font:13px system-ui,sans-serif;margin:32px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #999;padding:4px 6px;text-align:left} .sign{margin-top:48px;display:flex;gap:48px} .sign div{flex:1;border-top:1px solid #000;padding-top:4px} @media print{button{display:none}}</style></head><body>
@@ -650,6 +689,7 @@ const printCoverSheet = (claims: ClaimView[], payer: string, recipient?: string)
     <p>Total: ${[...total].map(([cur, n]) => escapeHtml(formatMoney(n, cur))).join(' + ')}</p>
     <div class="sign"><div>Delivered by (name, signature)</div><div>Received by (name, signature, stamp)</div></div>
     <p><button onclick="window.print()">Print</button></p></body></html>`);
+
   target.document.close();
 };
 
@@ -670,6 +710,7 @@ const ClaimDetail = ({
   const [auths, setAuths] = useState<ClaimAuthorization[]>([]);
   const [reason, setReason] = useState('');
   const [addingAuth, setAddingAuth] = useState(false);
+
   const loadAux = useCallback(async () => {
     try {
       setDocuments(
@@ -677,26 +718,30 @@ const ClaimDetail = ({
           (d) => d.verification !== 'rejected',
         ),
       );
+
       setAuths(
         (await listAuthorizations(context, claim.patientId)).authorizations.filter(
           (a) => a.payerId === claim.payerId,
         ),
       );
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   }, [context, claim.payerId, claim.patientId, onError]);
+
   useEffect(() => {
     void loadAux();
   }, [loadAux]);
+
   const attach = async (documentId: string, remove: boolean) => {
     try {
       await setClaimAttachment(context, claim.id, documentId, remove);
       onChanged();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   };
+
   const renderEpisodeKind = () => {
     if (claim.episode.kind === 'admission') {
       return 'Admission';
@@ -851,6 +896,7 @@ const ClaimDetail = ({
           ) : (
             documents.map((d) => {
               const on = claim.attachments.some((a) => a.documentId === d.id);
+
               return (
                 <label key={d.id} className="flex min-h-[40px] items-center gap-2 text-sm">
                   <input
@@ -877,7 +923,7 @@ const ClaimDetail = ({
                     toast(
                       'Supporting documents downloaded, with a list of what belongs to this claim.',
                     ),
-                  (cause) => onError(describeInsuranceError(cause)),
+                  (cause) => onError(describeStaffActionError(cause)),
                 )
               }
             >
@@ -897,10 +943,11 @@ const ClaimDetail = ({
                 toast(
                   `Revision ${r.revision} started; the earlier claim and its history are kept.`,
                 );
+
                 setReason('');
                 onChanged();
               },
-              (cause) => onError(describeInsuranceError(cause)),
+              (cause) => onError(describeStaffActionError(cause)),
             );
           }}
         >
@@ -951,9 +998,11 @@ const AuthorizationForm = ({
 }) => {
   const context = useAuthorizationContext();
   const [kind, setKind] = useState<'pre_authorization' | 'referral'>('pre_authorization');
+
   const [status, setStatus] = useState<'requested' | 'approved' | 'denied' | 'emergency_exception'>(
     'approved',
   );
+
   const [note, setNote] = useState('');
   const [requestedOn, setRequestedOn] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -965,8 +1014,10 @@ const AuthorizationForm = ({
   const [replaces, setReplaces] = useState('');
   const [evidence, setEvidence] = useState('');
   const [busy, setBusy] = useState(false);
+
   const save = async () => {
     setBusy(true);
+
     try {
       await saveAuthorization(context, {
         patientId: claim.patientId,
@@ -992,13 +1043,15 @@ const AuthorizationForm = ({
         ...(replaces ? { replaces } : {}),
         ...(evidence ? { evidenceDocumentId: evidence } : {}),
       });
+
       onSaved();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <form
       aria-label="Record authorization"
@@ -1165,18 +1218,22 @@ const BatchesPanel = ({
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState(today());
   const [reference, setReference] = useState('');
+
   const load = useCallback(async () => {
     try {
       setBatches((await listClaimBatches(context)).batches);
       setSubmissions((await listClaimSubmissions(context)).submissions);
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   }, [context, onError]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const exported = claims.filter((c) => c.state === 'exported');
+
   return (
     <div className="space-y-6">
       <section
@@ -1222,7 +1279,7 @@ const BatchesPanel = ({
                   void load();
                   onChanged();
                 },
-                (cause) => onError(describeInsuranceError(cause)),
+                (cause) => onError(describeStaffActionError(cause)),
               )
             }
           >
@@ -1318,6 +1375,7 @@ const SubmissionForm = ({
       () => undefined,
     );
   }, [context]);
+
   const chosen = useMemo(() => exported.filter((c) => ids.includes(c.id)), [exported, ids]);
   const files = recentExports.filter((x) => x.claimIds.some((id) => ids.includes(id)));
   const profile = profiles.find((p) => p.payerId === chosen[0]?.payerId)?.profile;
@@ -1326,13 +1384,16 @@ const SubmissionForm = ({
       setChannel(profile.channel);
     }
   }, [profile]);
+
   useEffect(() => {
     setExportIds(
       recentExports.filter((x) => x.claimIds.some((id) => ids.includes(id))).map((x) => x.exportId),
     );
   }, [ids]);
+
   const emailDraft = () => {
     const subject = `Claims · ${chosen.map((c) => `${c.claimNumber}${c.revision > 1 ? ` r${c.revision}` : ''}`).join(', ')}`;
+
     const body = [
       'Please find attached the following claims:',
       '',
@@ -1343,8 +1404,10 @@ const SubmissionForm = ({
       '',
       'Attach the exported claim file and supporting documents before sending.',
     ].join('\n');
+
     return `mailto:${encodeURIComponent(profile?.recipient ?? '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
+
   return (
     <section
       aria-label="Record submission"
@@ -1480,7 +1543,7 @@ const SubmissionForm = ({
                   setNote('');
                   onSaved();
                 },
-                (cause) => onError(describeInsuranceError(cause)),
+                (cause) => onError(describeStaffActionError(cause)),
               )
             }
           >
@@ -1506,6 +1569,7 @@ const AcknowledgeRow = ({
   const context = useAuthorizationContext();
   const [reference, setReference] = useState('');
   const [on, setOn] = useState(today());
+
   return (
     <div
       data-submission={submission.reference}
@@ -1553,7 +1617,7 @@ const AcknowledgeRow = ({
                 submissionId: submission.id,
                 acknowledgedOn: on,
                 ...(reference.trim() ? { reference: reference.trim() } : {}),
-              }).then(onSaved, (cause) => onError(describeInsuranceError(cause)))
+              }).then(onSaved, (cause) => onError(describeStaffActionError(cause)))
             }
           >
             Record acknowledgement
@@ -1580,12 +1644,15 @@ const LayoutEditor = ({
   const toast = useToast();
   const [payerId, setPayerId] = useState(payers[0]?.id ?? '');
   const [name, setName] = useState('');
+
   const [columns, setColumns] = useState<{ field: ClaimExportField; header: string }[]>(
     DEFAULT_CLAIM_COLUMNS.map((f) => ({ field: f, header: FIELD_LABELS[f] })),
   );
+
   const [dateFormat, setDateFormat] = useState<'date_iso' | 'date_dmy'>('date_dmy');
   const [amountFormat, setAmountFormat] = useState<'amount_major' | 'amount_minor'>('amount_major');
   const [editing, setEditing] = useState<ImportTemplate>();
+
   const open = (t: ImportTemplate) => {
     setEditing(t);
     setName(t.name);
@@ -1598,29 +1665,37 @@ const LayoutEditor = ({
           header: t.headers[column] ?? '',
         })),
     );
+
     const formats = Object.values(t.formats ?? {});
     setDateFormat(formats.includes('date_iso') ? 'date_iso' : 'date_dmy');
     setAmountFormat(formats.includes('amount_minor') ? 'amount_minor' : 'amount_major');
   };
+
   const move = (i: number, by: number) =>
     setColumns((c) => {
       const n = [...c];
       const [x] = n.splice(i, 1);
       n.splice(Math.max(0, Math.min(n.length, i + by)), 0, x);
+
       return n;
     });
+
   const unused = CLAIM_EXPORT_FIELDS.filter((f) => !columns.some((c) => c.field === f));
+
   const save = async () => {
     try {
       const formats: Record<string, typeof dateFormat | typeof amountFormat> = {};
+
       for (const c of columns) {
         if (/date|Date/.test(c.field) || c.field === 'fulfilledOn') {
           formats[c.field] = dateFormat;
         }
+
         if (['unitPrice', 'amountClaimed', 'patientShare', 'listPrice'].includes(c.field)) {
           formats[c.field] = amountFormat;
         }
       }
+
       await saveImportTemplate(context, {
         kind: 'claim_export',
         ...(payerId ? { payerId } : {}),
@@ -1635,12 +1710,14 @@ const LayoutEditor = ({
           ? { expectedRevision: editing.revision }
           : {}),
       });
+
       toast(`Layout "${name.trim()}" saved.`);
       onSaved();
     } catch (cause) {
-      onError(describeInsuranceError(cause));
+      onError(describeStaffActionError(cause));
     }
   };
+
   return (
     <section
       aria-label="Export layout"

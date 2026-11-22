@@ -30,9 +30,11 @@ export const FacilitySwitcher = () => {
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+
   const [directory, setDirectory] = useState(
     () => cachedFacilityDirectory(facility.code, user.staffId)?.directory,
   );
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,11 +42,14 @@ export const FacilitySwitcher = () => {
   const [refresh, setRefresh] = useState(0);
   const [position, setPosition] = useState({ top: 64, left: 8 });
   const entries = listFacilityWorkspaces();
+
   const choices = directory?.facilities ?? [
     { id: facility.code, name: facility.name, accessible: true, canEnrollDevice: false },
   ];
+
   const canAdd =
     directory?.canCreateFacility ?? (user.roles.includes('facility_admin') && user.canWrite);
+
   const close = () => {
     setOpen(false);
     trigger.current?.focus();
@@ -54,6 +59,7 @@ export const FacilitySwitcher = () => {
     if (!open) {
       return;
     }
+
     let cancelled = false;
     setLoading(true);
     setError('');
@@ -62,6 +68,7 @@ export const FacilitySwitcher = () => {
         if (cancelled) {
           return;
         }
+
         setDirectory(value);
         await cacheFacilityDirectory(facility.code, user.staffId, value);
       })
@@ -75,26 +82,33 @@ export const FacilitySwitcher = () => {
           setLoading(false);
         }
       });
+
     return () => {
       cancelled = true;
     };
   }, [open, refresh, facility.code, user.staffId]);
+
   useLayoutEffect(() => {
     if (!open || !trigger.current) {
       return;
     }
+
     const rect = trigger.current.getBoundingClientRect();
     setPosition({
       top: rect.bottom + 6,
       left: Math.max(8, Math.min(rect.left, innerWidth - Math.min(360, innerWidth - 16) - 8)),
     });
+
     panel.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
   }, [open]);
+
   useEffect(() => {
     if (!open) {
       return;
     }
+
     const resized = () => close();
+
     const clicked = (event: PointerEvent) => {
       if (
         !trigger.current?.contains(event.target as Node) &&
@@ -103,8 +117,10 @@ export const FacilitySwitcher = () => {
         close();
       }
     };
+
     window.addEventListener('resize', resized);
     document.addEventListener('pointerdown', clicked);
+
     return () => {
       window.removeEventListener('resize', resized);
       document.removeEventListener('pointerdown', clicked);
@@ -115,39 +131,51 @@ export const FacilitySwitcher = () => {
     if (!choice.accessible || selecting.current) {
       return;
     }
+
     if (choice.id === facility.code) {
       close();
+
       return;
     }
+
     const existing = entries.find((entry) => entry.facilityId === choice.id);
+
     if (!existing && !choice.canEnrollDevice) {
       close();
       navigate(`/facilities?connect=${encodeURIComponent(choice.id)}`);
+
       return;
     }
+
     selecting.current = true;
     setBusy(true);
     setError('');
+
     try {
       if (navigator.onLine === false) {
         if (!existing?.prepared) {
           throw new Error('Connect to the internet to set up this facility on this device');
         }
+
         await switchFacilityWorkspace(existing.deviceId);
       } else {
         const proof = existing
           ? { deviceId: existing.deviceId }
           : await facilityOpeningProof(facility.code, user.staffId, choice.id);
+
         const access = await resolveOrganizationFacility(
           user.staffId,
           choice.id,
           proof,
           Boolean(existing?.prepared),
         );
+
         if (!access) {
           await switchFacilityWorkspace(existing!.deviceId);
+
           return;
         }
+
         await switchFacilityWorkspace(
           access.device?.deviceId ?? existing!.deviceId,
           access.device,
@@ -200,17 +228,21 @@ export const FacilitySwitcher = () => {
                   event.preventDefault();
                   close();
                 }
+
                 if (event.key === 'Tab') {
                   setOpen(false);
                   trigger.current?.focus();
                 }
+
                 if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
                   event.preventDefault();
+
                   const buttons = [
                     ...(panel.current?.querySelectorAll<HTMLButtonElement>(
                       'button[role="menuitem"]:not(:disabled)',
                     ) ?? []),
                   ];
+
                   const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
                   buttons[nextFocusIndex(event.key, at, buttons.length, 'ArrowDown')]?.focus();
                 }
@@ -232,6 +264,7 @@ export const FacilitySwitcher = () => {
                   .map((choice) => {
                     const current = choice.id === facility.code;
                     const local = entries.find((entry) => entry.facilityId === choice.id);
+
                     const renderStatusLabel = () => {
                       if (current) {
                         return 'Current facility';

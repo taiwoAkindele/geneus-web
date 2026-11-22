@@ -11,9 +11,11 @@ export const BillingSetup = () => {
   const context = useAuthorizationContext();
   const query = useBilling();
   const step = Math.min(3, Math.max(1, Number(params.get('step')) || 1));
+
   if (!context.permissions.includes('fee_item:manage')) {
     return <p className="p-5">Billing setup requires catalogue management permission.</p>;
   }
+
   const renderStep = () => {
     if (step === 1) {
       return (

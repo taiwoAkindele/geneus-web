@@ -19,11 +19,14 @@ export const MagicLinkScreen = () => {
 
   const submit = async () => {
     const code = token.trim().toUpperCase();
+
     if (!code || checking) {
       return;
     }
+
     setChecking(true);
     setError(undefined);
+
     try {
       const invite = await checkInvite(code);
       navigate('/onboarding/register', { state: { inviteToken: code, label: invite.label } });

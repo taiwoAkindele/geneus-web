@@ -27,9 +27,12 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
         onClose();
       }
     };
+
     document.addEventListener('keydown', close);
+
     return () => document.removeEventListener('keydown', close);
   }, [onClose]);
+
   return (
     <>
       {/* Backdrop — tap anywhere to dismiss. */}
@@ -67,6 +70,7 @@ export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
       if (!o) {
         markAllRead();
       }
+
       return !o;
     });
   };
@@ -146,9 +150,11 @@ const ShiftNotice = ({ shift, compact }: { shift: Shift; compact: boolean }) => 
   const [dismissed, setDismissed] = useState(false);
   const seconds = useShiftCountdown(shift.minutesLeft, shift.endsOn);
   const { signOut } = useAuth();
+
   if (dismissed || shift.minutesLeft > 30) {
     return null;
   }
+
   return (
     <div
       role="status"
@@ -192,10 +198,13 @@ const ShiftNotice = ({ shift, compact }: { shift: Shift; compact: boolean }) => 
 
 export const ShiftBanner = () => {
   const { shift } = useSession();
+
   return shift ? <ShiftNotice key={shift.endsOn} shift={shift} compact={false} /> : null;
 };
+
 export const ShiftCountdownStrip = () => {
   const { shift } = useSession();
+
   return shift ? <ShiftNotice key={shift.endsOn} shift={shift} compact /> : null;
 };
 
@@ -205,11 +214,14 @@ const ExtendShiftAction = () => {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const allowed = context.permissions.includes('roster:extend');
+
   const extend = async () => {
     if (busy || !allowed) {
       return;
     }
+
     setBusy(true);
+
     try {
       await extendShift();
       toast('Shift extended');
@@ -221,6 +233,7 @@ const ExtendShiftAction = () => {
       setBusy(false);
     }
   };
+
   return allowed ? (
     <Button
       variant="ghost"

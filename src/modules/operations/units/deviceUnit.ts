@@ -1,5 +1,6 @@
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { activeWorkspace } from '@/data/facilityWorkspaces';
+
 /**
  * The unit this device usually sits in — a per-device convenience, so the
  * queue and "send from" open on the right room. Not a secret and not a rule:

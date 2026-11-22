@@ -6,6 +6,7 @@ import { listIncomingTransfers } from '@/data/repos/billing';
 import { formatMoney } from '@/lib/money';
 import { userMessage } from '@/lib/api/userMessage';
 import { Button, SelectField } from '@/ui';
+
 type Capacity = {
   id: string;
   patientMinor: number;
@@ -13,6 +14,7 @@ type Capacity = {
   availableMinor: number;
   overRecognizedMinor: number;
 };
+
 export const useReceiptCapacity = (ids: readonly string[], revision?: unknown) => {
   const context = useAuthorizationContext();
   const { hasServerSession } = useStaffVerification();
@@ -20,19 +22,24 @@ export const useReceiptCapacity = (ids: readonly string[], revision?: unknown) =
   const [sources, setSources] = useState<Record<string, Capacity>>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const refresh = useCallback(async () => {
     if (!key || !hasServerSession) {
       setSources({});
+
       return;
     }
+
     setBusy(true);
     setError('');
+
     try {
       const response = await billingRequest<{ sources: Capacity[] }>(
         context,
         'transfers/capacity',
         { ids: key.split('|') },
       );
+
       setSources(Object.fromEntries(response.sources.map((c) => [c.id, c])));
     } catch (e) {
       setSources({});
@@ -41,11 +48,14 @@ export const useReceiptCapacity = (ids: readonly string[], revision?: unknown) =
       setBusy(false);
     }
   }, [key, hasServerSession, context.userId]);
+
   useEffect(() => {
     void refresh();
   }, [refresh, revision]);
+
   return { sources, error, busy, refresh, hasServerSession };
 };
+
 export const VerifiedReceiptPicker = ({
   value,
   onChange,
@@ -56,10 +66,13 @@ export const VerifiedReceiptPicker = ({
   currency?: string;
 }) => {
   const query = useLiveQuery(listIncomingTransfers, ['incoming_transfer', 'payment']);
+
   const receipts = (query.data ?? [])
     .filter((r) => r.mode === 'live' && r.currency === currency)
     .slice(-200);
+
   const capacity = useReceiptCapacity(receipts.map((r) => r.id));
+
   return (
     <div className="space-y-2 rounded-field border border-outline-soft p-3">
       <SelectField

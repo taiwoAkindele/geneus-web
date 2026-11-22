@@ -18,22 +18,29 @@ export const preparePayment = (
   available?: number,
 ) => {
   const selected = rows.filter((row) => amounts[row.charge.id]?.trim());
+
   if (!selected.length) {
     throw new PaymentInputError('Enter an amount against at least one unpaid fee.');
   }
+
   const currency = selected[0].charge.currency;
+
   const allocations = selected.map((row) => {
     try {
       if (row.charge.currency !== currency) {
         throw new Error('Collect one currency at a time.');
       }
+
       if (transfer && (transfer.currency !== currency || transfer.mode !== 'live')) {
         throw new Error('Choose fees in this verified transfer’s currency.');
       }
+
       const amountMinor = parseAmount(amounts[row.charge.id], currency);
+
       if (amountMinor <= 0 || amountMinor > row.balanceMinor) {
         throw new Error('Enter an amount greater than zero and no more than the unpaid balance.');
       }
+
       return { chargeId: row.charge.id, amountMinor };
     } catch (cause) {
       throw new PaymentInputError(
@@ -42,12 +49,16 @@ export const preparePayment = (
       );
     }
   });
+
   const amountMinor = allocations.reduce((sum, allocation) => sum + allocation.amountMinor, 0);
+
   if (!Number.isSafeInteger(amountMinor) || amountMinor > MAX_AMOUNT_MINOR) {
     throw new PaymentInputError('The total exceeds the supported payment range.');
   }
+
   if (transfer && available !== undefined && amountMinor > available) {
     throw new PaymentInputError('The allocation exceeds the amount left on this transfer.');
   }
+
   return { currency, allocations, amountMinor };
 };

@@ -3,9 +3,11 @@ import { currentFacilityRevisions, intervalContains } from '@shared';
 import { useAuthorizationContext } from '@/session';
 import { eventHeads } from '@/data/repos/workforce';
 import { useWorkforce } from './useWorkforce';
+
 export const WorkforceHome = () => {
   const query = useWorkforce();
   const context = useAuthorizationContext();
+
   if (query.loading) {
     return (
       <div
@@ -15,6 +17,7 @@ export const WorkforceHome = () => {
       />
     );
   }
+
   if (query.error) {
     return (
       <p role="alert" className="my-4 rounded-card bg-white p-4 text-sm">
@@ -25,13 +28,17 @@ export const WorkforceHome = () => {
       </p>
     );
   }
+
   const data = query.data;
+
   if (!data?.offerings.length) {
     return null;
   }
+
   const assignments = currentFacilityRevisions(data.assignments).filter(
     (a) => a.staffId === context.userId && a.status === 'active' && intervalContains(a, Date.now()),
   );
+
   const offers = eventHeads(
     data.ownership.filter(
       (e) =>
@@ -44,6 +51,7 @@ export const WorkforceHome = () => {
       e.recipientStaffId === context.userId &&
       data.handoffs.some((h) => h.id === e.sourceId && h.status !== 'done'),
   );
+
   return (
     <section aria-label="My service work" className="my-5 grid gap-3 sm:grid-cols-3">
       {[

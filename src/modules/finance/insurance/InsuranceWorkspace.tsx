@@ -16,7 +16,7 @@ import {
   confirmAllocations,
   SKIP_REASONS,
   type ConfirmOutcome,
-  describeInsuranceError,
+  describeStaffActionError,
 } from '@/lib/api/insurance';
 import { formatMoney } from '@/lib/money';
 import { useAuthorizationContext, StaffVerification } from '@/session';
@@ -80,9 +80,11 @@ const LiabilityForm = ({
   const [agreement, setAgreement] = useState('');
   const [clause, setClause] = useState('');
   const [checkId, setCheckId] = useState('');
+
   const notEligible = checks.filter(
     (c) => c.patientId === patientId && c.result === 'not_eligible',
   );
+
   if (!open) {
     return (
       <Button fullWidth={false} variant="ghost" onClick={() => setOpen(true)}>
@@ -90,7 +92,9 @@ const LiabilityForm = ({
       </Button>
     );
   }
+
   const needsApproval = payerExpected || ground === 'contract_clause';
+
   const liabilityChange = () => {
     if (ground === 'patient_election') {
       return { ground, patientAgreement: agreement.trim() };
@@ -102,8 +106,10 @@ const LiabilityForm = ({
 
     return { ground, contractClause: clause.trim() };
   };
+
   const liability = liabilityChange();
   const parsed = LiabilityChange.safeParse(liability);
+
   return (
     <div className="space-y-2 rounded-field border border-outline-soft p-3">
       <SelectField
@@ -179,6 +185,7 @@ const LiabilityForm = ({
     </div>
   );
 };
+
 type Visit = { key: string; patientId: string; name: string; date: string; rows: Row[] };
 
 /**
@@ -199,7 +206,9 @@ export const InsuranceWorkspace = () => {
   useEffect(() => {
     document.title = 'Insurance · Geneus Health';
   }, []);
+
   const data = query.data;
+
   // Payments the server flagged at sync for going beyond the patient's part: an older device, stale cover data, or undecided cover.
   const flags = useLiveQuery(
     useCallback(
@@ -213,21 +222,27 @@ export const InsuranceWorkspace = () => {
     ),
     ['audit_event'],
   );
+
   const view = useMemo(() => {
     if (!data) {
       return undefined;
     }
+
     const rows = billingRows(data.charges, data.payments, data.adjustments, data.coverage).filter(
       (r) => r.coverage,
     );
+
     const names = new Map(data.patients.map((p) => [p.patientId, p.fullName]));
     const visits = new Map<string, Visit>();
+
     for (const row of rows) {
       const date =
         serviceDateOf(row.charge.createdOn, data.insurance.timeZone) ??
         row.charge.createdOn.slice(0, 10);
+
       const key =
         row.charge.encounterId ?? row.charge.appointmentId ?? `${row.charge.patientId}|${date}`;
+
       const visit = visits.get(key) ?? {
         key,
         patientId: row.charge.patientId,
@@ -235,31 +250,39 @@ export const InsuranceWorkspace = () => {
         date,
         rows: [],
       };
+
       visit.rows.push(row);
       visits.set(key, visit);
     }
+
     const paid = (r: Row) => r.settledMinor - r.refundedMinor;
+
     const open = [...visits.values()].filter((v) =>
       v.rows.some((r) => r.coverage!.state === 'estimated'),
     );
+
     const routine = open.filter(
       (v) =>
         v.rows.every((r) => r.coverage!.state !== 'estimated' || isRoutine(r.coverage!, paid(r))) &&
         v.rows.some((r) => r.coverage!.state === 'estimated'),
     );
+
     const exceptions = open.filter((v) => !routine.includes(v));
     const undetermined = new Map<UndeterminedReason, Row[]>();
+
     for (const r of rows) {
       if (r.coverage!.state === 'undetermined') {
         undetermined.set(r.coverage!.reason, [...(undetermined.get(r.coverage!.reason) ?? []), r]);
       }
     }
+
     const selfPaidWhileCovered = rows.filter(
       (r) =>
         r.coverage!.state === 'self_pay_elected' &&
         data.insurance.checks.some((c) => {
           const cover = (r.coverage as { cover?: { id: string } }).cover;
           const date = serviceDateOf(r.charge.createdOn, data.insurance.timeZone);
+
           return (
             cover &&
             date &&
@@ -270,7 +293,9 @@ export const InsuranceWorkspace = () => {
           );
         }),
     );
+
     const credits = rows.filter((r) => r.balanceMinor < 0);
+
     return { routine, exceptions, undetermined, selfPaidWhileCovered, credits, names };
   }, [data]);
 
@@ -294,6 +319,7 @@ export const InsuranceWorkspace = () => {
       </main>
     );
   }
+
   if (!view) {
     return (
       <main className="p-4">
@@ -301,7 +327,9 @@ export const InsuranceWorkspace = () => {
       </main>
     );
   }
+
   const canConfirm = context.permissions.includes('coverage:confirm');
+
   const money = (rows: Row[], pick: (r: Row) => number) =>
     [...new Set(rows.map((r) => r.charge.currency))]
       .map((c) =>
@@ -311,9 +339,11 @@ export const InsuranceWorkspace = () => {
         ),
       )
       .join(' + ');
+
   const run = async (key: string, input: Parameters<typeof confirmAllocations>[1]) => {
     setBusy(key);
     setError('');
+
     try {
       const result = await confirmAllocations(context, input);
       setOutcomes(result.outcomes);
@@ -322,11 +352,12 @@ export const InsuranceWorkspace = () => {
         `${confirmed} charge${confirmed === 1 ? '' : 's'} confirmed${result.outcomes.length > confirmed ? `, ${result.outcomes.length - confirmed} need review` : ''}. Changes arrive with the next sync.`,
       );
     } catch (cause) {
-      setError(describeInsuranceError(cause, 'Confirmation failed'));
+      setError(describeStaffActionError(cause, 'Confirmation failed'));
     } finally {
       setBusy('');
     }
   };
+
   const visitLine = (v: Visit) => (
     <p className="text-sm">
       {v.date} · {v.rows.length} charge{v.rows.length === 1 ? '' : 's'} · patient pays{' '}
@@ -335,6 +366,7 @@ export const InsuranceWorkspace = () => {
       )}
     </p>
   );
+
   const routineIds = view.routine.flatMap((v) =>
     v.rows.filter((r) => r.coverage!.state === 'estimated').map((r) => r.charge.id),
   );

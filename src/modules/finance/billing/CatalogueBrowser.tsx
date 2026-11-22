@@ -26,6 +26,7 @@ export const CatalogueBrowser = ({
     setCategory(initialCategory);
     setPage(0);
   }, [initialCategory]);
+
   const query = useLiveQuery(
     useCallback(
       () => cataloguePage({ search, category, page, facilityId: context.facilityId }),
@@ -33,6 +34,7 @@ export const CatalogueBrowser = ({
     ),
     ['fee_item'],
   );
+
   const renderCatalogue = () => {
     if (query.loading) {
       return <p role="status">Reading catalogue…</p>;
