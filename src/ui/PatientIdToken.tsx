@@ -41,4 +41,4 @@ export const PatientIdToken = ({ id, parts, variant = 'card', className = '' }: 
       ) : null}
     </div>
   );
-}
+};

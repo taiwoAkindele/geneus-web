@@ -56,4 +56,7 @@ export type RegisterDef = {
 };
 
 /** The editable shape while building — becomes a NEW definition version on publish. */
-export type RegisterDraft = Pick<RegisterDef, 'name' | 'category' | 'description' | 'fields' | 'visitLink'>;
+export type RegisterDraft = Pick<
+  RegisterDef,
+  'name' | 'category' | 'description' | 'fields' | 'visitLink'
+>;

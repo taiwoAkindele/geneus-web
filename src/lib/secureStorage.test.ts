@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { destroySecureStorage, resetSecureStorageForTests, secureGet, secureSet, unlockSecureStorage } from './secureStorage';
+import {
+  destroySecureStorage,
+  resetSecureStorageForTests,
+  secureGet,
+  secureSet,
+  unlockSecureStorage,
+} from './secureStorage';
 import { memoryStorage } from './testing/memoryStorage';
 
 /**

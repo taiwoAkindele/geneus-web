@@ -1,2 +1,2 @@
-import { ServiceWorkspace } from '@/modules/operations/workforce/Workspaces';
+import { ServiceWorkspace } from '@/modules/operations/workforce';
 export const ServiceScreen = () => <ServiceWorkspace />;

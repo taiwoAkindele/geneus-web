@@ -55,21 +55,46 @@ describe('field kinds', () => {
 
 describe('fromRow', () => {
   it('reads existing text-stored workflow versions without weakening contract validation', () => {
-    const base = { id: 'entry:version', facilityId: 'TEST', schemaVersion: 5, createdBy: 'staff:doctor', createdOn: '2026-11-05T09:00:00Z', deviceId: 'device:one', patientId: 'TEST-000001-K2' };
+    const base = {
+      id: 'entry:version',
+      facilityId: 'TEST',
+      schemaVersion: 5,
+      createdBy: 'staff:doctor',
+      createdOn: '2026-11-05T09:00:00Z',
+      deviceId: 'device:one',
+      patientId: 'TEST-000001-K2',
+    };
     const records = [
       Encounter.parse({ ...base, type: 'encounter', workflowVersion: 1, openedOn: base.createdOn }),
-      EncounterEntry.parse({ ...base, type: 'encounter_entry', workflowVersion: 1, encounterId: 'visit:one', actorRole: 'doctor', step: 'complaint', values: { note: 'Synthetic care' } }),
+      EncounterEntry.parse({
+        ...base,
+        type: 'encounter_entry',
+        workflowVersion: 1,
+        encounterId: 'visit:one',
+        actorRole: 'doctor',
+        step: 'complaint',
+        values: { note: 'Synthetic care' },
+      }),
     ];
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       for (const record of records) {
         const stored = { ...toRow(record.type, record), workflowVersion: '1' };
         expect(fromRow(record.type, stored)).toMatchObject({ workflowVersion: 1 });
-        expect(parseDocument({ ...decodeValues(record.type, { ...stored, workflowVersion: '2' }), type: record.type }).success).toBe(false);
-        expect(fromRow<typeof record>(record.type, { ...stored, workflowVersion: null }).workflowVersion).toBeUndefined();
+        expect(
+          parseDocument({
+            ...decodeValues(record.type, { ...stored, workflowVersion: '2' }),
+            type: record.type,
+          }).success,
+        ).toBe(false);
+        expect(
+          fromRow<typeof record>(record.type, { ...stored, workflowVersion: null }).workflowVersion,
+        ).toBeUndefined();
       }
       expect(warning).not.toHaveBeenCalled();
-    } finally { warning.mockRestore(); }
+    } finally {
+      warning.mockRestore();
+    }
   });
   it('turns a synced row back into a contract record', () => {
     const patient = fromRow<Patient>('patient', wirePatient);
@@ -117,12 +142,25 @@ describe('toRow', () => {
       ageYears: 32,
     });
 
-    expect(row).toEqual({ id: 'X-Y-000001-K2', dobEstimated: 0, allergies: '["penicillin"]', phone: null, ageYears: 32 });
+    expect(row).toEqual({
+      id: 'X-Y-000001-K2',
+      dobEstimated: 0,
+      allergies: '["penicillin"]',
+      phone: null,
+      ageYears: 32,
+    });
     expect('type' in row).toBe(false);
   });
 
   it('round-trips through decodeValues', () => {
-    const record = { id: 'r:1', fields: [{ id: 'f1', type: 'text', label: 'Name' }], version: 2, status: 'published' };
-    expect(decodeValues('register_definition', toRow('register_definition', record))).toEqual(record);
+    const record = {
+      id: 'r:1',
+      fields: [{ id: 'f1', type: 'text', label: 'Name' }],
+      version: 2,
+      status: 'published',
+    };
+    expect(decodeValues('register_definition', toRow('register_definition', record))).toEqual(
+      record,
+    );
   });
 });

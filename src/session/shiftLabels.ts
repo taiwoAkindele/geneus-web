@@ -7,8 +7,14 @@ const timeLabel = (value: string): string =>
 /** Overnight and 24-hour shifts must visibly identify the following day. */
 export const shiftEndLabel = (shift: RosterShift): string => {
   const end = shift.extendedUntil ?? shift.endsAt;
-  return calendarDate(shift.startsAt) === calendarDate(end) ? timeLabel(end)
-    : new Date(end).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return calendarDate(shift.startsAt) === calendarDate(end)
+    ? timeLabel(end)
+    : new Date(end).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 };
 export const shiftRangeLabel = (shift: RosterShift): string =>
   `${timeLabel(shift.startsAt)}–${shiftEndLabel(shift)}`;

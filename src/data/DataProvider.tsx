@@ -1,5 +1,13 @@
 import { nameActiveWorkspace } from './facilityWorkspaces';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { DeviceCredential, Facility } from '@shared';
 import { PulseLoader } from '@/ui';
 import { deviceId as localDeviceId } from './device';
@@ -32,14 +40,28 @@ export type DeviceContext = {
 const DeviceContextContext = createContext<DeviceContext | null>(null);
 
 const Screen = ({ children }: { children: ReactNode }) => (
-  <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center text-ink-muted">{children}</div>
+  <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center text-ink-muted">
+    {children}
+  </div>
 );
 
 /** Mounted only once the database is open: reads the facility live. */
-const EnrolledDevice = ({ credential, enroll, children }: { credential: DeviceCredential; enroll: DeviceContext['enroll']; children: ReactNode }) => {
+const EnrolledDevice = ({
+  credential,
+  enroll,
+  children,
+}: {
+  credential: DeviceCredential;
+  enroll: DeviceContext['enroll'];
+  children: ReactNode;
+}) => {
   const load = useCallback(() => getFacility(), []);
   const { data, loading, error } = useLiveQuery(load);
-  useEffect(() => { if (data?.name) void nameActiveWorkspace(data.name); }, [data?.name]);
+  useEffect(() => {
+    if (data?.name) {
+      void nameActiveWorkspace(data.name);
+    }
+  }, [data?.name]);
   const value = useMemo<DeviceContext>(
     () => ({ deviceId: credential.deviceId, facility: data, enrolled: true, enroll }),
     [credential.deviceId, data, enroll],
@@ -55,24 +77,38 @@ const EnrolledDevice = ({ credential, enroll, children }: { credential: DeviceCr
       </Screen>
     );
   }
-  if (loading) return <Screen><PulseLoader label="Loading this facility…" /></Screen>;
+  if (loading) {
+    return (
+      <Screen>
+        <PulseLoader label="Loading this facility…" />
+      </Screen>
+    );
+  }
   return <DeviceContextContext.Provider value={value}>{children}</DeviceContextContext.Provider>;
 };
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [credential, setCredential] = useState<DeviceCredential | undefined>(() => getDeviceCredential());
+  const [credential, setCredential] = useState<DeviceCredential | undefined>(() =>
+    getDeviceCredential(),
+  );
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<Error>();
 
   useEffect(() => {
-    if (!credential) return;
+    if (!credential) {
+      return;
+    }
     let cancelled = false;
     startSync().then(
       () => {
-        if (!cancelled) setOpen(true);
+        if (!cancelled) {
+          setOpen(true);
+        }
       },
       (cause: unknown) => {
-        if (!cancelled) setFailure(cause instanceof Error ? cause : new Error(String(cause)));
+        if (!cancelled) {
+          setFailure(cause instanceof Error ? cause : new Error(String(cause)));
+        }
       },
     );
     return () => {
@@ -105,8 +141,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       </Screen>
     );
   }
-  if (!credential) return <DeviceContextContext.Provider value={unenrolled}>{children}</DeviceContextContext.Provider>;
-  if (!open) return <Screen><PulseLoader label="Opening records…" /></Screen>;
+  if (!credential) {
+    return (
+      <DeviceContextContext.Provider value={unenrolled}>{children}</DeviceContextContext.Provider>
+    );
+  }
+  if (!open) {
+    return (
+      <Screen>
+        <PulseLoader label="Opening records…" />
+      </Screen>
+    );
+  }
   return (
     <EnrolledDevice credential={credential} enroll={enroll}>
       {children}
@@ -116,6 +162,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 export const useDeviceContext = (): DeviceContext => {
   const device = useContext(DeviceContextContext);
-  if (!device) throw new Error('useDeviceContext must be used within a DataProvider');
+  if (!device) {
+    throw new Error('useDeviceContext must be used within a DataProvider');
+  }
   return device;
 };

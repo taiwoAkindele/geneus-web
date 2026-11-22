@@ -29,7 +29,13 @@ describe('money entered as decimal text', () => {
 
 describe('offline receipt numbers', () => {
   it('uses only this facility receipt sequence, including reversal receipts', () => {
-    expect(mintReceiptNumber('OOE-PHC', ['OOE-PHC-R-000009-K2', 'OTHER-R-000900-AB', 'OOE-PHC-000500-AB'])).toMatch(/^OOE-PHC-R-000010-[A-HJ-NP-Z2-9]{2}$/);
+    expect(
+      mintReceiptNumber('OOE-PHC', [
+        'OOE-PHC-R-000009-K2',
+        'OTHER-R-000900-AB',
+        'OOE-PHC-000500-AB',
+      ]),
+    ).toMatch(/^OOE-PHC-R-000010-[A-HJ-NP-Z2-9]{2}$/);
     expect(mintReceiptNumber('OOE', ['OOE-PHC-R-000999-K2'])).toMatch(/^OOE-R-000001-/);
   });
 

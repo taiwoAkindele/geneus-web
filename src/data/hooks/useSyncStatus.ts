@@ -43,7 +43,9 @@ export const useSyncStatus = (): SyncState => {
   const [state, setState] = useState<SyncState>(IDLE);
 
   useEffect(() => {
-    if (!isDatabaseOpen()) return;
+    if (!isDatabaseOpen()) {
+      return;
+    }
     const db = getDatabase();
     let disposed = false;
 
@@ -51,9 +53,14 @@ export const useSyncStatus = (): SyncState => {
       const status = db.currentStatus;
       let pending = 0;
       let pendingKnown = true;
-      try { pending = await countPending(); }
-      catch { pendingKnown = false; }
-      if (disposed) return;
+      try {
+        pending = await countPending();
+      } catch {
+        pendingKnown = false;
+      }
+      if (disposed) {
+        return;
+      }
       setState({
         connected: status.connected,
         connecting: status.connecting,
@@ -63,13 +70,19 @@ export const useSyncStatus = (): SyncState => {
         downloading: status.dataFlowStatus.downloading,
         pending,
         pendingKnown,
-        error: status.dataFlowStatus.uploadError?.message ?? status.dataFlowStatus.downloadError?.message ?? (!pendingKnown ? 'The upload queue could not be read.' : undefined),
+        error:
+          status.dataFlowStatus.uploadError?.message ??
+          status.dataFlowStatus.downloadError?.message ??
+          (!pendingKnown ? 'The upload queue could not be read.' : undefined),
       });
     };
 
     void refresh();
     const stopStatus = db.registerListener({ statusChanged: () => void refresh() });
-    const stopChanges = db.onChangeWithCallback({ onChange: () => void refresh() }, { tables: ['ps_crud'] });
+    const stopChanges = db.onChangeWithCallback(
+      { onChange: () => void refresh() },
+      { tables: ['ps_crud'] },
+    );
     return () => {
       disposed = true;
       stopStatus();
@@ -82,10 +95,20 @@ export const useSyncStatus = (): SyncState => {
 
 /** The one-word truth for the status pill. */
 export const indicatorFor = (state: SyncState): IndicatorStatus => {
-  if (state.error) return 'error';
-  if (state.uploading || state.downloading) return 'syncing';
-  if (state.pending > 0) return state.connected ? 'syncing' : 'pending';
-  if (!state.connected) return 'offline';
-  if (state.connecting || !state.hasSynced) return 'syncing';
+  if (state.error) {
+    return 'error';
+  }
+  if (state.uploading || state.downloading) {
+    return 'syncing';
+  }
+  if (state.pending > 0) {
+    return state.connected ? 'syncing' : 'pending';
+  }
+  if (!state.connected) {
+    return 'offline';
+  }
+  if (state.connecting || !state.hasSynced) {
+    return 'syncing';
+  }
   return 'synced';
 };

@@ -1,13 +1,41 @@
-import { Appointment, type AppointmentAllocation, type AppointmentAction, type AppointmentActivity, type AuthorizationContext, type Charge, type Encounter, type FeeItem, type Patient, type VisitType } from '@shared';
+import {
+  Appointment,
+  type AppointmentAllocation,
+  type AppointmentAction,
+  type AppointmentActivity,
+  type AuthorizationContext,
+  type Charge,
+  type Encounter,
+  type FeeItem,
+  type Patient,
+  type VisitType,
+} from '@shared';
 import { validateAllocation } from './workforce';
 import { assertAllowed } from '@/auth/authorization';
-import { allOfType, allWhere, ContractError, envelope, findRecord, insertRecords, newId, updateRecord, type NewRecord } from '../db';
+import {
+  allOfType,
+  allWhere,
+  ContractError,
+  envelope,
+  findRecord,
+  insertRecords,
+  newId,
+  updateRecord,
+  type NewRecord,
+} from '../db';
 import { chargesForPatient, listFeeItems, newCharge, patientBillingFacts } from './billing';
 import { patientIdentityIds } from './patientIdentity';
 import { checkCareServiceChoice } from './careServices';
 
 export const listAppointments = () => allOfType<Appointment>('appointment');
-export const reservationForAppointment = async(id:string) => ({ booking:await findRecord<Appointment>('appointment',id), reservations:await allWhere<import('@shared').AppointmentReservation>('appointment_reservation','appointmentId',id) });
+export const reservationForAppointment = async (id: string) => ({
+  booking: await findRecord<Appointment>('appointment', id),
+  reservations: await allWhere<import('@shared').AppointmentReservation>(
+    'appointment_reservation',
+    'appointmentId',
+    id,
+  ),
+});
 
 export type AppointmentDraft = {
   patientId: string;
@@ -21,7 +49,11 @@ export type AppointmentDraft = {
 };
 
 /** The appointment record for a booking — also written alongside a follow-up that closes an encounter. */
-export const newAppointment = (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string) => ({
+export const newAppointment = (
+  draft: AppointmentDraft,
+  context: AuthorizationContext,
+  createdOn?: string,
+) => ({
   ...envelope(context, createdOn),
   id: newId('appointment'),
   type: 'appointment' as const,
@@ -34,36 +66,105 @@ export const newAppointment = (draft: AppointmentDraft, context: AuthorizationCo
   status: draft.scheduledFor ? ('scheduled' as const) : ('pending' as const),
 });
 
-const checkedAppointment = (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string) => {
+const checkedAppointment = (
+  draft: AppointmentDraft,
+  context: AuthorizationContext,
+  createdOn?: string,
+) => {
   const appointment = newAppointment(draft, context, createdOn);
   const parsed = Appointment.safeParse(appointment);
-  if (!parsed.success) throw new ContractError(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
+  if (!parsed.success) {
+    throw new ContractError(
+      parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
+    );
+  }
   return { appointment, parsed: parsed.data };
 };
 
-type BookingFacts = { patient: Patient; fees: readonly FeeItem[]; firstVisit: boolean; linkedCharges: readonly Charge[] };
-
-/** The appointment and the fees it raises, from facts already read. Pure, so registration can book in its own write. */
-const bookingRecordsFrom = (appointment: ReturnType<typeof newAppointment>, draft: AppointmentDraft, context: AuthorizationContext, { patient, fees, firstVisit, linkedCharges }: BookingFacts): NewRecord[] => {
-  const selected = fees.filter((f) => f.active && (f.chargeWhen === 'every_visit' || (firstVisit && f.chargeWhen === 'first_visit' && !linkedCharges.some((c) => c.feeItemId === f.id))));
-  const raised = selected.map((fee): NewRecord => ({
-    permission: 'charge:create', type: 'charge', record: newCharge(fee, { patientId: draft.patientId, appointmentId: appointment.id, facts: patientBillingFacts(patient, draft.visitType) }, context),
-  }));
-  const firstVisitIds = firstVisit ? linkedCharges.filter((c) => fees.some((f) => f.id === c.feeItemId && f.chargeWhen === 'first_visit')).map((c) => c.id) : [];
-  return [{ permission: 'appointment:create', type: 'appointment', record: { ...appointment, chargeIds: [...firstVisitIds, ...raised.map((r) => (r.record as { id: string }).id)] } }, ...raised];
+type BookingFacts = {
+  patient: Patient;
+  fees: readonly FeeItem[];
+  firstVisit: boolean;
+  linkedCharges: readonly Charge[];
 };
 
-export const bookingRecords = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<NewRecord[]> => {
+/** The appointment and the fees it raises, from facts already read. Pure, so registration can book in its own write. */
+const bookingRecordsFrom = (
+  appointment: ReturnType<typeof newAppointment>,
+  draft: AppointmentDraft,
+  context: AuthorizationContext,
+  { patient, fees, firstVisit, linkedCharges }: BookingFacts,
+): NewRecord[] => {
+  const selected = fees.filter(
+    (f) =>
+      f.active &&
+      (f.chargeWhen === 'every_visit' ||
+        (firstVisit &&
+          f.chargeWhen === 'first_visit' &&
+          !linkedCharges.some((c) => c.feeItemId === f.id))),
+  );
+  const raised = selected.map((fee): NewRecord => ({
+    permission: 'charge:create',
+    type: 'charge',
+    record: newCharge(
+      fee,
+      {
+        patientId: draft.patientId,
+        appointmentId: appointment.id,
+        facts: patientBillingFacts(patient, draft.visitType),
+      },
+      context,
+    ),
+  }));
+  const firstVisitIds = firstVisit
+    ? linkedCharges
+        .filter((c) => fees.some((f) => f.id === c.feeItemId && f.chargeWhen === 'first_visit'))
+        .map((c) => c.id)
+    : [];
+  return [
+    {
+      permission: 'appointment:create',
+      type: 'appointment',
+      record: {
+        ...appointment,
+        chargeIds: [...firstVisitIds, ...raised.map((r) => (r.record as { id: string }).id)],
+      },
+    },
+    ...raised,
+  ];
+};
+
+export const bookingRecords = async (
+  draft: AppointmentDraft,
+  context: AuthorizationContext,
+  createdOn?: string,
+): Promise<NewRecord[]> => {
   assertAllowed(context, 'appointment:create');
   const { appointment, parsed } = checkedAppointment(draft, context, createdOn);
-  if (draft.offeringId) await checkCareServiceChoice({ offeringId: draft.offeringId, visitType: draft.visitType ?? 'general' }, context);
+  if (draft.offeringId) {
+    await checkCareServiceChoice(
+      { offeringId: draft.offeringId, visitType: draft.visitType ?? 'general' },
+      context,
+    );
+  }
   await validateAllocation(parsed);
-  const [patient, fees, appointments] = await Promise.all([findRecord<Patient>('patient', draft.patientId), listFeeItems(), listAppointments()]);
-  if (!patient) throw new Error('The patient is not available on this device');
+  const [patient, fees, appointments] = await Promise.all([
+    findRecord<Patient>('patient', draft.patientId),
+    listFeeItems(),
+    listAppointments(),
+  ]);
+  if (!patient) {
+    throw new Error('The patient is not available on this device');
+  }
   const identityIds = await patientIdentityIds(draft.patientId);
   const linkedCharges = (await Promise.all(identityIds.map(chargesForPatient))).flat();
   const firstVisit = !appointments.some((a) => identityIds.includes(a.patientId));
-  return bookingRecordsFrom(appointment, draft, context, { patient, fees, firstVisit, linkedCharges });
+  return bookingRecordsFrom(appointment, draft, context, {
+    patient,
+    fees,
+    firstVisit,
+    linkedCharges,
+  });
 };
 
 /**
@@ -71,50 +172,132 @@ export const bookingRecords = async (draft: AppointmentDraft, context: Authoriza
  * extra records): their first visit, with the registration charges just raised.
  * Resource reservations are not offered here; they need the scheduled booking flow.
  */
-export const newPatientBookingRecords = (draft: Omit<AppointmentDraft, 'allocation'>, context: AuthorizationContext, created: { patient: Patient; fees: readonly FeeItem[]; charges: readonly Charge[] }): NewRecord[] => {
+export const newPatientBookingRecords = (
+  draft: Omit<AppointmentDraft, 'allocation'>,
+  context: AuthorizationContext,
+  created: { patient: Patient; fees: readonly FeeItem[]; charges: readonly Charge[] },
+): NewRecord[] => {
   assertAllowed(context, 'appointment:create');
   const { appointment } = checkedAppointment(draft, context);
-  return bookingRecordsFrom(appointment, draft, context, { patient: created.patient, fees: created.fees, firstVisit: true, linkedCharges: created.charges });
+  return bookingRecordsFrom(appointment, draft, context, {
+    patient: created.patient,
+    fees: created.fees,
+    firstVisit: true,
+    linkedCharges: created.charges,
+  });
 };
-export const book = async (draft: AppointmentDraft, context: AuthorizationContext, createdOn?: string): Promise<Appointment> =>
+export const book = async (
+  draft: AppointmentDraft,
+  context: AuthorizationContext,
+  createdOn?: string,
+): Promise<Appointment> =>
   (await insertRecords(context, await bookingRecords(draft, context, createdOn)))[0] as Appointment;
 
-export type AppointmentChange = { action: AppointmentAction; reason?: string; scheduledFor?: string; expectedActivityId?: string; allocation?: AppointmentAllocation | null };
+export type AppointmentChange = {
+  action: AppointmentAction;
+  reason?: string;
+  scheduledFor?: string;
+  expectedActivityId?: string;
+  allocation?: AppointmentAllocation | null;
+};
 
 /** Change the existing booking, never make another appointment or raise its fees again. */
-export const changeAppointment = async (id: string, change: AppointmentChange, context: AuthorizationContext): Promise<Appointment> => {
+export const changeAppointment = async (
+  id: string,
+  change: AppointmentChange,
+  context: AuthorizationContext,
+): Promise<Appointment> => {
   assertAllowed(context, 'appointment:update');
   const booking = await findRecord<Appointment>('appointment', id);
-  if (!booking || booking.facilityId !== context.facilityId) throw new Error('This booking is not available at this facility');
+  if (!booking || booking.facilityId !== context.facilityId) {
+    throw new Error('This booking is not available at this facility');
+  }
   const history = booking.activity ?? [];
-  if (history[history.length - 1]?.id !== change.expectedActivityId) throw new Error('This booking has changed. Close this form and review its current details');
-  if ((await allWhere<Encounter>('encounter', 'appointmentId', id)).length) throw new Error('Care has already started. Continue or review the linked visit');
+  if (history[history.length - 1]?.id !== change.expectedActivityId) {
+    throw new Error('This booking has changed. Close this form and review its current details');
+  }
+  if ((await allWhere<Encounter>('encounter', 'appointmentId', id)).length) {
+    throw new Error('Care has already started. Continue or review the linked visit');
+  }
   // PowerSync omits unchanged columns. A distinct timestamp ensures even two
   // immediate actions carry updatedOn and their attribution through the queue.
-  const recordedOn = new Date(Math.max(Date.now(), Date.parse(booking.updatedOn ?? booking.createdOn) + 1)).toISOString();
-  const attendance: Appointment['attendance'] = change.action === 'rescheduled' || change.action === 'reopened' ? 'booked' : change.action;
+  const recordedOn = new Date(
+    Math.max(Date.now(), Date.parse(booking.updatedOn ?? booking.createdOn) + 1),
+  ).toISOString();
+  const attendance: Appointment['attendance'] =
+    change.action === 'rescheduled' || change.action === 'reopened' ? 'booked' : change.action;
   const scheduledFor = change.action === 'rescheduled' ? change.scheduledFor : booking.scheduledFor;
   const action: AppointmentActivity = {
-    id: crypto.randomUUID(), action: change.action, recordedBy: context.userId, recordedOn,
-    fromAttendance: booking.attendance ?? 'booked', toAttendance: attendance,
-    fromScheduledFor: booking.scheduledFor, toScheduledFor: scheduledFor, reason: change.reason?.trim() || undefined,
+    id: crypto.randomUUID(),
+    action: change.action,
+    recordedBy: context.userId,
+    recordedOn,
+    fromAttendance: booking.attendance ?? 'booked',
+    toAttendance: attendance,
+    fromScheduledFor: booking.scheduledFor,
+    toScheduledFor: scheduledFor,
+    reason: change.reason?.trim() || undefined,
   };
-  const changes = { attendance, scheduledFor, ...(change.allocation!==undefined?{allocation:change.allocation||undefined}:{}), status: change.action === 'rescheduled' ? 'scheduled' as const : booking.status, activity: [...history, action], updatedBy: context.userId, updatedOn: recordedOn };
+  const changes = {
+    attendance,
+    scheduledFor,
+    ...(change.allocation !== undefined ? { allocation: change.allocation || undefined } : {}),
+    status: change.action === 'rescheduled' ? ('scheduled' as const) : booking.status,
+    activity: [...history, action],
+    updatedBy: context.userId,
+    updatedOn: recordedOn,
+  };
   const parsed = Appointment.safeParse({ ...booking, ...changes });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Review the booking change');
-  if(change.action==='rescheduled'||change.action==='reopened')await validateAllocation(parsed.data);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Review the booking change');
+  }
+  if (change.action === 'rescheduled' || change.action === 'reopened') {
+    await validateAllocation(parsed.data);
+  }
   // Keep the history entry and PATCH metadata on the same timestamp.
-  return updateRecord<Appointment>(context, 'appointment:update', 'appointment', id, changes, recordedOn);
+  return updateRecord<Appointment>(
+    context,
+    'appointment:update',
+    'appointment',
+    id,
+    changes,
+    recordedOn,
+  );
 };
 
 /** Resource changes retain attendance, fees, scheduled time and the same booking identity. */
-export const reallocateAppointment=async(id:string,allocation:AppointmentAllocation|undefined,expected:AppointmentAllocation|undefined,context:AuthorizationContext):Promise<Appointment>=>{
-  assertAllowed(context,'appointment:update');
-  const booking=await findRecord<Appointment>('appointment',id);
-  if(!booking||booking.facilityId!==context.facilityId)throw new Error('This booking is unavailable');
-  if(JSON.stringify(booking.allocation)!==JSON.stringify(expected))throw new Error('The resource proposal changed. Close this editor and review the latest booking');
-  if((await allWhere<Encounter>('encounter','appointmentId',id)).length)throw new Error('Care has started. Continue the linked visit');
-  if(['cancelled','no_show'].includes(booking.attendance||'')||!booking.scheduledFor)throw new Error('Reopen or schedule this booking before reserving resources');
-  const next=Appointment.parse({...booking,allocation});await validateAllocation(next);
-  return updateRecord<Appointment>(context,'appointment:update','appointment',id,{allocation},new Date(Math.max(Date.now(),Date.parse(booking.updatedOn||booking.createdOn)+1)).toISOString());
+export const reallocateAppointment = async (
+  id: string,
+  allocation: AppointmentAllocation | undefined,
+  expected: AppointmentAllocation | undefined,
+  context: AuthorizationContext,
+): Promise<Appointment> => {
+  assertAllowed(context, 'appointment:update');
+  const booking = await findRecord<Appointment>('appointment', id);
+  if (!booking || booking.facilityId !== context.facilityId) {
+    throw new Error('This booking is unavailable');
+  }
+  if (JSON.stringify(booking.allocation) !== JSON.stringify(expected)) {
+    throw new Error(
+      'The resource proposal changed. Close this editor and review the latest booking',
+    );
+  }
+  if ((await allWhere<Encounter>('encounter', 'appointmentId', id)).length) {
+    throw new Error('Care has started. Continue the linked visit');
+  }
+  if (['cancelled', 'no_show'].includes(booking.attendance || '') || !booking.scheduledFor) {
+    throw new Error('Reopen or schedule this booking before reserving resources');
+  }
+  const next = Appointment.parse({ ...booking, allocation });
+  await validateAllocation(next);
+  return updateRecord<Appointment>(
+    context,
+    'appointment:update',
+    'appointment',
+    id,
+    { allocation },
+    new Date(
+      Math.max(Date.now(), Date.parse(booking.updatedOn || booking.createdOn) + 1),
+    ).toISOString(),
+  );
 };

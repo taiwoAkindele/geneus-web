@@ -16,13 +16,11 @@ export const ChoiceChip = ({ selected = false, className = '', children, ...prop
       type="button"
       aria-pressed={selected}
       className={`min-h-0 rounded-full px-3.5 py-2 text-sm font-semibold ${
-        selected
-          ? 'bg-brand text-white'
-          : 'border-[1.5px] border-outline bg-white text-ink-soft'
+        selected ? 'bg-brand text-white' : 'border-[1.5px] border-outline bg-white text-ink-soft'
       } ${className}`}
       {...props}
     >
       {children}
     </button>
   );
-}
+};

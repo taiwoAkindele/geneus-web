@@ -19,14 +19,25 @@ export const StaffSectionTabs = ({ value }: { value: StaffView }) => {
     { value: 'coverage', label: 'Coverage' },
     ...(manage ? [{ value: 'facilities' as const, label: 'Facility assignments' }] : []),
   ];
-  return <SectionTabs label="Staff sections" value={value} onChange={(view) => navigate(view === 'directory' ? '/admin/staff' : `/admin/staff?view=${view}`)} options={options} />;
+  return (
+    <SectionTabs
+      label="Staff sections"
+      value={value}
+      onChange={(view) =>
+        navigate(view === 'directory' ? '/admin/staff' : `/admin/staff?view=${view}`)
+      }
+      options={options}
+    />
+  );
 };
 
 /** A Staff section without its own page header: the module title and its sections, then the content. */
-export const StaffSectionPage = ({ view, children }: { view: StaffView; children: ReactNode }) => <div className="min-h-screen bg-surface">
-  <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
-    <h1 className="text-[24px] font-extrabold">Staff &amp; roster</h1>
-    <StaffSectionTabs value={view} />
-    {children}
+export const StaffSectionPage = ({ view, children }: { view: StaffView; children: ReactNode }) => (
+  <div className="min-h-screen bg-surface">
+    <div className="mx-auto w-full max-w-md space-y-4 px-5 py-3 md:max-w-2xl lg:max-w-none lg:px-8">
+      <h1 className="text-[24px] font-extrabold">Staff &amp; roster</h1>
+      <StaffSectionTabs value={view} />
+      {children}
+    </div>
   </div>
-</div>;
+);

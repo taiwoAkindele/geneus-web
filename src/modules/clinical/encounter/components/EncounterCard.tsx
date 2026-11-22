@@ -2,7 +2,11 @@ import type { Patient } from '@shared';
 import { Avatar, Tag } from '@/ui';
 import type { EncounterSummary } from '../encounterSummary';
 
-const TONE: Record<EncounterSummary['status'], 'amber' | 'neutral' | 'slate'> = { Open: 'amber', Closed: 'neutral', Admitted: 'slate' };
+const TONE: Record<EncounterSummary['status'], 'amber' | 'neutral' | 'slate'> = {
+  Open: 'amber',
+  Closed: 'neutral',
+  Admitted: 'slate',
+};
 
 const initialsOf = (fullName: string): string =>
   fullName
@@ -13,8 +17,20 @@ const initialsOf = (fullName: string): string =>
     .join('');
 
 /** One encounter in a list — the hub's and a patient's history alike. */
-export const EncounterCard = ({ card, patient, onOpen }: { card: EncounterSummary; patient?: Patient; onOpen: () => void }) => (
-  <button type="button" onClick={onOpen} className="w-full rounded-card border border-outline-soft bg-white p-4 text-left">
+export const EncounterCard = ({
+  card,
+  patient,
+  onOpen,
+}: {
+  card: EncounterSummary;
+  patient?: Patient;
+  onOpen: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    className="w-full rounded-card border border-outline-soft bg-white p-4 text-left"
+  >
     <div className="flex items-center gap-3">
       <Avatar tone="green">{patient ? initialsOf(patient.fullName) : '??'}</Avatar>
       <div className="min-w-0 flex-1">
@@ -28,7 +44,12 @@ export const EncounterCard = ({ card, patient, onOpen }: { card: EncounterSummar
       <span className="text-[11px] text-ink-muted">· {card.when}</span>
       <span className="flex-1" />
       {card.chips.map((c) => (
-        <span key={c} className="rounded-md bg-surface-muted px-2 py-1 font-mono text-[11px] text-ink-soft">{c}</span>
+        <span
+          key={c}
+          className="rounded-md bg-surface-muted px-2 py-1 font-mono text-[11px] text-ink-soft"
+        >
+          {c}
+        </span>
       ))}
     </div>
   </button>

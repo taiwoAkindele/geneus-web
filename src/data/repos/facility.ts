@@ -6,12 +6,18 @@ import { allOfType } from '../db';
  * record. The record itself is created by the server at registration and
  * synced down — never written here.
  */
-export const getFacility = async (): Promise<Facility | undefined> => (await allOfType<Facility>('facility'))[0];
+export const getFacility = async (): Promise<Facility | undefined> =>
+  (await allOfType<Facility>('facility'))[0];
 
 /** Suggests OOE-PHC from "Odo-Ona Elewe PHC" — initials, then any trailing acronym. */
 export const suggestCode = (name: string): string => {
-  const words = name.trim().split(/[\s-]+/).filter(Boolean);
-  if (words.length === 0) return '';
+  const words = name
+    .trim()
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  if (words.length === 0) {
+    return '';
+  }
   const isAcronym = (word: string) => word.length <= 4 && word === word.toUpperCase();
   const tail = words.filter(isAcronym);
   const head = words.filter((word) => !isAcronym(word));

@@ -40,4 +40,4 @@ export const AppBar = ({ title, onBack, right, variant = 'surface' }: Props) => 
       {right ? <div className="flex-none">{right}</div> : null}
     </header>
   );
-}
+};

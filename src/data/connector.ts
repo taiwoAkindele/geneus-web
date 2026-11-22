@@ -1,9 +1,13 @@
 import type { CrudEntry, PowerSyncBackendConnector, PowerSyncCredentials } from '@powersync/web';
-import type { UploadMutation, UploadRequest } from '@shared';
-import {rememberIntegratedBilling} from './integratedBillingSupport';
+import {
+  type UploadMutation,
+  type UploadRequest,
+  FACILITY_DOCUMENT_POLICY,
+  requiresFacilityContract,
+} from '@shared';
+import { rememberIntegratedBilling } from './integratedBillingSupport';
 import { rememberBillingCatalogue } from './billingCatalogueSupport';
 import { fetchSyncToken, uploadMutations, WORKFORCE_VERSIONS } from '@/lib/api/sync';
-import { FACILITY_DOCUMENT_POLICY, requiresFacilityContract } from '@shared';
 import { refreshWorkforceKeys } from './workforceAuthority';
 import { confirmWorkforceReceipts } from './repos/workforceReceipts';
 import { isUnauthorized } from '@/lib/api/client';
@@ -44,12 +48,16 @@ export type ConnectorOptions = {
 /** One queued write as the contract describes it (SCHEMA.md §12). */
 export const toMutation = (entry: CrudEntry): UploadMutation => {
   const table = TYPE_FOR[entry.table];
-  if (!table) throw new Error(`queued write for unknown table ${entry.table}`);
+  if (!table) {
+    throw new Error(`queued write for unknown table ${entry.table}`);
+  }
   const data = decodeValues(table, entry.opData ?? {});
   // PowerSync omits unchanged columns from a PATCH, so a second edit by the same
   // person arrives without `updatedBy`; db.ts put the actor in the write's
   // metadata for exactly this case, and the server insists on knowing who.
-  if (entry.op === 'PATCH' && data.updatedBy === undefined && entry.metadata) data.updatedBy = entry.metadata;
+  if (entry.op === 'PATCH' && data.updatedBy === undefined && entry.metadata) {
+    data.updatedBy = entry.metadata;
+  }
   return {
     clientId: entry.clientId,
     op: entry.op.toLowerCase() as UploadMutation['op'],
@@ -57,73 +65,168 @@ export const toMutation = (entry: CrudEntry): UploadMutation => {
     id: entry.id,
     data,
     ...(entry.previousValues ? { previous: decodeValues(table, entry.previousValues) } : {}),
-    ...((['unit','billing_department','location','service_definition','service_offering','practitioner_profile','result_template','result_part','answer_list'].includes(table) && entry.op === 'PATCH' && typeof data.revision === 'number') ? { expectedRevision: data.revision - 1 } : {}),
-    ...((Object.prototype.hasOwnProperty.call(FACILITY_DOCUMENT_POLICY, table) && ['versioned','append_only'].includes(FACILITY_DOCUMENT_POLICY[table as keyof typeof FACILITY_DOCUMENT_POLICY].change)) ? { expectedPreviousId: typeof data.previousId === 'string' ? data.previousId : null } : {}),
+    ...([
+      'unit',
+      'billing_department',
+      'location',
+      'service_definition',
+      'service_offering',
+      'practitioner_profile',
+      'result_template',
+      'result_part',
+      'answer_list',
+    ].includes(table) &&
+    entry.op === 'PATCH' &&
+    typeof data.revision === 'number'
+      ? { expectedRevision: data.revision - 1 }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(FACILITY_DOCUMENT_POLICY, table) &&
+    ['versioned', 'append_only'].includes(
+      FACILITY_DOCUMENT_POLICY[table as keyof typeof FACILITY_DOCUMENT_POLICY].change,
+    )
+      ? { expectedPreviousId: typeof data.previousId === 'string' ? data.previousId : null }
+      : {}),
   };
 };
 
-export const createConnector = ({ onDeenrolled, pendingUploads }: ConnectorOptions): PowerSyncBackendConnector => {
+export const createConnector = ({
+  onDeenrolled,
+  pendingUploads,
+}: ConnectorOptions): PowerSyncBackendConnector => {
   const enrolledDevice = getDeviceCredential();
-  const fileScope=enrolledDevice?documentScope(enrolledDevice):undefined;
-  return ({
-  fetchCredentials: async (): Promise<PowerSyncCredentials | null> => {
-    const device = enrolledDevice;
-    if (!device) return null;
-    try {
-      let pending = 1;
-      try { if (pendingUploads) { const n = await pendingUploads(); if (Number.isSafeInteger(n) && n >= 0) pending = n; } } catch { /* Unknown queue: keep reporting 1. */ }
-      const minted = await fetchSyncToken(device.credential, pending);
-      rememberBillingCatalogue(device,minted.billingCatalogueEnabled);
-      rememberIntegratedBilling(device,minted.integratedBillingEnabled);
-      rememberInpatientSupport(device, minted.inpatientWorkflowVersion);
-      rememberWardCareSupport(device, minted.wardCareVersion);
-      rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
-      rememberDocumentSupport(device,minted.documentWorkflowVersion);
-      rememberInsuranceSupport(device, minted.insuranceWorkflowVersion, minted.insuranceBillingActive, minted.insuranceBillingPeriods);
-      recordServerContact(minted.serverTime, device.deviceId);
-      await refreshWorkforceKeys();
-      return { endpoint: minted.syncEndpoint, token: minted.token, expiresAt: new Date(minted.expiresOn) };
-    } catch (cause) {
-      if (isUnauthorized(cause)) {
-        await onDeenrolled();
+  const fileScope = enrolledDevice ? documentScope(enrolledDevice) : undefined;
+  return {
+    fetchCredentials: async (): Promise<PowerSyncCredentials | null> => {
+      const device = enrolledDevice;
+      if (!device) {
         return null;
       }
-      throw cause;
-    }
-  },
-
-  uploadData: async (database): Promise<void> => {
-    const device = enrolledDevice;
-    if (!device) return;
-    const db = database as unknown as Pick<LocalDatabase, 'getNextCrudTransaction'>;
-
-    for (;;) {
-      const transaction = await db.getNextCrudTransaction();
-      if (!transaction) {
-        try{const handshake=await fetchSyncToken(device.credential,0);rememberBillingCatalogue(device,handshake.billingCatalogueEnabled);rememberIntegratedBilling(device,handshake.integratedBillingEnabled);recordServerContact(handshake.serverTime, device.deviceId);rememberInpatientSupport(device,handshake.inpatientWorkflowVersion);rememberWardCareSupport(device,handshake.wardCareVersion);rememberPharmacySupport(device,handshake.pharmacyWorkflowVersion);rememberDocumentSupport(device,handshake.documentWorkflowVersion);rememberInsuranceSupport(device,handshake.insuranceWorkflowVersion,handshake.insuranceBillingActive,handshake.insuranceBillingPeriods);}
-        catch(cause){if(isUnauthorized(cause))await onDeenrolled();throw cause;}
-        return;
-      }
-
-      const request: UploadRequest = {
-        ...WORKFORCE_VERSIONS,
-        transactionId: transaction.transactionId ?? null,
-        mutations: transaction.crud.map(toMutation),
-      };
       try {
-        if(fileScope && request.mutations.some((mutation)=>['library_document','visit_document'].includes(mutation.table)||(mutation.table==='encounter_entry'&&mutation.data.labReport!==undefined))){const {transferDocumentFiles}=await import('./documentTransfer');await transferDocumentFiles(device.credential,fileScope,request.mutations);}
-        const response = await uploadMutations(device.credential, request);
-        await confirmWorkforceReceipts(device.credential, request.mutations.filter((mutation) => requiresFacilityContract(mutation) || (mutation.table === 'encounter' && Boolean(mutation.data.inpatientContext)) || (mutation.table === 'encounter_entry' && Boolean(mutation.data.admissionId || mutation.data.pharmacyVersion)) || ['service_charge_allocation','ward_care_event','inpatient_event','bed_ready_event','library_document','visit_document'].includes(mutation.table)));
-        recordServerContact(response.serverTime, device.deviceId);
-        if (response.rejected.length > 0) {
-          console.warn('server rejected queued writes — see the reconcile queue', response.rejected);
+        let pending = 1;
+        try {
+          if (pendingUploads) {
+            const n = await pendingUploads();
+            if (Number.isSafeInteger(n) && n >= 0) {
+              pending = n;
+            }
+          }
+        } catch {
+          /* Unknown queue: keep reporting 1. */
         }
+        const minted = await fetchSyncToken(device.credential, pending);
+        rememberBillingCatalogue(device, minted.billingCatalogueEnabled);
+        rememberIntegratedBilling(device, minted.integratedBillingEnabled);
+        rememberInpatientSupport(device, minted.inpatientWorkflowVersion);
+        rememberWardCareSupport(device, minted.wardCareVersion);
+        rememberPharmacySupport(device, minted.pharmacyWorkflowVersion);
+        rememberDocumentSupport(device, minted.documentWorkflowVersion);
+        rememberInsuranceSupport(
+          device,
+          minted.insuranceWorkflowVersion,
+          minted.insuranceBillingActive,
+          minted.insuranceBillingPeriods,
+        );
+        recordServerContact(minted.serverTime, device.deviceId);
+        await refreshWorkforceKeys();
+        return {
+          endpoint: minted.syncEndpoint,
+          token: minted.token,
+          expiresAt: new Date(minted.expiresOn),
+        };
       } catch (cause) {
-        if (isUnauthorized(cause)) await onDeenrolled();
+        if (isUnauthorized(cause)) {
+          await onDeenrolled();
+          return null;
+        }
         throw cause;
       }
-      await transaction.complete();
-    }
-  },
-});
+    },
+
+    uploadData: async (database): Promise<void> => {
+      const device = enrolledDevice;
+      if (!device) {
+        return;
+      }
+      const db = database as unknown as Pick<LocalDatabase, 'getNextCrudTransaction'>;
+
+      for (;;) {
+        const transaction = await db.getNextCrudTransaction();
+        if (!transaction) {
+          try {
+            const handshake = await fetchSyncToken(device.credential, 0);
+            rememberBillingCatalogue(device, handshake.billingCatalogueEnabled);
+            rememberIntegratedBilling(device, handshake.integratedBillingEnabled);
+            recordServerContact(handshake.serverTime, device.deviceId);
+            rememberInpatientSupport(device, handshake.inpatientWorkflowVersion);
+            rememberWardCareSupport(device, handshake.wardCareVersion);
+            rememberPharmacySupport(device, handshake.pharmacyWorkflowVersion);
+            rememberDocumentSupport(device, handshake.documentWorkflowVersion);
+            rememberInsuranceSupport(
+              device,
+              handshake.insuranceWorkflowVersion,
+              handshake.insuranceBillingActive,
+              handshake.insuranceBillingPeriods,
+            );
+          } catch (cause) {
+            if (isUnauthorized(cause)) {
+              await onDeenrolled();
+            }
+            throw cause;
+          }
+          return;
+        }
+
+        const request: UploadRequest = {
+          ...WORKFORCE_VERSIONS,
+          transactionId: transaction.transactionId ?? null,
+          mutations: transaction.crud.map(toMutation),
+        };
+        try {
+          if (
+            fileScope &&
+            request.mutations.some(
+              (mutation) =>
+                ['library_document', 'visit_document'].includes(mutation.table) ||
+                (mutation.table === 'encounter_entry' && mutation.data.labReport !== undefined),
+            )
+          ) {
+            const { transferDocumentFiles } = await import('./documentTransfer');
+            await transferDocumentFiles(device.credential, fileScope, request.mutations);
+          }
+          const response = await uploadMutations(device.credential, request);
+          await confirmWorkforceReceipts(
+            device.credential,
+            request.mutations.filter(
+              (mutation) =>
+                requiresFacilityContract(mutation) ||
+                (mutation.table === 'encounter' && Boolean(mutation.data.inpatientContext)) ||
+                (mutation.table === 'encounter_entry' &&
+                  Boolean(mutation.data.admissionId || mutation.data.pharmacyVersion)) ||
+                [
+                  'service_charge_allocation',
+                  'ward_care_event',
+                  'inpatient_event',
+                  'bed_ready_event',
+                  'library_document',
+                  'visit_document',
+                ].includes(mutation.table),
+            ),
+          );
+          recordServerContact(response.serverTime, device.deviceId);
+          if (response.rejected.length > 0) {
+            console.warn(
+              'server rejected queued writes — see the reconcile queue',
+              response.rejected,
+            );
+          }
+        } catch (cause) {
+          if (isUnauthorized(cause)) {
+            await onDeenrolled();
+          }
+          throw cause;
+        }
+        await transaction.complete();
+      }
+    },
+  };
 };

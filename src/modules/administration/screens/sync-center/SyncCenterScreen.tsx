@@ -6,12 +6,20 @@ import { useAuth, useSession } from '@/session';
 import { ReconcileQueue } from '@/modules/administration/reconcile';
 
 const lastSyncedLabel = (at: Date | undefined): string => {
-  if (!at) return 'Never synced';
+  if (!at) {
+    return 'Never synced';
+  }
   const minutes = Math.round((Date.now() - at.getTime()) / 60_000);
-  if (minutes < 1) return 'Synced just now';
-  if (minutes < 60) return `Synced ${minutes} min ago`;
+  if (minutes < 1) {
+    return 'Synced just now';
+  }
+  if (minutes < 60) {
+    return `Synced ${minutes} min ago`;
+  }
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return `Synced ${hours} h ago`;
+  if (hours < 48) {
+    return `Synced ${hours} h ago`;
+  }
   return `Synced ${Math.round(hours / 24)} days ago`;
 };
 
@@ -23,19 +31,59 @@ const lastSyncedLabel = (at: Date | undefined): string => {
 export const SyncCenterScreen = () => {
   const { signOut } = useAuth();
   const { shift, access, notifications } = useSession();
-  useEffect(() => { document.title = 'Sync & review · Geneus Health'; }, []);
+  useEffect(() => {
+    document.title = 'Sync & review · Geneus Health';
+  }, []);
   const sync = useSyncStatus();
   const indicator = indicatorFor(sync);
-  const headline =
-    notifications.some((notification) => notification.kind === 'conflict')
-      ? 'Records need review'
-      : indicator === 'error'
-      ? 'Sync problem'
-      : indicator === 'offline'
-        ? 'Offline · working from this device'
-        : sync.pending > 0
-          ? 'Changes waiting to sync'
-          : !sync.hasSynced ? 'First sync not completed' : indicator === 'syncing' ? 'Sync in progress' : 'No queued changes';
+  // The most urgent state wins: records to review, then sync health, then queued work.
+  const headlineFor = () => {
+    if (notifications.some((notification) => notification.kind === 'conflict')) {
+      return 'Records need review';
+    }
+
+    if (indicator === 'error') {
+      return 'Sync problem';
+    }
+
+    if (indicator === 'offline') {
+      return 'Offline · working from this device';
+    }
+
+    if (sync.pending > 0) {
+      return 'Changes waiting to sync';
+    }
+
+    if (!sync.hasSynced) {
+      return 'First sync not completed';
+    }
+
+    if (indicator === 'syncing') {
+      return 'Sync in progress';
+    }
+
+    return 'No queued changes';
+  };
+  const headline = headlineFor();
+  const shiftHeading = () => {
+    if (!shift) {
+      return accessLabel(access);
+    }
+
+    return shift.ended ? 'Shift ended' : `Shift ends ${shift.endsAtLabel}`;
+  };
+  const renderAccessDescription = () => {
+    if (access === 'admin') {
+      return 'You can sign in at any time. Administrator sessions still close after 30 minutes without activity.';
+    }
+
+    if (access === 'always') {
+      return 'You can sign in at any time, every day, without a roster window. Sign out when finished.';
+    }
+
+    return 'Your shift controls new sign-ins. An existing session stays open after the shift ends. Sign out when finished.';
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg lg:max-w-3xl">
@@ -46,11 +94,17 @@ export const SyncCenterScreen = () => {
             <div className="rounded-[18px] border border-outline-soft bg-white p-4">
               <div className="mb-3.5 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                 <span className="text-base font-bold">{headline}</span>
-                <span className="font-mono text-[13px] text-slate-text">{lastSyncedLabel(sync.lastSyncedAt)}</span>
+                <span className="font-mono text-[13px] text-slate-text">
+                  {lastSyncedLabel(sync.lastSyncedAt)}
+                </span>
               </div>
               <div className="mt-4 flex justify-between text-center">
                 <Stat value={sync.connected ? 'Yes' : 'No'} label="Connected" />
-                <Stat value={sync.pendingKnown === false ? '—' : String(sync.pending)} label="Queued changes" tone={sync.pending > 0 ? 'amber' : undefined} />
+                <Stat
+                  value={sync.pendingKnown === false ? '—' : String(sync.pending)}
+                  label="Queued changes"
+                  tone={sync.pending > 0 ? 'amber' : undefined}
+                />
               </div>
             </div>
             <p className="mx-1 mt-3.5 text-[13px] leading-relaxed text-ink-muted">
@@ -65,11 +119,15 @@ export const SyncCenterScreen = () => {
             <ReconcileQueue />
           </div>
           {/* Roster information does not close the signed-in session. */}
-          <section className="rounded-[18px] border border-outline-soft bg-white p-4" aria-label="Sign-in and shift status">
-            <h2 className="text-[17px] font-extrabold">{shift ? shift.ended ? 'Shift ended' : `Shift ends ${shift.endsAtLabel}` : accessLabel(access)}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{access === 'admin' ? 'You can sign in at any time. Administrator sessions still close after 30 minutes without activity.' : access === 'always' ? 'You can sign in at any time, every day, without a roster window. Sign out when finished.' : 'Your shift controls new sign-ins. An existing session stays open after the shift ends. Sign out when finished.'}</p>
+          <section
+            className="rounded-[18px] border border-outline-soft bg-white p-4"
+            aria-label="Sign-in and shift status"
+          >
+            <h2 className="text-[17px] font-extrabold">{shiftHeading()}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              {renderAccessDescription()}
+            </p>
           </section>
-
 
           <div className="flex items-center gap-2.5 px-1 lg:col-span-2">
             <span className="h-2 w-2 rounded-full bg-brand-strong" />

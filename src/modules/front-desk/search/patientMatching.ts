@@ -27,8 +27,12 @@ const nameTokens = (name: string): string[] =>
 
 /** Equal, or one slip of the pen apart on a longer name (Amaka / Ammaka). */
 const sameToken = (a: string, b: string): boolean => {
-  if (a === b) return true;
-  if (Math.min(a.length, b.length) < 5 || Math.abs(a.length - b.length) > 1) return false;
+  if (a === b) {
+    return true;
+  }
+  if (Math.min(a.length, b.length) < 5 || Math.abs(a.length - b.length) > 1) {
+    return false;
+  }
   let i = 0;
   let j = 0;
   let edits = 0;
@@ -39,10 +43,14 @@ const sameToken = (a: string, b: string): boolean => {
       continue;
     }
     edits += 1;
-    if (edits > 1) return false;
-    if (a.length > b.length) i += 1;
-    else if (b.length > a.length) j += 1;
-    else {
+    if (edits > 1) {
+      return false;
+    }
+    if (a.length > b.length) {
+      i += 1;
+    } else if (b.length > a.length) {
+      j += 1;
+    } else {
       i += 1;
       j += 1;
     }
@@ -56,12 +64,16 @@ const sameToken = (a: string, b: string): boolean => {
  */
 export const namesMatch = (a: string, b: string): boolean => {
   const [shorter, longer] = [nameTokens(a), nameTokens(b)].sort((x, y) => x.length - y.length);
-  return shorter.length > 0 && shorter.every((token) => longer.some((other) => sameToken(token, other)));
+  return (
+    shorter.length > 0 && shorter.every((token) => longer.some((other) => sameToken(token, other)))
+  );
 };
 
 /** Age today: from the date of birth, else the age given at registration plus the years since. */
-export const currentAge = (patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'createdOn' | 'ageObservedOn'>, now = Date.now()): number | undefined =>
-  patientAge(patient, new Date(now).toISOString().slice(0, 10));
+export const currentAge = (
+  patient: Pick<Patient, 'dateOfBirth' | 'ageYears' | 'createdOn' | 'ageObservedOn'>,
+  now = Date.now(),
+): number | undefined => patientAge(patient, new Date(now).toISOString().slice(0, 10));
 
 const candidateAge = (details: PatientDetails, now: number): number | undefined =>
   currentAge({ ...details, createdOn: new Date(now).toISOString() }, now);
@@ -76,21 +88,43 @@ export type LikelyMatch = { patient: Patient; reasons: MatchReason[] };
  * is not enough — families often register on one number. Address only adds
  * support. Strongest first: a phone match, then the most reasons.
  */
-export const findLikelyMatches = (details: PatientDetails, patients: readonly Patient[], now = Date.now()): LikelyMatch[] => {
+export const findLikelyMatches = (
+  details: PatientDetails,
+  patients: readonly Patient[],
+  now = Date.now(),
+): LikelyMatch[] => {
   // Generated temporary labels are not evidence of a shared identity.
-  if (details.identityStatus === 'provisional') return [];
+  if (details.identityStatus === 'provisional') {
+    return [];
+  }
   const age = candidateAge(details, now);
   const phone = phoneKey(details.phone);
   return patients
     .filter((patient) => patient.identityStatus !== 'provisional')
     .map((patient): LikelyMatch => {
       const reasons: MatchReason[] = [];
-      if (namesMatch(details.fullName, patient.fullName)) reasons.push('name');
-      if (phone && phone === phoneKey(patient.phone)) reasons.push('phone');
+      if (namesMatch(details.fullName, patient.fullName)) {
+        reasons.push('name');
+      }
+      if (phone && phone === phoneKey(patient.phone)) {
+        reasons.push('phone');
+      }
       const theirs = currentAge(patient, now);
-      if (age !== undefined && theirs !== undefined && Math.abs(age - theirs) <= AGE_TOLERANCE_YEARS) reasons.push('age');
-      if (details.sex && details.sex === patient.sex) reasons.push('sex');
-      if (nameTokens(details.address ?? '').some((token) => token.length > 3 && nameTokens(patient.address ?? '').includes(token))) {
+      if (
+        age !== undefined &&
+        theirs !== undefined &&
+        Math.abs(age - theirs) <= AGE_TOLERANCE_YEARS
+      ) {
+        reasons.push('age');
+      }
+      if (details.sex && details.sex === patient.sex) {
+        reasons.push('sex');
+      }
+      if (
+        nameTokens(details.address ?? '').some(
+          (token) => token.length > 3 && nameTokens(patient.address ?? '').includes(token),
+        )
+      ) {
         reasons.push('address');
       }
       return { patient, reasons };
@@ -99,7 +133,11 @@ export const findLikelyMatches = (details: PatientDetails, patients: readonly Pa
       const has = (reason: MatchReason) => reasons.includes(reason);
       return has('name') && (has('phone') || (has('age') && has('sex')));
     })
-    .sort((a, b) => Number(b.reasons.includes('phone')) - Number(a.reasons.includes('phone')) || b.reasons.length - a.reasons.length);
+    .sort(
+      (a, b) =>
+        Number(b.reasons.includes('phone')) - Number(a.reasons.includes('phone')) ||
+        b.reasons.length - a.reasons.length,
+    );
 };
 
 /**
@@ -107,22 +145,47 @@ export const findLikelyMatches = (details: PatientDetails, patients: readonly Pa
  * registration number on its own ("47"), then phone, then name. An empty
  * query lists the most recently registered first.
  */
-export const searchPatients = (patients: readonly Patient[], query: string, facilityCode: string): Patient[] => {
+export const searchPatients = (
+  patients: readonly Patient[],
+  query: string,
+  facilityCode: string,
+): Patient[] => {
   const text = query.trim();
   const newestFirst = [...patients].sort((a, b) => b.createdOn.localeCompare(a.createdOn));
-  if (!text) return newestFirst;
+  if (!text) {
+    return newestFirst;
+  }
 
   const upper = text.toUpperCase();
   const digits = text.replace(/\D/g, '');
   const onlyDigits = /^[\d\s+()-]+$/.test(text);
   const rank = (patient: Patient): number | undefined => {
-    if (patient.patientId === upper) return 0;
-    if (patient.legacyPaperRef?.toUpperCase() === upper) return 0;
-    if (onlyDigits && digits.length === 11 && patient.nin === digits) return 0;
-    if (onlyDigits && digits && sequenceOf(patient.patientId, facilityCode) === Number(digits)) return 1;
-    if (patient.patientId.includes(upper)) return 2;
-    if (onlyDigits && digits.length >= 4 && ((patient.phone ?? '').replace(/\D/g, '').includes(digits) || phoneKey(patient.phone) === phoneKey(text))) return 3;
-    if (!onlyDigits && namesMatchPrefix(text, patient.fullName)) return 4;
+    if (patient.patientId === upper) {
+      return 0;
+    }
+    if (patient.legacyPaperRef?.toUpperCase() === upper) {
+      return 0;
+    }
+    if (onlyDigits && digits.length === 11 && patient.nin === digits) {
+      return 0;
+    }
+    if (onlyDigits && digits && sequenceOf(patient.patientId, facilityCode) === Number(digits)) {
+      return 1;
+    }
+    if (patient.patientId.includes(upper)) {
+      return 2;
+    }
+    if (
+      onlyDigits &&
+      digits.length >= 4 &&
+      ((patient.phone ?? '').replace(/\D/g, '').includes(digits) ||
+        phoneKey(patient.phone) === phoneKey(text))
+    ) {
+      return 3;
+    }
+    if (!onlyDigits && namesMatchPrefix(text, patient.fullName)) {
+      return 4;
+    }
     return undefined;
   };
   return newestFirst

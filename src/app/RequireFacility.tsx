@@ -9,6 +9,8 @@ import { SyncingFacility } from './SyncingFacility';
  */
 export const RequireFacility = () => {
   const { facility, enrolled } = useDeviceContext();
-  if (facility) return <Outlet />;
+  if (facility) {
+    return <Outlet />;
+  }
   return enrolled ? <SyncingFacility /> : <Navigate to="/onboarding/start" replace />;
 };

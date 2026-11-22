@@ -13,8 +13,18 @@ export const bytesToBase64 = (bytes: Uint8Array): string => btoa(String.fromChar
 
 export const randomSalt = (): string => bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));
 
-export const pbkdf2Base64 = async (secret: string, saltBase64: string, iterations: number): Promise<string> => {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveBits']);
+export const pbkdf2Base64 = async (
+  secret: string,
+  saltBase64: string,
+  iterations: number,
+): Promise<string> => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
   const bits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: base64ToBytes(saltBase64), iterations },
     key,
@@ -25,8 +35,12 @@ export const pbkdf2Base64 = async (secret: string, saltBase64: string, iteration
 
 /** Compares without stopping at the first difference, so timing says nothing about how close a guess was. */
 export const sameText = (a: string, b: string): boolean => {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {
+    return false;
+  }
   let difference = 0;
-  for (let index = 0; index < a.length; index += 1) difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  for (let index = 0; index < a.length; index += 1) {
+    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
   return difference === 0;
 };

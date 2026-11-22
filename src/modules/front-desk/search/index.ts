@@ -6,3 +6,4 @@ export {
   type MatchReason,
 } from './patientMatching';
 export { usePatient, usePatients } from './usePatients';
+export { namesMatch, phoneKey } from './patientMatching';

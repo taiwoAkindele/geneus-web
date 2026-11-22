@@ -6,21 +6,42 @@ export const TEST_CSV_TEMPLATE = `${TEST_CSV_HEADERS.join(',')}\nAntenatal booki
 
 /** RFC 4180 fields: commas and line breaks inside double quotes, "" for a quote. */
 const csvRows = (text: string): string[][] => {
-  const rows: string[][] = []; let row: string[] = [], field = '', quoted = false;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quoted) {
-      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ',') { row.push(field); field = ''; }
-    else if (c === '\n' || c === '\r') {
-      if (c === '\r' && text[i + 1] === '\n') i++;
-      row.push(field); rows.push(row); row = []; field = '';
-    } else field += c;
+      if (c === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (c === '"') {
+        quoted = false;
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      quoted = true;
+    } else if (c === ',') {
+      row.push(field);
+      field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') {
+        i++;
+      }
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += c;
+    }
   }
-  if (field || row.length) { row.push(field); rows.push(row); }
+  if (field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows.filter((cells) => cells.some((cell) => cell.trim()));
 };
 
@@ -33,17 +54,54 @@ export type CsvIssue = { line: number; message: string };
  */
 export const parseTestCsv = (text: string): { tests: OwnTest[]; issues: CsvIssue[] } => {
   const [header, ...body] = csvRows(text.replace(/^﻿/, ''));
-  if (!header) return { tests: [], issues: [{ line: 1, message: 'The file is empty' }] };
-  const index = (name: string) => header.findIndex((cell) => cell.trim().toLowerCase() === name.toLowerCase());
+  if (!header) {
+    return { tests: [], issues: [{ line: 1, message: 'The file is empty' }] };
+  }
+  const index = (name: string) =>
+    header.findIndex((cell) => cell.trim().toLowerCase() === name.toLowerCase());
   const [name, specimen, classification, others] = TEST_CSV_HEADERS.map(index);
-  const missing = TEST_CSV_HEADERS.slice(0, 3).filter((_, i) => [name, specimen, classification][i] < 0);
-  if (missing.length) return { tests: [], issues: [{ line: 1, message: `Missing column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}` }] };
-  const tests: OwnTest[] = [], issues: CsvIssue[] = [];
+  const missing = TEST_CSV_HEADERS.slice(0, 3).filter(
+    (_, i) => [name, specimen, classification][i] < 0,
+  );
+  if (missing.length) {
+    return {
+      tests: [],
+      issues: [
+        {
+          line: 1,
+          message: `Missing column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`,
+        },
+      ],
+    };
+  }
+  const tests: OwnTest[] = [];
+  const issues: CsvIssue[] = [];
   body.forEach((cells, at) => {
-    const line = at + 2, value = (i: number) => (i < 0 ? '' : cells[i] ?? '').trim();
-    const blank = [['Test name', name], ['Specimen', specimen], ['Classification', classification]].filter(([, i]) => !value(i as number)).map(([label]) => label);
-    if (blank.length) { issues.push({ line, message: `${blank.join(', ')} ${blank.length > 1 ? 'are' : 'is'} empty` }); return; }
-    tests.push({ name: value(name), specimen: value(specimen), classification: value(classification), aliases: value(others).split(';').map((alias) => alias.trim()).filter(Boolean) });
+    const line = at + 2;
+    const value = (i: number) => (i < 0 ? '' : (cells[i] ?? '')).trim();
+    const blank = [
+      ['Test name', name],
+      ['Specimen', specimen],
+      ['Classification', classification],
+    ]
+      .filter(([, i]) => !value(i as number))
+      .map(([label]) => label);
+    if (blank.length) {
+      issues.push({
+        line,
+        message: `${blank.join(', ')} ${blank.length > 1 ? 'are' : 'is'} empty`,
+      });
+      return;
+    }
+    tests.push({
+      name: value(name),
+      specimen: value(specimen),
+      classification: value(classification),
+      aliases: value(others)
+        .split(';')
+        .map((alias) => alias.trim())
+        .filter(Boolean),
+    });
   });
   return { tests, issues };
 };

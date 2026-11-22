@@ -16,7 +16,7 @@ type Props<T extends string> = {
  * Religion). The selected segment fills primary green; the rest are hairline
  * outlines. For 2–3 short options shown inline.
  */
-export const SegmentedControl = <T extends string,>({
+export const SegmentedControl = <T extends string>({
   options,
   value,
   onChange,
@@ -46,4 +46,4 @@ export const SegmentedControl = <T extends string,>({
       })}
     </div>
   );
-}
+};

@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Icon, type IconName } from './Icon';
 
 /**
@@ -44,13 +52,24 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   // fixed element. Shown as a manual popover, the toasts join the top layer and are re-raised
   // above whatever sheet is open each time a toast appears. Browsers without popovers keep the fixed layer.
   useEffect(() => {
-    const el = layer.current as (HTMLDivElement & { showPopover?: () => void; hidePopover?: () => void }) | null;
-    if (!el?.showPopover || !el.hidePopover) return;
-    if (!el.hasAttribute('popover')) el.setAttribute('popover', 'manual');
+    const el = layer.current as
+      (HTMLDivElement & { showPopover?: () => void; hidePopover?: () => void }) | null;
+    if (!el?.showPopover || !el.hidePopover) {
+      return;
+    }
+    if (!el.hasAttribute('popover')) {
+      el.setAttribute('popover', 'manual');
+    }
     try {
-      if (el.matches(':popover-open')) el.hidePopover();
-      if (toasts.length) el.showPopover();
-    } catch { /* The fixed layer still shows the toast. */ }
+      if (el.matches(':popover-open')) {
+        el.hidePopover();
+      }
+      if (toasts.length) {
+        el.showPopover();
+      }
+    } catch {
+      /* The fixed layer still shows the toast. */
+    }
   }, [toasts]);
 
   return (
@@ -60,7 +79,17 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       <div
         ref={layer}
         className="pointer-events-none fixed z-50 flex flex-col items-end gap-2"
-        style={{ inset: 'calc(env(safe-area-inset-top, 0px) + 4.75rem) 1rem auto 1rem', width: 'auto', height: 'auto', margin: 0, padding: 0, border: 0, background: 'transparent', overflow: 'visible', color: 'inherit' }}
+        style={{
+          inset: 'calc(env(safe-area-inset-top, 0px) + 4.75rem) 1rem auto 1rem',
+          width: 'auto',
+          height: 'auto',
+          margin: 0,
+          padding: 0,
+          border: 0,
+          background: 'transparent',
+          overflow: 'visible',
+          color: 'inherit',
+        }}
         role="status"
         aria-live={toasts.some((t) => t.tone === 'error') ? 'assertive' : 'polite'}
       >
@@ -80,6 +109,8 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
 export const useToast = (): ToastFn => {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used within a ToastProvider');
+  if (!ctx) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
   return ctx;
 };

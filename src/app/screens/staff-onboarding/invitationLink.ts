@@ -15,13 +15,27 @@ export const invitationTokenFromHash = (hash: string): string | undefined => {
  * - `switch_facility`: this browser already holds the facility, just not as the open one;
  * - `needs_device`: the invitation cannot set up a device here, so it must be opened on a facility device.
  */
-export type InvitationStep = 'done' | 'unusable' | 'pin' | 'new_device' | 'add_facility' | 'switch_facility' | 'needs_device';
+export type InvitationStep =
+  'done' | 'unusable' | 'pin' | 'new_device' | 'add_facility' | 'switch_facility' | 'needs_device';
 
-export const invitationStep = (view: InvitationLinkView, device: { facilityId?: string; workspaceFacilityIds: readonly string[] }): InvitationStep => {
-  if (view.status === 'accepted') return 'done';
-  if (view.status !== 'pending') return 'unusable';
-  if (device.facilityId === view.facilityId) return 'pin';
-  if (device.workspaceFacilityIds.includes(view.facilityId)) return 'switch_facility';
-  if (view.newDevice !== 'allowed') return 'needs_device';
+export const invitationStep = (
+  view: InvitationLinkView,
+  device: { facilityId?: string; workspaceFacilityIds: readonly string[] },
+): InvitationStep => {
+  if (view.status === 'accepted') {
+    return 'done';
+  }
+  if (view.status !== 'pending') {
+    return 'unusable';
+  }
+  if (device.facilityId === view.facilityId) {
+    return 'pin';
+  }
+  if (device.workspaceFacilityIds.includes(view.facilityId)) {
+    return 'switch_facility';
+  }
+  if (view.newDevice !== 'allowed') {
+    return 'needs_device';
+  }
   return device.facilityId ? 'add_facility' : 'new_device';
 };

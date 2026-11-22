@@ -11,29 +11,91 @@ import type { AuthorizationContext, Permission } from '@shared';
  */
 export type ModuleSettingsId = 'laboratory' | 'insurance';
 export type ModuleSettingsPage = { key: string; label: string; to: string; tab: boolean };
-export type ModuleSettings = { id: ModuleSettingsId; label: string; home: string; base: string; pages: ModuleSettingsPage[] };
+export type ModuleSettings = {
+  id: ModuleSettingsId;
+  label: string;
+  home: string;
+  base: string;
+  pages: ModuleSettingsPage[];
+};
 type Viewer = Pick<AuthorizationContext, 'role' | 'roles' | 'permissions'>;
 
-const has = (context: Viewer, ...permissions: Permission[]) => permissions.some((permission) => context.permissions.includes(permission));
-const page = (key: string, label: string, to: string, allowed: boolean, tab = true): ModuleSettingsPage[] => allowed ? [{ key, label, to, tab }] : [];
+const has = (context: Viewer, ...permissions: Permission[]) =>
+  permissions.some((permission) => context.permissions.includes(permission));
+const page = (
+  key: string,
+  label: string,
+  to: string,
+  allowed: boolean,
+  tab = true,
+): ModuleSettingsPage[] => (allowed ? [{ key, label, to, tab }] : []);
 
 export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): ModuleSettings => {
   if (id === 'laboratory') {
     const templates = has(context, 'result_template:manage');
-    return { id, label: 'Laboratory', home: '/laboratory', base: '/laboratory/settings', pages: [
-      ...page('tests', 'Tests', '/laboratory/settings/tests', has(context, 'service:manage', 'result_template:manage')),
-      ...page('templates', 'Result templates', '/laboratory/settings/templates', templates),
-      ...page('parts', 'Result parts', '/laboratory/settings/templates?tab=parts', templates, false),
-      ...page('answers', 'Answer lists', '/laboratory/settings/templates?tab=answers', templates, false),
-    ] };
+    return {
+      id,
+      label: 'Laboratory',
+      home: '/laboratory',
+      base: '/laboratory/settings',
+      pages: [
+        ...page(
+          'tests',
+          'Tests',
+          '/laboratory/settings/tests',
+          has(context, 'service:manage', 'result_template:manage'),
+        ),
+        ...page('templates', 'Result templates', '/laboratory/settings/templates', templates),
+        ...page(
+          'parts',
+          'Result parts',
+          '/laboratory/settings/templates?tab=parts',
+          templates,
+          false,
+        ),
+        ...page(
+          'answers',
+          'Answer lists',
+          '/laboratory/settings/templates?tab=answers',
+          templates,
+          false,
+        ),
+      ],
+    };
   }
   // Billing has no module settings menu: Prices is a Finance page and bank collection is in Settings → Billing.
-  return { id, label: 'Insurance', home: '/insurance', base: '/insurance/settings', pages: [
-    ...page('setup', 'Setup & readiness', '/insurance/settings/setup', has(context, 'insurance_contract:activate', 'insurance_contract:manage')),
-    ...page('payers', 'Payers & contracts', '/insurance/settings/payers', has(context, 'insurance_contract:read', 'insurance_contract:manage', 'insurance_contract:activate')),
-  ] };
+  return {
+    id,
+    label: 'Insurance',
+    home: '/insurance',
+    base: '/insurance/settings',
+    pages: [
+      ...page(
+        'setup',
+        'Setup & readiness',
+        '/insurance/settings/setup',
+        has(context, 'insurance_contract:activate', 'insurance_contract:manage'),
+      ),
+      ...page(
+        'payers',
+        'Payers & contracts',
+        '/insurance/settings/payers',
+        has(
+          context,
+          'insurance_contract:read',
+          'insurance_contract:manage',
+          'insurance_contract:activate',
+        ),
+      ),
+    ],
+  };
 };
 
 /** The settings page a path belongs to, ignoring any query (a tab inside that page). */
-export const activeSettingsPage = (settings: ModuleSettings, pathname: string): ModuleSettingsPage | undefined =>
-  settings.pages.filter((p) => p.tab).find((p) => pathname === p.to || pathname.startsWith(p.to + '/'));
+export const activeSettingsPage = (
+  settings: ModuleSettings,
+  pathname: string,
+): ModuleSettingsPage | undefined =>
+  settings.pages
+    .filter((p) => p.tab)
+    .find((p) => pathname === p.to || pathname.startsWith(p.to + '/'));

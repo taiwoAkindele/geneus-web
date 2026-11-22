@@ -38,4 +38,4 @@ export const Banner = ({ tone = 'amber', title, children, icon = '!', className 
       </div>
     </div>
   );
-}
+};

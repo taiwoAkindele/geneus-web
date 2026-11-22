@@ -1,4 +1,10 @@
-import type { AppointmentStatus, AppointmentAttendance, AppointmentActivity, AppointmentAllocation, VisitType } from '@shared';
+import type {
+  AppointmentStatus,
+  AppointmentAttendance,
+  AppointmentActivity,
+  AppointmentAllocation,
+  VisitType,
+} from '@shared';
 
 /**
  * Appointments (PRD §9.8). A booking made from a patient's profile drops the
@@ -6,7 +12,8 @@ import type { AppointmentStatus, AppointmentAttendance, AppointmentActivity, App
  * "scheduled" when booked ahead.
  */
 export type { AppointmentStatus };
-export type AppointmentGroup = 'today' | 'overdue' | 'upcoming' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentGroup =
+  'today' | 'overdue' | 'upcoming' | 'completed' | 'cancelled' | 'no_show';
 
 export type AppointmentPatient = { id: string; name: string; initials: string; allergy: string };
 

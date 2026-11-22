@@ -1,7 +1,14 @@
 import { column, Schema, Table, type ColumnsType, type IndexShorthand } from '@powersync/web';
 import type { DocType } from '@shared';
 import { fieldKindsFor, type FieldKind } from './contractShape';
-import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, WORKFORCE_DRAFTS_TABLE, WORKFORCE_RECEIPTS_TABLE, CLINICAL_REVIEWS_TABLE, TABLE_FOR } from './tables';
+import {
+  DRAFTS_TABLE,
+  REGISTER_DRAFTS_TABLE,
+  WORKFORCE_DRAFTS_TABLE,
+  WORKFORCE_RECEIPTS_TABLE,
+  CLINICAL_REVIEWS_TABLE,
+  TABLE_FOR,
+} from './tables';
 
 /**
  * The local SQLite schema, derived from the shared contract: one table per
@@ -13,7 +20,7 @@ import { DRAFTS_TABLE, REGISTER_DRAFTS_TABLE, WORKFORCE_DRAFTS_TABLE, WORKFORCE_
  * cheap phone, so each one names the query it serves.
  */
 const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
-  fee_item: { catalogue: ['category','name'] },
+  fee_item: { catalogue: ['category', 'name'] },
   patient: { name: ['fullName'], phone: ['phone'], folder: ['legacyPaperRef'], nin: ['nin'] },
   patient_identity_event: { patient: ['patientId'], other: ['otherPatientId'] },
   appointment: { patient: ['patientId'], scheduled: ['scheduledFor'] },
@@ -22,16 +29,35 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   billing_adjustment: { charge: ['chargeId'], patient: ['patientId'] },
   patient_contact: { patient: ['patientId'] },
   patient_message: { subject: ['subject'] },
-  service_charge_allocation:{charge:['chargeId'],source:['sourceEntryId','sourceItemId'],patient:['patientId']},
+  service_charge_allocation: {
+    charge: ['chargeId'],
+    source: ['sourceEntryId', 'sourceItemId'],
+    patient: ['patientId'],
+  },
   encounter: { patient: ['patientId'] },
-  ward_care_event: { admission: ['admissionId'], encounter: ['encounterId'], patient: ['patientId'] },
+  ward_care_event: {
+    admission: ['admissionId'],
+    encounter: ['encounterId'],
+    patient: ['patientId'],
+  },
   handoff: { toUnit: ['toUnitId'], patient: ['patientId'] },
   encounter_entry: { encounter: ['encounterId'], patient: ['patientId'], step: ['step'] },
   clinical_event: { patient: ['patientId'], record: ['recordId'], kind: ['kind'] },
-  inpatient_event: { patient: ['patientId'], admission: ['admissionId'], visit: ['encounterId'], previous: ['previousId'], bed: ['bedId'] },
+  inpatient_event: {
+    patient: ['patientId'],
+    admission: ['admissionId'],
+    visit: ['encounterId'],
+    previous: ['previousId'],
+    bed: ['bedId'],
+  },
   bed_ready_event: { bed: ['bedId'], release: ['releaseEventId'] },
-  library_document:{document:['documentId'],previous:['previousId']},
-  visit_document:{document:['documentId'],visit:['encounterId'],patient:['patientId'],previous:['previousId']},
+  library_document: { document: ['documentId'], previous: ['previousId'] },
+  visit_document: {
+    document: ['documentId'],
+    visit: ['encounterId'],
+    patient: ['patientId'],
+    previous: ['previousId'],
+  },
   register_definition: { register: ['registerId'] },
   register_entry: { register: ['registerId'], patient: ['patientId'] },
   roster_shift: { staff: ['staffId'] },
@@ -58,7 +84,9 @@ const COLUMN_FOR: Record<FieldKind, typeof column.text> = {
 const tableFor = (type: DocType): Table => {
   const columns: ColumnsType = {};
   for (const [field, kind] of Object.entries(fieldKindsFor(type))) {
-    if (field === 'id') continue;
+    if (field === 'id') {
+      continue;
+    }
     columns[field] = COLUMN_FOR[kind];
   }
   return new Table(columns, {
@@ -75,17 +103,44 @@ const tableFor = (type: DocType): Table => {
 
 /** One unsaved section per staff member, patient, encounter and step (repos/drafts.ts). */
 const draftsTable = new Table(
-  { staffId: column.text, patientId: column.text, encounterKey: column.text, step: column.text, data: column.text, updatedOn: column.text },
+  {
+    staffId: column.text,
+    patientId: column.text,
+    encounterKey: column.text,
+    step: column.text,
+    data: column.text,
+    updatedOn: column.text,
+  },
   { localOnly: true, indexes: { owner: ['staffId', 'patientId', 'encounterKey'] } },
 );
 
 export const AppSchema = new Schema({
-  patient_statement_snapshots:new Table({patientId:column.text,currency:column.text,cutoff:column.text,data:column.text},{localOnly:true,indexes:{patient:['patientId','currency']}}),
-  ...Object.fromEntries((Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)])),
+  patient_statement_snapshots: new Table(
+    { patientId: column.text, currency: column.text, cutoff: column.text, data: column.text },
+    { localOnly: true, indexes: { patient: ['patientId', 'currency'] } },
+  ),
+  ...Object.fromEntries(
+    (Object.keys(TABLE_FOR) as DocType[]).map((type) => [TABLE_FOR[type], tableFor(type)]),
+  ),
   [DRAFTS_TABLE]: draftsTable,
-  [WORKFORCE_DRAFTS_TABLE]: new Table({ staffId:column.text, deviceId:column.text, slot:column.text, data:column.text, updatedOn:column.text }, { localOnly:true, indexes:{owner:['staffId','deviceId','slot']} }),
-  [WORKFORCE_RECEIPTS_TABLE]: new Table({ clientId:column.integer, outcome:column.text }, {localOnly:true}),
-  [CLINICAL_REVIEWS_TABLE]: new Table({ facilityId:column.text, staffId:column.text, semanticKey:column.text, data:column.text }, {localOnly:true,indexes:{owner:['staffId']}}),
+  [WORKFORCE_DRAFTS_TABLE]: new Table(
+    {
+      staffId: column.text,
+      deviceId: column.text,
+      slot: column.text,
+      data: column.text,
+      updatedOn: column.text,
+    },
+    { localOnly: true, indexes: { owner: ['staffId', 'deviceId', 'slot'] } },
+  ),
+  [WORKFORCE_RECEIPTS_TABLE]: new Table(
+    { clientId: column.integer, outcome: column.text },
+    { localOnly: true },
+  ),
+  [CLINICAL_REVIEWS_TABLE]: new Table(
+    { facilityId: column.text, staffId: column.text, semanticKey: column.text, data: column.text },
+    { localOnly: true, indexes: { owner: ['staffId'] } },
+  ),
   [REGISTER_DRAFTS_TABLE]: new Table(
     { staffId: column.text, registerKey: column.text, data: column.text, updatedOn: column.text },
     { localOnly: true, indexes: { owner: ['staffId', 'registerKey'] } },

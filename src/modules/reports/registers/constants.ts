@@ -28,7 +28,12 @@ export const PLACEHOLDERS: Partial<Record<FieldType, string>> = {
 };
 
 /** HTML input type for single-line inputs. */
-export const INPUT_TYPE: Partial<Record<FieldType, string>> = { text: 'text', number: 'number', phone: 'tel', date: 'date' };
+export const INPUT_TYPE: Partial<Record<FieldType, string>> = {
+  text: 'text',
+  number: 'number',
+  phone: 'tel',
+  date: 'date',
+};
 
 /** Category → [background, foreground] for the little register icon tile. */
 export const CATEGORY_COLORS: Record<string, [string, string]> = {
@@ -39,11 +44,16 @@ export const CATEGORY_COLORS: Record<string, [string, string]> = {
   Pharmacy: ['#fdeecb', '#7a4f00'],
 };
 
-export const typeDef = (type: FieldType): FieldTypeDef => FIELD_TYPES.find((t) => t.type === type) ?? FIELD_TYPES[0];
+export const typeDef = (type: FieldType): FieldTypeDef =>
+  FIELD_TYPES.find((t) => t.type === type) ?? FIELD_TYPES[0];
 export const isChoice = (type: FieldType): boolean => type === 'select' || type === 'multiselect';
 
 /** Field identities survive reloads and cannot collide across offline devices. */
 export const uid = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`;
 
 /** Two-letter monogram from a register name, for the icon tile. */
-export const monogram = (name: string): string => name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'RG';
+export const monogram = (name: string): string =>
+  name
+    .replace(/[^A-Za-z]/g, '')
+    .slice(0, 2)
+    .toUpperCase() || 'RG';

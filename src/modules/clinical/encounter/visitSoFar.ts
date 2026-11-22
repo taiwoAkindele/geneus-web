@@ -13,7 +13,9 @@ const TREATMENT_CONTEXT: Partial<Record<StepKey, readonly StepKey[]>> = {
  */
 export const visitContextSteps = (visitSteps: readonly StepKey[], current: StepKey): StepKey[] => {
   const fixed = TREATMENT_CONTEXT[current];
-  if (fixed) return visitSteps.filter((key) => fixed.includes(key));
+  if (fixed) {
+    return visitSteps.filter((key) => fixed.includes(key));
+  }
   const before = visitSteps.slice(0, Math.max(0, visitSteps.indexOf(current)));
   return before.filter((key) => !(key === 'investigation_review' && before.includes('lab_order')));
 };
@@ -31,11 +33,27 @@ type Rows = readonly { label: string; value: string }[];
  * (`emptyRows`): a form default such as "No injection ordered" is not something anyone recorded.
  * Anything else is not recorded, which is different from recorded as normal.
  */
-export const sectionState = (enc: Pick<EncounterState, 'sig' | 'skipped'>, key: StepKey, rows: Rows, emptyRows: Rows): SectionState =>
-  enc.sig[key] ? 'signed'
-    : JSON.stringify(rows) !== JSON.stringify(emptyRows) ? 'draft'
-      : enc.skipped.includes(key) ? 'skipped'
-        : 'not_recorded';
+export const sectionState = (
+  enc: Pick<EncounterState, 'sig' | 'skipped'>,
+  key: StepKey,
+  rows: Rows,
+  emptyRows: Rows,
+): SectionState => {
+  if (enc.sig[key]) {
+    return 'signed';
+  }
+
+  if (JSON.stringify(rows) !== JSON.stringify(emptyRows)) {
+    return 'draft';
+  }
+
+  if (enc.skipped.includes(key)) {
+    return 'skipped';
+  }
+
+  return 'not_recorded';
+};
 
 /** A field left blank inside a signed section reads as not recorded, never as a normal finding. */
-export const shownValue = (value: string): string => BLANK_VALUES.has(value.trim()) ? 'Not recorded' : value;
+export const shownValue = (value: string): string =>
+  BLANK_VALUES.has(value.trim()) ? 'Not recorded' : value;

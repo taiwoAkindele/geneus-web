@@ -5,27 +5,101 @@ export type StepDef = { key: StepKey; title: string; hint: string; short: string
 /** Definition for every possible section (PRD §9.8.1). Which ones appear, and in
  *  what order, is decided per-encounter by `stepsFor`. */
 export const STEP_DEFS: Record<StepKey, StepDef> = {
-  vitals: { key: 'vitals', title: 'Vitals', hint: 'Temperature, blood pressure, pulse, weight, SpO₂', short: 'Vitals' },
-  complaint: { key: 'complaint', title: 'Complaints', hint: "What the patient reports — chief complaint, other complaints and their history — plus the clinician's note", short: 'Complaints' },
-  lab_order: { key: 'lab_order', title: 'Lab investigations ordered', hint: 'Tests requested for the patient', short: 'Lab order' },
-  lab_results: { key: 'lab_results', title: 'Lab results', hint: 'Findings entered against each ordered test', short: 'Results' },
-  diagnosis: { key: 'diagnosis', title: 'Diagnoses', hint: 'What the clinician concludes — working or confirmed diagnoses, coded where known', short: 'Diagnoses' },
-  result_review: { key: 'result_review', title: 'Review laboratory results', hint: 'Record clinical acknowledgment and any action taken', short: 'Result review' },
-  investigation_review: { key: 'investigation_review', title: 'Investigation decision', hint: 'Record whether testing is required', short: 'Testing decision' },
-  prescription: { key: 'prescription', title: 'Medication orders', hint: 'Prescribe or record no medication required', short: 'Prescription' },
-  injection_order: { key: 'injection_order', title: 'Injection order', hint: 'Request treatment; administration is recorded separately', short: 'Injection order' },
-  disposition: { key: 'disposition', title: 'Disposition & care plan', hint: 'Record what happens next and who is responsible', short: 'Disposition' },
-  injection: { key: 'injection', title: 'Injection administered', hint: 'Drug, dose and route — signed by the nurse who gave it', short: 'Injection' },
-  dispense: { key: 'dispense', title: 'Medication dispensed', hint: 'What the pharmacy handed over', short: 'Dispense' },
-  admission: { key: 'admission', title: 'Admission to facility', hint: 'Ward, bed and admitting note', short: 'Admission' },
-  follow_up: { key: 'follow_up', title: 'Follow-up & close encounter', hint: 'Book a review, then lock the encounter', short: 'Follow-up' },
+  vitals: {
+    key: 'vitals',
+    title: 'Vitals',
+    hint: 'Temperature, blood pressure, pulse, weight, SpO₂',
+    short: 'Vitals',
+  },
+  complaint: {
+    key: 'complaint',
+    title: 'Complaints',
+    hint: "What the patient reports — chief complaint, other complaints and their history — plus the clinician's note",
+    short: 'Complaints',
+  },
+  lab_order: {
+    key: 'lab_order',
+    title: 'Lab investigations ordered',
+    hint: 'Tests requested for the patient',
+    short: 'Lab order',
+  },
+  lab_results: {
+    key: 'lab_results',
+    title: 'Lab results',
+    hint: 'Findings entered against each ordered test',
+    short: 'Results',
+  },
+  diagnosis: {
+    key: 'diagnosis',
+    title: 'Diagnoses',
+    hint: 'What the clinician concludes — working or confirmed diagnoses, coded where known',
+    short: 'Diagnoses',
+  },
+  result_review: {
+    key: 'result_review',
+    title: 'Review laboratory results',
+    hint: 'Record clinical acknowledgment and any action taken',
+    short: 'Result review',
+  },
+  investigation_review: {
+    key: 'investigation_review',
+    title: 'Investigation decision',
+    hint: 'Record whether testing is required',
+    short: 'Testing decision',
+  },
+  prescription: {
+    key: 'prescription',
+    title: 'Medication orders',
+    hint: 'Prescribe or record no medication required',
+    short: 'Prescription',
+  },
+  injection_order: {
+    key: 'injection_order',
+    title: 'Injection order',
+    hint: 'Request treatment; administration is recorded separately',
+    short: 'Injection order',
+  },
+  disposition: {
+    key: 'disposition',
+    title: 'Disposition & care plan',
+    hint: 'Record what happens next and who is responsible',
+    short: 'Disposition',
+  },
+  injection: {
+    key: 'injection',
+    title: 'Injection administered',
+    hint: 'Drug, dose and route — signed by the nurse who gave it',
+    short: 'Injection',
+  },
+  dispense: {
+    key: 'dispense',
+    title: 'Medication dispensed',
+    hint: 'What the pharmacy handed over',
+    short: 'Dispense',
+  },
+  admission: {
+    key: 'admission',
+    title: 'Admission to facility',
+    hint: 'Ward, bed and admitting note',
+    short: 'Admission',
+  },
+  follow_up: {
+    key: 'follow_up',
+    title: 'Follow-up & close encounter',
+    hint: 'Book a review, then lock the encounter',
+    short: 'Follow-up',
+  },
 };
 
 /**
  * How diagnostic certainty reads to a clinician. The stored values (and what insurance claims
  * read) are unchanged: suspected is the provisional or working diagnosis, confirmed the final one.
  */
-export const CERTAINTY_LABEL = { unknown: 'Not stated', suspected: 'Provisional / working', confirmed: 'Confirmed / final' } as const;
+export const CERTAINTY_LABEL = {
+  unknown: 'Not stated',
+  suspected: 'Provisional / working',
+  confirmed: 'Confirmed / final',
+} as const;
 
 /** Saving a disposition (other than observation) closes the encounter, so it can never be skipped. */
 export const isClosingStep = (key: StepKey): boolean => key === 'disposition';
@@ -43,11 +117,19 @@ export const LAB_STEPS: readonly StepKey[] = ['lab_results'];
  */
 export const stepsFor = (data: EncounterData): StepDef[] => {
   const keys: StepKey[] = ['vitals', 'complaint', 'investigation_review'];
-  if (data.investigation_review.decision === 'ordered' || data.lab_order.tests.length) keys.push('lab_order');
-  if (data.lab_order.tests.length) keys.push('lab_results', 'result_review');
+  if (data.investigation_review.decision === 'ordered' || data.lab_order.tests.length) {
+    keys.push('lab_order');
+  }
+  if (data.lab_order.tests.length) {
+    keys.push('lab_results', 'result_review');
+  }
   keys.push('diagnosis', 'prescription', 'injection_order', 'disposition');
-  if (data.prescription.rx.length || data.diagnosis.rx.length) keys.push('dispense');
-  if (data.injection_order.required) keys.push('injection');
+  if (data.prescription.rx.length || data.diagnosis.rx.length) {
+    keys.push('dispense');
+  }
+  if (data.injection_order.required) {
+    keys.push('injection');
+  }
   return keys.map((key) => STEP_DEFS[key]);
 };
 

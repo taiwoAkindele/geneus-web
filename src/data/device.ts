@@ -7,7 +7,9 @@ const STORAGE_KEY = 'geneus.deviceId';
  */
 export const deviceId = (): string => {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return stored;
+  if (stored) {
+    return stored;
+  }
   const minted = crypto.randomUUID?.() ?? `device-${Date.now()}`;
   localStorage.setItem(STORAGE_KEY, minted);
   return minted;

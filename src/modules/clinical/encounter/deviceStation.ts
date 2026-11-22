@@ -14,8 +14,13 @@ export type StationView = 'all' | StationQueue;
 
 export const readDeviceStation = (): StationView => {
   try {
-    const stored = (localStorage.getItem(getDeviceCredential() ? BASE_KEY + ':' + getDeviceCredential()!.facilityId : BASE_KEY) ?? (activeWorkspace()?.legacy ? localStorage.getItem(BASE_KEY) : null));
-    return stored && (STATION_QUEUES as readonly string[]).includes(stored) ? (stored as StationQueue) : 'all';
+    const stored =
+      localStorage.getItem(
+        getDeviceCredential() ? BASE_KEY + ':' + getDeviceCredential()!.facilityId : BASE_KEY,
+      ) ?? (activeWorkspace()?.legacy ? localStorage.getItem(BASE_KEY) : null);
+    return stored && (STATION_QUEUES as readonly string[]).includes(stored)
+      ? (stored as StationQueue)
+      : 'all';
   } catch {
     return 'all';
   }
@@ -23,7 +28,10 @@ export const readDeviceStation = (): StationView => {
 
 export const rememberDeviceStation = (view: StationView): void => {
   try {
-    localStorage.setItem(getDeviceCredential() ? BASE_KEY + ':' + getDeviceCredential()!.facilityId : BASE_KEY, view);
+    localStorage.setItem(
+      getDeviceCredential() ? BASE_KEY + ':' + getDeviceCredential()!.facilityId : BASE_KEY,
+      view,
+    );
   } catch {
     // Not remembered; the screen opens on every encounter next time.
   }

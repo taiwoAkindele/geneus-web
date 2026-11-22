@@ -27,16 +27,34 @@ const kindOf = (schema: ZodLike): FieldKind => {
   let current: ZodLike | undefined = schema;
   while (current?._zod?.def) {
     const def: ZodDef = current._zod.def;
-    if (def.type === 'boolean') return 'boolean';
-    if (def.type === 'number') return 'number';
-    if (def.type === 'literal' && def.values?.length) {
-      if (def.values.every((value) => typeof value === 'number')) return 'number';
-      if (def.values.every((value) => typeof value === 'boolean')) return 'boolean';
+    if (def.type === 'boolean') {
+      return 'boolean';
     }
-    if (def.type && JSON_TYPES.has(def.type)) return 'json';
+    if (def.type === 'number') {
+      return 'number';
+    }
+    if (def.type === 'literal' && def.values?.length) {
+      if (def.values.every((value) => typeof value === 'number')) {
+        return 'number';
+      }
+      if (def.values.every((value) => typeof value === 'boolean')) {
+        return 'boolean';
+      }
+    }
+    if (def.type && JSON_TYPES.has(def.type)) {
+      return 'json';
+    }
     // A union of objects (a result part of any kind) is stored as one JSON value.
-    if (def.type === 'union' && def.options?.length && def.options.every((option) => kindOf(option) === 'json')) return 'json';
-    if (!def.innerType && !def.in) return 'text';
+    if (
+      def.type === 'union' &&
+      def.options?.length &&
+      def.options.every((option) => kindOf(option) === 'json')
+    ) {
+      return 'json';
+    }
+    if (!def.innerType && !def.in) {
+      return 'text';
+    }
     current = def.innerType ?? def.in;
   }
   return 'text';
@@ -47,7 +65,9 @@ const cache = new Map<DocType, Record<string, FieldKind>>();
 /** Field → kind for one record type, `type` excluded (it is the table). */
 export const fieldKindsFor = (type: DocType): Record<string, FieldKind> => {
   const cached = cache.get(type);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
   const shape = SCHEMA_BY_TYPE[type].shape as Record<string, ZodLike>;
   const kinds = Object.fromEntries(
     Object.entries(shape)

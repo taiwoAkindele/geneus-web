@@ -7,23 +7,48 @@ import { SigningPatient } from './SigningPatient';
  * Add an amendment to a locked section (PRD §9.8.3). The original is never
  * touched; the note is appended and logged against the author.
  */
-export const AmendSheet = ({ onSave, onClose, patientId }: { onSave: (note: string) => Promise<void>; onClose: () => void; patientId?: string }) => {
+export const AmendSheet = ({
+  onSave,
+  onClose,
+  patientId,
+}: {
+  onSave: (note: string) => Promise<void>;
+  onClose: () => void;
+  patientId?: string;
+}) => {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const save = async () => {
-    if (busy.current || !note.trim()) return;
-    busy.current = true; setSaving(true);
-    try { await onSave(note.trim()); }
-    finally { busy.current = false; setSaving(false); }
+    if (busy.current || !note.trim()) {
+      return;
+    }
+    busy.current = true;
+    setSaving(true);
+    try {
+      await onSave(note.trim());
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
   };
   return (
-    <Sheet onClose={onClose} title="Add an amendment" closeDisabled={saving} placement="side" hasUnsavedChanges={Boolean(note.trim())}>
+    <Sheet
+      onClose={onClose}
+      title="Add an amendment"
+      closeDisabled={saving}
+      placement="side"
+      hasUnsavedChanges={Boolean(note.trim())}
+    >
       {patientId ? <SigningPatient patientId={patientId} label="Amending the record of" /> : null}
       <p className="mb-4 text-sm leading-relaxed text-ink-muted">
-        The original record stays locked and unchanged. Your amendment is appended and logged against your name.
+        The original record stays locked and unchanged. Your amendment is appended and logged
+        against your name.
       </p>
-      <TextAreaField label="Amendment note" name="amendment_note" help={ENCOUNTER_FIELD_HELP.amendment}
+      <TextAreaField
+        label="Amendment note"
+        name="amendment_note"
+        help={ENCOUNTER_FIELD_HELP.amendment}
         rows={4}
         value={note}
         disabled={saving}

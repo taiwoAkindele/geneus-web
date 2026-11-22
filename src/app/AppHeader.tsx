@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, useToast } from '@/ui';
-import { useAuth, useAuthorizationContext } from '@/session';
+import {
+  useAuth,
+  useAuthorizationContext,
+  formatCountdown,
+  useSession,
+  useShiftCountdown,
+  type Shift,
+} from '@/session';
 import { accessLabel } from '@/session/accessPolicy';
 import { SyncPill } from './SyncPill';
-import { formatCountdown, useSession, useShiftCountdown, type Shift } from '@/session';
 import { NotificationList } from './NotificationList';
 import { FacilitySwitcher } from './FacilitySwitcher';
 
@@ -16,7 +22,11 @@ import { FacilitySwitcher } from './FacilitySwitcher';
 const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
   const { notifications, notificationsLoading, notificationsError } = useSession();
   useEffect(() => {
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
   }, [onClose]);
@@ -35,7 +45,12 @@ const NotificationCenter = ({ onClose }: { onClose: () => void }) => {
           <span className="text-xs text-ink-muted">{notifications.length}</span>
         </div>
         <div className="max-h-[60vh] overflow-auto">
-          <NotificationList notifications={notifications} loading={notificationsLoading} error={notificationsError} onDone={onClose} />
+          <NotificationList
+            notifications={notifications}
+            loading={notificationsLoading}
+            error={notificationsError}
+            onDone={onClose}
+          />
         </div>
       </div>
     </>
@@ -49,7 +64,9 @@ export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
 
   const toggle = () => {
     setOpen((o) => {
-      if (!o) markAllRead();
+      if (!o) {
+        markAllRead();
+      }
       return !o;
     });
   };
@@ -72,7 +89,13 @@ export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
       <FacilitySwitcher />
 
       <div className="ml-auto flex items-center gap-1.5">
-        <Link to="/sync" title="Sync & review" className="inline-flex min-h-11 shrink-0 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><SyncPill /></Link>
+        <Link
+          to="/sync"
+          title="Sync & review"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+        >
+          <SyncPill />
+        </Link>
 
         {/* Notification bell */}
         <div className="relative">
@@ -92,7 +115,26 @@ export const AppHeader = ({ onProfile }: { onProfile?: () => void }) => {
           </button>
           {open ? <NotificationCenter onClose={() => setOpen(false)} /> : null}
         </div>
-        {onProfile ? <button type="button" onClick={onProfile} title={shift ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}` : accessLabel(access)} aria-label="Your profile and sign out" aria-haspopup="dialog" className="flex min-h-11 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-ink hover:bg-brand-wash"><Avatar tone="mint" size="sm">{user.initials}</Avatar><span className="hidden max-w-[150px] truncate xl:block">{user.name}</span><Icon name="chevron-down" className="hidden h-4 w-4 md:block" /></button> : null}
+        {onProfile ? (
+          <button
+            type="button"
+            onClick={onProfile}
+            title={
+              shift
+                ? `Shift ${shift.ended ? 'ended' : 'ends'} at ${shift.endsAtLabel}`
+                : accessLabel(access)
+            }
+            aria-label="Your profile and sign out"
+            aria-haspopup="dialog"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-ink hover:bg-brand-wash"
+          >
+            <Avatar tone="mint" size="sm">
+              {user.initials}
+            </Avatar>
+            <span className="hidden max-w-[150px] truncate xl:block">{user.name}</span>
+            <Icon name="chevron-down" className="hidden h-4 w-4 md:block" />
+          </button>
+        ) : null}
       </div>
     </header>
   );
@@ -104,17 +146,48 @@ const ShiftNotice = ({ shift, compact }: { shift: Shift; compact: boolean }) => 
   const [dismissed, setDismissed] = useState(false);
   const seconds = useShiftCountdown(shift.minutesLeft, shift.endsOn);
   const { signOut } = useAuth();
-  if (dismissed || shift.minutesLeft > 30) return null;
-  return <div role="status" className={`items-center gap-2 border-amber-border bg-amber-bg px-4 py-2 text-amber-text ${compact ? 'flex border-t sm:hidden' : 'hidden border-b sm:flex'}`}>
-    <Icon name="clock" className="h-[18px] w-[18px] flex-none" />
-    <div className="min-w-0 flex-1">
-      <div className="text-[13px] font-bold">{seconds === 0 ? 'Shift ended' : <>Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span></>}</div>
-      <p className="text-xs">You stay signed in. Sign out when finished.</p>
+  if (dismissed || shift.minutesLeft > 30) {
+    return null;
+  }
+  return (
+    <div
+      role="status"
+      className={`items-center gap-2 border-amber-border bg-amber-bg px-4 py-2 text-amber-text ${compact ? 'flex border-t sm:hidden' : 'hidden border-b sm:flex'}`}
+    >
+      <Icon name="clock" className="h-[18px] w-[18px] flex-none" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-bold">
+          {seconds === 0 ? (
+            'Shift ended'
+          ) : (
+            <>
+              Shift ends in <span className="font-mono">{formatCountdown(seconds)}</span>
+            </>
+          )}
+        </div>
+        <p className="text-xs">You stay signed in. Sign out when finished.</p>
+      </div>
+      <ExtendShiftAction />
+      <Button
+        variant="ghost"
+        fullWidth={false}
+        className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]"
+        onClick={signOut}
+      >
+        Sign out
+      </Button>
+      {!compact ? (
+        <button
+          type="button"
+          aria-label="Dismiss shift reminder"
+          onClick={() => setDismissed(true)}
+          className="flex h-9 w-9 min-h-0 flex-none items-center justify-center"
+        >
+          <Icon name="close" className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
-    <ExtendShiftAction />
-    <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" onClick={signOut}>Sign out</Button>
-    {!compact ? <button type="button" aria-label="Dismiss shift reminder" onClick={() => setDismissed(true)} className="flex h-9 w-9 min-h-0 flex-none items-center justify-center"><Icon name="close" className="h-4 w-4" /></button> : null}
-  </div>;
+  );
 };
 
 export const ShiftBanner = () => {
@@ -133,11 +206,30 @@ const ExtendShiftAction = () => {
   const [busy, setBusy] = useState(false);
   const allowed = context.permissions.includes('roster:extend');
   const extend = async () => {
-    if (busy || !allowed) return;
+    if (busy || !allowed) {
+      return;
+    }
     setBusy(true);
-    try { await extendShift(); toast('Shift extended'); }
-    catch (cause) { toast(cause instanceof Error ? cause.message : 'Could not extend the shift', { tone: 'error' }); }
-    finally { setBusy(false); }
+    try {
+      await extendShift();
+      toast('Shift extended');
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : 'Could not extend the shift', {
+        tone: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
   };
-  return allowed ? <Button variant="ghost" fullWidth={false} className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]" loading={busy} onClick={() => void extend()}>Extend</Button> : null;
+  return allowed ? (
+    <Button
+      variant="ghost"
+      fullWidth={false}
+      className="min-h-[44px] flex-none bg-white/70 px-2 py-2 text-[12px]"
+      loading={busy}
+      onClick={() => void extend()}
+    >
+      Extend
+    </Button>
+  ) : null;
 };

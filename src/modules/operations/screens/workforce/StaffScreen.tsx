@@ -1,2 +1,2 @@
-import { StaffWorkspace } from '@/modules/operations/workforce/StaffWorkspace';
+import { StaffWorkspace } from '@/modules/operations/workforce';
 export const StaffScreen = () => <StaffWorkspace />;

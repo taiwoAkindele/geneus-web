@@ -13,14 +13,86 @@ type Entry = {
 };
 
 const ENTRIES: Entry[] = [
-  { date: '05 Jul', patient: 'Amaka Okoro', id: '…000047-K2', test: 'RDT', result: 'Positive', treatment: 'ACT · 3 days', setting: 'Facility' },
-  { date: '05 Jul', patient: 'Segun Adio', id: '…000046-P9', test: 'RDT', result: 'Negative', treatment: '—', setting: 'Facility' },
-  { date: '04 Jul', patient: 'Ngozi Umeh', id: '…000044-B3', test: 'Micro.', result: 'Positive', treatment: 'ACT · 3 days', setting: 'Outreach' },
-  { date: '04 Jul', patient: 'Musa Danjuma', id: '…000041-K7', test: 'RDT', result: 'Negative', treatment: '—', setting: 'Facility' },
-  { date: '03 Jul', patient: 'Blessing Eze', id: '…000039-M2', test: 'RDT', result: 'Positive', treatment: 'ACT · 3 days', setting: 'Facility' },
+  {
+    date: '05 Jul',
+    patient: 'Amaka Okoro',
+    id: '…000047-K2',
+    test: 'RDT',
+    result: 'Positive',
+    treatment: 'ACT · 3 days',
+    setting: 'Facility',
+  },
+  {
+    date: '05 Jul',
+    patient: 'Segun Adio',
+    id: '…000046-P9',
+    test: 'RDT',
+    result: 'Negative',
+    treatment: '—',
+    setting: 'Facility',
+  },
+  {
+    date: '04 Jul',
+    patient: 'Ngozi Umeh',
+    id: '…000044-B3',
+    test: 'Micro.',
+    result: 'Positive',
+    treatment: 'ACT · 3 days',
+    setting: 'Outreach',
+  },
+  {
+    date: '04 Jul',
+    patient: 'Musa Danjuma',
+    id: '…000041-K7',
+    test: 'RDT',
+    result: 'Negative',
+    treatment: '—',
+    setting: 'Facility',
+  },
+  {
+    date: '03 Jul',
+    patient: 'Blessing Eze',
+    id: '…000039-M2',
+    test: 'RDT',
+    result: 'Positive',
+    treatment: 'ACT · 3 days',
+    setting: 'Facility',
+  },
 ];
 
-const TOTALS: { label: string; value: string; tone?: 'ink' | 'danger' | 'brand' | 'amber'; primary?: boolean; amberBox?: boolean }[] = [
+const VALUE_TONES: Record<string, string> = {
+  danger: 'text-danger',
+  brand: 'text-brand',
+  amber: 'text-amber-text',
+};
+
+/** A totals box is primary (brand fill), highlighted (amber) or plain. */
+const totalTones = (total: {
+  primary?: boolean;
+  amberBox?: boolean;
+  tone?: string;
+}): { box: string; label: string; value: string } => {
+  if (total.primary) {
+    return { box: 'bg-brand text-white', label: 'text-brand-accent-soft', value: 'text-white' };
+  }
+
+  const value =
+    (total.tone && VALUE_TONES[total.tone]) || (total.amberBox ? 'text-amber-text' : 'text-ink');
+
+  if (total.amberBox) {
+    return { box: 'border border-amber-border bg-amber-bg', label: 'text-amber-text', value };
+  }
+
+  return { box: 'border border-outline-soft bg-white', label: 'text-ink-muted', value };
+};
+
+const TOTALS: {
+  label: string;
+  value: string;
+  tone?: 'ink' | 'danger' | 'brand' | 'amber';
+  primary?: boolean;
+  amberBox?: boolean;
+}[] = [
   { label: 'Tested', value: '96', primary: true },
   { label: 'Positive', value: '37', tone: 'danger' },
   { label: 'Treated', value: '37', tone: 'brand' },
@@ -147,32 +219,9 @@ export const MalariaRegisterScreen = () => {
         {/* Running totals */}
         <div className="flex gap-3 px-8 py-4">
           {TOTALS.map((t) => (
-            <div
-              key={t.label}
-              className={`flex-1 rounded-[14px] px-4 py-3 ${
-                t.primary
-                  ? 'bg-brand text-white'
-                  : t.amberBox
-                    ? 'border border-amber-border bg-amber-bg'
-                    : 'border border-outline-soft bg-white'
-              }`}
-            >
-              <div className={`text-xs ${t.primary ? 'text-brand-accent-soft' : t.amberBox ? 'text-amber-text' : 'text-ink-muted'}`}>
-                {t.label}
-              </div>
-              <div
-                className={`font-mono text-2xl font-semibold ${
-                  t.primary
-                    ? 'text-white'
-                    : t.tone === 'danger'
-                      ? 'text-danger'
-                      : t.tone === 'brand'
-                        ? 'text-brand'
-                        : t.tone === 'amber' || t.amberBox
-                          ? 'text-amber-text'
-                          : 'text-ink'
-                }`}
-              >
+            <div key={t.label} className={`flex-1 rounded-[14px] px-4 py-3 ${totalTones(t).box}`}>
+              <div className={`text-xs ${totalTones(t).label}`}>{t.label}</div>
+              <div className={`font-mono text-2xl font-semibold ${totalTones(t).value}`}>
                 {t.value}
               </div>
             </div>
@@ -197,9 +246,13 @@ export const MalariaRegisterScreen = () => {
               <tbody>
                 {ENTRIES.map((e, i) => (
                   <tr key={i} className="border-t border-outline-soft">
-                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-ink-soft">{e.date}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-ink-soft">
+                      {e.date}
+                    </td>
                     <td className="px-4 py-3.5 font-semibold">{e.patient}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-ink-muted">{e.id}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-ink-muted">
+                      {e.id}
+                    </td>
                     <td className="px-4 py-3.5">{e.test}</td>
                     <td className="px-4 py-3.5">
                       <Tag tone={e.result === 'Positive' ? 'danger' : 'green'}>{e.result}</Tag>

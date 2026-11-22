@@ -2,13 +2,31 @@ import { getDatabase } from '../database';
 import { nowIso } from '../db';
 import { DRAFTS_TABLE } from '../tables';
 import type { WardSession } from './wardCare';
-import type { StepKey } from '@/modules/clinical/encounter/types';
+import type { StepKey } from '@/modules/clinical/encounter';
 
-export const listWardDrafts = async (owner: { staffId: string; patientId: string }, admissionId: string): Promise<{ session: WardSession; step: StepKey; changeOrderId?: string }[]> => {
-  const rows = await getDatabase().getAll<{ data: string }>(`SELECT data FROM ${DRAFTS_TABLE} WHERE staffId = ? AND patientId = ? AND step = ?`, [owner.staffId, owner.patientId, 'ward_form']);
+export const listWardDrafts = async (
+  owner: { staffId: string; patientId: string },
+  admissionId: string,
+): Promise<{ session: WardSession; step: StepKey; changeOrderId?: string }[]> => {
+  const rows = await getDatabase().getAll<{ data: string }>(
+    `SELECT data FROM ${DRAFTS_TABLE} WHERE staffId = ? AND patientId = ? AND step = ?`,
+    [owner.staffId, owner.patientId, 'ward_form'],
+  );
   return rows.flatMap((row) => {
-    try { const draft = JSON.parse(row.data) as { session?: WardSession; step?: StepKey; changeOrderId?: string }; return draft.session?.admissionId === admissionId && draft.session.patientId === owner.patientId && draft.step ? [{ session: draft.session, step: draft.step, changeOrderId: draft.changeOrderId }] : []; }
-    catch { return []; }
+    try {
+      const draft = JSON.parse(row.data) as {
+        session?: WardSession;
+        step?: StepKey;
+        changeOrderId?: string;
+      };
+      return draft.session?.admissionId === admissionId &&
+        draft.session.patientId === owner.patientId &&
+        draft.step
+        ? [{ session: draft.session, step: draft.step, changeOrderId: draft.changeOrderId }]
+        : [];
+    } catch {
+      return [];
+    }
   });
 };
 
@@ -34,7 +52,8 @@ export type StoredDraft = { step: string; data: unknown; updatedOn: string };
 
 type DraftRow = { id: string; step: string; data: string; updatedOn: string };
 
-const idOf = (owner: DraftOwner, step: string) => [owner.staffId, owner.patientId, owner.encounterKey, step].join('|');
+const idOf = (owner: DraftOwner, step: string) =>
+  [owner.staffId, owner.patientId, owner.encounterKey, step].join('|');
 
 const OWNER_MATCH = `"staffId" = ? AND "patientId" = ? AND "encounterKey" = ?`;
 const ownerValues = (owner: DraftOwner) => [owner.staffId, owner.patientId, owner.encounterKey];
@@ -61,7 +80,11 @@ export const writeDraft = async (owner: DraftOwner, step: string, data: unknown)
   const json = JSON.stringify(data);
   const updatedOn = nowIso();
   if (await db.getOptional(`SELECT "id" FROM ${DRAFTS_TABLE} WHERE "id" = ?`, [id])) {
-    await db.execute(`UPDATE ${DRAFTS_TABLE} SET "data" = ?, "updatedOn" = ? WHERE "id" = ?`, [json, updatedOn, id]);
+    await db.execute(`UPDATE ${DRAFTS_TABLE} SET "data" = ?, "updatedOn" = ? WHERE "id" = ?`, [
+      json,
+      updatedOn,
+      id,
+    ]);
   } else {
     await db.execute(
       `INSERT INTO ${DRAFTS_TABLE} ("id", "staffId", "patientId", "encounterKey", "step", "data", "updatedOn") VALUES (?, ?, ?, ?, ?, ?, ?)`,

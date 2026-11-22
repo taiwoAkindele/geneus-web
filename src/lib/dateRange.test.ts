@@ -9,7 +9,10 @@ describe('date ranges for filters', () => {
     expect(presetRange('last7', today)).toEqual({ from: '2026-11-04', to: today });
     expect(presetRange('next7', today)).toEqual({ from: today, to: '2026-11-16' });
     expect(presetRange('next30', '2026-12-20')).toEqual({ from: '2026-12-20', to: '2027-01-18' });
-    expect(presetRange('thisMonth', '2027-02-14')).toEqual({ from: '2027-02-01', to: '2027-02-28' });
+    expect(presetRange('thisMonth', '2027-02-14')).toEqual({
+      from: '2027-02-01',
+      to: '2027-02-28',
+    });
     expect(presetRange('last7', '2026-03-03')).toEqual({ from: '2026-02-25', to: '2026-03-03' });
   });
 

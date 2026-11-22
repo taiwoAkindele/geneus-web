@@ -4,7 +4,8 @@ import { memoryStorage } from '@/lib/testing/memoryStorage';
 import { checkPin, hasPin, needsLongerPin, pinLength, setPin } from './credentials';
 import { approvePinSetup, isPinSetupApproved, takePinSetupApproval } from './pinApproval';
 
-const stored = () => JSON.parse(secureGet('geneus.credentials') ?? '{}') as Record<string, Record<string, unknown>>;
+const stored = () =>
+  JSON.parse(secureGet('geneus.credentials') ?? '{}') as Record<string, Record<string, unknown>>;
 
 /**
  * A PIN is only as strong as the number of guesses allowed, so the lockout is
@@ -39,7 +40,9 @@ describe('PIN credentials', () => {
     await setPin('staff:nurse', '482193');
 
     expect(localStorage.getItem('geneus.credentials')?.startsWith('enc1:')).toBe(true);
-    expect(localStorage.getItem('geneus.credentials')).not.toContain(stored()['staff:nurse']?.hash as string);
+    expect(localStorage.getItem('geneus.credentials')).not.toContain(
+      stored()['staff:nurse']?.hash as string,
+    );
   });
 
   it('locks a person out after five wrong PINs, even against the right one, then lets them in once it passes', async () => {
@@ -48,8 +51,16 @@ describe('PIN credentials', () => {
       expect((await checkPin('staff:nurse', '000000', NOW)).ok).toBe(false);
     }
 
-    expect(await checkPin('staff:nurse', '000000', NOW)).toEqual({ ok: false, reason: 'locked', retryAt: NOW + 60_000 });
-    expect(await checkPin('staff:nurse', '482193', NOW + 30_000)).toEqual({ ok: false, reason: 'locked', retryAt: NOW + 60_000 });
+    expect(await checkPin('staff:nurse', '000000', NOW)).toEqual({
+      ok: false,
+      reason: 'locked',
+      retryAt: NOW + 60_000,
+    });
+    expect(await checkPin('staff:nurse', '482193', NOW + 30_000)).toEqual({
+      ok: false,
+      reason: 'locked',
+      retryAt: NOW + 60_000,
+    });
     expect(await checkPin('staff:nurse', '482193', NOW + 60_001)).toEqual({ ok: true });
     expect(stored()['staff:nurse']?.failures).toBeUndefined();
   });
@@ -71,7 +82,9 @@ describe('PIN credentials', () => {
   it('accepts an old 4-digit PIN stored in plaintext, rehashes it, and marks it for replacing', async () => {
     const salt = 'legacy-salt';
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}:4821`));
-    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const hash = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
     localStorage.setItem('geneus.credentials', JSON.stringify({ 'staff:nurse': { salt, hash } }));
     await unlockSecureStorage();
 

@@ -1,7 +1,22 @@
-import { isHighRisk, type AuthorizationContext, type DocType, type Patient, type Permission, type SyncRejection } from '@shared';
+import {
+  isHighRisk,
+  type AuthorizationContext,
+  type DocType,
+  type Patient,
+  type Permission,
+  type SyncRejection,
+} from '@shared';
 import { assertAllowed } from '@/auth/authorization';
 import { mintPatientId } from '@/lib/patientId';
-import { allOfType, findRecord, insertRecords, newId, nowIso, updateRecord, type NewRecord } from '../db';
+import {
+  allOfType,
+  findRecord,
+  insertRecords,
+  newId,
+  nowIso,
+  updateRecord,
+  type NewRecord,
+} from '../db';
 import { listPatients } from './patients';
 
 /**
@@ -17,7 +32,11 @@ export const listOpenRejections = async (): Promise<SyncRejection[]> =>
     .filter((rejection) => !rejection.resolvedOn)
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
 
-export const resolveRejection = (rejection: SyncRejection, resolution: string, context: AuthorizationContext) =>
+export const resolveRejection = (
+  rejection: SyncRejection,
+  resolution: string,
+  context: AuthorizationContext,
+) =>
   updateRecord<SyncRejection>(context, 'sync_rejection:resolve', 'sync_rejection', rejection.id, {
     resolvedOn: nowIso(),
     resolvedBy: context.userId,
@@ -54,21 +73,36 @@ const CREATE_PERMISSION: Partial<Record<DocType, Permission>> = {
 };
 
 /** A staff or shift change needs the permission its columns need (as the server decides it). */
-const changePermission = (type: DocType, changes: Record<string, unknown>): Permission | undefined => {
+const changePermission = (
+  type: DocType,
+  changes: Record<string, unknown>,
+): Permission | undefined => {
   const columns = Object.keys(changes);
   if (type === 'staff') {
-    if (columns.includes('permission')) return 'staff:permission';
-    if (changes.active === false) return 'staff:deactivate';
+    if (columns.includes('permission')) {
+      return 'staff:permission';
+    }
+    if (changes.active === false) {
+      return 'staff:deactivate';
+    }
     return 'staff:manage';
   }
-  if (type === 'roster_shift') return columns.every((column) => column === 'extendedUntil') ? 'roster:extend' : 'roster:assign';
+  if (type === 'roster_shift') {
+    return columns.every((column) => column === 'extendedUntil')
+      ? 'roster:extend'
+      : 'roster:assign';
+  }
   return UPDATE_PERMISSION[type];
 };
 
 /** The permission applying this refused write again needs, or undefined when it cannot be applied again. */
 const permissionToApply = (rejection: SyncRejection): Permission | undefined => {
-  if (rejection.operation === 'put' && rejection.refusedRecord) return CREATE_PERMISSION[rejection.entityType];
-  if (rejection.operation === 'patch' && rejection.refusedChanges) return changePermission(rejection.entityType, rejection.refusedChanges);
+  if (rejection.operation === 'put' && rejection.refusedRecord) {
+    return CREATE_PERMISSION[rejection.entityType];
+  }
+  if (rejection.operation === 'patch' && rejection.refusedChanges) {
+    return changePermission(rejection.entityType, rejection.refusedChanges);
+  }
   return undefined;
 };
 
@@ -77,16 +111,38 @@ const permissionToApply = (rejection: SyncRejection): Permission | undefined => 
  * on — or undefined when they can. Applying needs the record's own permission
  * as well as the right to resolve, because the write is applied in their name.
  */
-export const applyAgainBlocker = (rejection: SyncRejection, context: AuthorizationContext): string | undefined => {
-  if(['library_document','visit_document'].includes(rejection.entityType))return 'Open the retained file, then review the current library version or inpatient chart before recording a corrected version. Document history cannot be overwritten from here.';
-  if(['encounter_entry','clinical_event','ward_care_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext)return 'Use independent clinical review to preserve the original author, authority and performance time';
-  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Review the current register configuration and save a new draft version. The refused snapshot is kept here; an existing version cannot be overwritten.';
-  if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Review this booking in Appointments and record the intended action against its current history. Saved booking history cannot be overwritten.';
-  if (!rejection.refusedRecord && !rejection.refusedChanges) return 'Nothing was kept to apply again — this can only be discarded.';
+export const applyAgainBlocker = (
+  rejection: SyncRejection,
+  context: AuthorizationContext,
+): string | undefined => {
+  if (['library_document', 'visit_document'].includes(rejection.entityType)) {
+    return 'Open the retained file, then review the current library version or inpatient chart before recording a corrected version. Document history cannot be overwritten from here.';
+  }
+  if (
+    ['encounter_entry', 'clinical_event', 'ward_care_event'].includes(rejection.entityType) &&
+    rejection.refusedRecord?.actorContext
+  ) {
+    return 'Use independent clinical review to preserve the original author, authority and performance time';
+  }
+  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') {
+    return 'Review the current register configuration and save a new draft version. The refused snapshot is kept here; an existing version cannot be overwritten.';
+  }
+  if (rejection.entityType === 'appointment' && rejection.operation === 'patch') {
+    return 'Review this booking in Appointments and record the intended action against its current history. Saved booking history cannot be overwritten.';
+  }
+  if (!rejection.refusedRecord && !rejection.refusedChanges) {
+    return 'Nothing was kept to apply again — this can only be discarded.';
+  }
   const permission = permissionToApply(rejection);
-  if (!permission) return 'This kind of record cannot be applied again from here.';
-  if (!context.permissions.includes('sync_rejection:resolve')) return 'A records officer or facility admin resolves this.';
-  if (!context.permissions.includes(permission)) return 'Your role cannot make this change — someone whose role can must apply it again.';
+  if (!permission) {
+    return 'This kind of record cannot be applied again from here.';
+  }
+  if (!context.permissions.includes('sync_rejection:resolve')) {
+    return 'A records officer or facility admin resolves this.';
+  }
+  if (!context.permissions.includes(permission)) {
+    return 'Your role cannot make this change — someone whose role can must apply it again.';
+  }
   return undefined;
 };
 
@@ -98,17 +154,24 @@ export const applyAgainBlocker = (rejection: SyncRejection, context: Authorizati
  * insert keeps its first time, except a high-risk one, which the server only
  * accepts within 24 hours of being made.
  */
-export const applyAgain = async (rejection: SyncRejection, context: AuthorizationContext): Promise<void> => {
+export const applyAgain = async (
+  rejection: SyncRejection,
+  context: AuthorizationContext,
+): Promise<void> => {
   const blocker = applyAgainBlocker(rejection, context);
   const permission = permissionToApply(rejection);
-  if (blocker || !permission) throw new Error(blocker ?? 'This cannot be applied again');
+  if (blocker || !permission) {
+    throw new Error(blocker ?? 'This cannot be applied again');
+  }
   assertAllowed(context, 'sync_rejection:resolve');
   assertAllowed(context, permission);
   const type = rejection.entityType;
 
   if (rejection.operation === 'put' && rejection.refusedRecord) {
     if (await findRecord(type, rejection.entityId)) {
-      throw new Error('This record is already on the device — it may still be syncing. Try again in a moment.');
+      throw new Error(
+        'This record is already on the device — it may still be syncing. Try again in a moment.',
+      );
     }
     const { updatedBy: _updatedBy, updatedOn: _updatedOn, ...original } = rejection.refusedRecord;
     const record = {
@@ -116,14 +179,21 @@ export const applyAgain = async (rejection: SyncRejection, context: Authorizatio
       type,
       id: rejection.entityId,
       createdBy: context.userId,
-      createdOn: isHighRisk(permission) || typeof original.createdOn !== 'string' ? nowIso() : original.createdOn,
+      createdOn:
+        isHighRisk(permission) || typeof original.createdOn !== 'string'
+          ? nowIso()
+          : original.createdOn,
       deviceId: context.deviceId,
-      ...(['encounter_entry', 'clinical_event', 'ward_care_event'].includes(type) ? { actorRole: context.role } : {}),
+      ...(['encounter_entry', 'clinical_event', 'ward_care_event'].includes(type)
+        ? { actorRole: context.role }
+        : {}),
     };
     await insertRecords(context, [{ permission, type, record }]);
   } else if (rejection.refusedChanges) {
     if (!(await findRecord(type, rejection.entityId))) {
-      throw new Error('The record this changes is not on this device — apply or discard its creation first.');
+      throw new Error(
+        'The record this changes is not on this device — apply or discard its creation first.',
+      );
     }
     await updateRecord(context, permission, type, rejection.entityId, rejection.refusedChanges);
   }
@@ -135,17 +205,31 @@ export const discardRejection = (rejection: SyncRejection, context: Authorizatio
   resolveRejection(rejection, 'Discarded', context);
 
 /** Puts this device's values back over the server's, for the columns chosen, then closes the rejection. */
-export const applyDeviceValues = async (rejection: SyncRejection, columns: readonly string[], context: AuthorizationContext) => {
+export const applyDeviceValues = async (
+  rejection: SyncRejection,
+  columns: readonly string[],
+  context: AuthorizationContext,
+) => {
   const permission = UPDATE_PERMISSION[rejection.entityType];
-  if (!permission) throw new Error(`${rejection.entityType} changes cannot be re-applied here`);
+  if (!permission) {
+    throw new Error(`${rejection.entityType} changes cannot be re-applied here`);
+  }
   // Both writes are checked before the first: a person who may edit the record
   // but not reconcile must not leave the value changed and the rejection open.
   assertAllowed(context, 'sync_rejection:resolve');
   assertAllowed(context, permission);
-  const chosen = (rejection.conflicts ?? []).filter((conflict) => columns.includes(conflict.column));
-  const changes = Object.fromEntries(chosen.map((conflict) => [conflict.column, conflict.deviceValue]));
+  const chosen = (rejection.conflicts ?? []).filter((conflict) =>
+    columns.includes(conflict.column),
+  );
+  const changes = Object.fromEntries(
+    chosen.map((conflict) => [conflict.column, conflict.deviceValue]),
+  );
   await updateRecord(context, permission, rejection.entityType, rejection.entityId, changes);
-  await resolveRejection(rejection, `Kept this device's ${chosen.map((conflict) => conflict.column).join(', ')}`, context);
+  await resolveRejection(
+    rejection,
+    `Kept this device's ${chosen.map((conflict) => conflict.column).join(', ')}`,
+    context,
+  );
 };
 
 /**
@@ -153,7 +237,10 @@ export const applyDeviceValues = async (rejection: SyncRejection, columns: reado
  * clash — the server held them in the queue rather than attach them to the
  * patient who took the ID first (SCHEMA.md §7).
  */
-export const heldFor = (patientRejection: SyncRejection, open: readonly SyncRejection[]): SyncRejection[] =>
+export const heldFor = (
+  patientRejection: SyncRejection,
+  open: readonly SyncRejection[],
+): SyncRejection[] =>
   open.filter(
     (rejection) =>
       rejection.id !== patientRejection.id &&
@@ -163,7 +250,10 @@ export const heldFor = (patientRejection: SyncRejection, open: readonly SyncReje
   );
 
 /** Edits this device made to the patient whose registration it lost — held with it, carried onto the restored record. */
-export const heldEditsFor = (patientRejection: SyncRejection, open: readonly SyncRejection[]): SyncRejection[] =>
+export const heldEditsFor = (
+  patientRejection: SyncRejection,
+  open: readonly SyncRejection[],
+): SyncRejection[] =>
   open.filter(
     (rejection) =>
       rejection.id !== patientRejection.id &&
@@ -175,15 +265,27 @@ export const heldEditsFor = (patientRejection: SyncRejection, open: readonly Syn
   );
 
 /** The refused registration with the held edits laid over it, in the order they were made. */
-export const withHeldEdits = (patientRejection: SyncRejection, edits: readonly SyncRejection[]): SyncRejection => ({
+export const withHeldEdits = (
+  patientRejection: SyncRejection,
+  edits: readonly SyncRejection[],
+): SyncRejection => ({
   ...patientRejection,
   refusedRecord: [...edits]
     .sort((a, b) => (a.occurredOn ?? a.createdOn).localeCompare(b.occurredOn ?? b.createdOn))
-    .reduce<Record<string, unknown>>((record, edit) => ({ ...record, ...edit.refusedChanges }), patientRejection.refusedRecord ?? {}),
+    .reduce<Record<string, unknown>>(
+      (record, edit) => ({ ...record, ...edit.refusedChanges }),
+      patientRejection.refusedRecord ?? {},
+    ),
 });
 
 /** Within one moment, a record goes before the records that point at it. */
-const TYPE_ORDER: Partial<Record<string, number>> = { patient: 0, encounter: 1, appointment: 2, encounter_entry: 3, handoff: 4 };
+const TYPE_ORDER: Partial<Record<string, number>> = {
+  patient: 0,
+  encounter: 1,
+  appointment: 2,
+  encounter_entry: 3,
+  handoff: 4,
+};
 
 const LINKS = ['encounterId', 'amends', 'recordId', 'previousId'] as const;
 
@@ -201,7 +303,9 @@ export const planRestore = (
   mintId: (type: DocType) => string = newId,
 ): { type: DocType; record: Record<string, unknown> }[] => {
   const patient = patientRejection.refusedRecord;
-  if (!patient) throw new Error('this rejection kept no record to restore');
+  if (!patient) {
+    throw new Error('this rejection kept no record to restore');
+  }
 
   const pending = held
     .map((rejection) => ({ type: rejection.entityType, record: rejection.refusedRecord ?? {} }))
@@ -215,28 +319,57 @@ export const planRestore = (
   while (pending.length) {
     const index = pending.findIndex(({ record }) => {
       const values = record.values as Record<string, unknown> | undefined;
-      const links = [...LINKS.map((key) => record[key]), values?.appointmentId, values?.problemId, values?.previousAmendmentId];
-      return !links.some((link) => link !== record.id && pending.some((candidate) => candidate.record.id === link));
+      const links = [
+        ...LINKS.map((key) => record[key]),
+        values?.appointmentId,
+        values?.problemId,
+        values?.previousAmendmentId,
+      ];
+      return !links.some(
+        (link) => link !== record.id && pending.some((candidate) => candidate.record.id === link),
+      );
     });
-    if (index < 0) throw new Error('The held records have circular links. Review them before restoring');
+    if (index < 0) {
+      throw new Error('The held records have circular links. Review them before restoring');
+    }
     records.push(...pending.splice(index, 1));
   }
   const renamed = new Map<string, string>([[patientRejection.entityId, newPatientId]]);
-  for (const { type, record } of records) renamed.set(String(record.id), mintId(type));
+  for (const { type, record } of records) {
+    renamed.set(String(record.id), mintId(type));
+  }
 
-  const relink = (value: unknown) => (typeof value === 'string' ? (renamed.get(value) ?? value) : value);
+  const relink = (value: unknown) =>
+    typeof value === 'string' ? (renamed.get(value) ?? value) : value;
 
   return [
-    { type: 'patient' as DocType, record: { ...patient, id: newPatientId, patientId: newPatientId, deviceId } },
+    {
+      type: 'patient' as DocType,
+      record: { ...patient, id: newPatientId, patientId: newPatientId, deviceId },
+    },
     ...records.map(({ type, record }) => {
-      const restored: Record<string, unknown> = { ...record, id: renamed.get(String(record.id)), patientId: newPatientId, deviceId };
-      for (const link of LINKS) if (restored[link] !== undefined) restored[link] = relink(restored[link]);
-      const values = restored.values as Record<string, unknown> | undefined;
-      if (values) restored.values = { ...values,
-        ...(values.appointmentId ? { appointmentId: relink(values.appointmentId) } : {}),
-        ...(values.problemId ? { problemId: relink(values.problemId) } : {}),
-        ...(values.previousAmendmentId ? { previousAmendmentId: relink(values.previousAmendmentId) } : {}),
+      const restored: Record<string, unknown> = {
+        ...record,
+        id: renamed.get(String(record.id)),
+        patientId: newPatientId,
+        deviceId,
       };
+      for (const link of LINKS) {
+        if (restored[link] !== undefined) {
+          restored[link] = relink(restored[link]);
+        }
+      }
+      const values = restored.values as Record<string, unknown> | undefined;
+      if (values) {
+        restored.values = {
+          ...values,
+          ...(values.appointmentId ? { appointmentId: relink(values.appointmentId) } : {}),
+          ...(values.problemId ? { problemId: relink(values.problemId) } : {}),
+          ...(values.previousAmendmentId
+            ? { previousAmendmentId: relink(values.previousAmendmentId) }
+            : {}),
+        };
+      }
       return { type, record: restored };
     }),
   ];
@@ -256,13 +389,27 @@ export const reRegisterPatient = async (
   const held = heldFor(patientRejection, open);
   const edits = heldEditsFor(patientRejection, open);
   const patients = await listPatients();
-  const newPatientId = mintPatientId(context.facilityId, patients.map((patient) => patient.patientId));
-  const plan = planRestore(withHeldEdits(patientRejection, edits), held, newPatientId, context.deviceId);
+  const newPatientId = mintPatientId(
+    context.facilityId,
+    patients.map((patient) => patient.patientId),
+  );
+  const plan = planRestore(
+    withHeldEdits(patientRejection, edits),
+    held,
+    newPatientId,
+    context.deviceId,
+  );
 
-  const records: NewRecord[] = plan.map(({ type, record }) => ({ permission: 'sync_rejection:resolve', type, record }));
+  const records: NewRecord[] = plan.map(({ type, record }) => ({
+    permission: 'sync_rejection:resolve',
+    type,
+    record,
+  }));
   const [patient] = (await insertRecords(context, records)) as [Patient];
 
   const resolution = `Re-registered as ${newPatientId}`;
-  for (const rejection of [patientRejection, ...held, ...edits]) await resolveRejection(rejection, resolution, context);
+  for (const rejection of [patientRejection, ...held, ...edits]) {
+    await resolveRejection(rejection, resolution, context);
+  }
   return patient;
 };

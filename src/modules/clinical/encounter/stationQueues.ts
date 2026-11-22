@@ -1,4 +1,11 @@
-import { CLOSING_STEPS, effectiveEncounterEntries, ENCOUNTER_STEP_VALUES, type EncounterEntry, type EncounterStep, type WardCareEvent } from '@shared';
+import {
+  CLOSING_STEPS,
+  effectiveEncounterEntries,
+  ENCOUNTER_STEP_VALUES,
+  type EncounterEntry,
+  type EncounterStep,
+  type WardCareEvent,
+} from '@shared';
 import { requestQueues } from './requestQueues';
 
 /**
@@ -13,7 +20,16 @@ export type StationQueue = 'lab' | 'results' | 'pharmacy';
 export const STATION_QUEUES: readonly StationQueue[] = ['lab', 'results', 'pharmacy'];
 
 /** The steps the queues are decided from — read by step, through the index. */
-export const QUEUE_STEPS: readonly EncounterStep[] = ['lab_order', 'lab_results', 'result_review', 'diagnosis', 'prescription', 'dispense', 'amendment', ...CLOSING_STEPS];
+export const QUEUE_STEPS: readonly EncounterStep[] = [
+  'lab_order',
+  'lab_results',
+  'result_review',
+  'diagnosis',
+  'prescription',
+  'dispense',
+  'amendment',
+  ...CLOSING_STEPS,
+];
 
 export type QueuedPatient = {
   encounterId: string;
@@ -30,29 +46,62 @@ const firstAt = (entries: readonly EncounterEntry[], step: EncounterStep) =>
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn))[0];
 
 /** Each open encounter in the queue it is waiting in, oldest first — the order patients arrived. */
-export const stationQueues = (entries: readonly EncounterEntry[], wardEvents: readonly WardCareEvent[] = []): Record<StationQueue, QueuedPatient[]> => {
+export const stationQueues = (
+  entries: readonly EncounterEntry[],
+  wardEvents: readonly WardCareEvent[] = [],
+): Record<StationQueue, QueuedPatient[]> => {
   const byEncounter = new Map<string, EncounterEntry[]>();
-  for (const entry of effectiveEncounterEntries(entries)) byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
+  for (const entry of effectiveEncounterEntries(entries)) {
+    byEncounter.set(entry.encounterId, [...(byEncounter.get(entry.encounterId) ?? []), entry]);
+  }
 
   const queues: Record<StationQueue, QueuedPatient[]> = { lab: [], results: [], pharmacy: [] };
   for (const [encounterId, saved] of byEncounter) {
-
     const order = firstAt(saved, 'lab_order');
     const results = firstAt(saved, 'lab_results');
     const patientId = saved[0].patientId;
 
     if (order) {
       const { tests, items } = ENCOUNTER_STEP_VALUES.lab_order.parse(order.values);
-      const completed = saved.filter((e) => e.step === 'lab_results').flatMap((e) => ENCOUNTER_STEP_VALUES.lab_results.parse(e.values).results.map((r) => r.orderItemId ?? r.test));
+      const completed = saved
+        .filter((e) => e.step === 'lab_results')
+        .flatMap((e) =>
+          ENCOUNTER_STEP_VALUES.lab_results
+            .parse(e.values)
+            .results.map((r) => r.orderItemId ?? r.test),
+        );
       const pending = tests.filter((t, index) => !completed.includes(items?.[index]?.id ?? t));
-      if (pending.length) queues.lab.push({ encounterId, patientId, waitingSince: order.createdOn, detail: pending.join(', ') });
+      if (pending.length) {
+        queues.lab.push({
+          encounterId,
+          patientId,
+          waitingSince: order.createdOn,
+          detail: pending.join(', '),
+        });
+      }
     }
-    const reviewedIds = new Set(saved.filter((e) => e.step === 'result_review').flatMap((e) => e.values.resultEntryIds as string[]));
+    const reviewedIds = new Set(
+      saved
+        .filter((e) => e.step === 'result_review')
+        .flatMap((e) => e.values.resultEntryIds as string[]),
+    );
     if (results && saved.some((e) => e.step === 'lab_results' && !reviewedIds.has(e.id))) {
-      queues.results.push({ encounterId, patientId, waitingSince: results.createdOn, detail: 'Lab results are back' });
+      queues.results.push({
+        encounterId,
+        patientId,
+        waitingSince: results.createdOn,
+        detail: 'Lab results are back',
+      });
     }
   }
-  queues.pharmacy = requestQueues(entries, wardEvents).pharmacy.open.map((request) => ({ encounterId: request.encounterId, patientId: request.patientId, waitingSince: request.requestedOn, detail: request.items.join(', ') }));
-  for (const queue of STATION_QUEUES) queues[queue].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince));
+  queues.pharmacy = requestQueues(entries, wardEvents).pharmacy.open.map((request) => ({
+    encounterId: request.encounterId,
+    patientId: request.patientId,
+    waitingSince: request.requestedOn,
+    detail: request.items.join(', '),
+  }));
+  for (const queue of STATION_QUEUES) {
+    queues[queue].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince));
+  }
   return queues;
 };

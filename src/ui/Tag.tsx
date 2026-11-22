@@ -28,4 +28,4 @@ export const Tag = ({ children, tone = 'neutral', className = '' }: Props) => {
       {children}
     </span>
   );
-}
+};

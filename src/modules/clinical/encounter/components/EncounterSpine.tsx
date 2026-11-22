@@ -1,3 +1,4 @@
+import { stepTone } from './stepTone';
 import { stepsFor } from '../steps';
 import type { EncounterState } from '../types';
 
@@ -12,19 +13,43 @@ export const EncounterSpine = ({ enc }: { enc: EncounterState }) => (
       const locked = Boolean(enc.sig[s.key]);
       const skipped = enc.skipped.includes(s.key);
       const active = i === enc.activeIndex;
+      const renderStepMarker = () => {
+        if (locked) {
+          return '✓';
+        }
+
+        if (skipped) {
+          return '–';
+        }
+
+        return i + 1;
+      };
+
       return (
         <span
           key={s.key}
-          className={`flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
-            locked ? 'bg-brand-tint text-brand' : active ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'
-          }`}
+          className={`flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${stepTone(
+            locked,
+            active,
+            {
+              locked: 'bg-brand-tint text-brand',
+              active: 'bg-brand text-white',
+              idle: 'bg-surface-muted text-ink-muted',
+            },
+          )}`}
         >
           <span
-            className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-extrabold ${
-              locked ? 'bg-brand text-white' : active ? 'bg-brand-accent-soft text-brand' : 'bg-surface-high text-ink-muted'
-            }`}
+            className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-extrabold ${stepTone(
+              locked,
+              active,
+              {
+                locked: 'bg-brand text-white',
+                active: 'bg-brand-accent-soft text-brand',
+                idle: 'bg-surface-high text-ink-muted',
+              },
+            )}`}
           >
-            {locked ? '✓' : skipped ? '–' : i + 1}
+            {renderStepMarker()}
           </span>
           {s.short}
         </span>

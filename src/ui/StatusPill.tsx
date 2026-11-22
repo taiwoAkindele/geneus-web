@@ -38,4 +38,4 @@ export const StatusPill = ({ status, children, className = '' }: Props) => {
       {children ?? s.label}
     </span>
   );
-}
+};

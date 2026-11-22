@@ -21,7 +21,11 @@ const HOUR = 60 * 60 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
 const contextFor = (role: Staff['role']): AuthorizationContext =>
-  authorizationFor({ staff: { staffId: `staff:${role}`, role, permission: 'read_write' }, facilityId: 'OOE-PHC', deviceId: 'device-3' });
+  authorizationFor({
+    staff: { staffId: `staff:${role}`, role, permission: 'read_write' },
+    facilityId: 'OOE-PHC',
+    deviceId: 'device-3',
+  });
 
 const rejection = (overrides: Partial<SyncRejection>): SyncRejection => ({
   id: `sync_rejection:${Math.random()}`,
@@ -71,7 +75,12 @@ const heldEncounter = rejection({
   },
 });
 
-const heldEntry = (id: string, step: string, values: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+const heldEntry = (
+  id: string,
+  step: string,
+  values: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+) =>
   rejection({
     entityType: 'encounter_entry',
     entityId: id,
@@ -92,19 +101,48 @@ const heldEntry = (id: string, step: string, values: Record<string, unknown>, ex
   });
 
 const vitals = heldEntry('encounter_entry:vitals', 'vitals', { temperatureC: 38.9 });
-const amendment = heldEntry('encounter_entry:amend', 'amendment', { note: 'Was 37.9' }, {
-  amends: 'encounter_entry:vitals',
-  createdOn: '2026-10-02T09:10:00.000Z',
+const amendment = heldEntry(
+  'encounter_entry:amend',
+  'amendment',
+  { note: 'Was 37.9' },
+  {
+    amends: 'encounter_entry:vitals',
+    createdOn: '2026-10-02T09:10:00.000Z',
+  },
+);
+const unrelated = rejection({
+  deviceId: 'device-9',
+  entityType: 'encounter',
+  entityId: 'encounter:x',
+  refusedRecord: { patientId: 'OOE-PHC-000047-K2' },
 });
-const unrelated = rejection({ deviceId: 'device-9', entityType: 'encounter', entityId: 'encounter:x', refusedRecord: { patientId: 'OOE-PHC-000047-K2' } });
 
 describe('the reconcile queue', () => {
   it('sorts each refusal into the decision it needs — none is just dropped', () => {
     expect(kindOf(refusedPatient)).toBe('patient_id_clash');
     expect(kindOf(heldEncounter, [refusedPatient, heldEncounter])).toBe('held');
-    expect(kindOf(rejection({ operation: 'patch', conflicts: [{ column: 'phone', deviceValue: '1', serverValue: '2' }] }))).toBe('column_conflict');
-    expect(kindOf(rejection({ category: 'authorization', operation: 'patch', refusedChanges: { phone: '0803' } }))).toBe('refused_write');
-    expect(kindOf(rejection({ category: 'authorization', operation: 'delete', refusedRecord: undefined }))).toBe('nothing_kept');
+    expect(
+      kindOf(
+        rejection({
+          operation: 'patch',
+          conflicts: [{ column: 'phone', deviceValue: '1', serverValue: '2' }],
+        }),
+      ),
+    ).toBe('column_conflict');
+    expect(
+      kindOf(
+        rejection({
+          category: 'authorization',
+          operation: 'patch',
+          refusedChanges: { phone: '0803' },
+        }),
+      ),
+    ).toBe('refused_write');
+    expect(
+      kindOf(
+        rejection({ category: 'authorization', operation: 'delete', refusedRecord: undefined }),
+      ),
+    ).toBe('nothing_kept');
   });
 
   /** Once its patient's clash is decided (or discarded), a held record is decided on its own — never stranded. */
@@ -113,7 +151,10 @@ describe('the reconcile queue', () => {
   });
 
   it('finds what the same device recorded for the refused patient, and nothing from other devices', () => {
-    expect(heldFor(refusedPatient, [refusedPatient, heldEncounter, vitals, unrelated])).toEqual([heldEncounter, vitals]);
+    expect(heldFor(refusedPatient, [refusedPatient, heldEncounter, vitals, unrelated])).toEqual([
+      heldEncounter,
+      vitals,
+    ]);
   });
 });
 
@@ -122,9 +163,38 @@ describe('restoring a patient who lost their ID', () => {
   const mint = (type: string) => `${type}:new-${(counter += 1)}`;
 
   it('restores clinical version chains in dependency order despite clock skew', () => {
-    const root = rejection({ entityType: 'clinical_event', entityId: 'clinical:root', refusedRecord: { ...envelope, id: 'clinical:root', type: 'clinical_event', patientId: 'OOE-PHC-000047-K2', recordId: 'clinical:root', kind: 'problem', actorRole: 'doctor', createdOn: '2026-10-02T10:00:00Z', values: { label: 'Condition', certainty: 'unknown', status: 'active' } } });
-    const revision = rejection({ entityType: 'clinical_event', entityId: 'clinical:revision', refusedRecord: { ...root.refusedRecord, id: 'clinical:revision', previousId: 'clinical:root', createdOn: '2026-10-02T09:00:00Z' } });
-    const plan = planRestore(refusedPatient, [revision, root], 'OOE-PHC-000048-AB', 'device-3', mint as never);
+    const root = rejection({
+      entityType: 'clinical_event',
+      entityId: 'clinical:root',
+      refusedRecord: {
+        ...envelope,
+        id: 'clinical:root',
+        type: 'clinical_event',
+        patientId: 'OOE-PHC-000047-K2',
+        recordId: 'clinical:root',
+        kind: 'problem',
+        actorRole: 'doctor',
+        createdOn: '2026-10-02T10:00:00Z',
+        values: { label: 'Condition', certainty: 'unknown', status: 'active' },
+      },
+    });
+    const revision = rejection({
+      entityType: 'clinical_event',
+      entityId: 'clinical:revision',
+      refusedRecord: {
+        ...root.refusedRecord,
+        id: 'clinical:revision',
+        previousId: 'clinical:root',
+        createdOn: '2026-10-02T09:00:00Z',
+      },
+    });
+    const plan = planRestore(
+      refusedPatient,
+      [revision, root],
+      'OOE-PHC-000048-AB',
+      'device-3',
+      mint as never,
+    );
     const restoredRoot = plan[1].record;
     const restoredRevision = plan[2].record;
     expect(restoredRoot.recordId).toBe(restoredRoot.id);
@@ -135,12 +205,34 @@ describe('restoring a patient who lost their ID', () => {
 
   it('gives everything new ids, follows every link, and keeps who recorded it and when', () => {
     counter = 0;
-    const plan = planRestore(refusedPatient, [amendment, vitals, heldEncounter], 'OOE-PHC-000048-AB', 'device-3', mint as never);
+    const plan = planRestore(
+      refusedPatient,
+      [amendment, vitals, heldEncounter],
+      'OOE-PHC-000048-AB',
+      'device-3',
+      mint as never,
+    );
 
-    expect(plan.map(({ type }) => type)).toEqual(['patient', 'encounter', 'encounter_entry', 'encounter_entry']);
-    const [patient, encounter, restoredVitals, restoredAmendment] = plan.map(({ record }) => record);
-    expect(patient).toMatchObject({ id: 'OOE-PHC-000048-AB', patientId: 'OOE-PHC-000048-AB', deviceId: 'device-3', fullName: 'Bisi Adeyemi' });
-    expect(encounter).toMatchObject({ patientId: 'OOE-PHC-000048-AB', createdBy: 'staff:nurse', createdOn: '2026-10-02T09:05:00.000Z' });
+    expect(plan.map(({ type }) => type)).toEqual([
+      'patient',
+      'encounter',
+      'encounter_entry',
+      'encounter_entry',
+    ]);
+    const [patient, encounter, restoredVitals, restoredAmendment] = plan.map(
+      ({ record }) => record,
+    );
+    expect(patient).toMatchObject({
+      id: 'OOE-PHC-000048-AB',
+      patientId: 'OOE-PHC-000048-AB',
+      deviceId: 'device-3',
+      fullName: 'Bisi Adeyemi',
+    });
+    expect(encounter).toMatchObject({
+      patientId: 'OOE-PHC-000048-AB',
+      createdBy: 'staff:nurse',
+      createdOn: '2026-10-02T09:05:00.000Z',
+    });
     expect(restoredVitals.encounterId).toBe(encounter.id);
     expect(restoredAmendment.amends).toBe(restoredVitals.id);
     expect(plan.every(({ record }) => record.deviceId === 'device-3')).toBe(true);
@@ -152,15 +244,38 @@ describe('restoring a patient who lost their ID', () => {
       entityType: 'appointment',
       entityId: 'appointment:old',
       reason: 'held: …',
-      refusedRecord: { ...envelope, id: 'appointment:old', type: 'appointment', createdBy: 'staff:doctor', createdOn: '2026-10-02T09:20:00.000Z', patientId: 'OOE-PHC-000047-K2', reason: 'Review', status: 'scheduled', scheduledFor: '2026-10-09T08:00:00.000Z' },
+      refusedRecord: {
+        ...envelope,
+        id: 'appointment:old',
+        type: 'appointment',
+        createdBy: 'staff:doctor',
+        createdOn: '2026-10-02T09:20:00.000Z',
+        patientId: 'OOE-PHC-000047-K2',
+        reason: 'Review',
+        status: 'scheduled',
+        scheduledFor: '2026-10-09T08:00:00.000Z',
+      },
     });
-    const followUp = heldEntry('encounter_entry:close', 'follow_up', { followUpOn: '2026-10-09', appointmentId: 'appointment:old' }, { createdOn: '2026-10-02T09:20:00.000Z' });
+    const followUp = heldEntry(
+      'encounter_entry:close',
+      'follow_up',
+      { followUpOn: '2026-10-09', appointmentId: 'appointment:old' },
+      { createdOn: '2026-10-02T09:20:00.000Z' },
+    );
 
-    const plan = planRestore(refusedPatient, [followUp, appointment], 'OOE-PHC-000048-AB', 'device-3', mint as never);
+    const plan = planRestore(
+      refusedPatient,
+      [followUp, appointment],
+      'OOE-PHC-000048-AB',
+      'device-3',
+      mint as never,
+    );
 
     const restoredAppointment = plan.find(({ type }) => type === 'appointment')?.record;
     const restoredFollowUp = plan.find(({ type }) => type === 'encounter_entry')?.record;
-    expect((restoredFollowUp?.values as Record<string, unknown>).appointmentId).toBe(restoredAppointment?.id);
+    expect((restoredFollowUp?.values as Record<string, unknown>).appointmentId).toBe(
+      restoredAppointment?.id,
+    );
   });
 });
 
@@ -170,7 +285,14 @@ describe('resolving', () => {
   beforeEach(() => {
     recordServerContact(ago(HOUR));
     db = fakeDatabase({
-      patients: [{ ...refusedPatient.refusedRecord, fullName: 'Amaka Okoro', dobEstimated: 0, allergies: '[]' }],
+      patients: [
+        {
+          ...refusedPatient.refusedRecord,
+          fullName: 'Amaka Okoro',
+          dobEstimated: 0,
+          allergies: '[]',
+        },
+      ],
       sync_rejections: [refusedPatient, heldEncounter, vitals],
     });
     setDatabaseForTests(db);
@@ -179,15 +301,23 @@ describe('resolving', () => {
   afterEach(() => setDatabaseForTests(undefined));
 
   it('only lets those who reconcile close a rejection', async () => {
-    await expect(resolveRejection(refusedPatient, 'Reviewed', contextFor('nurse'))).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(
+      resolveRejection(refusedPatient, 'Reviewed', contextFor('nurse')),
+    ).rejects.toBeInstanceOf(AuthorizationError);
     expect(db.statements).toEqual([]);
 
     await resolveRejection(refusedPatient, 'Reviewed', contextFor('records_officer'));
-    expect(db.statements[0].sql).toMatch(/^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/);
+    expect(db.statements[0].sql).toMatch(
+      /^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/,
+    );
   });
 
   it('re-registers under the next ID, restores what was held, and closes all of it', async () => {
-    const patient = await reRegisterPatient(refusedPatient, [refusedPatient, heldEncounter, vitals], contextFor('records_officer'));
+    const patient = await reRegisterPatient(
+      refusedPatient,
+      [refusedPatient, heldEncounter, vitals],
+      contextFor('records_officer'),
+    );
 
     expect(patient.patientId).toMatch(/^OOE-PHC-000048-[A-Z2-9]{2}$/);
     const writes = db.statements.map((statement) => statement.sql.split(' ').slice(0, 3).join(' '));
@@ -211,7 +341,9 @@ describe('resolving', () => {
     });
     db.rows.sync_rejections.push(conflict);
 
-    await expect(applyDeviceValues(conflict, ['phone'], contextFor('nurse'))).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(
+      applyDeviceValues(conflict, ['phone'], contextFor('nurse')),
+    ).rejects.toBeInstanceOf(AuthorizationError);
     expect(db.statements).toEqual([]);
     await applyDeviceValues(conflict, ['phone'], contextFor('facility_admin'));
 
@@ -220,7 +352,8 @@ describe('resolving', () => {
     expect(db.statements[1].sql).toMatch(/^UPDATE sync_rejections/);
   });
 
-  const columnsOf = (sql: string) => (/\(([^)]+)\)/.exec(sql)?.[1].split(', ') ?? []).map((name) => name.replace(/"/g, ''));
+  const columnsOf = (sql: string) =>
+    (/\(([^)]+)\)/.exec(sql)?.[1].split(', ') ?? []).map((name) => name.replace(/"/g, ''));
 
   /** A nurse deactivated while the device was offline: her correction is not lost, it waits for a decision. */
   it('applies a refused change again, in the name of the person applying it', async () => {
@@ -263,20 +396,32 @@ describe('resolving', () => {
   });
 
   it('says plainly who can apply it again, and offers only discarding when nothing was kept', () => {
-    const clinical = rejection({ entityType: 'encounter_entry', refusedRecord: vitals.refusedRecord });
+    const clinical = rejection({
+      entityType: 'encounter_entry',
+      refusedRecord: vitals.refusedRecord,
+    });
 
     expect(applyAgainBlocker(clinical, contextFor('records_officer'))).toMatch(/whose role can/);
     // A clinician may record the step but not resolve the queue (sync_rejection:resolve), so cannot apply it.
-    expect(applyAgainBlocker(clinical, contextFor('nurse'))).toMatch(/records officer or facility admin/);
+    expect(applyAgainBlocker(clinical, contextFor('nurse'))).toMatch(
+      /records officer or facility admin/,
+    );
     expect(applyAgainBlocker(clinical, contextFor('facility_admin'))).toBeUndefined();
-    expect(applyAgainBlocker(rejection({ operation: 'delete', refusedRecord: undefined }), contextFor('facility_admin'))).toMatch(/only be discarded/);
+    expect(
+      applyAgainBlocker(
+        rejection({ operation: 'delete', refusedRecord: undefined }),
+        contextFor('facility_admin'),
+      ),
+    ).toMatch(/only be discarded/);
   });
 
   it('records a discard in the name of the person who discarded it', async () => {
     await discardRejection(refusedPatient, contextFor('records_officer'));
 
     const [update] = db.statements;
-    expect(update.sql).toMatch(/^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/);
+    expect(update.sql).toMatch(
+      /^UPDATE sync_rejections SET "resolvedOn" = \?, "resolvedBy" = \?, "resolution" = \?/,
+    );
     expect(update.parameters.slice(1, 3)).toEqual(['staff:records_officer', 'Discarded']);
   });
 
@@ -284,7 +429,10 @@ describe('resolving', () => {
     const edit = (phone: string, occurredOn: string) =>
       rejection({ operation: 'patch', reason: 'held: …', occurredOn, refusedChanges: { phone } });
 
-    const merged = withHeldEdits(refusedPatient, [edit('0805', '2026-10-02T11:00:00.000Z'), edit('0803', '2026-10-02T10:00:00.000Z')]);
+    const merged = withHeldEdits(refusedPatient, [
+      edit('0805', '2026-10-02T11:00:00.000Z'),
+      edit('0803', '2026-10-02T10:00:00.000Z'),
+    ]);
 
     expect(merged.refusedRecord).toMatchObject({ fullName: 'Bisi Adeyemi', phone: '0805' });
   });

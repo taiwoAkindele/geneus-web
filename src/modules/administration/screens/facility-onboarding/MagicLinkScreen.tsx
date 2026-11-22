@@ -19,7 +19,9 @@ export const MagicLinkScreen = () => {
 
   const submit = async () => {
     const code = token.trim().toUpperCase();
-    if (!code || checking) return;
+    if (!code || checking) {
+      return;
+    }
     setChecking(true);
     setError(undefined);
     try {
@@ -40,9 +42,12 @@ export const MagicLinkScreen = () => {
           <div className="absolute left-1/2 top-1/2 h-6 w-[7px] -translate-x-1/2 -translate-y-1/2 rounded bg-brand" />
         </div>
 
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em]">Set up your facility</h1>
+        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em]">
+          Set up your facility
+        </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-brand-on-dark">
-          Enter the invite code you were given. It can only be used once, and sets up this facility on this device.
+          Enter the invite code you were given. It can only be used once, and sets up this facility
+          on this device.
         </p>
 
         <form
@@ -62,7 +67,12 @@ export const MagicLinkScreen = () => {
             error={error}
           />
           <div className="mt-4">
-            <Button type="submit" variant="primary" disabled={!token.trim() || checking} loading={checking}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!token.trim() || checking}
+              loading={checking}
+            >
               Continue
             </Button>
           </div>
@@ -73,7 +83,11 @@ export const MagicLinkScreen = () => {
         {facility ? (
           <div className="mt-auto pt-8 text-center text-sm text-brand-on-dark">
             Already set up?{' '}
-            <button type="button" onClick={() => navigate('/login')} className="min-h-0 font-bold text-white underline">
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="min-h-0 font-bold text-white underline"
+            >
               Sign in
             </button>
           </div>
@@ -81,7 +95,11 @@ export const MagicLinkScreen = () => {
           <div className="mt-auto space-y-3 pt-8 text-center text-sm text-brand-on-dark">
             <p>
               Facility already uses Geneus?{' '}
-              <button type="button" onClick={() => navigate('/onboarding/join')} className="min-h-0 font-bold text-white underline">
+              <button
+                type="button"
+                onClick={() => navigate('/onboarding/join')}
+                className="min-h-0 font-bold text-white underline"
+              >
                 Join an existing facility
               </button>
             </p>

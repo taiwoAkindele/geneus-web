@@ -19,8 +19,14 @@ const REFERENCE = /^geneus-co-[a-f0-9-]{36}$/;
  */
 export const checkoutReference = (search: string): string | undefined => {
   let decoded = search;
-  try { decoded = decodeURIComponent(search); } catch { /* keep it as it came */ }
-  const found = /geneus-co-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.exec(decoded)?.[0];
+  try {
+    decoded = decodeURIComponent(search);
+  } catch {
+    /* keep it as it came */
+  }
+  const found = /geneus-co-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.exec(
+    decoded,
+  )?.[0];
   return found && REFERENCE.test(found) ? found : undefined;
 };
 
@@ -69,9 +75,11 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
           return;
         }
 
-        setError(cause instanceof ApiError
-          ? cause.message
-          : 'Your payment could not be checked. Try again.');
+        setError(
+          cause instanceof ApiError
+            ? cause.message
+            : 'Your payment could not be checked. Try again.',
+        );
       }
 
       if (active) {
@@ -106,17 +114,18 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
 
       window.location.assign(destination.toString());
     } catch (cause) {
-      setError(cause instanceof ApiError
-        ? cause.message
-        : 'Online payment could not be started. Try again.');
+      setError(
+        cause instanceof ApiError
+          ? cause.message
+          : 'Online payment could not be started. Try again.',
+      );
       setBusy(false);
       starting.current = false;
     }
   };
 
   const canCheckAgain = reference && !checking && payment?.status !== 'paid';
-  const hasReceipt = payment?.status === 'paid'
-    && (payment.heldMinor ?? 0) < payment.amountMinor;
+  const hasReceipt = payment?.status === 'paid' && (payment.heldMinor ?? 0) < payment.amountMinor;
 
   return (
     <div className="space-y-3">
@@ -131,24 +140,26 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
           {payment.heldMinor ? (
             <p className="mt-1">
               The bill balance changed while you were paying. The hospital is holding{' '}
-              {payment.currency} {(payment.heldMinor / 100).toLocaleString('en-NG', {
+              {payment.currency}{' '}
+              {(payment.heldMinor / 100).toLocaleString('en-NG', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
-              })} for staff to review.
+              })}{' '}
+              for staff to review.
             </p>
           ) : null}
         </div>
       ) : null}
       {payment?.status === 'failed' ? (
         <p role="status" className="text-sm text-ink-soft">
-          No live payment was applied. A test checkout does not settle this bill.
-          Contact the hospital if your account was debited.
+          No live payment was applied. A test checkout does not settle this bill. Contact the
+          hospital if your account was debited.
         </p>
       ) : null}
       {payment?.status === 'expired' ? (
         <p role="status" className="text-sm text-ink-soft">
-          This checkout has expired. Check the payment again if your account was debited,
-          or start a new checkout.
+          This checkout has expired. Check the payment again if your account was debited, or start a
+          new checkout.
         </p>
       ) : null}
       {payment?.status === 'pending' && !checking ? (
@@ -156,7 +167,11 @@ export const BillCheckout = ({ api, payable, onConfirmed }: BillCheckoutProps) =
           Your payment is still awaiting confirmation. Check again before starting another payment.
         </p>
       ) : null}
-      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
       {canCheckAgain ? (
         <button
           type="button"

@@ -13,3 +13,4 @@ export { formatCountdown, useShiftCountdown } from './useShiftCountdown';
 export { checkPin, hasPin, PIN_LENGTH, pinLength, setPin } from './credentials';
 export { approvePinSetup, isPinSetupApproved, takePinSetupApproval } from './pinApproval';
 export { isFrozen } from './signInChecks';
+export { StaffVerification, useStaffVerification } from './StaffVerification';

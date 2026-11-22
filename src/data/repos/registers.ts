@@ -35,9 +35,12 @@ export const currentPublished = (
   registerId: string,
 ): RegisterDefinition | undefined =>
   definitions
-    .filter((definition) => definition.registerId === registerId && definition.status === 'published')
+    .filter(
+      (definition) => definition.registerId === registerId && definition.status === 'published',
+    )
     .reduce<RegisterDefinition | undefined>(
-      (latest, definition) => (!latest || definition.version > latest.version ? definition : latest),
+      (latest, definition) =>
+        !latest || definition.version > latest.version ? definition : latest,
       undefined,
     );
 
@@ -59,32 +62,79 @@ const saveDefinition = async (
   const definitions = await listDefinitions();
   const id = registerId ?? newId('register_definition');
   const version = highestVersion(definitions, id) + 1;
-  if (expectedVersion !== undefined && version !== expectedVersion + 1) throw new Error('A newer register version is available. Reopen its configuration before saving your changes. Your private recovery is kept.');
+  if (expectedVersion !== undefined && version !== expectedVersion + 1) {
+    throw new Error(
+      'A newer register version is available. Reopen its configuration before saving your changes. Your private recovery is kept.',
+    );
+  }
   const words = (list: readonly string[]) => list.map((word) => word.trim()).filter(Boolean);
   const { visitLink, ...rest } = draft;
   const values = {
-    ...rest, name: draft.name.trim(), category: draft.category.trim(), status,
-    ...(visitLink ? { visitLink: { visits: visitLink.visits, words: words(visitLink.words), codes: words(visitLink.codes), visitTypes: [...new Set(visitLink.visitTypes ?? [])] } } : {}),
+    ...rest,
+    name: draft.name.trim(),
+    category: draft.category.trim(),
+    status,
+    ...(visitLink
+      ? {
+          visitLink: {
+            visits: visitLink.visits,
+            words: words(visitLink.words),
+            codes: words(visitLink.codes),
+            visitTypes: [...new Set(visitLink.visitTypes ?? [])],
+          },
+        }
+      : {}),
     fields: draft.fields.map(({ fromVisit, ...field }) => ({
-      ...field, label: field.label.trim(), options: field.options?.map((option) => option.trim()),
-      ...(fromVisit ? { fromVisit: { fact: fromVisit.fact, ...(fromVisit.words && words(fromVisit.words).length ? { words: words(fromVisit.words) } : {}) } } : {}),
+      ...field,
+      label: field.label.trim(),
+      options: field.options?.map((option) => option.trim()),
+      ...(fromVisit
+        ? {
+            fromVisit: {
+              fact: fromVisit.fact,
+              ...(fromVisit.words && words(fromVisit.words).length
+                ? { words: words(fromVisit.words) }
+                : {}),
+            },
+          }
+        : {}),
     })),
   };
-  const issues = registerDefinitionIssues(values, definitions.filter((definition) => definition.registerId === id));
-  if (issues.length) throw new Error(issues.join(' '));
-  return insertRecord<RegisterDefinition>(context, 'register_definition:publish', 'register_definition', {
-    ...envelope(context),
-    id: `${id}:v${version}`,
-    type: 'register_definition',
-    registerId: id,
-    version,
-    ...values,
-  });
+  const issues = registerDefinitionIssues(
+    values,
+    definitions.filter((definition) => definition.registerId === id),
+  );
+  if (issues.length) {
+    throw new Error(issues.join(' '));
+  }
+  return insertRecord<RegisterDefinition>(
+    context,
+    'register_definition:publish',
+    'register_definition',
+    {
+      ...envelope(context),
+      id: `${id}:v${version}`,
+      type: 'register_definition',
+      registerId: id,
+      version,
+      ...values,
+    },
+  );
 };
 
 /** Each explicit draft save is an immutable snapshot, just like publication. */
-export const saveDraftDefinition = (draft: RegisterDraft, registerId: string | null, context: AuthorizationContext, expectedVersion?: number) => saveDefinition(draft, registerId, context, 'draft', expectedVersion);
-export const publishDefinition = (draft: RegisterDraft, registerId: string | null, context: AuthorizationContext, expectedVersion?: number) => saveDefinition(draft, registerId, context, 'published', expectedVersion);
+export const saveDraftDefinition = (
+  draft: RegisterDraft,
+  registerId: string | null,
+  context: AuthorizationContext,
+  expectedVersion?: number,
+) => saveDefinition(draft, registerId, context, 'draft', expectedVersion);
+export const publishDefinition = (
+  draft: RegisterDraft,
+  registerId: string | null,
+  context: AuthorizationContext,
+  expectedVersion?: number,
+) => saveDefinition(draft, registerId, context, 'published', expectedVersion);
 
 export type EntryDraft = {
   registerId: string;
@@ -99,17 +149,26 @@ export type AddEntryResult = { saved: true } | { saved: false; issues: string[] 
  * Per-field rules live in the register's own definition, so they are checked
  * here rather than by a static schema (SCHEMA.md §11.3).
  */
-export const addEntry = async (draft: EntryDraft, context: AuthorizationContext): Promise<AddEntryResult> => {
+export const addEntry = async (
+  draft: EntryDraft,
+  context: AuthorizationContext,
+): Promise<AddEntryResult> => {
   const definition = currentPublished(await listDefinitions(), draft.registerId);
-  if (!definition) return { saved: false, issues: ['Publish this register before recording entries'] };
+  if (!definition) {
+    return { saved: false, issues: ['Publish this register before recording entries'] };
+  }
 
   // In a visit-linked register staff record only the fields the visit does not fill.
   const asked = definition.fields.filter((field) => field.type !== 'section' && !field.fromVisit);
   const issues = validateRegisterEntry(asked, draft.values);
   issues.push(...registerEntryLinkIssues(definition, { ...draft.visit, values: draft.values }));
   const known = new Set(asked.map((field) => field.id));
-  if (Object.keys(draft.values).some((field) => !known.has(field))) issues.push('The entry includes a field outside this register version');
-  if (issues.length > 0) return { saved: false, issues };
+  if (Object.keys(draft.values).some((field) => !known.has(field))) {
+    issues.push('The entry includes a field outside this register version');
+  }
+  if (issues.length > 0) {
+    return { saved: false, issues };
+  }
 
   await insertRecord<RegisterEntry>(context, 'register_entry:create', 'register_entry', {
     ...envelope(context),
@@ -119,7 +178,9 @@ export const addEntry = async (draft: EntryDraft, context: AuthorizationContext)
     registerVersion: definition.version,
     entryDate: calendarDate(),
     setting: 'facility',
-    ...(draft.visit ? { patientId: draft.visit.patientId, encounterId: draft.visit.encounterId } : {}),
+    ...(draft.visit
+      ? { patientId: draft.visit.patientId, encounterId: draft.visit.encounterId }
+      : {}),
     values: draft.values,
   });
   return { saved: true };

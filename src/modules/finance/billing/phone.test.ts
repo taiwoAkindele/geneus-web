@@ -13,6 +13,8 @@ describe('WhatsApp number for payment alerts', () => {
     expect(internationalPhone('+233 24 412 3456')).toBe('+233244123456');
   });
   it('refuses anything that cannot be a phone number', () => {
-    for (const value of ['', '0', '0903558942', '+0123456789', 'abc', '0903558942612', '+12']) expect(internationalPhone(value)).toBeUndefined();
+    for (const value of ['', '0', '0903558942', '+0123456789', 'abc', '0903558942612', '+12']) {
+      expect(internationalPhone(value)).toBeUndefined();
+    }
   });
 });

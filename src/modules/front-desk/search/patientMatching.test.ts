@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Patient } from '@shared';
 import type { PatientDetails } from '@/data/repos/patients';
-import { currentAge, findLikelyMatches, namesMatch, phoneKey, searchPatients } from './patientMatching';
+import {
+  currentAge,
+  findLikelyMatches,
+  namesMatch,
+  phoneKey,
+  searchPatients,
+} from './patientMatching';
 
 const NOW = Date.parse('2026-10-02T09:00:00Z');
 
@@ -26,8 +32,22 @@ const patient = (overrides: Partial<Patient>): Patient => ({
 });
 
 const amaka = patient({});
-const mother = patient({ id: 'OOE-PHC-000012-AB', patientId: 'OOE-PHC-000012-AB', fullName: 'Ngozi Okoro', ageYears: 58, createdOn: '2026-09-01T09:00:00Z' });
-const ibrahim = patient({ id: 'OOE-PHC-000231-T4', patientId: 'OOE-PHC-000231-T4', fullName: 'Ibrahim Musa', sex: 'male', ageYears: 34, phone: '0805 111 2222', createdOn: '2026-09-20T09:00:00Z' });
+const mother = patient({
+  id: 'OOE-PHC-000012-AB',
+  patientId: 'OOE-PHC-000012-AB',
+  fullName: 'Ngozi Okoro',
+  ageYears: 58,
+  createdOn: '2026-09-01T09:00:00Z',
+});
+const ibrahim = patient({
+  id: 'OOE-PHC-000231-T4',
+  patientId: 'OOE-PHC-000231-T4',
+  fullName: 'Ibrahim Musa',
+  sex: 'male',
+  ageYears: 34,
+  phone: '0805 111 2222',
+  createdOn: '2026-09-20T09:00:00Z',
+});
 
 const registering = (overrides: Partial<PatientDetails>): PatientDetails => ({
   fullName: 'Amaka Okoro',
@@ -39,8 +59,12 @@ const registering = (overrides: Partial<PatientDetails>): PatientDetails => ({
 
 describe('the duplicate check', () => {
   it('does not treat temporary provisional labels as evidence of identity', () => {
-    expect(findLikelyMatches(registering({ identityStatus: 'provisional' }), [amaka], NOW)).toEqual([]);
-    expect(findLikelyMatches(registering({}), [{ ...amaka, identityStatus: 'provisional' }], NOW)).toEqual([]);
+    expect(findLikelyMatches(registering({ identityStatus: 'provisional' }), [amaka], NOW)).toEqual(
+      [],
+    );
+    expect(
+      findLikelyMatches(registering({}), [{ ...amaka, identityStatus: 'provisional' }], NOW),
+    ).toEqual([]);
   });
   it('flags the same name, sex and a close age as the same person', () => {
     const [match] = findLikelyMatches(registering({}), [amaka, ibrahim], NOW);
@@ -59,7 +83,11 @@ describe('the duplicate check', () => {
   it('puts a phone match first, however the number was written', () => {
     expect(phoneKey('+234 803 555 0147')).toBe(phoneKey('0803 555 0147'));
 
-    const [match] = findLikelyMatches(registering({ ageYears: 40, phone: '2348035550147' }), [amaka], NOW);
+    const [match] = findLikelyMatches(
+      registering({ ageYears: 40, phone: '2348035550147' }),
+      [amaka],
+      NOW,
+    );
     expect(match.reasons).toContain('phone');
   });
 
@@ -77,7 +105,12 @@ describe('the duplicate check', () => {
 
   it('ages a patient registered by age, and uses the date of birth when there is one', () => {
     expect(currentAge({ ageYears: 30, createdOn: '2023-10-01T00:00:00Z' }, NOW)).toBe(33);
-    expect(currentAge({ dateOfBirth: '1990-01-01', ageYears: 99, createdOn: '2026-01-01T00:00:00Z' }, NOW)).toBe(36);
+    expect(
+      currentAge(
+        { dateOfBirth: '1990-01-01', ageYears: 99, createdOn: '2026-01-01T00:00:00Z' },
+        NOW,
+      ),
+    ).toBe(36);
   });
 });
 
@@ -85,7 +118,12 @@ describe('patient search', () => {
   const everyone = [amaka, mother, ibrahim];
 
   it('finds an old paper folder and an exact NIN, and keeps ambiguous short numbers visible', () => {
-    const alias = patient({ id: 'OOE-PHC-000047-AB', patientId: 'OOE-PHC-000047-AB', legacyPaperRef: '2023/1187', nin: '12345678901' });
+    const alias = patient({
+      id: 'OOE-PHC-000047-AB',
+      patientId: 'OOE-PHC-000047-AB',
+      legacyPaperRef: '2023/1187',
+      nin: '12345678901',
+    });
     expect(searchPatients([amaka, alias], '2023/1187', 'OOE-PHC')).toEqual([alias]);
     expect(searchPatients([amaka, alias], '12345678901', 'OOE-PHC')).toEqual([alias]);
     expect(searchPatients([amaka, alias], '47', 'OOE-PHC')).toHaveLength(2);
@@ -107,6 +145,10 @@ describe('patient search', () => {
   });
 
   it('lists the most recently registered first when nothing is typed', () => {
-    expect(searchPatients(everyone, '  ', 'OOE-PHC').map((found) => found.fullName)).toEqual(['Amaka Okoro', 'Ibrahim Musa', 'Ngozi Okoro']);
+    expect(searchPatients(everyone, '  ', 'OOE-PHC').map((found) => found.fullName)).toEqual([
+      'Amaka Okoro',
+      'Ibrahim Musa',
+      'Ngozi Okoro',
+    ]);
   });
 });

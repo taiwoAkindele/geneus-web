@@ -21,7 +21,12 @@ const encounter: Encounter = {
 
 describe('visit list next actions', () => {
   it('matches the current task after earlier sections were skipped', () => {
-    const diagnosis = entry('diagnosis', { diagnosis: 'Recorded diagnosis', prescription: [], giveInjection: false, admit: false });
+    const diagnosis = entry('diagnosis', {
+      diagnosis: 'Recorded diagnosis',
+      prescription: [],
+      giveInjection: false,
+      admit: false,
+    });
     const summary = summariseEncounter(encounter, [diagnosis]);
     // A visit begun in the retired order continues in the current one: treatment decisions follow the diagnosis.
     expect(summary.nextAction).toBe('Prescription');
@@ -34,7 +39,11 @@ describe('visit list next actions', () => {
 });
 
 let minute = 0;
-const entry = (step: EncounterEntry['step'], values: Record<string, unknown>, extra: Partial<EncounterEntry> = {}): EncounterEntry => {
+const entry = (
+  step: EncounterEntry['step'],
+  values: Record<string, unknown>,
+  extra: Partial<EncounterEntry> = {},
+): EncounterEntry => {
   minute += 1;
   return {
     id: `encounter_entry:${step}-${minute}`,
@@ -53,7 +62,11 @@ const entry = (step: EncounterEntry['step'], values: Record<string, unknown>, ex
   };
 };
 
-const project = (entries: EncounterEntry[], draft: EncounterData = EMPTY_ENCOUNTER_DATA, skippedNow: StepKey[] = []) =>
+const project = (
+  entries: EncounterEntry[],
+  draft: EncounterData = EMPTY_ENCOUNTER_DATA,
+  skippedNow: StepKey[] = [],
+) =>
   projectEncounter({
     patientId: encounter.patientId,
     encounter,
@@ -65,20 +78,61 @@ const project = (entries: EncounterEntry[], draft: EncounterData = EMPTY_ENCOUNT
 
 describe('section values', () => {
   it('round-trips separate prescription fields and structured diagnoses without flattening them', () => {
-    const data: EncounterData = { ...EMPTY_ENCOUNTER_DATA, diagnosis: { dx: 'Hypertension', code: 'I10', codingSystem: 'ICD-10', certainty: 'suspected', diagnoses: [{ label: 'Other condition', certainty: 'unknown' }], rx: [{ name: 'Medicine', dose: '1 tablet', frequency: 'daily', duration: '7 days', route: 'oral', quantity: '7' }], injection: false, admit: false } };
+    const data: EncounterData = {
+      ...EMPTY_ENCOUNTER_DATA,
+      diagnosis: {
+        dx: 'Hypertension',
+        code: 'I10',
+        codingSystem: 'ICD-10',
+        certainty: 'suspected',
+        diagnoses: [{ label: 'Other condition', certainty: 'unknown' }],
+        rx: [
+          {
+            name: 'Medicine',
+            dose: '1 tablet',
+            frequency: 'daily',
+            duration: '7 days',
+            route: 'oral',
+            quantity: '7',
+          },
+        ],
+        injection: false,
+        admit: false,
+      },
+    };
     const values = toStepValues('diagnosis', data);
-    expect(values.prescription).toEqual([{ drug: 'Medicine', dose: '1 tablet', frequency: 'daily', duration: '7 days', route: 'oral', quantity: 7 }]);
-    expect(fromStepValues('diagnosis', values, EMPTY_ENCOUNTER_DATA).diagnosis).toEqual(data.diagnosis);
+    expect(values.prescription).toEqual([
+      {
+        drug: 'Medicine',
+        dose: '1 tablet',
+        frequency: 'daily',
+        duration: '7 days',
+        route: 'oral',
+        quantity: 7,
+      },
+    ]);
+    expect(fromStepValues('diagnosis', values, EMPTY_ENCOUNTER_DATA).diagnosis).toEqual(
+      data.diagnosis,
+    );
     expect(stepProblems('diagnosis', data)).toEqual([]);
   });
   it('allows a structured progress note without forcing a duplicate free-text note', () => {
-    const data = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: '', note: '', assessment: 'Symptoms improving', plan: 'Review progress' } };
+    const data = {
+      ...EMPTY_ENCOUNTER_DATA,
+      complaint: { text: '', note: '', assessment: 'Symptoms improving', plan: 'Review progress' },
+    };
     expect(stepProblems('complaint', data)).toEqual([]);
-    expect(fromStepValues('complaint', toStepValues('complaint', data), EMPTY_ENCOUNTER_DATA).complaint.assessment).toBe('Symptoms improving');
+    expect(
+      fromStepValues('complaint', toStepValues('complaint', data), EMPTY_ENCOUNTER_DATA).complaint
+        .assessment,
+    ).toBe('Symptoms improving');
   });
 
   it('reads blood pressure as two numbers and leaves blank vitals out', () => {
-    const data = { ...EMPTY_ENCOUNTER_DATA, vitals: { temp: '38.9', bp: '118 / 76', pulse: '', weight: '', spo2: '' } };
+    const data = {
+      ...EMPTY_ENCOUNTER_DATA,
+      vitals: { temp: '38.9', bp: '118 / 76', pulse: '', weight: '', spo2: '' },
+    };
 
     expect(toStepValues('vitals', data)).toEqual({
       temperatureC: 38.9,
@@ -91,9 +145,14 @@ describe('section values', () => {
   });
 
   it('explains what to fix in words, not in field names', () => {
-    const unreadable = { ...EMPTY_ENCOUNTER_DATA, vitals: { ...EMPTY_ENCOUNTER_DATA.vitals, bp: '118' } };
+    const unreadable = {
+      ...EMPTY_ENCOUNTER_DATA,
+      vitals: { ...EMPTY_ENCOUNTER_DATA.vitals, bp: '118' },
+    };
 
-    expect(stepProblems('vitals', EMPTY_ENCOUNTER_DATA)).toEqual(['Record at least one vital sign']);
+    expect(stepProblems('vitals', EMPTY_ENCOUNTER_DATA)).toEqual([
+      'Record at least one vital sign',
+    ]);
     expect(stepProblems('vitals', unreadable)).toEqual(['Check blood pressure (e.g. 120/80)']);
     expect(stepProblems('lab_order', EMPTY_ENCOUNTER_DATA)[0]).toMatch(/skip this step/);
   });
@@ -101,35 +160,69 @@ describe('section values', () => {
   it('asks why a prescribed drug was not handed over', () => {
     const data = {
       ...EMPTY_ENCOUNTER_DATA,
-      diagnosis: { ...EMPTY_ENCOUNTER_DATA.diagnosis, rx: [{ name: 'Paracetamol', dose: '500mg' }] },
+      diagnosis: {
+        ...EMPTY_ENCOUNTER_DATA.diagnosis,
+        rx: [{ name: 'Paracetamol', dose: '500mg' }],
+      },
     };
 
     expect(stepProblems('dispense', data)).toEqual(['Give a reason for anything not dispensed']);
-    expect(stepProblems('dispense', { ...data, dispense: { done: {}, reasons: { 0: 'Out of stock' } } })).toEqual([]);
+    expect(
+      stepProblems('dispense', { ...data, dispense: { done: {}, reasons: { 0: 'Out of stock' } } }),
+    ).toEqual([]);
   });
 
   it('saves complaints as typed, in the patient’s words, chief complaint first', () => {
-    const typed = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: '  pain when passing urine for 2 days ', note: '' } };
+    const typed = {
+      ...EMPTY_ENCOUNTER_DATA,
+      complaint: { text: '  pain when passing urine for 2 days ', note: '' },
+    };
 
-    expect(toStepValues('complaint', typed)).toEqual({ complaints: ['pain when passing urine for 2 days'], note: undefined });
-    expect(stepProblems('complaint', EMPTY_ENCOUNTER_DATA)).toEqual(['Record a complaint or a clinical note']);
-    const withOthers = { ...EMPTY_ENCOUNTER_DATA, complaint: { text: 'Fever for 3 days', others: 'Headache\n\n  Cough for a week ', note: '' } };
-    expect(toStepValues('complaint', withOthers)).toEqual({ complaints: ['Fever for 3 days', 'Headache', 'Cough for a week'], note: undefined });
+    expect(toStepValues('complaint', typed)).toEqual({
+      complaints: ['pain when passing urine for 2 days'],
+      note: undefined,
+    });
+    expect(stepProblems('complaint', EMPTY_ENCOUNTER_DATA)).toEqual([
+      'Record a complaint or a clinical note',
+    ]);
+    const withOthers = {
+      ...EMPTY_ENCOUNTER_DATA,
+      complaint: { text: 'Fever for 3 days', others: 'Headache\n\n  Cough for a week ', note: '' },
+    };
+    expect(toStepValues('complaint', withOthers)).toEqual({
+      complaints: ['Fever for 3 days', 'Headache', 'Cough for a week'],
+      note: undefined,
+    });
   });
 
   it('reads the first saved complaint as the chief complaint and keeps the rest', () => {
-    const read = fromStepValues('complaint', { complaints: ['Fever', 'Headache', 'Cough'] }, EMPTY_ENCOUNTER_DATA).complaint;
+    const read = fromStepValues(
+      'complaint',
+      { complaints: ['Fever', 'Headache', 'Cough'] },
+      EMPTY_ENCOUNTER_DATA,
+    ).complaint;
     expect(read.text).toBe('Fever');
     expect(read.others).toBe('Headache\nCough');
-    expect(toStepValues('complaint', { ...EMPTY_ENCOUNTER_DATA, complaint: read })).toEqual({ complaints: ['Fever', 'Headache', 'Cough'], note: undefined });
+    expect(toStepValues('complaint', { ...EMPTY_ENCOUNTER_DATA, complaint: read })).toEqual({
+      complaints: ['Fever', 'Headache', 'Cough'],
+      note: undefined,
+    });
     // A visit saved with one free-text complaint reads back unchanged.
-    expect(fromStepValues('complaint', { complaints: ['Fever, headache'] }, EMPTY_ENCOUNTER_DATA).complaint).toEqual({ text: 'Fever, headache', note: '' });
+    expect(
+      fromStepValues('complaint', { complaints: ['Fever, headache'] }, EMPTY_ENCOUNTER_DATA)
+        .complaint,
+    ).toEqual({ text: 'Fever, headache', note: '' });
   });
 
   it('reads a saved section back exactly as it was entered', () => {
-    const data = { ...EMPTY_ENCOUNTER_DATA, vitals: { temp: '37.5', bp: '120/80', pulse: '72', weight: '60', spo2: '98' } };
+    const data = {
+      ...EMPTY_ENCOUNTER_DATA,
+      vitals: { temp: '37.5', bp: '120/80', pulse: '72', weight: '60', spo2: '98' },
+    };
 
-    expect(fromStepValues('vitals', toStepValues('vitals', data), EMPTY_ENCOUNTER_DATA).vitals).toEqual(data.vitals);
+    expect(
+      fromStepValues('vitals', toStepValues('vitals', data), EMPTY_ENCOUNTER_DATA).vitals,
+    ).toEqual(data.vitals);
   });
 });
 
@@ -158,21 +251,30 @@ describe('the encounter on screen', () => {
   });
 
   it('marks sections passed over before a later save as skipped, without writing them', () => {
-    const state = project([entry('vitals', { temperatureC: 37 }), entry('diagnosis', { diagnosis: 'Malaria' })]);
+    const state = project([
+      entry('vitals', { temperatureC: 37 }),
+      entry('diagnosis', { diagnosis: 'Malaria' }),
+    ]);
 
     expect(state.skipped).toEqual(['complaint', 'investigation_review']);
     expect(state.entries.lab_order).toBeUndefined();
   });
 
   it('moves past a section skipped now', () => {
-    const state = project([entry('vitals', { temperatureC: 37 })], EMPTY_ENCOUNTER_DATA, ['complaint']);
+    const state = project([entry('vitals', { temperatureC: 37 })], EMPTY_ENCOUNTER_DATA, [
+      'complaint',
+    ]);
 
     expect(state.activeIndex).toBe(2);
     expect(state.skipped).toEqual(['complaint']);
   });
 
   it('grows the tail from the saved plan and closes on the closing step', () => {
-    const plan = entry('diagnosis', { diagnosis: 'Malaria', prescription: [{ drug: 'ACT', dose: '1 tab' }], admit: true });
+    const plan = entry('diagnosis', {
+      diagnosis: 'Malaria',
+      prescription: [{ drug: 'ACT', dose: '1 tab' }],
+      admit: true,
+    });
     const admitted = project([
       plan,
       entry('dispense', { lines: [{ drug: 'ACT', dispensed: true }] }),
@@ -186,7 +288,10 @@ describe('the encounter on screen', () => {
 
   it('shows an amendment beside the section it corrects, and logs it', () => {
     const vitals = entry('vitals', { temperatureC: 38.9 });
-    const state = project([vitals, entry('amendment', { note: 'Was 37.9' }, { amends: vitals.id })]);
+    const state = project([
+      vitals,
+      entry('amendment', { note: 'Was 37.9' }, { amends: vitals.id }),
+    ]);
 
     expect(state.amend.vitals?.[0]?.note).toBe('Was 37.9');
     expect(state.data.vitals.temp).toBe('38.9');
@@ -200,8 +305,21 @@ describe('the encounter on screen', () => {
 
 describe('encounter list cards', () => {
   it('uses corrected values in the record, encounter summary and pharmacy queue', () => {
-    const diagnosis = entry('diagnosis', { diagnosis: 'Initial', prescription: [{ drug: 'Old medicine', dose: '1' }] });
-    const correction = entry('amendment', { note: 'Corrected diagnosis and prescription', correctedValues: { diagnosis: 'Corrected', prescription: [{ drug: 'Correct medicine', dose: '2' }] } }, { amends: diagnosis.id });
+    const diagnosis = entry('diagnosis', {
+      diagnosis: 'Initial',
+      prescription: [{ drug: 'Old medicine', dose: '1' }],
+    });
+    const correction = entry(
+      'amendment',
+      {
+        note: 'Corrected diagnosis and prescription',
+        correctedValues: {
+          diagnosis: 'Corrected',
+          prescription: [{ drug: 'Correct medicine', dose: '2' }],
+        },
+      },
+      { amends: diagnosis.id },
+    );
     expect(project([diagnosis, correction]).data.diagnosis.dx).toBe('Corrected');
     expect(summariseEncounter(encounter, [diagnosis, correction]).title).toBe('Corrected');
     expect(stationQueues([diagnosis, correction]).pharmacy[0].detail).toBe('Correct medicine');
@@ -224,7 +342,12 @@ describe('encounter list cards', () => {
       entry('diagnosis', { diagnosis: 'Malaria' }),
     ]);
 
-    expect(card).toMatchObject({ status: 'Open', title: 'Malaria', chips: ['38.9°C', '118/76', '2 tests'], label: 'ENC-ABC123' });
+    expect(card).toMatchObject({
+      status: 'Open',
+      title: 'Malaria',
+      chips: ['38.9°C', '118/76', '2 tests'],
+      label: 'ENC-ABC123',
+    });
   });
 
   it('is closed once a follow-up is saved, with or without a review booked', () => {
@@ -233,26 +356,47 @@ describe('encounter list cards', () => {
 });
 
 describe('station queues', () => {
-  const inEncounter = (encounterId: string, step: EncounterEntry['step'], values: Record<string, unknown>) =>
-    entry(step, values, { encounterId });
+  const inEncounter = (
+    encounterId: string,
+    step: EncounterEntry['step'],
+    values: Record<string, unknown>,
+  ) => entry(step, values, { encounterId });
 
   it('puts an ordered test in the lab queue until its results are saved', () => {
     const order = inEncounter('encounter:a', 'lab_order', { tests: ['Malaria RDT', 'FBC'] });
 
     expect(stationQueues([order]).lab).toEqual([
-      { encounterId: 'encounter:a', patientId: encounter.patientId, waitingSince: order.createdOn, detail: 'Malaria RDT, FBC' },
+      {
+        encounterId: 'encounter:a',
+        patientId: encounter.patientId,
+        waitingSince: order.createdOn,
+        detail: 'Malaria RDT, FBC',
+      },
     ]);
-    const withResults = stationQueues([order, inEncounter('encounter:a', 'lab_results', { results: [{ test: 'FBC', result: 'Normal' }] })]);
+    const withResults = stationQueues([
+      order,
+      inEncounter('encounter:a', 'lab_results', { results: [{ test: 'FBC', result: 'Normal' }] }),
+    ]);
     expect(withResults.lab.map((queued) => queued.detail)).toEqual(['Malaria RDT']);
     expect(withResults.results.map((queued) => queued.encounterId)).toEqual(['encounter:a']);
   });
 
   it('sends a prescription to the pharmacy until it is dispensed, and nothing without one', () => {
-    const prescribed = inEncounter('encounter:b', 'diagnosis', { diagnosis: 'Malaria', prescription: [{ drug: 'ACT', dose: '1 tab' }] });
+    const prescribed = inEncounter('encounter:b', 'diagnosis', {
+      diagnosis: 'Malaria',
+      prescription: [{ drug: 'ACT', dose: '1 tab' }],
+    });
     const noDrugs = inEncounter('encounter:c', 'diagnosis', { diagnosis: 'Viral fever' });
 
-    expect(stationQueues([prescribed, noDrugs]).pharmacy.map((queued) => queued.detail)).toEqual(['ACT']);
-    expect(stationQueues([prescribed, inEncounter('encounter:b', 'dispense', { lines: [{ drug: 'ACT', dispensed: true }] })]).pharmacy).toEqual([]);
+    expect(stationQueues([prescribed, noDrugs]).pharmacy.map((queued) => queued.detail)).toEqual([
+      'ACT',
+    ]);
+    expect(
+      stationQueues([
+        prescribed,
+        inEncounter('encounter:b', 'dispense', { lines: [{ drug: 'ACT', dispensed: true }] }),
+      ]).pharmacy,
+    ).toEqual([]);
   });
 
   it('retains pending work after consultation closure, and lists the longest wait first', () => {
@@ -260,7 +404,16 @@ describe('station queues', () => {
     const late = inEncounter('encounter:e', 'lab_order', { tests: ['FBC'] });
     const closed = inEncounter('encounter:f', 'lab_order', { tests: ['RDT'] });
 
-    const queues = stationQueues([late, closed, early, inEncounter('encounter:f', 'follow_up', {})]);
-    expect(queues.lab.map((queued) => queued.encounterId)).toEqual(['encounter:d', 'encounter:e', 'encounter:f']);
+    const queues = stationQueues([
+      late,
+      closed,
+      early,
+      inEncounter('encounter:f', 'follow_up', {}),
+    ]);
+    expect(queues.lab.map((queued) => queued.encounterId)).toEqual([
+      'encounter:d',
+      'encounter:e',
+      'encounter:f',
+    ]);
   });
 });

@@ -18,8 +18,13 @@ type Props = {
 
 const Req = ({ on }: { on?: boolean }) => (on ? <span className="text-danger"> *</span> : null);
 /** Contract values may be numbers (e.g. from synced docs); inputs need text. */
-const asText = (v: EntryValue | undefined): string =>
-  typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
+const asText = (v: EntryValue | undefined): string => {
+  if (typeof v === 'string') {
+    return v;
+  }
+
+  return typeof v === 'number' ? String(v) : '';
+};
 const Help = ({ text }: { text?: string }) =>
   text && text.trim() ? <div className="mt-1.5 text-[12px] text-ink-muted">{text}</div> : null;
 
@@ -36,19 +41,31 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
   }
 
   if (isChoice(field.type)) {
-    const options = field.options && field.options.length ? field.options : ['Option 1', 'Option 2'];
+    const options =
+      field.options && field.options.length ? field.options : ['Option 1', 'Option 2'];
     const multi = field.type === 'multiselect';
     const arr = Array.isArray(value) ? value : [];
     const single = typeof value === 'string' ? value : '';
     const radius = multi ? 'rounded-[8px]' : 'rounded-full';
     const pick = (o: string) => {
-      if (!onChange) return;
-      if (multi) onChange(arr.includes(o) ? arr.filter((x) => x !== o) : [...arr, o]);
-      else onChange(o);
+      if (!onChange) {
+        return;
+      }
+      if (multi) {
+        onChange(arr.includes(o) ? arr.filter((x) => x !== o) : [...arr, o]);
+      } else {
+        onChange(o);
+      }
     };
     return (
-      <fieldset aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}>
-        <legend className="mb-2 text-[13px] font-semibold text-ink-soft">{label}<Req on={field.required} /></legend>
+      <fieldset
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+      >
+        <legend className="mb-2 text-[13px] font-semibold text-ink-soft">
+          {label}
+          <Req on={field.required} />
+        </legend>
         <div className="flex flex-wrap gap-2">
           {options.map((o) => {
             const on = multi ? arr.includes(o) : single === o;
@@ -67,7 +84,11 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
           })}
         </div>
         <Help text={field.help} />
-        {error ? <p id={errorId} className="mt-1 text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <p id={errorId} className="mt-1 text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
       </fieldset>
     );
   }
@@ -75,8 +96,16 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
   if (field.type === 'checkbox') {
     return (
       <div className="flex items-center gap-3">
-        <ToggleSwitch checked={value === true} disabled={preview} ariaLabel={label} onChange={(v) => onChange?.(v)} />
-        <span className="text-sm font-semibold text-ink-soft">{label}<Req on={field.required} /></span>
+        <ToggleSwitch
+          checked={value === true}
+          disabled={preview}
+          ariaLabel={label}
+          onChange={(v) => onChange?.(v)}
+        />
+        <span className="text-sm font-semibold text-ink-soft">
+          {label}
+          <Req on={field.required} />
+        </span>
       </div>
     );
   }
@@ -85,7 +114,15 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
     return (
       <div>
         {preview ? (
-          <><div className="mb-1.5 text-[13px] font-semibold text-ink-soft">{label}<Req on={field.required} /></div><div className="rounded-field border-[1.5px] border-outline bg-surface-muted px-3 py-3 text-sm text-ink-muted">{PLACEHOLDERS.textarea}</div></>
+          <>
+            <div className="mb-1.5 text-[13px] font-semibold text-ink-soft">
+              {label}
+              <Req on={field.required} />
+            </div>
+            <div className="rounded-field border-[1.5px] border-outline bg-surface-muted px-3 py-3 text-sm text-ink-muted">
+              {PLACEHOLDERS.textarea}
+            </div>
+          </>
         ) : (
           <TextAreaField
             label={label}
@@ -108,7 +145,10 @@ export const RegisterField = ({ field, value, onChange, preview, error }: Props)
   if (preview) {
     return (
       <div>
-        <div className="mb-1.5 text-[13px] font-semibold text-ink-soft">{label}<Req on={field.required} /></div>
+        <div className="mb-1.5 text-[13px] font-semibold text-ink-soft">
+          {label}
+          <Req on={field.required} />
+        </div>
         <div className="rounded-field border-[1.5px] border-outline bg-surface-muted px-3 py-3 text-sm text-ink-muted">
           {PLACEHOLDERS[field.type] ?? 'Type here…'}
         </div>

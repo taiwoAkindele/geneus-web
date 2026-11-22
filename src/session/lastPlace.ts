@@ -11,13 +11,20 @@ let last: Place | undefined;
 const NOT_A_PLACE = /^\/(login|onboarding|home$)/;
 
 export const rememberPlace = (staffId: string, facilityId: string, path: string): void => {
-  if (NOT_A_PLACE.test(path)) return;
+  if (NOT_A_PLACE.test(path)) {
+    return;
+  }
   last = { staffId, facilityId, path };
 };
 
 /** The remembered path for exactly this person at this facility; cleared once read. */
-export const takePlace = (staffId: string | null | undefined, facilityId: string): string | undefined => {
+export const takePlace = (
+  staffId: string | null | undefined,
+  facilityId: string,
+): string | undefined => {
   const place = last;
   last = undefined;
-  return place && staffId && place.staffId === staffId && place.facilityId === facilityId ? place.path : undefined;
+  return place && staffId && place.staffId === staffId && place.facilityId === facilityId
+    ? place.path
+    : undefined;
 };

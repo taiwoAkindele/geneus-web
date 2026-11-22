@@ -12,20 +12,46 @@ import { ApiError, post, postAsDevice } from './client';
 /** As the enrolled device, for `issuedBy`, who must hold `device:enroll` (checked by the server). */
 export const issueEnrollmentCode = (issuedBy: string): Promise<EnrollmentCode> => {
   const device = getDeviceCredential();
-  if (!device) return Promise.reject(new ApiError('not_enrolled', 'This device is not enrolled with a facility'));
+  if (!device) {
+    return Promise.reject(
+      new ApiError('not_enrolled', 'This device is not enrolled with a facility'),
+    );
+  }
   return postAsDevice<EnrollmentCode>('/devices/codes', device.credential, { issuedBy });
 };
 
 /** Codes are read aloud and typed on a phone, so spaces and case do not matter. */
-export const normalizeEnrollmentCode = (code: string): string => code.replace(/[\s-]+/g, '').toUpperCase();
+export const normalizeEnrollmentCode = (code: string): string =>
+  code.replace(/[\s-]+/g, '').toUpperCase();
 
 /** As the joining device: the code alone decides the facility. */
-export const joinFacility = (code: string, deviceId: string, deviceLabel?: string): Promise<DeviceCredential> =>
-  post<DeviceCredential>('/devices', { code: normalizeEnrollmentCode(code), deviceId, deviceLabel: deviceLabel?.trim() || undefined });
+export const joinFacility = (
+  code: string,
+  deviceId: string,
+  deviceLabel?: string,
+): Promise<DeviceCredential> =>
+  post<DeviceCredential>('/devices', {
+    code: normalizeEnrollmentCode(code),
+    deviceId,
+    deviceLabel: deviceLabel?.trim() || undefined,
+  });
 
 /** Online only; the server rechecks the actor and facility before revoking. */
-export const revokeFacilityDevice = async (id: string, revokedBy: string, wipe: boolean, acceptUnsentWork = false): Promise<Device> => {
+export const revokeFacilityDevice = async (
+  id: string,
+  revokedBy: string,
+  wipe: boolean,
+  acceptUnsentWork = false,
+): Promise<Device> => {
   const device = getDeviceCredential();
-  if (!device) throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
-  return Device.parse(await postAsDevice(`/devices/${encodeURIComponent(id)}/revoke`, device.credential, { revokedBy, wipe, ...(acceptUnsentWork ? { acceptUnsentWork: true } : {}) }));
+  if (!device) {
+    throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
+  }
+  return Device.parse(
+    await postAsDevice(`/devices/${encodeURIComponent(id)}/revoke`, device.credential, {
+      revokedBy,
+      wipe,
+      ...(acceptUnsentWork ? { acceptUnsentWork: true } : {}),
+    }),
+  );
 };
