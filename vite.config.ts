@@ -73,6 +73,9 @@ export default defineConfig(({ command, mode }) => {
           globPatterns: ['**/*.{html,js,css,woff2,svg,png}', SQLITE_WASM],
           maximumFileSizeToCacheInBytes: MAX_PRECACHED_FILE_BYTES,
           navigateFallback: 'index.html',
+          // Patient links (/p/...) always load fresh from the network: a phone or browser still running an older
+          // cached version of the staff app must never open them as the staff app.
+          navigateFallbackDenylist: [/^\/p\//],
           runtimeCaching: [
             {
               // The plaintext build, opened only by a device still retiring its
