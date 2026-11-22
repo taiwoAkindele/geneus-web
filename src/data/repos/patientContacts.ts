@@ -1,4 +1,4 @@
-import { currentPatientContact, emailAddress, type AuthorizationContext, type PatientContact } from '@shared';
+import { currentPatientContact, emailAddress, type AuthorizationContext, type PatientContact, type PatientMessage } from '@shared';
 import { allOfType, allWhere, envelope, insertRecord, newId, type NewRecord } from '../db';
 import { TABLE_FOR } from '../tables';
 
@@ -54,4 +54,15 @@ export const currentContactsByPatient = async (): Promise<Map<string, PatientCon
   const byPatient = new Map<string, PatientContact[]>();
   for (const c of await allOfType<PatientContact>('patient_contact')) byPatient.set(c.patientId, [...(byPatient.get(c.patientId) ?? []), c]);
   return new Map([...byPatient].flatMap(([id, records]) => { const head = currentPatientContact(records, id); return head ? [[id, head] as const] : []; }));
+};
+
+/** Every send of one bill (its key) or receipt (its payment id) to the patient, oldest first. */
+export const messagesFor = async (subject: string) =>
+  (await allWhere<PatientMessage>('patient_message', 'subject', subject)).sort((a, b) => a.createdOn.localeCompare(b.createdOn));
+
+/** How a send reads in Activity, e.g. "Bill sent by email to a***@gmail.com" and its outcome. */
+export const messageActivity = (m: PatientMessage) => {
+  const what = `${m.kind === 'bill' ? 'Bill' : 'Receipt'} ${m.automatic ? 'sent automatically' : 'sent'} by ${m.channel === 'sms' ? 'SMS' : 'email'} to ${m.to}`;
+  const outcome = m.status === 'delivered' ? 'Delivered' : m.status === 'sent' ? 'Sent' : m.status === 'failed' ? `Not sent: ${m.reason ?? 'try again'}` : m.attempts ? 'Not sent yet, trying again' : 'Sending…';
+  return { text: `${what} · ${outcome}`, failed: m.status === 'failed' };
 };

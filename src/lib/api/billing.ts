@@ -1,4 +1,4 @@
-import type { AuthorizationContext, Payment, PaymentAllocation } from '@shared';
+import type { AuthorizationContext, DocumentLinkRequest, DocumentLinkResponse, DocumentLinkStopResponse, Payment, PaymentAllocation, SendToPatientRequest, SendToPatientResponse } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, staffRequest } from './client';
 import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
@@ -30,3 +30,13 @@ export type ProviderDescriptor = {
   accountFields: { key: string; label: string; type: 'email' | 'tel' | 'text' | 'select'; pattern?: string; help?: string; sensitive?: boolean; options?: { value: string; label: string }[] }[];
   can: { createAccount: boolean; listAccounts: boolean; verifyByReference: boolean };
 };
+
+/** A link the patient opens without signing in: their bill or a receipt. Bill links last 30 days, receipts a year. */
+export const patientDocumentLink = (context: AuthorizationContext, request: DocumentLinkRequest) =>
+  billingRequest<DocumentLinkResponse>(context, 'documents/link', request);
+/** Stops every open patient link to this bill or receipt. */
+export const stopPatientDocumentLinks = (context: AuthorizationContext, request: DocumentLinkRequest) =>
+  billingRequest<DocumentLinkStopResponse>(context, 'documents/stop', request);
+/** Sends a bill or receipt to the patient by SMS and/or email; each send then appears as a synced patient message. */
+export const sendToPatient = (context: AuthorizationContext, request: SendToPatientRequest) =>
+  billingRequest<SendToPatientResponse>(context, 'documents/send', request);

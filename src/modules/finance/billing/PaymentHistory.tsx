@@ -61,10 +61,17 @@ export const PaymentHistory = ({ data, bills, onOpenBill, onReceipt, onLink, onC
   return <div className="space-y-4">
     <PageHeader title="Payment history">{canReceive ? <Button variant="ghost" fullWidth={false} onClick={() => setChecking(true)}>Check a transfer reference</Button> : null}</PageHeader>
 
-    {canReceive && toLink.length ? <section aria-label="Bank transfers not linked to a bill" className="rounded-card border border-amber-border bg-amber-bg p-4 text-amber-text">
-      <h2 className="font-bold">{toLink.length === 1 ? '1 bank transfer isn\'t linked to a bill yet' : `${toLink.length} bank transfers aren't linked to a bill yet`}</h2>
+    {canReceive && toLink.length ? <section aria-label="Payments not linked to a bill" className="rounded-card border border-amber-border bg-amber-bg p-4 text-amber-text">
+      <h2 className="font-bold">{toLink.length === 1 ? '1 payment isn\'t linked to a bill yet' : `${toLink.length} payments aren't linked to a bill yet`}</h2>
       <ul className="mt-2 divide-y divide-amber-border">{(showAll ? toLink : toLink.slice(0, 3)).map((t) => <li key={t.transfer.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-        <span className="min-w-0 flex-1"><strong>{t.transfer.payerName ?? 'Bank transfer'}</strong> · {displayMoney(t.transfer.amountMinor, t.transfer.currency)} · {whenText(t.transfer.receivedOn)}<span className="block text-xs">{displayMoney(t.left, t.transfer.currency)} not yet applied{t.checked ? '' : ' (checked when you link it)'}{t.over ? ` · ${displayMoney(t.over, t.transfer.currency)} over-applied, needs reconciliation` : ''}</span></span>
+        <span className="min-w-0 flex-1">
+          <strong>{t.transfer.payerName ?? 'Payment received'}</strong> · {displayMoney(t.transfer.amountMinor, t.transfer.currency)} · {whenText(t.transfer.receivedOn)}
+          {t.transfer.channel === 'checkout' ? <span className="block text-xs">Paid online</span> : null}
+          <span className="block text-xs">
+            {displayMoney(t.left, t.transfer.currency)} not yet applied{t.checked ? '' : ' (checked when you link it)'}
+            {t.over ? ` · ${displayMoney(t.over, t.transfer.currency)} over-applied, needs reconciliation` : ''}
+          </span>
+        </span>
         {t.left > 0 ? <Button variant="outlined" fullWidth={false} onClick={() => onLink(t.transfer)}>Link to bill</Button> : null}
       </li>)}</ul>
       {toLink.length > 3 ? <Button variant="ghost" fullWidth={false} className="!px-0 !py-2" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${toLink.length}`}</Button> : null}

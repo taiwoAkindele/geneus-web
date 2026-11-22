@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { Payment } from '@shared';
 import { Button, Sheet, useToast } from '@/ui';
 import { formatMoney } from '@/lib/money';
-import { useSession } from '@/session';
+import { useAuthorizationContext, useSession } from '@/session';
+import { PatientLinkPanel, canMakePatientLinks } from './PatientLinkPanel';
 import type { BillingData } from './useBilling';
 import { displayMoney } from './billingUi';
 
@@ -12,12 +13,12 @@ import { displayMoney } from './billingUi';
  */
 export const Receipt = ({ payment, data, onClose, fresh = false, onNextPatient }: { payment: Payment; data: BillingData; onClose: () => void; fresh?: boolean; onNextPatient?: () => void }) => {
   const { facility } = useSession();
-  const toast = useToast();
+  const toast = useToast(), context = useAuthorizationContext();
   const patient = data.patients.find((p) => p.patientId === payment.patientId);
   const staff = data.staff.find((s) => s.staffId === payment.createdBy);
   const [printError, setPrintError] = useState('');
   const money = (n: number) => displayMoney(n, payment.currency);
-  const method = payment.method === 'cash' ? 'Cash' : payment.method === 'transfer' ? 'Bank transfer' : payment.method;
+  const method = payment.method === 'cash' ? 'Cash' : payment.method === 'transfer' ? 'Bank transfer' : payment.method === 'online' ? 'Paid online' : payment.method;
   const print = () => {
     const popup = window.open('', '_blank', 'width=500,height=650');
     if (!popup) { const message = 'The print window was blocked. Allow pop-ups for this app and try again. The payment is already recorded; do not record it again.'; setPrintError(message); toast(message, { tone: 'error' }); return; }
@@ -43,6 +44,7 @@ export const Receipt = ({ payment, data, onClose, fresh = false, onNextPatient }
         {payment.reference ? <p className="break-all text-sm text-ink-muted">Reference: {payment.reference}</p> : null}
       </div>
       <Button onClick={print}>{printError ? 'Print again' : 'Print receipt'}</Button>
+      {payment.method !== 'waiver' && canMakePatientLinks(context) ? <PatientLinkPanel label="receipt" patientId={payment.patientId} request={{ kind: 'receipt', paymentId: payment.id }} /> : null}
       {printError ? <p role="alert" className="text-sm text-danger">{printError}</p> : null}
       {fresh ? <div className="grid grid-cols-2 gap-2">{onNextPatient ? <Button variant="outlined" onClick={onNextPatient}>Next patient</Button> : null}<Button variant="outlined" onClick={onClose}>Back to bill</Button></div> : null}
     </div>

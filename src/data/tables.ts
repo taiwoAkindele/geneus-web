@@ -65,7 +65,7 @@ export const TABLE_FOR: Record<DocType, string> = {
   answer_list: 'answer_lists',
   standard_test: 'standard_tests',
   standard_template: 'standard_templates',
-  refund: 'refunds', payer: 'payers', cover_schedule: 'cover_schedules', patient_cover: 'patient_covers', patient_contact: 'patient_contacts',
+  refund: 'refunds', payer: 'payers', cover_schedule: 'cover_schedules', patient_cover: 'patient_covers', patient_contact: 'patient_contacts', patient_message: 'patient_messages',
   cover_check: 'cover_checks', coverage_election: 'coverage_elections', coverage_allocation: 'coverage_allocations',
   service_completion: 'service_completions',
 };

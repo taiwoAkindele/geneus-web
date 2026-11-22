@@ -53,6 +53,9 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
 export const workforceRequest = <T>(path: string, credential: string, token?: string, body?: unknown, method = body === undefined ? 'GET' : 'POST'): Promise<T> =>
   request<T>(path, { method, cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...(token ? { 'x-workforce-access': token } : {}), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
 
+/** The full address of a server path, for a plain link the browser opens itself (e.g. a PDF download). */
+export const apiUrl = (path: string): string => `${BASE_URL}${path}`;
+
 export const get = <T>(path: string): Promise<T> => request<T>(path, { method: 'GET' });
 
 export const post = <T>(path: string, body: unknown): Promise<T> =>

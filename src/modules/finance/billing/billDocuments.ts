@@ -1,10 +1,9 @@
-import type { Charge, Payment, IncomingTransfer, Refund } from '@shared';
+import { billKey, billReference, type Payment, type IncomingTransfer, type Refund } from '@shared';
 import { billingRows } from './ledger';
 import type { BillingData } from './useBilling';
 
-/** Presentation groups use explicit source identities, never coincident dates or amounts. */
-export const billKey = (c: Charge) => `${c.patientId}|${c.currency}|${c.billId ? `bill:${c.billId}` : c.encounterId ? `visit:${c.encounterId}` : c.appointmentId ? `appointment:${c.appointmentId}` : `charge:${c.id}`}`;
-export const billReference = (key: string) => `B-${key.split('|').slice(-1)[0].replace(/^[^:]+:/, '').slice(-12).toUpperCase()}`;
+/** The bill rules are shared with the server, so the patient's link names the same bill and reference. */
+export { billKey, billReference };
 export const billDocuments = (data: BillingData) => {
   const groups = new Map<string, ReturnType<typeof billingRows>>();
   for (const row of billingRows(data.charges, data.payments, data.adjustments, data.coverage)) {
@@ -48,7 +47,7 @@ export const historyDocuments = (payments: readonly Payment[], refunds: readonly
   ...payments.map(payment => ({ id: payment.id, at: payment.createdOn, currency: payment.currency, patientId: payment.patientId,
     amount: payment.reverses ? -payment.amountMinor : payment.amountMinor,
     kind: (payment.reverses ? 'reversal' : payment.method === 'waiver' ? 'waiver' : payment.method === 'cash' ? 'cash' : 'bank') as 'cash' | 'bank' | 'reversal' | 'waiver' | 'refund',
-    method: payment.reverses ? 'Reversal' : payment.method === 'cash' ? 'Cash' : payment.method === 'waiver' ? 'Waiver' : payment.method === 'transfer' ? 'Bank transfer' : payment.method,
+    method: payment.reverses ? 'Reversal' : payment.method === 'cash' ? 'Cash' : payment.method === 'waiver' ? 'Waiver' : payment.method === 'transfer' ? 'Bank transfer' : payment.method === 'online' ? 'Paid online' : payment.method,
     reference: payment.receiptNumber, chargeIds: payment.allocations.map(a => a.chargeId), payment, refund: undefined as Refund | undefined })),
   ...refunds.map(refund => ({ id: refund.id, at: refund.createdOn, currency: refund.currency, patientId: refund.patientId, amount: -refund.amountMinor,
     kind: 'refund' as const, method: `Refund · ${refund.method}`, reference: refund.refundNumber, chargeIds: refund.allocations.map(a => a.chargeId),
