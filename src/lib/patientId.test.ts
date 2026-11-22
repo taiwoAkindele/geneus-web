@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PATIENT_ID_RE } from '@shared';
-import { MAX_SEQUENCE, mintPatientId, nextSequence, randomSafetyCode, sequenceOf } from './patientId';
+import {
+  MAX_SEQUENCE,
+  mintPatientId,
+  nextSequence,
+  randomSafetyCode,
+  sequenceOf,
+} from './patientId';
 
 describe('Patient ID minting', () => {
   it('numbers the next patient one above the highest this device can see', () => {
@@ -25,10 +31,14 @@ describe('Patient ID minting', () => {
   });
 
   it('never uses letters that read aloud ambiguously in the safety code', () => {
-    for (let i = 0; i < 200; i += 1) expect(randomSafetyCode()).toMatch(/^[A-HJ-NP-Z2-9]{2}$/);
+    for (let i = 0; i < 200; i += 1) {
+      expect(randomSafetyCode()).toMatch(/^[A-HJ-NP-Z2-9]{2}$/);
+    }
   });
 
   it('fails loudly rather than wrap when the numbers run out', () => {
-    expect(() => nextSequence('OOE', [`OOE-${MAX_SEQUENCE}-AB`])).toThrow(/every Patient ID number/);
+    expect(() => nextSequence('OOE', [`OOE-${MAX_SEQUENCE}-AB`])).toThrow(
+      /every Patient ID number/,
+    );
   });
 });

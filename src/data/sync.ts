@@ -1,4 +1,11 @@
-import { ensureFacilityWorkspace, forgetActiveWorkspace, listFacilityWorkspaces, holdWorkspaceTab, isWorkspaceSwitching, markWorkspacePrepared } from './facilityWorkspaces';
+import {
+  ensureFacilityWorkspace,
+  forgetActiveWorkspace,
+  listFacilityWorkspaces,
+  holdWorkspaceTab,
+  isWorkspaceSwitching,
+  markWorkspacePrepared,
+} from './facilityWorkspaces';
 import { getDeviceCredential } from './deviceCredential';
 import { createConnector } from './connector';
 import { databaseCatchingUp, destroyDatabases, openDatabase, type LocalDatabase } from './database';
@@ -23,7 +30,10 @@ const preparedListeners = new WeakSet<LocalDatabase>();
 const onDeenrolled = async (): Promise<void> => {
   await destroyDatabases();
   await forgetActiveWorkspace();
-  if (typeof window !== 'undefined') window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/onboarding/start');
+
+  if (typeof window !== 'undefined') {
+    window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/onboarding/start');
+  }
 };
 
 /**
@@ -32,18 +42,46 @@ const onDeenrolled = async (): Promise<void> => {
  */
 export const startSync = async (): Promise<LocalDatabase> => {
   const credential = getDeviceCredential();
-  if (credential) await ensureFacilityWorkspace(credential);
+
+  if (credential) {
+    await ensureFacilityWorkspace(credential);
+  }
+
   holdWorkspaceTab();
   const db = await openDatabase();
-  if (credential && db.currentStatus.hasSynced) await markWorkspacePrepared(credential.deviceId);
-  if (credential && !preparedListeners.has(db)) { preparedListeners.add(db); db.registerListener({ statusChanged: (status) => { if (status.hasSynced) void markWorkspacePrepared(credential.deviceId); } }); }
-  const scopedDeenrollment = async () => { if (!isWorkspaceSwitching() && getDeviceCredential()?.deviceId === credential?.deviceId) await onDeenrolled(); };
+
+  if (credential && db.currentStatus.hasSynced) {
+    await markWorkspacePrepared(credential.deviceId);
+  }
+
+  if (credential && !preparedListeners.has(db)) {
+    preparedListeners.add(db);
+    db.registerListener({
+      statusChanged: (status) => {
+        if (status.hasSynced) {
+          void markWorkspacePrepared(credential.deviceId);
+        }
+      },
+    });
+  }
+
+  const scopedDeenrollment = async () => {
+    if (!isWorkspaceSwitching() && getDeviceCredential()?.deviceId === credential?.deviceId) {
+      await onDeenrolled();
+    }
+  };
+
   // Both connections report the main database's queue: it is the one that holds this device's unsent work.
-  const pendingUploads = async () => (await db.getOptional<{ n: number }>('SELECT count(*) AS n FROM ps_crud'))?.n ?? 0;
+  const pendingUploads = async () =>
+    (await db.getOptional<{ n: number }>('SELECT count(*) AS n FROM ps_crud'))?.n ?? 0;
+
   await db.connect(createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }));
   // The encrypted database replacing a legacy one downloads in the background;
   // it has no local writes, so it never uploads (database.ts).
-  void databaseCatchingUp()?.connect(createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }));
+  void databaseCatchingUp()?.connect(
+    createConnector({ onDeenrolled: scopedDeenrollment, pendingUploads }),
+  );
+
   return db;
 };
 
@@ -53,11 +91,16 @@ export const startSync = async (): Promise<LocalDatabase> => {
  * or stamped. Bounded, because a registration screen must never hang forever
  * on a 2G link — after the timeout the app proceeds and sync carries on.
  */
-export const waitForFirstSync = async (db: LocalDatabase, timeoutMs = FIRST_SYNC_TIMEOUT_MS): Promise<boolean> => {
+export const waitForFirstSync = async (
+  db: LocalDatabase,
+  timeoutMs = FIRST_SYNC_TIMEOUT_MS,
+): Promise<boolean> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
     await db.waitForFirstSync(controller.signal);
+
     return true;
   } catch {
     return false;
@@ -72,7 +115,7 @@ export const waitForFirstSync = async (db: LocalDatabase, timeoutMs = FIRST_SYNC
  * than at the next token refresh. Queued writes are kept and uploaded as usual.
  */
 export const reconnectSync = async (): Promise<void> => {
-  const db = await openDatabase() as LocalDatabase & { disconnect?: () => Promise<void> };
+  const db = (await openDatabase()) as LocalDatabase & { disconnect?: () => Promise<void> };
   await db.disconnect?.();
   await startSync();
 };

@@ -1,20 +1,200 @@
-import {useState} from 'react';
-import {FeeCategory,sumStatementLines,type PatientStatement} from '@shared';
-import {billingRequest} from '@/lib/api/billing';
-import {useAuthorizationContext} from '@/session';
-import {StaffVerification} from '@/modules/insurance/StaffVerification';
-import {Button} from '@/ui';
-import {formatMoney} from '@/lib/money';
-import {userMessage} from '@/lib/api/userMessage';
-import {downloadCsv} from '@/lib/csv';
-import {CATEGORY_LABELS} from './feeForm';
-export const FinancialSnapshotReport=({currency}:{currency:string})=>{
- const context=useAuthorizationContext(),[statements,setStatements]=useState<PatientStatement[]>(),[cutoff,setCutoff]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[payerMoney,setPayerMoney]=useState({received:0,unallocated:0});
- const load=async()=>{setBusy(true);setError('');setStatements(undefined);try{let after:string|undefined,at:string|undefined;const all:PatientStatement[]=[];do{const page: {cutoff:string;statements:PatientStatement[];nextAfter?:string;payerReceiptsMinor:number;unallocatedPayerReceiptsMinor:number}=await billingRequest(context,'reports/financial',{currency,...(at?{cutoff:at}:{}),...(after?{after}:{})});if(!at)setPayerMoney({received:page.payerReceiptsMinor,unallocated:page.unallocatedPayerReceiptsMinor});at=page.cutoff;all.push(...page.statements);after=page.nextAfter;}while(after);setStatements(all);setCutoff(at!);}catch(e){setError(userMessage(e,'The report could not be generated. Try again.'));}finally{setBusy(false);}};
- const total=(key:keyof PatientStatement['totals'])=>(statements??[]).reduce((n,s)=>n+s.totals[key],0),money=(n:number)=>formatMoney(n,currency);
- const groups=FeeCategory.options.map(category=>({category,totals:sumStatementLines((statements??[]).flatMap(s=>s.lines).filter(l=>l.category===category))}));
- return <section aria-label="Hospital financial snapshot" className="space-y-3 rounded-card border border-outline-soft bg-white p-4"><h2 className="text-lg font-bold">Hospital financial snapshot</h2><p className="text-sm">Whole patient accounts in {currency}, using the same records and calculation as patient statements. Collection-date and legacy department filters below apply to the existing collection reports.</p><StaffVerification requireServerSession purpose="Generating the hospital financial snapshot"><Button loading={busy} onClick={()=>void load()}>Generate financial snapshot</Button></StaffVerification>{error?<p role="alert">{error}</p>:null}
- {statements?<><p className="text-xs">{statements.length} patient accounts · Cutoff {new Date(cutoff).toLocaleString('en-GB')}</p><dl className="grid gap-2 sm:grid-cols-2">{[['Original charges','originalMinor'],['Signed contractual adjustments','contractAdjustmentMinor'],['Returned insured services','returnAdjustmentMinor'],['Payments held pending responsibility','heldPatientPaymentsMinor'],['Net charges','netMinor'],['Confirmed insurer responsibility','payerMinor'],['Confirmed patient responsibility','patientMinor'],['Pending insurance','pendingMinor'],['Patient payments received','patientReceivedMinor'],['Actual claim-level payer payments','payerReceivedMinor'],['Patient refunds','patientRefundedMinor'],['Outstanding insurer balance','payerOutstandingMinor'],['Outstanding patient balance','patientOutstandingMinor'],['Patient credits','patientCreditMinor']].map(([label,key])=><div key={key}><dt className="text-sm">{label}</dt><dd className="font-mono font-bold">{money(total(key as keyof PatientStatement['totals']))}</dd></div>)}</dl>
- <p className="text-sm">All actual insurer receipts: {money(payerMoney.received)}. Unallocated insurer receipts: {money(payerMoney.unallocated)}. These funds remain at facility/payer level until explicitly allocated to a claim.</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="text-left font-bold">Central Billing categories</caption><thead><tr><th>Category</th><th>Original</th><th>Net</th><th>Patient balance</th></tr></thead><tbody>{groups.map(g=><tr key={g.category}><td className="py-2">{CATEGORY_LABELS[g.category]}</td><td>{money(g.totals.originalMinor)}</td><td>{money(g.totals.netMinor)}</td><td>{money(g.totals.patientBalanceMinor)}</td></tr>)}</tbody></table></div>
- <Button variant="outlined" onClick={()=>downloadCsv(`financial-snapshot-${currency}-${cutoff.slice(0,10)}.csv`,[['Currency',currency],['Cutoff',cutoff],['All actual insurer receipts',payerMoney.received],['Unallocated insurer receipts',payerMoney.unallocated],['Patient ID','Patient','Original','Net','Patient responsibility','Insurer responsibility','Patient payments','Claim-level payer payments','Patient refunds','Patient outstanding','Patient credit','Insurer outstanding','Pending insurance'],...statements.map(s=>[s.patientId,s.patientName,s.totals.originalMinor,s.totals.netMinor,s.totals.patientMinor,s.totals.payerMinor,s.totals.patientReceivedMinor,s.totals.payerReceivedMinor,s.totals.patientRefundedMinor,s.totals.patientOutstandingMinor,s.totals.patientCreditMinor,s.totals.payerOutstandingMinor,s.totals.pendingMinor]),['Amounts are integer minor units; insurer payments are not apportioned to categories or charge rows.']])}>Export financial snapshot CSV</Button></>:null}</section>;
+import { useState } from 'react';
+import { FeeCategory, sumStatementLines, type PatientStatement } from '@shared';
+import { billingRequest } from '@/lib/api/billing';
+import { useAuthorizationContext, StaffVerification } from '@/session';
+import { Button } from '@/ui';
+import { formatMoney } from '@/lib/money';
+import { userMessage } from '@/lib/api/userMessage';
+import { downloadCsv } from '@/lib/csv';
+import { CATEGORY_LABELS } from './feeForm';
+
+export const FinancialSnapshotReport = ({ currency }: { currency: string }) => {
+  const context = useAuthorizationContext();
+  const [statements, setStatements] = useState<PatientStatement[]>();
+  const [cutoff, setCutoff] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [payerMoney, setPayerMoney] = useState({ received: 0, unallocated: 0 });
+
+  const load = async () => {
+    setBusy(true);
+    setError('');
+    setStatements(undefined);
+
+    try {
+      let after: string | undefined;
+      let at: string | undefined;
+      const all: PatientStatement[] = [];
+
+      do {
+        const page: {
+          cutoff: string;
+          statements: PatientStatement[];
+          nextAfter?: string;
+          payerReceiptsMinor: number;
+          unallocatedPayerReceiptsMinor: number;
+        } = await billingRequest(context, 'reports/financial', {
+          currency,
+          ...(at ? { cutoff: at } : {}),
+          ...(after ? { after } : {}),
+        });
+
+        if (!at) {
+          setPayerMoney({
+            received: page.payerReceiptsMinor,
+            unallocated: page.unallocatedPayerReceiptsMinor,
+          });
+        }
+
+        at = page.cutoff;
+        all.push(...page.statements);
+        after = page.nextAfter;
+      } while (after);
+
+      setStatements(all);
+      setCutoff(at!);
+    } catch (e) {
+      setError(userMessage(e, 'The report could not be generated. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const total = (key: keyof PatientStatement['totals']) =>
+    (statements ?? []).reduce((n, s) => n + s.totals[key], 0);
+
+  const money = (n: number) => formatMoney(n, currency);
+
+  const groups = FeeCategory.options.map((category) => ({
+    category,
+    totals: sumStatementLines(
+      (statements ?? []).flatMap((s) => s.lines).filter((l) => l.category === category),
+    ),
+  }));
+
+  return (
+    <section
+      aria-label="Hospital financial snapshot"
+      className="space-y-3 rounded-card border border-outline-soft bg-white p-4"
+    >
+      <h2 className="text-lg font-bold">Hospital financial snapshot</h2>
+      <p className="text-sm">
+        Whole patient accounts in {currency}, using the same records and calculation as patient
+        statements. Collection-date and legacy department filters below apply to the existing
+        collection reports.
+      </p>
+      <StaffVerification requireServerSession purpose="Generating the hospital financial snapshot">
+        <Button loading={busy} onClick={() => void load()}>
+          Generate financial snapshot
+        </Button>
+      </StaffVerification>
+      {error ? <p role="alert">{error}</p> : null}
+      {statements ? (
+        <>
+          <p className="text-xs">
+            {statements.length} patient accounts · Cutoff {new Date(cutoff).toLocaleString('en-GB')}
+          </p>
+          <dl className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['Original charges', 'originalMinor'],
+              ['Signed contractual adjustments', 'contractAdjustmentMinor'],
+              ['Returned insured services', 'returnAdjustmentMinor'],
+              ['Payments held pending responsibility', 'heldPatientPaymentsMinor'],
+              ['Net charges', 'netMinor'],
+              ['Confirmed insurer responsibility', 'payerMinor'],
+              ['Confirmed patient responsibility', 'patientMinor'],
+              ['Pending insurance', 'pendingMinor'],
+              ['Patient payments received', 'patientReceivedMinor'],
+              ['Actual claim-level payer payments', 'payerReceivedMinor'],
+              ['Patient refunds', 'patientRefundedMinor'],
+              ['Outstanding insurer balance', 'payerOutstandingMinor'],
+              ['Outstanding patient balance', 'patientOutstandingMinor'],
+              ['Patient credits', 'patientCreditMinor'],
+            ].map(([label, key]) => (
+              <div key={key}>
+                <dt className="text-sm">{label}</dt>
+                <dd className="font-mono font-bold">
+                  {money(total(key as keyof PatientStatement['totals']))}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-sm">
+            All actual insurer receipts: {money(payerMoney.received)}. Unallocated insurer receipts:{' '}
+            {money(payerMoney.unallocated)}. These funds remain at facility/payer level until
+            explicitly allocated to a claim.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <caption className="text-left font-bold">Central Billing categories</caption>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Original</th>
+                  <th>Net</th>
+                  <th>Patient balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => (
+                  <tr key={g.category}>
+                    <td className="py-2">{CATEGORY_LABELS[g.category]}</td>
+                    <td>{money(g.totals.originalMinor)}</td>
+                    <td>{money(g.totals.netMinor)}</td>
+                    <td>{money(g.totals.patientBalanceMinor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Button
+            variant="outlined"
+            onClick={() =>
+              downloadCsv(`financial-snapshot-${currency}-${cutoff.slice(0, 10)}.csv`, [
+                ['Currency', currency],
+                ['Cutoff', cutoff],
+                ['All actual insurer receipts', payerMoney.received],
+                ['Unallocated insurer receipts', payerMoney.unallocated],
+                [
+                  'Patient ID',
+                  'Patient',
+                  'Original',
+                  'Net',
+                  'Patient responsibility',
+                  'Insurer responsibility',
+                  'Patient payments',
+                  'Claim-level payer payments',
+                  'Patient refunds',
+                  'Patient outstanding',
+                  'Patient credit',
+                  'Insurer outstanding',
+                  'Pending insurance',
+                ],
+                ...statements.map((s) => [
+                  s.patientId,
+                  s.patientName,
+                  s.totals.originalMinor,
+                  s.totals.netMinor,
+                  s.totals.patientMinor,
+                  s.totals.payerMinor,
+                  s.totals.patientReceivedMinor,
+                  s.totals.payerReceivedMinor,
+                  s.totals.patientRefundedMinor,
+                  s.totals.patientOutstandingMinor,
+                  s.totals.patientCreditMinor,
+                  s.totals.payerOutstandingMinor,
+                  s.totals.pendingMinor,
+                ]),
+                [
+                  'Amounts are integer minor units; insurer payments are not apportioned to categories or charge rows.',
+                ],
+              ])
+            }
+          >
+            Export financial snapshot CSV
+          </Button>
+        </>
+      ) : null}
+    </section>
+  );
 };

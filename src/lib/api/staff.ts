@@ -1,4 +1,9 @@
-import type { AuthorizationContext, DeviceCredential, EmailSent, PinSetupCodeIssued } from '@shared';
+import type {
+  AuthorizationContext,
+  DeviceCredential,
+  EmailSent,
+  PinSetupCodeIssued,
+} from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, post, postAsDevice, staffRequest } from './client';
 import { VerificationRequired } from './insurance';
@@ -7,11 +12,20 @@ import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staf
 /** Every call here is made as the enrolled device; the server decides the facility from its credential. */
 const deviceCredential = (): string => {
   const device = getDeviceCredential();
-  if (!device) throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
+
+  if (!device) {
+    throw new ApiError('not_enrolled', 'This device is not enrolled with a facility');
+  }
+
   return device.credential;
 };
+
 const asDevice = <T>(path: string, body?: unknown): Promise<T> => {
-  try { return postAsDevice<T>(path, deviceCredential(), body); } catch (cause) { return Promise.reject(cause); }
+  try {
+    return postAsDevice<T>(path, deviceCredential(), body);
+  } catch (cause) {
+    return Promise.reject(cause);
+  }
 };
 
 /**
@@ -19,55 +33,110 @@ const asDevice = <T>(path: string, body?: unknown): Promise<T> => {
  * PIN-proven session, never just the id this device says is signed in. When
  * the session has ended, `VerificationRequired` asks the screen for the PIN.
  */
-const asProvenPerson = async <T>(context: AuthorizationContext, path: string, body: unknown): Promise<T> => {
+const asProvenPerson = async <T>(
+  context: AuthorizationContext,
+  path: string,
+  body: unknown,
+): Promise<T> => {
   try {
-    const result = await staffRequest<T>(path, deviceCredential(), staffSessionToken(context), body);
+    const result = await staffRequest<T>(
+      path,
+      deviceCredential(),
+      staffSessionToken(context),
+      body,
+    );
+
     touchStaffSession();
+
     return result;
   } catch (cause) {
-    if (cause instanceof ApiError && cause.code === 'staff_session_required') { forgetStaffSession(); throw new VerificationRequired(); }
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') {
+      forgetStaffSession();
+      throw new VerificationRequired();
+    }
+
     throw cause;
   }
 };
 
-const staffPath = (staffId: string, rest: string) => `/staff/${encodeURIComponent(staffId)}/${rest}`;
+const staffPath = (staffId: string, rest: string) =>
+  `/staff/${encodeURIComponent(staffId)}/${rest}`;
 
 /**
  * Asks geneus-server for a one-time code that lets `staffId` set their PIN on
  * a facility device. Online only: the server checks the signed-in person's
  * own session holds `staff:manage` and is the only one that ever sees the plain code.
  */
-export const issuePinSetupCode = (context: AuthorizationContext, staffId: string): Promise<PinSetupCodeIssued> =>
-  asProvenPerson<PinSetupCodeIssued>(context, staffPath(staffId, 'pin-codes'), { issuedBy: context.userId });
+export const issuePinSetupCode = (
+  context: AuthorizationContext,
+  staffId: string,
+): Promise<PinSetupCodeIssued> =>
+  asProvenPerson<PinSetupCodeIssued>(context, staffPath(staffId, 'pin-codes'), {
+    issuedBy: context.userId,
+  });
 
 /** A facility admin who forgot their PIN: the server emails them a PIN setup code (SCHEMA.md §10). */
-export const emailPinSetupCode = (staffId: string): Promise<EmailSent> => asDevice<EmailSent>(staffPath(staffId, 'pin-codes/email'));
+export const emailPinSetupCode = (staffId: string): Promise<EmailSent> =>
+  asDevice<EmailSent>(staffPath(staffId, 'pin-codes/email'));
 
 /** Step one of a facility admin setting their own recovery email: codes go to the new address (and the current one). */
-export const requestRecoveryEmailCode = (context: AuthorizationContext, email: string): Promise<EmailSent> =>
-  asProvenPerson<EmailSent>(context, staffPath(context.userId, 'email/code'), { email, requestedBy: context.userId });
+export const requestRecoveryEmailCode = (
+  context: AuthorizationContext,
+  email: string,
+): Promise<EmailSent> =>
+  asProvenPerson<EmailSent>(context, staffPath(context.userId, 'email/code'), {
+    email,
+    requestedBy: context.userId,
+  });
 
-export const confirmRecoveryEmail = (context: AuthorizationContext, email: string, code: string, currentCode?: string): Promise<void> =>
-  asProvenPerson<void>(context, staffPath(context.userId, 'email'), { email, code, currentCode, requestedBy: context.userId });
+export const confirmRecoveryEmail = (
+  context: AuthorizationContext,
+  email: string,
+  code: string,
+  currentCode?: string,
+): Promise<void> =>
+  asProvenPerson<void>(context, staffPath(context.userId, 'email'), {
+    email,
+    code,
+    currentCode,
+    requestedBy: context.userId,
+  });
 
 /* ---------------- Invitations (server-only state; these shapes are the server's answers) ---------------- */
 
 export type InvitationStatus = 'pending' | 'expired' | 'locked' | 'accepted' | 'revoked';
+
 /** `provider_accepted`: the email provider took it — not proof it arrived. `not_configured`: a development server only logged it. */
-export type InvitationDelivery = 'sending' | 'provider_accepted' | 'provider_rejected' | 'not_configured';
+export type InvitationDelivery =
+  'sending' | 'provider_accepted' | 'provider_rejected' | 'not_configured';
+
 export type InvitationView = {
-  id: string; channel: 'email'; destination: string; status: InvitationStatus; delivery: InvitationDelivery;
-  createdOn: string; expiresOn: string; acceptedOn?: string; revokedOn?: string; revokedReason?: 'resent' | 'revoked' | 'pin_code_issued';
+  id: string;
+  channel: 'email';
+  destination: string;
+  status: InvitationStatus;
+  delivery: InvitationDelivery;
+  createdOn: string;
+  expiresOn: string;
+  acceptedOn?: string;
+  revokedOn?: string;
+  revokedReason?: 'resent' | 'revoked' | 'pin_code_issued';
   /** The link may set up one new device, as an administrator who may add devices chose. */
   allowsNewDevice: boolean;
 };
+
 export type ContactActivation = {
   email?: { address: string; verified: true };
   invitation?: InvitationView;
   activation: { serverPinDevices: number; lastPinRegisteredOn?: string };
   nextSendAllowedOn?: string;
 };
-export type StaffOnboardingSummary = { staffId: string; activated: boolean; invitation?: { status: InvitationStatus; delivery: InvitationDelivery; expiresOn: string } };
+
+export type StaffOnboardingSummary = {
+  staffId: string;
+  activated: boolean;
+  invitation?: { status: InvitationStatus; delivery: InvitationDelivery; expiresOn: string };
+};
 
 /**
  * Emails `staffId` an invitation link, with a PIN setup code as a fallback.
@@ -76,13 +145,33 @@ export type StaffOnboardingSummary = { staffId: string; activated: boolean; invi
  * enrolled; the server allows it only for someone who may add devices. The
  * answer never contains the link or the code: only their recipient sees them.
  */
-export const sendStaffInvitation = (context: AuthorizationContext, staffId: string, email?: string, allowNewDevice = false): Promise<{ invitation: InvitationView }> =>
-  asProvenPerson(context, staffPath(staffId, 'invitations'), { channel: 'email', ...(email ? { email } : {}), ...(allowNewDevice ? { allowNewDevice: true } : {}) });
-export const revokeStaffInvitation = (context: AuthorizationContext, staffId: string): Promise<{ revoked: true }> =>
+export const sendStaffInvitation = (
+  context: AuthorizationContext,
+  staffId: string,
+  email?: string,
+  allowNewDevice = false,
+): Promise<{ invitation: InvitationView }> =>
+  asProvenPerson(context, staffPath(staffId, 'invitations'), {
+    channel: 'email',
+    ...(email ? { email } : {}),
+    ...(allowNewDevice ? { allowNewDevice: true } : {}),
+  });
+
+export const revokeStaffInvitation = (
+  context: AuthorizationContext,
+  staffId: string,
+): Promise<{ revoked: true }> =>
   asProvenPerson(context, staffPath(staffId, 'invitations/revoke'), {});
-export const staffContactActivation = (context: AuthorizationContext, staffId: string): Promise<ContactActivation> =>
+
+export const staffContactActivation = (
+  context: AuthorizationContext,
+  staffId: string,
+): Promise<ContactActivation> =>
   asProvenPerson(context, staffPath(staffId, 'contact-activation'), {});
-export const staffOnboardingSummaries = (context: AuthorizationContext): Promise<{ staff: StaffOnboardingSummary[] }> =>
+
+export const staffOnboardingSummaries = (
+  context: AuthorizationContext,
+): Promise<{ staff: StaffOnboardingSummary[] }> =>
   asProvenPerson(context, '/staff/invitations/list', {});
 
 /**
@@ -96,22 +185,41 @@ export const checkInvitationCode = (staffId: string, code: string): Promise<void
 
 /** Who an invitation link is for and what it can still do. Never a code. */
 export type InvitationLinkView = {
-  staffId: string; staffName: string; role: string; facilityId: string; facilityName: string; expiresOn: string;
+  staffId: string;
+  staffName: string;
+  role: string;
+  facilityId: string;
+  facilityName: string;
+  expiresOn: string;
   status: InvitationStatus;
   newDevice: 'allowed' | 'used' | 'not_allowed';
 };
 
 /** Reads a link without spending anything. Needs no device credential: the device may not be enrolled yet. */
-export const openInvitationLink = (token: string): Promise<InvitationLinkView> => post<InvitationLinkView>('/invitations/link/open', { token });
+export const openInvitationLink = (token: string): Promise<InvitationLinkView> =>
+  post<InvitationLinkView>('/invitations/link/open', { token });
 
 /** Enrols this (unenrolled) device from the link, when its invitation allows one new device. */
-export const enrolDeviceFromInvitation = (token: string, deviceId: string, deviceLabel: string): Promise<DeviceCredential> =>
-  post<DeviceCredential>('/invitations/link/device', { token, deviceId, deviceLabel: deviceLabel.trim() });
+export const enrolDeviceFromInvitation = (
+  token: string,
+  deviceId: string,
+  deviceLabel: string,
+): Promise<DeviceCredential> =>
+  post<DeviceCredential>('/invitations/link/device', {
+    token,
+    deviceId,
+    deviceLabel: deviceLabel.trim(),
+  });
 
 /** As a device enrolled at the invitation's facility: a fresh one-time PIN setup code for the person invited. */
 export const invitationLinkCode = (token: string): Promise<{ staffId: string; code: string }> =>
   asDevice<{ staffId: string; code: string }>('/invitations/link/code', { token });
 
 /** Whether an invitation needs the administrator to do something: send again, or check the address. */
-export const invitationNeedsAttention = (invitation: { status: InvitationStatus; delivery: InvitationDelivery }): boolean =>
-  invitation.status === 'expired' || invitation.status === 'locked' || (invitation.status === 'pending' && invitation.delivery === 'provider_rejected');
+export const invitationNeedsAttention = (invitation: {
+  status: InvitationStatus;
+  delivery: InvitationDelivery;
+}): boolean =>
+  invitation.status === 'expired' ||
+  invitation.status === 'locked' ||
+  (invitation.status === 'pending' && invitation.delivery === 'provider_rejected');

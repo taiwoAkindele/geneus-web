@@ -11,19 +11,33 @@ const isOpen = (code: PinSetupCode, now: number): boolean =>
   !code.usedOn && !code.revokedOn && Date.parse(code.expiresOn) > now;
 
 /** The open code for this person that matches what they typed, if any. */
-export const findMatchingCode = async (staffId: string, typed: string, now = Date.now()): Promise<PinSetupCode | undefined> => {
+export const findMatchingCode = async (
+  staffId: string,
+  typed: string,
+  now = Date.now(),
+): Promise<PinSetupCode | undefined> => {
   const candidates = (await allOfType<PinSetupCode>('pin_setup_code')).filter(
     (code) => code.staffId === staffId && isOpen(code, now),
   );
+
   const normalized = normalizePinSetupCode(typed);
+
   for (const code of candidates) {
-    if (sameText(await pbkdf2Base64(normalized, code.codeSalt, code.codeIterations), code.codeHash)) return code;
+    if (
+      sameText(await pbkdf2Base64(normalized, code.codeSalt, code.codeIterations), code.codeHash)
+    ) {
+      return code;
+    }
   }
+
   return undefined;
 };
 
 /** Marks the code used on this device, as the person it was issued for (see `claimingFor`). */
-export const markCodeUsed = async (code: PinSetupCode, context: AuthorizationContext): Promise<void> => {
+export const markCodeUsed = async (
+  code: PinSetupCode,
+  context: AuthorizationContext,
+): Promise<void> => {
   await updateRecord<PinSetupCode>(context, 'pin_setup_code:claim', 'pin_setup_code', code.id, {
     usedOn: nowIso(),
     usedOnDevice: context.deviceId,

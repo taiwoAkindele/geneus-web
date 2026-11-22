@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { canRetireLegacy, type LocalDatabase } from './database';
 
 /** Only what the retirement rule reads: the upload queue and the last completed sync. */
-const database = (pending: number, status: { hasSynced?: boolean; lastSyncedAt?: Date }): LocalDatabase =>
+const database = (
+  pending: number,
+  status: { hasSynced?: boolean; lastSyncedAt?: Date },
+): LocalDatabase =>
   ({
     getOptional: async () => ({ n: pending }),
     currentStatus: status,
@@ -23,10 +26,12 @@ describe('retiring the plaintext database', () => {
   });
 
   it('waits until the encrypted copy has completed a sync', async () => {
-    expect(await canRetireLegacy(database(0, synced), database(0, { hasSynced: false }))).toBe(false);
+    expect(await canRetireLegacy(database(0, synced), database(0, { hasSynced: false }))).toBe(
+      false,
+    );
   });
 
-  it('waits while the encrypted copy is behind the legacy one, so an offline phone keeps today\'s roster', async () => {
+  it("waits while the encrypted copy is behind the legacy one, so an offline phone keeps today's roster", async () => {
     const behind = { hasSynced: true, lastSyncedAt: at('2026-09-30T09:00:00Z') };
     expect(await canRetireLegacy(database(0, synced), database(0, behind))).toBe(false);
   });

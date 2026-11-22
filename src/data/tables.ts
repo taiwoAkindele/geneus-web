@@ -1,8 +1,11 @@
 import type { DocType } from '@shared';
 
 export const REGISTER_DRAFTS_TABLE = 'register_builder_drafts';
+
 export const WORKFORCE_DRAFTS_TABLE = 'workforce_editor_drafts';
+
 export const WORKFORCE_RECEIPTS_TABLE = 'workforce_upload_receipts';
+
 export const CLINICAL_REVIEWS_TABLE = 'clinical_review_drafts';
 
 /**
@@ -19,8 +22,10 @@ export const TABLE_FOR: Record<DocType, string> = {
   encounter_entry: 'encounter_entries',
   ward_care_event: 'ward_care_events',
   clinical_event: 'clinical_events',
-  inpatient_event: 'inpatient_events', bed_ready_event: 'bed_ready_events',
-  library_document:'library_documents',visit_document:'visit_documents',
+  inpatient_event: 'inpatient_events',
+  bed_ready_event: 'bed_ready_events',
+  library_document: 'library_documents',
+  visit_document: 'visit_documents',
   handoff: 'handoffs',
   appointment: 'appointments',
   register_definition: 'register_definitions',
@@ -41,8 +46,8 @@ export const TABLE_FOR: Record<DocType, string> = {
   charge: 'charges',
   payment: 'payments',
   billing_adjustment: 'billing_adjustments',
-  service_charge_allocation:'service_charge_allocations',
-  coverage_financial_summary:'coverage_financial_summaries',
+  service_charge_allocation: 'service_charge_allocations',
+  coverage_financial_summary: 'coverage_financial_summaries',
   incoming_transfer: 'incoming_transfers',
   billing_department: 'billing_departments',
   location: 'locations',
@@ -65,8 +70,15 @@ export const TABLE_FOR: Record<DocType, string> = {
   answer_list: 'answer_lists',
   standard_test: 'standard_tests',
   standard_template: 'standard_templates',
-  refund: 'refunds', payer: 'payers', cover_schedule: 'cover_schedules', patient_cover: 'patient_covers', patient_contact: 'patient_contacts', patient_message: 'patient_messages',
-  cover_check: 'cover_checks', coverage_election: 'coverage_elections', coverage_allocation: 'coverage_allocations',
+  refund: 'refunds',
+  payer: 'payers',
+  cover_schedule: 'cover_schedules',
+  patient_cover: 'patient_covers',
+  patient_contact: 'patient_contacts',
+  patient_message: 'patient_messages',
+  cover_check: 'cover_checks',
+  coverage_election: 'coverage_elections',
+  coverage_allocation: 'coverage_allocations',
   service_completion: 'service_completions',
 };
 

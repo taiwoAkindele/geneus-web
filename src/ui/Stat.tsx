@@ -29,4 +29,4 @@ export const Stat = ({ value, label, tone = 'brand', className = '' }: Props) =>
       <div className="mt-1 text-xs text-ink-muted">{label}</div>
     </div>
   );
-}
+};

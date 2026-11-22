@@ -14,9 +14,13 @@ import type {
 } from '@shared';
 
 export type FieldType = RegisterFieldType;
+
 export type RegisterField = RegisterFieldDef;
+
 export type EntryValue = RegisterEntryValue;
+
 export type EntryValues = Record<string, EntryValue>;
+
 export type { RegisterDefinition, RegisterEntry, RegisterStatus };
 
 /** One entry projected for display — derived from a `register_entry` document. */
@@ -56,4 +60,7 @@ export type RegisterDef = {
 };
 
 /** The editable shape while building — becomes a NEW definition version on publish. */
-export type RegisterDraft = Pick<RegisterDef, 'name' | 'category' | 'description' | 'fields' | 'visitLink'>;
+export type RegisterDraft = Pick<
+  RegisterDef,
+  'name' | 'category' | 'description' | 'fields' | 'visitLink'
+>;

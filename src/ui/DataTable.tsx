@@ -1,5 +1,23 @@
 import { useMemo, useState, type ReactNode } from 'react';
 
+type SortState = { key: string; descending: boolean };
+
+const ariaSortFor = (columnKey: string, sort?: SortState) => {
+  if (sort?.key !== columnKey) {
+    return 'none';
+  }
+
+  return sort.descending ? 'descending' : 'ascending';
+};
+
+const sortGlyph = (columnKey: string, sort?: SortState) => {
+  if (sort?.key !== columnKey) {
+    return '↕';
+  }
+
+  return sort.descending ? '↓' : '↑';
+};
+
 export type TableColumn<T> = {
   key: string;
   label: string;
@@ -34,22 +52,52 @@ type Props<T> = {
 };
 
 /** A single sortable, paginated table; columns may hide secondary details on phones. */
-export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, page: controlledPage, onPageChange, sort: controlledSort, onSortChange, uniformHeaders = false, centerRows = false, singleLine = false, total }: Props<T>) => {
+export const DataTable = <T,>({
+  caption,
+  rows,
+  columns,
+  rowKey,
+  selectedKey,
+  page: controlledPage,
+  onPageChange,
+  sort: controlledSort,
+  onSortChange,
+  uniformHeaders = false,
+  centerRows = false,
+  singleLine = false,
+  total,
+}: Props<T>) => {
   const paged = total !== undefined;
   const [storedSort, setStoredSort] = useState<{ key: string; descending: boolean }>();
   const sort = controlledSort ?? storedSort;
   const [storedPage, setStoredPage] = useState(0);
   const page = controlledPage ?? storedPage;
-  const setPage = (value: number) => { setStoredPage(value); onPageChange?.(value); };
+
+  const setPage = (value: number) => {
+    setStoredPage(value);
+    onPageChange?.(value);
+  };
+
   const pageSize = 25;
+
   const shown = useMemo(() => {
     const column = columns.find((candidate) => candidate.key === sort?.key);
-    if (paged || !column?.sortValue) return rows;
+
+    if (paged || !column?.sortValue) {
+      return rows;
+    }
+
     const value = column.sortValue;
+
     return [...rows].sort((a, b) => {
-      const first = value(a), second = value(b);
-      const comparison = typeof first === 'number' && typeof second === 'number'
-        ? first - second : String(first).localeCompare(String(second), undefined, { numeric: true });
+      const first = value(a);
+      const second = value(b);
+
+      const comparison =
+        typeof first === 'number' && typeof second === 'number'
+          ? first - second
+          : String(first).localeCompare(String(second), undefined, { numeric: true });
+
       return comparison * (sort?.descending ? -1 : 1);
     });
   }, [rows, columns, sort, paged]);
@@ -57,33 +105,98 @@ export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, pag
   const count = paged ? total : shown.length;
   const activePage = Math.max(0, Math.min(page, Math.ceil(count / pageSize) - 1));
   const visible = paged ? shown : shown.slice(activePage * pageSize, (activePage + 1) * pageSize);
+
   return (
     <div className="overflow-x-auto rounded-card border border-outline-soft bg-white">
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="border-b border-outline bg-surface-container text-[12px] text-ink-soft">
-          <tr>{columns.map((column) => (
-            <th key={column.key} scope="col" className={`px-3 py-2 font-bold md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
-              aria-sort={column.sortValue ? sort?.key === column.key ? sort.descending ? 'descending' : 'ascending' : 'none' : undefined}>
-              {column.sortValue ? (
-                <button type="button" className={`inline-flex min-h-[44px] items-center gap-2 text-left ${uniformHeaders ? 'text-[12px] font-bold' : ''}`}
-                  onClick={() => { const next = { key: column.key, descending: sort?.key === column.key ? !sort.descending : false }; setStoredPage(0); setStoredSort(next); if (onSortChange) onSortChange(next); else onPageChange?.(0); }}>
-                  {column.label}<span aria-hidden>{sort?.key === column.key ? sort.descending ? '↓' : '↑' : '↕'}</span>
-                </button>
-              ) : column.label}
-            </th>
-          ))}</tr>
+          <tr>
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                scope="col"
+                className={`px-3 py-2 font-bold md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
+                aria-sort={column.sortValue ? ariaSortFor(column.key, sort) : undefined}
+              >
+                {column.sortValue ? (
+                  <button
+                    type="button"
+                    className={`inline-flex min-h-[44px] items-center gap-2 text-left ${uniformHeaders ? 'text-[12px] font-bold' : ''}`}
+                    onClick={() => {
+                      const next = {
+                        key: column.key,
+                        descending: sort?.key === column.key ? !sort.descending : false,
+                      };
+
+                      setStoredPage(0);
+                      setStoredSort(next);
+
+                      if (onSortChange) {
+                        onSortChange(next);
+                      } else {
+                        onPageChange?.(0);
+                      }
+                    }}
+                  >
+                    {column.label}
+                    <span aria-hidden>{sortGlyph(column.key, sort)}</span>
+                  </button>
+                ) : (
+                  column.label
+                )}
+              </th>
+            ))}
+          </tr>
         </thead>
         <tbody className="divide-y divide-outline-soft">
           {visible.map((row) => (
-            <tr key={rowKey(row)} aria-selected={selectedKey === undefined ? undefined : rowKey(row) === selectedKey}
-              className={rowKey(row) === selectedKey ? 'bg-brand-wash' : 'hover:bg-surface focus-within:bg-brand-wash'}>
-              {columns.map((column) => <td key={column.key} className={`px-3 md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${centerRows ? 'py-3 align-middle' : 'py-4 align-top'} ${column.align === 'right' ? 'text-right tabular-nums' : ''} ${column.className ?? ''}`}>{column.render(row)}</td>)}
+            <tr
+              key={rowKey(row)}
+              aria-selected={selectedKey === undefined ? undefined : rowKey(row) === selectedKey}
+              className={
+                rowKey(row) === selectedKey
+                  ? 'bg-brand-wash'
+                  : 'hover:bg-surface focus-within:bg-brand-wash'
+              }
+            >
+              {columns.map((column) => (
+                <td
+                  key={column.key}
+                  className={`px-3 md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${centerRows ? 'py-3 align-middle' : 'py-4 align-top'} ${column.align === 'right' ? 'text-right tabular-nums' : ''} ${column.className ?? ''}`}
+                >
+                  {column.render(row)}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
-      {count > pageSize ? <div className="flex items-center justify-between gap-3 border-t border-outline-soft px-4 py-2 text-[13px]"><span>{activePage * pageSize + 1}–{Math.min((activePage + 1) * pageSize, count)} of {count}</span><div className="flex gap-3"><button type="button" className="min-h-[44px] px-2 font-bold text-brand disabled:text-ink-muted" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>Previous</button><button type="button" className="min-h-[44px] px-2 font-bold text-brand disabled:text-ink-muted" disabled={(activePage + 1) * pageSize >= count} onClick={() => setPage(activePage + 1)}>Next</button></div></div> : null}
+      {count > pageSize ? (
+        <div className="flex items-center justify-between gap-3 border-t border-outline-soft px-4 py-2 text-[13px]">
+          <span>
+            {activePage * pageSize + 1}–{Math.min((activePage + 1) * pageSize, count)} of {count}
+          </span>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="min-h-[44px] px-2 font-bold text-brand disabled:text-ink-muted"
+              disabled={activePage === 0}
+              onClick={() => setPage(activePage - 1)}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="min-h-[44px] px-2 font-bold text-brand disabled:text-ink-muted"
+              disabled={(activePage + 1) * pageSize >= count}
+              onClick={() => setPage(activePage + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

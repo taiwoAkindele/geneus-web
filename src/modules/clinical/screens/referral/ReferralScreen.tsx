@@ -187,6 +187,7 @@ export const ReferralScreen = () => {
             {REFERRALS.map((r) => {
               const active = r.id === selectedId;
               const closed = r.status === 'Closed';
+
               return (
                 <button
                   key={r.id}
@@ -202,7 +203,9 @@ export const ReferralScreen = () => {
                     <span className="text-[15px] font-bold">{r.name}</span>
                     <Tag tone={STATUS_TONE[r.status]}>{r.status}</Tag>
                   </div>
-                  <div className={`mt-1.5 text-[13px] ${active ? 'text-white/80' : 'text-ink-muted'}`}>
+                  <div
+                    className={`mt-1.5 text-[13px] ${active ? 'text-white/80' : 'text-ink-muted'}`}
+                  >
                     {r.summary}
                   </div>
                   <div className={`mt-2 text-xs ${active ? 'text-white/60' : 'text-ink-muted'}`}>

@@ -25,7 +25,21 @@ const KEY_STORE = 'keys';
 const KEY_ID = 'device';
 
 /** Every name kept here. Anything else in localStorage is not a secret. */
-export const SECURE_NAMES = ['geneus.organizationFacilities', 'geneus.facilityCreation', 'geneus.facilityOpening', 'geneus.facilitySwitchIdentity', 'geneus.facilityWorkspaces', 'geneus.registrationDrafts', 'geneus.credentials', 'geneus.device', 'geneus.lastServerContactOn', 'geneus.dbKey', 'geneus.workforce.verificationKeys', 'geneus.workforce.selections'] as const;
+export const SECURE_NAMES = [
+  'geneus.organizationFacilities',
+  'geneus.facilityCreation',
+  'geneus.facilityOpening',
+  'geneus.facilitySwitchIdentity',
+  'geneus.facilityWorkspaces',
+  'geneus.registrationDrafts',
+  'geneus.credentials',
+  'geneus.device',
+  'geneus.lastServerContactOn',
+  'geneus.dbKey',
+  'geneus.workforce.verificationKeys',
+  'geneus.workforce.selections',
+] as const;
+
 export type SecureName = (typeof SECURE_NAMES)[number];
 
 const memory = new Map<SecureName, string>();
@@ -43,24 +57,39 @@ const request = <T>(operation: IDBRequest<T>): Promise<T> =>
 const openKeyDatabase = (): Promise<IDBDatabase> => {
   const opening = indexedDB.open(KEY_DATABASE, 1);
   opening.onupgradeneeded = () => opening.result.createObjectStore(KEY_STORE);
+
   return request(opening);
 };
 
 const generateKey = (): Promise<CryptoKey> =>
-  crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as Promise<CryptoKey>;
+  crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ]) as Promise<CryptoKey>;
 
 /**
  * The device key, created on first use. Without IndexedDB (tests in Node) it
  * lives in memory only, which is the same as no persistence at all.
  */
 const loadDeviceKey = async (): Promise<CryptoKey> => {
-  if (!hasIndexedDb()) return generateKey();
+  if (!hasIndexedDb()) {
+    return generateKey();
+  }
+
   const db = await openKeyDatabase();
+
   try {
     const existing = await request(db.transaction(KEY_STORE).objectStore(KEY_STORE).get(KEY_ID));
-    if (existing instanceof CryptoKey) return existing;
+
+    if (existing instanceof CryptoKey) {
+      return existing;
+    }
+
     const created = await generateKey();
-    await request(db.transaction(KEY_STORE, 'readwrite').objectStore(KEY_STORE).put(created, KEY_ID));
+    await request(
+      db.transaction(KEY_STORE, 'readwrite').objectStore(KEY_STORE).put(created, KEY_ID),
+    );
+
     return created;
   } finally {
     db.close();
@@ -70,30 +99,67 @@ const loadDeviceKey = async (): Promise<CryptoKey> => {
 const key = (): Promise<CryptoKey> => (deviceKey ??= loadDeviceKey());
 
 /** Binary cache uses the same non-extractable device key; scope is authenticated with the ciphertext. */
-export const encryptDeviceBytes = async (plain:Uint8Array,scope:string):Promise<{iv:Uint8Array;cipher:ArrayBuffer}> => {
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(scope)},await key(),plain.slice().buffer);
-  return {iv,cipher};
+export const encryptDeviceBytes = async (
+  plain: Uint8Array,
+  scope: string,
+): Promise<{ iv: Uint8Array; cipher: ArrayBuffer }> => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const cipher = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(scope) },
+    await key(),
+    plain.slice().buffer,
+  );
+
+  return { iv, cipher };
 };
-export const decryptDeviceBytes = async (stored:{iv:Uint8Array;cipher:ArrayBuffer},scope:string):Promise<Uint8Array> =>
-  new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(stored.iv).buffer,additionalData:new TextEncoder().encode(scope)},await key(),stored.cipher));
+
+export const decryptDeviceBytes = async (
+  stored: { iv: Uint8Array; cipher: ArrayBuffer },
+  scope: string,
+): Promise<Uint8Array> =>
+  new Uint8Array(
+    await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: new Uint8Array(stored.iv).buffer,
+        additionalData: new TextEncoder().encode(scope),
+      },
+      await key(),
+      stored.cipher,
+    ),
+  );
 
 const encrypt = async (plain: string): Promise<string> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await key(), new TextEncoder().encode(plain));
+
+  const cipher = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    await key(),
+    new TextEncoder().encode(plain),
+  );
+
   return `${ENCRYPTED_PREFIX}${bytesToBase64(iv)}.${bytesToBase64(new Uint8Array(cipher))}`;
 };
 
 const decrypt = async (stored: string): Promise<string> => {
   const [iv, cipher] = stored.slice(ENCRYPTED_PREFIX.length).split('.');
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(iv ?? '') }, await key(), base64ToBytes(cipher ?? ''));
+
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(iv ?? '') },
+    await key(),
+    base64ToBytes(cipher ?? ''),
+  );
+
   return new TextDecoder().decode(plain);
 };
 
 let writes: Promise<void> = Promise.resolve();
+
 /** Persists in call order, so a later write can never be overtaken by an earlier one. */
 const persist = (task: () => Promise<void>): Promise<void> => {
   writes = writes.then(task, task);
+
   return writes;
 };
 
@@ -104,15 +170,23 @@ const persist = (task: () => Promise<void>): Promise<void> => {
  * unreadable for good and is dropped, which leaves the device unenrolled.
  */
 export const unlockSecureStorage = async (): Promise<void> => {
-  if (!hasLocalStorage()) return;
+  if (!hasLocalStorage()) {
+    return;
+  }
+
   for (const name of SECURE_NAMES) {
     const stored = localStorage.getItem(name);
-    if (stored === null) continue;
+
+    if (stored === null) {
+      continue;
+    }
+
     if (!stored.startsWith(ENCRYPTED_PREFIX)) {
       memory.set(name, stored);
       await persist(async () => localStorage.setItem(name, await encrypt(stored)));
       continue;
     }
+
     try {
       memory.set(name, await decrypt(stored));
     } catch {
@@ -125,13 +199,21 @@ export const secureGet = (name: SecureName): string | null => memory.get(name) ?
 
 export const secureSet = (name: SecureName, value: string): Promise<void> => {
   memory.set(name, value);
-  if (!hasLocalStorage()) return Promise.resolve();
+
+  if (!hasLocalStorage()) {
+    return Promise.resolve();
+  }
+
   return persist(async () => localStorage.setItem(name, await encrypt(value)));
 };
 
 export const secureRemove = (name: SecureName): Promise<void> => {
   memory.delete(name);
-  if (!hasLocalStorage()) return Promise.resolve();
+
+  if (!hasLocalStorage()) {
+    return Promise.resolve();
+  }
+
   return persist(async () => localStorage.removeItem(name));
 };
 
@@ -143,7 +225,10 @@ export const secureRemove = (name: SecureName): Promise<void> => {
 export const destroySecureStorage = async (): Promise<void> => {
   await Promise.all(SECURE_NAMES.map((name) => secureRemove(name)));
   deviceKey = undefined;
-  if (hasIndexedDb()) await request(indexedDB.deleteDatabase(KEY_DATABASE));
+
+  if (hasIndexedDb()) {
+    await request(indexedDB.deleteDatabase(KEY_DATABASE));
+  }
 };
 
 /**
@@ -152,6 +237,10 @@ export const destroySecureStorage = async (): Promise<void> => {
  */
 export const resetSecureStorageForTests = ({ keepKey = false } = {}): void => {
   memory.clear();
-  if (!keepKey) deviceKey = undefined;
+
+  if (!keepKey) {
+    deviceKey = undefined;
+  }
+
   writes = Promise.resolve();
 };

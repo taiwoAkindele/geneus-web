@@ -40,7 +40,9 @@ describe('roster signature check', () => {
 
   const signedBy = async (secretKey: Uint8Array, signed: RosterShift): Promise<RosterShift> => ({
     ...signed,
-    signature: bytesToBase64(await signAsync(new TextEncoder().encode(rosterSignaturePayload(signed)), secretKey)),
+    signature: bytesToBase64(
+      await signAsync(new TextEncoder().encode(rosterSignaturePayload(signed)), secretKey),
+    ),
   });
 
   it('accepts a shift exactly as the server signed it', async () => {
@@ -55,15 +57,25 @@ describe('roster signature check', () => {
     const publicKey = await getPublicKeyAsync(secretKey);
     const signed = await signedBy(secretKey, shift);
 
-    expect(await checkShiftSignature({ ...signed, endsAt: '2026-10-01T22:00:00Z' }, publicKey)).toBe('invalid');
-    expect(await checkShiftSignature({ ...signed, extendedUntil: '2026-10-01T22:00:00Z' }, publicKey)).toBe('invalid');
+    expect(
+      await checkShiftSignature({ ...signed, endsAt: '2026-10-01T22:00:00Z' }, publicKey),
+    ).toBe('invalid');
+
+    expect(
+      await checkShiftSignature({ ...signed, extendedUntil: '2026-10-01T22:00:00Z' }, publicKey),
+    ).toBe('invalid');
   });
 
   it('refuses a signature made with another key, and garbage', async () => {
     const publicKey = await getPublicKeyAsync(utils.randomSecretKey());
 
-    expect(await checkShiftSignature(await signedBy(utils.randomSecretKey(), shift), publicKey)).toBe('invalid');
-    expect(await checkShiftSignature({ ...shift, signature: 'bm90IGEgc2lnbmF0dXJl' }, publicKey)).toBe('invalid');
+    expect(
+      await checkShiftSignature(await signedBy(utils.randomSecretKey(), shift), publicKey),
+    ).toBe('invalid');
+
+    expect(
+      await checkShiftSignature({ ...shift, signature: 'bm90IGEgc2lnbmF0dXJl' }, publicKey),
+    ).toBe('invalid');
   });
 
   it('lets an unsigned shift through, because an offline facility must still roster staff', async () => {

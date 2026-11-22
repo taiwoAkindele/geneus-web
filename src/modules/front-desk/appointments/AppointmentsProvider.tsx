@@ -1,13 +1,26 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { book, changeAppointment, listAppointments, type AppointmentChange } from '@/data/repos/appointments';
+import {
+  book,
+  changeAppointment,
+  listAppointments,
+  type AppointmentChange,
+} from '@/data/repos/appointments';
 import { listPatients } from '@/data/repos/patients';
 import { closingEntries, listEncounters } from '@/data/repos/encounters';
 import { projectAppointments } from './appointmentList';
 import { listCharges, listPayments, listAdjustments, balanceCoverage } from '@/data/repos/billing';
 import type { BookedAppointment, NewAppointment } from './types';
-import { canReadPatientChart,linkedPatientIds } from '@shared';
+import { canReadPatientChart, linkedPatientIds } from '@shared';
 import { listIdentityEvents } from '@/data/repos/patientIdentity';
 import { listAllergyEvents } from '@/data/repos/clinical';
 
@@ -29,27 +42,116 @@ export const AppointmentsProvider = ({ children }: { children: ReactNode }) => {
     const tick = () => setNow(new Date());
     const timer = window.setInterval(tick, 60_000);
     document.addEventListener('visibilitychange', tick);
-    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, []);
 
   const load = useCallback(async () => {
-    const [appointments, patients, encounters, closing] = await Promise.all([listAppointments(), listPatients(), listEncounters(), closingEntries()]);
-    const [charges, payments, adjustments, identityEvents, clinicalEvents] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listIdentityEvents(), canReadPatientChart(context)?listAllergyEvents():Promise.resolve([])]);
+    const [appointments, patients, encounters, closing] = await Promise.all([
+      listAppointments(),
+      listPatients(),
+      listEncounters(),
+      closingEntries(),
+    ]);
+
+    const [charges, payments, adjustments, identityEvents, clinicalEvents] = await Promise.all([
+      listCharges(),
+      listPayments(),
+      listAdjustments(),
+      listIdentityEvents(),
+      canReadPatientChart(context) ? listAllergyEvents() : Promise.resolve([]),
+    ]);
+
     // An insured patient's undetermined cover is not a debt, so it never holds a booking at 'Awaiting payment'.
     const coverage = await balanceCoverage(charges);
-    return { appointments, patients:canReadPatientChart(context)?patients:patients.map(patient=>({...patient,allergies:[]})), encounters, closing, charges, payments, adjustments, identityEvents, clinicalEvents, coverage };
-  }, [context.userId,context.permissions.join('|')]);
+
+    return {
+      appointments,
+      patients: canReadPatientChart(context)
+        ? patients
+        : patients.map((patient) => ({ ...patient, allergies: [] })),
+      encounters,
+      closing,
+      charges,
+      payments,
+      adjustments,
+      identityEvents,
+      clinicalEvents,
+      coverage,
+    };
+  }, [context.userId, context.permissions.join('|')]);
+
   const { data, loading, error, reload } = useLiveQuery(load);
-  const appointments = useMemo(() => data ? projectAppointments(data.appointments, data.patients, data.encounters, data.closing, now, data.charges, data.payments, data.adjustments, data.clinicalEvents, data.identityEvents, data.coverage) : [], [data, now]);
-  const bookAppointment = useCallback(async (appointment: NewAppointment) => { await book(appointment, context); }, [context]);
-  const changeBooking = useCallback(async (id: string, change: AppointmentChange) => { await changeAppointment(id, change, context); reload(); }, [context, reload]);
-  const forPatient = useCallback((patientId: string) => { const ids = linkedPatientIds(patientId, data?.identityEvents ?? []); return appointments.filter((appointment) => ids.includes(appointment.patient.id)); }, [appointments, data]);
-  const value = useMemo(() => ({ appointments, loading, error, reload, book: bookAppointment, change: changeBooking, forPatient }), [appointments, loading, error, reload, bookAppointment, changeBooking, forPatient]);
+
+  const appointments = useMemo(
+    () =>
+      data
+        ? projectAppointments(
+            data.appointments,
+            data.patients,
+            data.encounters,
+            data.closing,
+            now,
+            data.charges,
+            data.payments,
+            data.adjustments,
+            data.clinicalEvents,
+            data.identityEvents,
+            data.coverage,
+          )
+        : [],
+    [data, now],
+  );
+
+  const bookAppointment = useCallback(
+    async (appointment: NewAppointment) => {
+      await book(appointment, context);
+    },
+    [context],
+  );
+
+  const changeBooking = useCallback(
+    async (id: string, change: AppointmentChange) => {
+      await changeAppointment(id, change, context);
+      reload();
+    },
+    [context, reload],
+  );
+
+  const forPatient = useCallback(
+    (patientId: string) => {
+      const ids = linkedPatientIds(patientId, data?.identityEvents ?? []);
+
+      return appointments.filter((appointment) => ids.includes(appointment.patient.id));
+    },
+    [appointments, data],
+  );
+
+  const value = useMemo(
+    () => ({
+      appointments,
+      loading,
+      error,
+      reload,
+      book: bookAppointment,
+      change: changeBooking,
+      forPatient,
+    }),
+    [appointments, loading, error, reload, bookAppointment, changeBooking, forPatient],
+  );
+
   return <AppointmentsContext.Provider value={value}>{children}</AppointmentsContext.Provider>;
 };
 
 export const useAppointments = (): Value => {
   const context = useContext(AppointmentsContext);
-  if (!context) throw new Error('useAppointments must be used within an AppointmentsProvider');
+
+  if (!context) {
+    throw new Error('useAppointments must be used within an AppointmentsProvider');
+  }
+
   return context;
 };

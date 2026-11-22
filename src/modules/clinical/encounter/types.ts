@@ -1,4 +1,10 @@
-import type { DocumentFile, EncounterEntry, EncounterStep, InvestigationItem, ResultFlag } from '@shared';
+import type {
+  DocumentFile,
+  EncounterEntry,
+  EncounterStep,
+  InvestigationItem,
+  ResultFlag,
+} from '@shared';
 
 /**
  * The Patient Encounter (PRD §9.8). One encounter is one record split into
@@ -8,36 +14,101 @@ import type { DocumentFile, EncounterEntry, EncounterStep, InvestigationItem, Re
  */
 export type StepKey = Exclude<EncounterStep, 'amendment'>;
 
-export type RxLine = { name: string; dose: string; frequency?: string; duration?: string; route?: string; quantity?: string; unitOfMeasure?: string };
+export type RxLine = {
+  name: string;
+  dose: string;
+  frequency?: string;
+  duration?: string;
+  route?: string;
+  quantity?: string;
+  unitOfMeasure?: string;
+};
+
 /** One template part as the lab scientist is filling it in — strings as typed. */
 export type LabPartDraft = {
-  value?: string; flag?: ResultFlag | '';
+  value?: string;
+  flag?: ResultFlag | '';
   growth?: '' | 'no_growth' | 'growth';
-  organisms?: { name: string; count: string; susceptibility: Record<string, '' | 'S' | 'I' | 'R'> }[];
+  organisms?: {
+    name: string;
+    count: string;
+    susceptibility: Record<string, '' | 'S' | 'I' | 'R'>;
+  }[];
   files?: DocumentFile[];
 };
+
 /** A test entered with a result template: its parts by key, and a comment for the doctor. */
 export type LabItemDraft = { values: Record<string, LabPartDraft>; comment: string };
-export type DiagnosisLine ={ label: string; code?: string; codingSystem?: 'ICD-10' | 'SNOMED CT' | 'local'; certainty?: 'unknown' | 'suspected' | 'confirmed' };
+
+export type DiagnosisLine = {
+  label: string;
+  code?: string;
+  codingSystem?: 'ICD-10' | 'SNOMED CT' | 'local';
+  certainty?: 'unknown' | 'suspected' | 'confirmed';
+};
 
 /** What each section's form holds while it is being recorded — strings as typed. */
 export type EncounterData = {
   workflowVersion?: 1;
   result_review: { resultEntryIds: string[]; note: string };
-  investigation_review: { decision: '' | 'none_required' | 'ordered'; reason: string; orderEntryId?: string };
+  investigation_review: {
+    decision: '' | 'none_required' | 'ordered';
+    reason: string;
+    orderEntryId?: string;
+  };
   prescription: { decision: '' | 'none_required' | 'prescribed'; rx: RxLine[] };
-  injection_order: { required: boolean; drug: string; dose: string; route: string; instructions: string };
-  disposition: { kind: '' | 'home_care' | 'observation' | 'referral' | 'admission'; note: string; responsibleService: string; reassessOn: string; toFacilityId: string; previousEntryId?: string; followUpOn: string };
+  injection_order: {
+    required: boolean;
+    drug: string;
+    dose: string;
+    route: string;
+    instructions: string;
+  };
+  disposition: {
+    kind: '' | 'home_care' | 'observation' | 'referral' | 'admission';
+    note: string;
+    responsibleService: string;
+    reassessOn: string;
+    toFacilityId: string;
+    previousEntryId?: string;
+    followUpOn: string;
+  };
 
-  vitals: { temp: string; bp: string; pulse: string; weight: string; spo2: string; height?: string; respiratoryRate?: string };
+  vitals: {
+    temp: string;
+    bp: string;
+    pulse: string;
+    weight: string;
+    spo2: string;
+    height?: string;
+    respiratoryRate?: string;
+  };
   /** In the patient's words: `text` is the chief complaint, `others` any further complaints, one per line. */
-  complaint: { text: string; others?: string; note: string; historyOfPresentIllness?: string; examination?: string; assessment?: string; plan?: string };
+  complaint: {
+    text: string;
+    others?: string;
+    note: string;
+    historyOfPresentIllness?: string;
+    examination?: string;
+    assessment?: string;
+    plan?: string;
+  };
   lab_order: { tests: string[]; items?: InvestigationItem[]; reason?: string };
   lab_results: Record<string, string>;
   /** Tests with a result template, by order item (or test name); others use `lab_results` text. */
   lab_report: Record<string, LabItemDraft>;
   // `rx`, `injection` and `admit` are read only from visits recorded in the retired order.
-  diagnosis: { dx: string; rx: RxLine[]; injection: boolean; admit: boolean; pendingResultsReason?: string; code?: string; codingSystem?: DiagnosisLine['codingSystem']; certainty?: DiagnosisLine['certainty']; diagnoses?: DiagnosisLine[] };
+  diagnosis: {
+    dx: string;
+    rx: RxLine[];
+    injection: boolean;
+    admit: boolean;
+    pendingResultsReason?: string;
+    code?: string;
+    codingSystem?: DiagnosisLine['codingSystem'];
+    certainty?: DiagnosisLine['certainty'];
+    diagnoses?: DiagnosisLine[];
+  };
   injection: { drug: string; dose: string; route: string; site: string; note: string };
   /** Per prescription line: handed over, or the reason it was not. */
   dispense: { done: Record<number, boolean>; reasons: Record<number, string> };
@@ -75,7 +146,11 @@ export type EncounterState = {
 };
 
 /** Which encounter to open: the one named, else the patient's open one, else a new one. */
-export type EncounterNavState = { patientId?: string; encounterId?: string; appointmentId?: string } | null;
+export type EncounterNavState = {
+  patientId?: string;
+  encounterId?: string;
+  appointmentId?: string;
+} | null;
 
 /** The signed-in staff member a save is attributed to (from the shift session). */
 export type Actor = { name: string; role: string };

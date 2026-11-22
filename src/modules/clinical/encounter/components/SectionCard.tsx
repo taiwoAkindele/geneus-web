@@ -1,3 +1,4 @@
+import { stepTone } from './stepTone';
 import type { ReactNode } from 'react';
 import { Button, Icon } from '@/ui';
 import type { Amendment, Signature } from '../types';
@@ -56,43 +57,40 @@ export const SectionCard = ({
   const active = state === 'active';
   const locked = state === 'locked';
 
-  return (
-    <div
-      className={`overflow-hidden rounded-card border bg-white ${active ? 'border-brand' : 'border-outline-soft'} ${
-        state === 'pending' ? 'opacity-70' : ''
-      }`}
-    >
-      {/* header */}
-      <div className={`flex items-center gap-3 border-b px-4 py-3.5 ${active ? 'border-brand-tint bg-brand-wash' : 'border-outline-soft'}`}>
-        <span
-          className={`flex h-7 w-7 flex-none items-center justify-center rounded-lg font-mono text-xs font-extrabold ${
-            locked || active ? 'bg-brand text-white' : 'bg-surface-container text-ink-muted'
-          }`}
-        >
-          {locked ? '✓' : String(index + 1).padStart(2, '0')}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-extrabold tracking-[-0.01em] text-ink">{title}</div>
-          <div className="text-xs text-ink-muted">{hint}</div>
-        </div>
-        <span
-          className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-bold ${
-            locked ? 'bg-brand-tint text-brand' : active ? 'bg-brand text-white' : 'bg-surface-container text-ink-muted'
-          }`}
-        >
-          {locked ? 'Locked' : active ? 'Recording' : state === 'skipped' ? 'Skipped' : 'Pending'}
-        </span>
-      </div>
+  const renderStatusLabel = () => {
+    if (locked) {
+      return 'Locked';
+    }
 
-      {/* body */}
-      {state === 'skipped' ? (
+    if (active) {
+      return 'Recording';
+    }
+
+    if (state === 'skipped') {
+      return 'Skipped';
+    }
+
+    return 'Pending';
+  };
+
+  const renderSectionBody = () => {
+    if (state === 'skipped') {
+      return (
         <div className="px-4 py-5 text-[13px] text-ink-muted">Not recorded for this encounter.</div>
-      ) : state === 'pending' ? (
+      );
+    }
+
+    if (state === 'pending') {
+      return (
         <div className="flex items-center gap-2.5 px-4 py-5 text-[13px] text-ink-muted">
           <span className="h-4 w-4 flex-none rounded-full border-2 border-outline" />
           Complete the step above before recording this.
         </div>
-      ) : locked ? (
+      );
+    }
+
+    if (locked) {
+      return (
         <div className="px-4 py-4">
           <SummaryRows rows={summary} />
           <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-dashed border-outline-hair pt-3">
@@ -107,14 +105,25 @@ export const SectionCard = ({
                 </span>
               </span>
             ) : null}
-            {!readOnly ? <button type="button" onClick={onAmend} className="ml-auto min-h-[44px] text-[13px] font-bold text-brand">＋ Add amendment</button> : null}
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={onAmend}
+                className="ml-auto min-h-[44px] text-[13px] font-bold text-brand"
+              >
+                ＋ Add amendment
+              </button>
+            ) : null}
           </div>
           {amendments.length > 0 ? (
             <div className="mt-3 space-y-2">
               {amendments.map((am, i) => (
                 <div key={i} className="rounded-[11px] bg-surface-muted p-3">
                   <div className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-muted">
-                    Amendment · <span className="font-mono">{am.time} · {am.date}</span>
+                    Amendment ·{' '}
+                    <span className="font-mono">
+                      {am.time} · {am.date}
+                    </span>
                   </div>
                   <div className="my-1 text-sm text-ink">{am.note}</div>
                   <div className="text-xs text-ink-soft">
@@ -125,10 +134,16 @@ export const SectionCard = ({
             </div>
           ) : null}
         </div>
-      ) : (
-        <div className="px-4 py-4">
-          {children}
-          {readOnly ? <p className="text-sm text-ink-muted">This step has not been recorded yet.</p> : <div className="mt-4 space-y-1">
+      );
+    }
+
+    return (
+      <div className="px-4 py-4">
+        {children}
+        {readOnly ? (
+          <p className="text-sm text-ink-muted">This step has not been recorded yet.</p>
+        ) : (
+          <div className="mt-4 space-y-1">
             <Button variant="primary" disabled={saving} loading={saving} onClick={onReview}>
               {reviewLabel}
             </Button>
@@ -137,9 +152,50 @@ export const SectionCard = ({
                 Skip — not needed for this patient
               </Button>
             ) : null}
-          </div>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className={`overflow-hidden rounded-card border bg-white ${active ? 'border-brand' : 'border-outline-soft'} ${
+        state === 'pending' ? 'opacity-70' : ''
+      }`}
+    >
+      {/* header */}
+      <div
+        className={`flex items-center gap-3 border-b px-4 py-3.5 ${active ? 'border-brand-tint bg-brand-wash' : 'border-outline-soft'}`}
+      >
+        <span
+          className={`flex h-7 w-7 flex-none items-center justify-center rounded-lg font-mono text-xs font-extrabold ${
+            locked || active ? 'bg-brand text-white' : 'bg-surface-container text-ink-muted'
+          }`}
+        >
+          {locked ? '✓' : String(index + 1).padStart(2, '0')}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold tracking-[-0.01em] text-ink">{title}</div>
+          <div className="text-xs text-ink-muted">{hint}</div>
         </div>
-      )}
+        <span
+          className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-bold ${stepTone(
+            locked,
+            active,
+            {
+              locked: 'bg-brand-tint text-brand',
+              active: 'bg-brand text-white',
+              idle: 'bg-surface-container text-ink-muted',
+            },
+          )}`}
+        >
+          {renderStatusLabel()}
+        </span>
+      </div>
+
+      {/* body */}
+      {renderSectionBody()}
     </div>
   );
 };

@@ -27,7 +27,9 @@ export const SyncingFacility = ({ facilityName }: { facilityName?: string }) => 
   if (!sync.error && !offline) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center">
-        <PulseLoader label={sync.connected ? 'Fetching your facility’s data…' : 'Connecting to Geneus…'} />
+        <PulseLoader
+          label={sync.connected ? 'Fetching your facility’s data…' : 'Connecting to Geneus…'}
+        />
       </div>
     );
   }

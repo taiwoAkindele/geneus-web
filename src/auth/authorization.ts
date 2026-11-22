@@ -44,27 +44,42 @@ const describe = (denial: Denial): string => {
  */
 export const assertAllowed = (context: AuthorizationContext, permission: Permission): void => {
   const denial = decide(freshAuthorization(context), permission);
-  if (denial) throw new AuthorizationError(denial);
+
+  if (denial) {
+    throw new AuthorizationError(denial);
+  }
 };
-export const freshAuthorization = (context:AuthorizationContext):AuthorizationContext => {
-  const contacts=[context.lastServerContactOn,lastServerContactOn()].filter((value):value is string=>Boolean(value)&&Number.isFinite(Date.parse(value!)));
-  const latest=contacts.sort((a,b)=>Date.parse(b)-Date.parse(a))[0];
-  return latest?{...context,lastServerContactOn:latest}:context;
+
+export const freshAuthorization = (context: AuthorizationContext): AuthorizationContext => {
+  const contacts = [context.lastServerContactOn, lastServerContactOn()].filter(
+    (value): value is string => Boolean(value) && Number.isFinite(Date.parse(value!)),
+  );
+
+  const latest = contacts.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+
+  return latest ? { ...context, lastServerContactOn: latest } : context;
 };
 
 export const isAllowed = (context: AuthorizationContext, permission: Permission): boolean => {
   try {
     assertAllowed(context, permission);
+
     return true;
   } catch (cause) {
-    if (cause instanceof AuthorizationError) return false;
+    if (cause instanceof AuthorizationError) {
+      return false;
+    }
+
     throw cause;
   }
 };
 
 /** The context for a member of staff acting from this device at this facility. */
 export const authorizationFor = (input: {
-  staff: Pick<Staff, 'staffId' | 'role' | 'permission' | 'additionalRoles' | 'additionalPermissions'>;
+  staff: Pick<
+    Staff,
+    'staffId' | 'role' | 'permission' | 'additionalRoles' | 'additionalPermissions'
+  >;
   facilityId: string;
   deviceId: string;
 }): AuthorizationContext => ({

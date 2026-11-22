@@ -9,6 +9,7 @@ import { indicatorFor, useSyncStatus } from '@/data';
 export const SyncPill = ({ className }: { className?: string }) => {
   const sync = useSyncStatus();
   const status = indicatorFor(sync);
+
   return (
     <StatusPill status={status} className={className}>
       {status === 'pending' ? `${sync.pending} waiting to sync` : undefined}

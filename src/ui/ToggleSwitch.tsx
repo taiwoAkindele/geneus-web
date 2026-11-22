@@ -30,4 +30,4 @@ export const ToggleSwitch = ({ checked, onChange, disabled, ariaLabel, className
       />
     </button>
   );
-}
+};

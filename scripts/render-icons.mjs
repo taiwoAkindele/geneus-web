@@ -22,7 +22,8 @@ const CHROME_CANDIDATES = [
 ];
 
 const chrome = CHROME_CANDIDATES.find((candidate) => candidate && existsSync(candidate));
-if (!chrome) throw new Error('no Chrome found — set CHROME_PATH to a Chrome or Chromium executable');
+if (!chrome)
+  throw new Error('no Chrome found — set CHROME_PATH to a Chrome or Chromium executable');
 
 const favicon = readFileSync('public/favicon.svg', 'utf8');
 // A maskable icon is cropped by the launcher to its own shape, so it must fill
@@ -40,7 +41,10 @@ try {
   for (const icon of icons) {
     const page = path.join(workDirectory, `${icon.size}.html`);
     const sizedSvg = icon.svg.replace('<svg ', `<svg width="${icon.size}" height="${icon.size}" `);
-    writeFileSync(page, `<!doctype html><html><body style="margin:0;background:transparent">${sizedSvg}</body></html>`);
+    writeFileSync(
+      page,
+      `<!doctype html><html><body style="margin:0;background:transparent">${sizedSvg}</body></html>`,
+    );
     const output = path.resolve('public/icons', icon.file);
     execFileSync(chrome, [
       '--headless',

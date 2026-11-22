@@ -7,9 +7,16 @@ export const internationalPhone = (input: string): string | undefined => {
   const trimmed = input.trim();
   const digits = trimmed.replace(/[\s\-().]/g, '');
   let candidate: string;
-  if (/^\+\d+$/.test(digits)) candidate = digits;
-  else if (/^0\d{10}$/.test(digits)) candidate = `+234${digits.slice(1)}`;
-  else if (/^234\d{10}$/.test(digits)) candidate = `+${digits}`;
-  else return undefined;
+
+  if (/^\+\d+$/.test(digits)) {
+    candidate = digits;
+  } else if (/^0\d{10}$/.test(digits)) {
+    candidate = `+234${digits.slice(1)}`;
+  } else if (/^234\d{10}$/.test(digits)) {
+    candidate = `+${digits}`;
+  } else {
+    return undefined;
+  }
+
   return /^\+[1-9]\d{7,14}$/.test(candidate) ? candidate : undefined;
 };

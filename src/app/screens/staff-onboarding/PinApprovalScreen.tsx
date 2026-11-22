@@ -10,6 +10,18 @@ import { checkInvitationCode, emailPinSetupCode } from '@/lib/api/staff';
 import { ApiError } from '@/lib/api/client';
 import { approvePinSetup, checkPin, hasPin, pinLength, useAuth, type RosterEntry } from '@/session';
 
+const codeCheckFailure = (cause: unknown): string => {
+  if (cause instanceof AuthorizationError) {
+    return 'This phone hasn’t synced in a while — connect to the internet and try again';
+  }
+
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+
+  return 'Could not check the code';
+};
+
 type ApprovalState = { staffId?: string; fullName?: string; role?: string; reset?: boolean };
 
 /**
@@ -49,12 +61,20 @@ export const PinApprovalScreen = () => {
   const [emailing, setEmailing] = useState(false);
 
   const person = roster.find((entry) => entry.staff.staffId === state.staffId);
-  if (loading) return null;
-  if (!state.staffId || !person) return <Navigate to="/login" replace />;
+
+  if (loading) {
+    return null;
+  }
+
+  if (!state.staffId || !person) {
+    return <Navigate to="/login" replace />;
+  }
 
   const approvers = roster.filter(
     (entry) =>
-      mayApprovePin(entry.staff, person.staff) && entry.staff.staffId !== person.staff.staffId && hasPin(entry.staff.staffId),
+      mayApprovePin(entry.staff, person.staff) &&
+      entry.staff.staffId !== person.staff.staffId &&
+      hasPin(entry.staff.staffId),
   );
 
   const approved = () => {
@@ -66,42 +86,55 @@ export const PinApprovalScreen = () => {
   };
 
   const useCode = async () => {
-    if (!code.trim() || checking) return;
+    if (!code.trim() || checking) {
+      return;
+    }
+
     setChecking(true);
     setError(undefined);
+
     try {
       const match = await findMatchingCode(person.staff.staffId, code);
+
       if (!match) {
         // Not a code read aloud that this phone holds: it may be an emailed invitation,
         // which only the server can check and accept — so it needs a connection.
         if (!navigator.onLine) {
-          setError('That code isn’t on this phone. If it came in an email, connect to the internet and try again. Codes last 24 hours and only the newest one works.');
+          setError(
+            'That code isn’t on this phone. If it came in an email, connect to the internet and try again. Codes last 24 hours and only the newest one works.',
+          );
+
           return;
         }
+
         try {
           await checkInvitationCode(person.staff.staffId, code);
         } catch (cause) {
-          setError(cause instanceof ApiError && cause.code === 'offline'
-            ? 'Can’t reach Geneus right now. Check the connection and try again.'
-            : 'That code isn’t valid. Codes last 24 hours and only the newest one works. If your admin has just made it, connect this phone so it can sync, then try again.');
+          setError(
+            cause instanceof ApiError && cause.code === 'offline'
+              ? 'Can’t reach Geneus right now. Check the connection and try again.'
+              : 'That code isn’t valid. Codes last 24 hours and only the newest one works. If your admin has just made it, connect this phone so it can sync, then try again.',
+          );
+
           return;
         }
+
         rememberSetupCode(person.staff.staffId, code, true);
         approved();
+
         return;
       }
-      await markCodeUsed(match, claimingFor({ staff: person.staff, facilityId: facility?.code ?? '', deviceId }));
+
+      await markCodeUsed(
+        match,
+        claimingFor({ staff: person.staff, facilityId: facility?.code ?? '', deviceId }),
+      );
+
       // The same code later registers the new PIN with the server, proving who chose it.
       rememberSetupCode(person.staff.staffId, code);
       approved();
     } catch (cause) {
-      setError(
-        cause instanceof AuthorizationError
-          ? 'This phone hasn’t synced in a while — connect to the internet and try again'
-          : cause instanceof Error
-            ? cause.message
-            : 'Could not check the code',
-      );
+      setError(codeCheckFailure(cause));
     } finally {
       setChecking(false);
     }
@@ -109,9 +142,13 @@ export const PinApprovalScreen = () => {
 
   /** A facility admin with no one to approve them: the server emails their own PIN code (SCHEMA.md §10). */
   const emailMeACode = async () => {
-    if (emailing) return;
+    if (emailing) {
+      return;
+    }
+
     setEmailing(true);
     setError(undefined);
+
     try {
       const sent = await emailPinSetupCode(person.staff.staffId);
       setEmailedTo(sent.sentTo);
@@ -125,21 +162,34 @@ export const PinApprovalScreen = () => {
   };
 
   const onDigit = async (digit: string) => {
-    if (!approver) return;
+    if (!approver) {
+      return;
+    }
+
     const digits = pinLength(approver.staff.staffId);
-    if (pin.length >= digits || checking) return;
+
+    if (pin.length >= digits || checking) {
+      return;
+    }
+
     setError(undefined);
     const next = pin + digit;
     setPin(next);
-    if (next.length < digits) return;
+
+    if (next.length < digits) {
+      return;
+    }
 
     setChecking(true);
     const result = await checkPin(approver.staff.staffId, next);
     setChecking(false);
+
     if (result.ok) {
       approved();
+
       return;
     }
+
     setPin('');
     setError(
       result.reason === 'locked'
@@ -166,14 +216,18 @@ export const PinApprovalScreen = () => {
               I have a code from my admin
             </Button>
             <Button variant="outlined" onClick={() => setMode('approver')}>
-              {hasRole(person.staff, 'facility_admin') ? 'Another facility admin is here' : 'An admin or supervisor is here'}
+              {hasRole(person.staff, 'facility_admin')
+                ? 'Another facility admin is here'
+                : 'An admin or supervisor is here'}
             </Button>
             {hasRole(person.staff, 'facility_admin') ? (
               <Button variant="ghost" loading={emailing} onClick={emailMeACode}>
                 Email me a code
               </Button>
             ) : null}
-            {error ? <p className="text-center text-[13px] font-semibold text-danger">{error}</p> : null}
+            {error ? (
+              <p className="text-center text-[13px] font-semibold text-danger">{error}</p>
+            ) : null}
             <p className="mt-2 text-center text-[13px] leading-relaxed text-ink-muted">
               {hasRole(person.staff, 'facility_admin')
                 ? 'No other admin to ask? We can email a code to the address you registered with. This phone needs an internet connection.'
@@ -186,8 +240,8 @@ export const PinApprovalScreen = () => {
           <div className="mt-8 space-y-4">
             {emailedTo ? (
               <p className="text-[13px] leading-relaxed text-ink-muted">
-                We emailed a code to <b className="text-ink">{emailedTo}</b>. It can take a minute to arrive, and this
-                phone needs to stay online until it has synced.
+                We emailed a code to <b className="text-ink">{emailedTo}</b>. It can take a minute
+                to arrive, and this phone needs to stay online until it has synced.
               </p>
             ) : null}
             <TextField
@@ -242,17 +296,24 @@ export const PinApprovalScreen = () => {
 
         {mode === 'approver' && approver ? (
           <div className="mt-8 flex flex-col items-center">
-            <div className="text-[13px] font-semibold text-ink-soft">{approver.staff.fullName}, enter your PIN</div>
+            <div className="text-[13px] font-semibold text-ink-soft">
+              {approver.staff.fullName}, enter your PIN
+            </div>
             <PinDots
               length={pinLength(approver.staff.staffId)}
               filled={pin.length}
               className={`mt-4 ${error ? 'animate-shake' : ''}`}
             />
-            {error ? <p className="mt-3 text-center text-[13px] font-semibold text-danger">{error}</p> : null}
+            {error ? (
+              <p className="mt-3 text-center text-[13px] font-semibold text-danger">{error}</p>
+            ) : null}
             <div className="mt-6 w-full max-w-[300px]">
               <PinKeypad
                 onDigit={onDigit}
-                action={{ label: 'Delete', onPress: () => setPin((current) => current.slice(0, -1)) }}
+                action={{
+                  label: 'Delete',
+                  onPress: () => setPin((current) => current.slice(0, -1)),
+                }}
                 tone="light"
               />
             </div>
@@ -270,6 +331,7 @@ export const PinApprovalScreen = () => {
             } else {
               navigate('/login', { replace: true });
             }
+
             setError(undefined);
           }}
           className="mx-auto mt-auto min-h-0 pt-6 text-[13px] font-bold text-brand"

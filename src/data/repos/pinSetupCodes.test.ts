@@ -12,7 +12,9 @@ const HOUR = 60 * 60 * 1000;
 const ITERATIONS = 1000;
 const SALT = 'c2FsdC1mb3ItdGVzdHM=';
 
-const codeRow = async (overrides: Partial<PinSetupCode> = {}): Promise<Record<string, unknown>> => ({
+const codeRow = async (
+  overrides: Partial<PinSetupCode> = {},
+): Promise<Record<string, unknown>> => ({
   id: 'pin_setup_code:one',
   facilityId: 'OOE-PHC',
   schemaVersion: 3,
@@ -58,9 +60,16 @@ describe('PIN setup codes on the device', () => {
 
   it('ignores a code that has expired, been replaced, or been used', async () => {
     await seed(
-      await codeRow({ id: 'pin_setup_code:expired', expiresOn: new Date(Date.now() - HOUR).toISOString() }),
+      await codeRow({
+        id: 'pin_setup_code:expired',
+        expiresOn: new Date(Date.now() - HOUR).toISOString(),
+      }),
       await codeRow({ id: 'pin_setup_code:revoked', revokedOn: new Date().toISOString() }),
-      await codeRow({ id: 'pin_setup_code:used', usedOn: new Date().toISOString(), usedOnDevice: 'device-2' }),
+      await codeRow({
+        id: 'pin_setup_code:used',
+        usedOn: new Date().toISOString(),
+        usedOnDevice: 'device-2',
+      }),
     );
 
     expect(await findMatchingCode('staff:nurse', 'K7QM2XPA')).toBeUndefined();
@@ -72,24 +81,35 @@ describe('PIN setup codes on the device', () => {
 
     await markCodeUsed(
       code as PinSetupCode,
-      claimingFor({ staff: { staffId: 'staff:nurse', role: 'nurse' }, facilityId: 'OOE-PHC', deviceId: 'device-1' }),
+      claimingFor({
+        staff: { staffId: 'staff:nurse', role: 'nurse' },
+        facilityId: 'OOE-PHC',
+        deviceId: 'device-1',
+      }),
     );
 
     expect(db.statements).toHaveLength(1);
-    expect(db.statements[0]?.sql).toMatch(/^UPDATE pin_setup_codes SET "usedOn" = \?, "usedOnDevice" = \?, "updatedBy" = \?, "updatedOn" = \?/);
+    expect(db.statements[0]?.sql).toMatch(
+      /^UPDATE pin_setup_codes SET "usedOn" = \?, "usedOnDevice" = \?, "updatedBy" = \?, "updatedOn" = \?/,
+    );
+
     expect(db.statements[0]?.parameters).toContain('staff:nurse');
   });
 
   it('cannot be marked used through a signed-in session — not even an admin holds the claim', async () => {
     await seed(await codeRow());
     const code = await findMatchingCode('staff:nurse', 'K7QM2XPA');
+
     const admin = authorizationFor({
       staff: { staffId: 'staff:admin', role: 'facility_admin', permission: 'read_write' },
       facilityId: 'OOE-PHC',
       deviceId: 'device-1',
     });
 
-    await expect(markCodeUsed(code as PinSetupCode, admin)).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(markCodeUsed(code as PinSetupCode, admin)).rejects.toBeInstanceOf(
+      AuthorizationError,
+    );
+
     expect(db.statements).toEqual([]);
   });
 });

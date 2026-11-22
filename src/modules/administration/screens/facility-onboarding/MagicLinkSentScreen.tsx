@@ -1,15 +1,15 @@
-import { useLocation, useNavigate } from "react-router-dom";
-import { Button } from "@/ui";
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Button } from '@/ui';
 
-type LinkState = { method?: "email" | "phone"; contact?: string };
+type LinkState = { method?: 'email' | 'phone'; contact?: string };
 
 export const MagicLinkSentScreen = () => {
   const navigate = useNavigate();
   const { state } = useLocation() as { state: LinkState | null };
-  const method = state?.method ?? "email";
-  const isEmail = method === "email";
+  const method = state?.method ?? 'email';
+  const isEmail = method === 'email';
   const contact = state?.contact?.trim();
-  const target = contact || (isEmail ? "your email" : "your phone");
+  const target = contact || (isEmail ? 'your email' : 'your phone');
 
   return (
     <div className="flex min-h-screen flex-col bg-brand px-7 pb-8 pt-12 text-white sm:min-h-0">
@@ -25,32 +25,27 @@ export const MagicLinkSentScreen = () => {
             ✓
           </div>
           <h1 className="mt-5 text-2xl font-extrabold tracking-[-0.02em]">
-            {isEmail ? "Check your email" : "Check your phone"}
+            {isEmail ? 'Check your email' : 'Check your phone'}
           </h1>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">
-            We sent a secure link {isEmail ? "to" : "by SMS to"}{" "}
-            <b className="text-ink">{target}</b>. Open it on this device to
-            continue setting up your facility.
+            We sent a secure link {isEmail ? 'to' : 'by SMS to'}{' '}
+            <b className="text-ink">{target}</b>. Open it on this device to continue setting up your
+            facility.
           </p>
-          <p className="mt-3 text-[13px] text-ink-muted">
-            The link expires in 15 minutes.
-          </p>
+          <p className="mt-3 text-[13px] text-ink-muted">The link expires in 15 minutes.</p>
 
           <div className="mt-6">
-            <Button
-              variant="outlined"
-              onClick={() => navigate("/onboarding/start")}
-            >
+            <Button variant="outlined" onClick={() => navigate('/onboarding/start')}>
               Resend link
             </Button>
           </div>
         </div>
 
         <div className="mt-auto pt-8 text-center text-sm text-brand-on-dark">
-          Entered the wrong {isEmail ? "address" : "number"}?{" "}
+          Entered the wrong {isEmail ? 'address' : 'number'}?{' '}
           <button
             type="button"
-            onClick={() => navigate("/onboarding/start")}
+            onClick={() => navigate('/onboarding/start')}
             className="min-h-0 font-bold text-white underline"
           >
             Start over

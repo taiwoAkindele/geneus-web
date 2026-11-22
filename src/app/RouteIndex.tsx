@@ -14,14 +14,22 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { to: '/home', label: 'Facility home', note: 'Signed-in hub' },
       { to: '/frontdesk/patients', label: 'Front desk patients', note: '' },
       { to: '/clinical/patients', label: 'Clinical patients', note: 'Needs chart access' },
-      { to: '/patients/identity', label: 'Patient identity review', note: 'Compare duplicates and review linked IDs' },
+      {
+        to: '/patients/identity',
+        label: 'Patient identity review',
+        note: 'Compare duplicates and review linked IDs',
+      },
       { to: '/patients/new', label: 'New patient', note: 'One screen; optional visit booking' },
       { to: '/patients/new/details', label: 'New patient (old step 2 address)', note: 'Redirects' },
       { to: '/patients/duplicate', label: 'Duplicate check', note: 'Bottom sheet' },
       { to: '/patients/send-to-unit', label: 'Send to another unit', note: '' },
       { to: '/units', label: 'Unit queue', note: '' },
       { to: '/admin/units', label: 'Units & rooms (admin)', note: '' },
-      { to: '/billing', label: 'Billing', note: 'Departments, fee categories, cash and bank transfers' },
+      {
+        to: '/billing',
+        label: 'Billing',
+        note: 'Departments, fee categories, cash and bank transfers',
+      },
       { to: '/registers/malaria', label: 'Programme register — Malaria', note: '' },
       { to: '/reports/month', label: 'This month at a glance', note: '' },
       { to: '/referrals/track', label: 'Refer & track', note: '' },
@@ -85,4 +93,4 @@ export const RouteIndex = () => {
       </div>
     </div>
   );
-}
+};

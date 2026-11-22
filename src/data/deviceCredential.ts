@@ -20,8 +20,13 @@ export const saveDeviceCredential = (credential: DeviceCredential): Promise<void
 
 export const getDeviceCredential = (): DeviceCredential | undefined => {
   const raw = secureGet(CREDENTIAL_KEY);
-  if (!raw) return undefined;
+
+  if (!raw) {
+    return undefined;
+  }
+
   const parsed = DeviceCredential.safeParse(JSON.parse(raw));
+
   return parsed.success ? parsed.data : undefined;
 };
 
@@ -36,8 +41,12 @@ export const clearDeviceCredential = (): void => {
  * clock, which a cheap phone cannot be trusted to keep (root §4.3).
  */
 export const recordServerContact = (serverTime: string, expectedDeviceId?: string): void => {
-  if (expectedDeviceId && getDeviceCredential()?.deviceId !== expectedDeviceId) return;
+  if (expectedDeviceId && getDeviceCredential()?.deviceId !== expectedDeviceId) {
+    return;
+  }
+
   void secureSet(LAST_CONTACT_KEY, serverTime);
 };
 
-export const lastServerContactOn = (): string | undefined => secureGet(LAST_CONTACT_KEY) ?? undefined;
+export const lastServerContactOn = (): string | undefined =>
+  secureGet(LAST_CONTACT_KEY) ?? undefined;

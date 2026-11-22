@@ -34,25 +34,39 @@ export const ReconcileQueue = () => {
   const [busyId, setBusyId] = useState<string>();
   const canResolve = context.permissions.includes('sync_rejection:resolve');
   const rejections = open.data ?? [];
-  const nameOf = (staffId: string) => staff.data?.find((member) => member.staffId === staffId)?.fullName ?? staffId;
+
+  const nameOf = (staffId: string) =>
+    staff.data?.find((member) => member.staffId === staffId)?.fullName ?? staffId;
 
   const act = async (rejection: SyncRejection, work: () => Promise<unknown>, done: string) => {
-    if (working.current) return;
+    if (working.current) {
+      return;
+    }
+
     working.current = true;
     setBusyId(rejection.id);
+
     try {
       await work();
       toast(done);
     } catch (cause) {
-      if (!(cause instanceof AuthorizationError)) console.error('reconcile action failed', cause);
-      toast(cause instanceof Error ? cause.message : 'Could not resolve this — please try again', { tone: 'error' });
+      if (!(cause instanceof AuthorizationError)) {
+        console.error('reconcile action failed', cause);
+      }
+
+      toast(cause instanceof Error ? cause.message : 'Could not resolve this — please try again', {
+        tone: 'error',
+      });
     } finally {
       working.current = false;
       setBusyId(undefined);
     }
   };
 
-  if (open.loading) return <div className="h-[80px] animate-pulse rounded-card bg-surface-muted" />;
+  if (open.loading) {
+    return <div className="h-[80px] animate-pulse rounded-card bg-surface-muted" />;
+  }
+
   if (open.error) {
     return (
       <div className="rounded-card bg-white p-4 text-[13px] text-danger-strong">
@@ -63,10 +77,12 @@ export const ReconcileQueue = () => {
       </div>
     );
   }
+
   if (rejections.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-outline p-4 text-center text-[13px] text-ink-muted">
-        No unresolved review items are currently available on this device. This does not confirm that every queued change has reached the server.
+        No unresolved review items are currently available on this device. This does not confirm
+        that every queued change has reached the server.
       </div>
     );
   }
@@ -82,11 +98,23 @@ export const ReconcileQueue = () => {
           canResolve={canResolve}
           applyBlocker={applyAgainBlocker(rejection, context)}
           nameOf={nameOf}
-          patientNameOf={(id) => patients.data?.find((patient) => patient.patientId === id)?.fullName}
+          patientNameOf={(id) =>
+            patients.data?.find((patient) => patient.patientId === id)?.fullName
+          }
           busy={busyId === rejection.id}
-          onKeepServer={() => void act(rejection, () => resolveRejection(rejection, 'Kept the saved values', context), 'Kept what is saved')}
+          onKeepServer={() =>
+            void act(
+              rejection,
+              () => resolveRejection(rejection, 'Kept the saved values', context),
+              'Kept what is saved',
+            )
+          }
           onUseDevice={(columns) =>
-            void act(rejection, () => applyDeviceValues(rejection, columns, context), 'This device’s values applied')
+            void act(
+              rejection,
+              () => applyDeviceValues(rejection, columns, context),
+              'This device’s values applied',
+            )
           }
           onReRegister={() =>
             void act(
@@ -98,8 +126,20 @@ export const ReconcileQueue = () => {
               'Held records restored',
             )
           }
-          onApplyAgain={() => void act(rejection, () => applyAgain(rejection, context), 'Saved locally and queued again in your name')}
-          onDiscard={() => void act(rejection, () => discardRejection(rejection, context), 'Discarded — recorded in your name')}
+          onApplyAgain={() =>
+            void act(
+              rejection,
+              () => applyAgain(rejection, context),
+              'Saved locally and queued again in your name',
+            )
+          }
+          onDiscard={() =>
+            void act(
+              rejection,
+              () => discardRejection(rejection, context),
+              'Discarded — recorded in your name',
+            )
+          }
         />
       ))}
     </div>

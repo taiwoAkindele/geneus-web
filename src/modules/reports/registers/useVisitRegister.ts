@@ -11,12 +11,35 @@ import type { RegisterDef } from './types';
 /** A visit-linked register's rows, worked out from the visits on this device. */
 export const useVisitRegister = (register: RegisterDef | undefined) => {
   const load = useCallback(async () => {
-    const [encounters, entries, patients, staff, appointments] = await Promise.all([listEncounters(), listEncounterEntries(), listPatients(), listStaff(), listAppointments()]);
-    return { encounters, entries, patients, appointments, staffNames: new Map(staff.map((member) => [member.staffId, member.fullName])) };
+    const [encounters, entries, patients, staff, appointments] = await Promise.all([
+      listEncounters(),
+      listEncounterEntries(),
+      listPatients(),
+      listStaff(),
+      listAppointments(),
+    ]);
+
+    return {
+      encounters,
+      entries,
+      patients,
+      appointments,
+      staffNames: new Map(staff.map((member) => [member.staffId, member.fullName])),
+    };
   }, []);
+
   const query = useLiveQuery(load);
-  const rows = useMemo<VisitRegisterRow[]>(() => register?.visitLink && query.data
-    ? visitRegisterRows({ registerId: register.id, fields: register.fields, visitLink: register.visitLink }, { ...query.data, completions: register.completions, localDate: calendarDate })
-    : [], [register, query.data]);
+
+  const rows = useMemo<VisitRegisterRow[]>(
+    () =>
+      register?.visitLink && query.data
+        ? visitRegisterRows(
+            { registerId: register.id, fields: register.fields, visitLink: register.visitLink },
+            { ...query.data, completions: register.completions, localDate: calendarDate },
+          )
+        : [],
+    [register, query.data],
+  );
+
   return { rows, loading: query.loading, error: query.error, reload: query.reload };
 };

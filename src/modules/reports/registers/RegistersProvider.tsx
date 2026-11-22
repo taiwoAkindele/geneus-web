@@ -1,7 +1,13 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
-import { addEntry, listDefinitions, listEntries, publishDefinition, saveDraftDefinition } from '@/data/repos/registers';
+import {
+  addEntry,
+  listDefinitions,
+  listEntries,
+  publishDefinition,
+  saveDraftDefinition,
+} from '@/data/repos/registers';
 import { listStaff } from '@/data/repos/staff';
 import { projectRegisters } from './registerProjection';
 import type { EntryValues, RegisterDef, RegisterDraft } from './types';
@@ -20,8 +26,16 @@ type Value = {
   error: Error | undefined;
   reload: () => void;
   getById: (registerId: string) => RegisterDef | undefined;
-  publish: (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => Promise<RegisterDef['configuration']>;
-  saveDraft: (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => Promise<RegisterDef['configuration']>;
+  publish: (
+    draft: RegisterDraft,
+    editingId: string | null,
+    expectedVersion?: number,
+  ) => Promise<RegisterDef['configuration']>;
+  saveDraft: (
+    draft: RegisterDraft,
+    editingId: string | null,
+    expectedVersion?: number,
+  ) => Promise<RegisterDef['configuration']>;
   /** Returns validation issues; an empty list means the entry was saved. */
   addEntry: (registerId: string, entry: NewEntry) => Promise<string[]>;
 };
@@ -32,7 +46,12 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
   const context = useAuthorizationContext();
 
   const load = useCallback(async () => {
-    const [definitions, entries, staff] = await Promise.all([listDefinitions(), listEntries(), listStaff()]);
+    const [definitions, entries, staff] = await Promise.all([
+      listDefinitions(),
+      listEntries(),
+      listStaff(),
+    ]);
+
     return projectRegisters(definitions, entries, staff);
   }, []);
 
@@ -51,11 +70,19 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
     [context],
   );
 
-  const saveDraft = useCallback((draft: RegisterDraft, editingId: string | null, expectedVersion?: number) => saveDraftDefinition(draft, editingId, context, expectedVersion), [context]);
+  const saveDraft = useCallback(
+    (draft: RegisterDraft, editingId: string | null, expectedVersion?: number) =>
+      saveDraftDefinition(draft, editingId, context, expectedVersion),
+    [context],
+  );
 
   const record = useCallback(
     async (registerId: string, entry: NewEntry) => {
-      const result = await addEntry({ registerId, values: entry.values, ...(entry.visit ? { visit: entry.visit } : {}) }, context);
+      const result = await addEntry(
+        { registerId, values: entry.values, ...(entry.visit ? { visit: entry.visit } : {}) },
+        context,
+      );
+
       return result.saved ? [] : result.issues;
     },
     [context],
@@ -71,6 +98,10 @@ export const RegistersProvider = ({ children }: { children: ReactNode }) => {
 
 export const useRegisters = (): Value => {
   const context = useContext(RegistersContext);
-  if (!context) throw new Error('useRegisters must be used within a RegistersProvider');
+
+  if (!context) {
+    throw new Error('useRegisters must be used within a RegistersProvider');
+  }
+
   return context;
 };

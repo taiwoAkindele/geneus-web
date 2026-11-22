@@ -10,9 +10,11 @@ const explain = (cause: unknown): string => {
   if (cause instanceof ApiError && cause.code === 'invalid_code') {
     return 'That code is not valid — it may have expired (codes last 15 minutes) or been used. Ask for a new one.';
   }
+
   if (cause instanceof ApiError && cause.code === 'device_already_enrolled') {
     return 'This device is already enrolled. Sign in instead, or ask your admin to remove it first.';
   }
+
   return cause instanceof Error ? cause.message : 'Could not join the facility';
 };
 
@@ -34,9 +36,13 @@ export const JoinFacilityScreen = () => {
   const ready = normalizeEnrollmentCode(code).length >= 8;
 
   const submit = async () => {
-    if (!ready || joining) return;
+    if (!ready || joining) {
+      return;
+    }
+
     setJoining(true);
     setError(undefined);
+
     try {
       const device = await joinFacility(code, deviceId, label);
       // Waits (bounded) for the facility's records; sign-in shows the rest syncing if it is slow.
@@ -56,10 +62,12 @@ export const JoinFacilityScreen = () => {
           <div className="absolute left-1/2 top-1/2 h-6 w-[7px] -translate-x-1/2 -translate-y-1/2 rounded bg-brand" />
         </div>
 
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em]">Add this device to your facility</h1>
+        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em]">
+          Add this device to your facility
+        </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-brand-on-dark">
-          A facility admin gets a device code from Admin → Add a device on a phone that is already set up. Enter it here
-          while you are connected.
+          A facility admin gets a device code from Admin → Add a device on a phone that is already
+          set up. Enter it here while you are connected.
         </p>
 
         {enrolled ? (
@@ -105,7 +113,11 @@ export const JoinFacilityScreen = () => {
 
         <div className="mt-auto pt-8 text-center text-sm text-brand-on-dark">
           Setting up a new facility instead?{' '}
-          <button type="button" onClick={() => navigate('/onboarding/start')} className="min-h-0 font-bold text-white underline">
+          <button
+            type="button"
+            onClick={() => navigate('/onboarding/start')}
+            className="min-h-0 font-bold text-white underline"
+          >
             Use an invite code
           </button>
         </div>

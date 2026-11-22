@@ -35,7 +35,7 @@ const SectionLabel = ({ children }: { children: string }) => {
       {children}
     </h3>
   );
-}
+};
 
 export const FoundationsScreen = () => {
   const [sex, setSex] = useState<'F' | 'M'>('F');
@@ -59,7 +59,9 @@ export const FoundationsScreen = () => {
             <div className="text-lg font-semibold">Title 18</div>
             <div className="text-base text-ink-soft">Body 16 — legible in the sun.</div>
             <div className="text-[13px] font-semibold text-ink-muted">Label 13</div>
-            <div className="pt-1 font-mono text-2xl font-semibold text-brand">OOE-PHC-000047-K2</div>
+            <div className="pt-1 font-mono text-2xl font-semibold text-brand">
+              OOE-PHC-000047-K2
+            </div>
           </Card>
         </section>
 
@@ -190,4 +192,4 @@ export const FoundationsScreen = () => {
       </main>
     </div>
   );
-}
+};

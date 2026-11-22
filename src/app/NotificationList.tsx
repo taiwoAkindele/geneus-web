@@ -24,10 +24,26 @@ type Props = {
 export const NotificationList = ({ notifications, onDone, loading, error }: Props) => {
   const navigate = useNavigate();
 
-  if (loading) return <p role="status" className="px-4 py-6 text-sm text-ink-muted">Reading alerts…</p>;
-  if (error) return <p role="alert" className="px-4 py-6 text-sm text-danger">Alerts could not be read. Open Sync &amp; device to check the connection.</p>;
+  if (loading) {
+    return (
+      <p role="status" className="px-4 py-6 text-sm text-ink-muted">
+        Reading alerts…
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p role="alert" className="px-4 py-6 text-sm text-danger">
+        Alerts could not be read. Open Sync &amp; device to check the connection.
+      </p>
+    );
+  }
+
   if (notifications.length === 0) {
-    return <div className="px-4 py-8 text-center text-[13px] text-ink-muted">You're all caught up.</div>;
+    return (
+      <div className="px-4 py-8 text-center text-[13px] text-ink-muted">You're all caught up.</div>
+    );
   }
 
   return (
@@ -37,7 +53,10 @@ export const NotificationList = ({ notifications, onDone, loading, error }: Prop
           <button
             type="button"
             onClick={() => {
-              if (n.to) navigate(n.to);
+              if (n.to) {
+                navigate(n.to);
+              }
+
               onDone();
             }}
             className="flex w-full items-start gap-3 px-4 py-3.5 text-left"
@@ -52,7 +71,9 @@ export const NotificationList = ({ notifications, onDone, loading, error }: Prop
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2">
                 <span className="truncate text-[14px] font-bold text-ink">{n.title}</span>
-                {!n.read ? <span className="h-2 w-2 flex-none rounded-full bg-brand-strong" /> : null}
+                {!n.read ? (
+                  <span className="h-2 w-2 flex-none rounded-full bg-brand-strong" />
+                ) : null}
               </span>
               <span className="mt-0.5 block text-[13px] leading-snug text-ink-muted">{n.body}</span>
             </span>

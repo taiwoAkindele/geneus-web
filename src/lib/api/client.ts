@@ -20,23 +20,58 @@ export class ApiError extends Error {
 
 const OFFLINE_MESSAGE = 'Cannot reach the Geneus server — check the connection and try again';
 
+/**
+ * Reads a reply body as JSON. A body that is empty or not JSON (a proxy's HTML error
+ * page, for example) reads as `undefined` on purpose: callers decide from the status
+ * code, so an unreadable body is not itself the error to report.
+ */
+export const readJsonBody = async (response: Response): Promise<unknown> => {
+  try {
+    return await response.json();
+  } catch {
+    return undefined;
+  }
+};
+
 /** Binary documents use the same API origin/error boundary; bytes never enter JSON or logs. */
-export const binaryRequest=async(path:string,init:RequestInit):Promise<Response>=>{
-  let response:Response;
-  try{response=await fetch(`${BASE_URL}${path}`,init);}catch(cause){if(cause instanceof Error&&cause.name==='AbortError')throw cause;throw new ApiError('offline',OFFLINE_MESSAGE);}
-  if(!response.ok){const detail=await response.json().catch(()=>undefined) as {error?:string;message?:string}|undefined;throw new ApiError(detail?.error??'request_failed',detail?.message??`The document request was refused (${response.status})`,response.status);}
+export const binaryRequest = async (path: string, init: RequestInit): Promise<Response> => {
+  let response: Response;
+
+  try {
+    response = await fetch(`${BASE_URL}${path}`, init);
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === 'AbortError') {
+      throw cause;
+    }
+
+    throw new ApiError('offline', OFFLINE_MESSAGE);
+  }
+
+  if (!response.ok) {
+    const detail = (await readJsonBody(response)) as
+      { error?: string; message?: string } | undefined;
+
+    throw new ApiError(
+      detail?.error ?? 'request_failed',
+      detail?.message ?? `The document request was refused (${response.status})`,
+      response.status,
+    );
+  }
+
   return response;
 };
 
 const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   let response: Response;
+
   try {
     response = await fetch(`${BASE_URL}${path}`, init);
   } catch {
     throw new ApiError('offline', OFFLINE_MESSAGE);
   }
 
-  const payload = await response.json().catch(() => undefined);
+  const payload = await readJsonBody(response);
+
   if (!response.ok) {
     const detail = payload as { error?: string; message?: string; details?: unknown } | undefined;
     throw new ApiError(
@@ -46,12 +81,28 @@ const request = async <T>(path: string, init: RequestInit): Promise<T> => {
       detail?.details,
     );
   }
+
   return payload as T;
 };
 
 /** Online-only private reads; tokens stay in the signed-in person's memory. */
-export const workforceRequest = <T>(path: string, credential: string, token?: string, body?: unknown, method = body === undefined ? 'GET' : 'POST'): Promise<T> =>
-  request<T>(path, { method, cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...(token ? { 'x-workforce-access': token } : {}), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+export const workforceRequest = <T>(
+  path: string,
+  credential: string,
+  token?: string,
+  body?: unknown,
+  method = body === undefined ? 'GET' : 'POST',
+): Promise<T> =>
+  request<T>(path, {
+    method,
+    cache: 'no-store',
+    headers: {
+      authorization: `Bearer ${credential}`,
+      ...(token ? { 'x-workforce-access': token } : {}),
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 
 /** The full address of a server path, for a plain link the browser opens itself (e.g. a PDF download). */
 export const apiUrl = (path: string): string => `${BASE_URL}${path}`;
@@ -81,10 +132,35 @@ export const postAsDevice = <T>(path: string, credential: string, body?: unknown
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-export const isUnauthorized = (cause: unknown): boolean => cause instanceof ApiError && cause.status === 401;
+export const isUnauthorized = (cause: unknown): boolean =>
+  cause instanceof ApiError && cause.status === 401;
 
 /** Who is acting: the person signed in on this enrolled device, and their server session when one is open. */
-export const staffHeaders = (session: string | undefined, actor: string | undefined): Record<string, string> => ({ 'x-integrated-billing-version':'1','x-billing-catalogue-version': '1', ...(session ? { 'x-staff-session': session } : {}), ...(actor ? { 'x-actor-staff-id': actor } : {}) });
+export const staffHeaders = (
+  session: string | undefined,
+  actor: string | undefined,
+): Record<string, string> => ({
+  'x-integrated-billing-version': '1',
+  'x-billing-catalogue-version': '1',
+  ...(session ? { 'x-staff-session': session } : {}),
+  ...(actor ? { 'x-actor-staff-id': actor } : {}),
+});
+
 /** An online action by the signed-in person: the device credential plus who is acting. */
-export const staffRequest = <T>(path: string, credential: string, session: string | undefined, body?: unknown, actor?: string): Promise<T> =>
-  request<T>(path, { method: 'POST', cache: 'no-store', headers: { authorization: `Bearer ${credential}`, ...staffHeaders(session, actor), 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });
+export const staffRequest = <T>(
+  path: string,
+  credential: string,
+  session: string | undefined,
+  body?: unknown,
+  actor?: string,
+): Promise<T> =>
+  request<T>(path, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      authorization: `Bearer ${credential}`,
+      ...staffHeaders(session, actor),
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body ?? {}),
+  });

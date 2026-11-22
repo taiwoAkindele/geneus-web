@@ -24,15 +24,25 @@ export const SelectField = forwardRef<HTMLSelectElement, Props>(function SelectF
   const selectId = id ?? props.name ?? generatedId;
   const helpId = `${selectId}-help`;
   const errorId = `${selectId}-error`;
+
   return (
     <div className="block">
-      <FieldLabel label={label} htmlFor={selectId} help={help} descriptionId={helpId} required={props.required} />
+      <FieldLabel
+        label={label}
+        htmlFor={selectId}
+        help={help}
+        descriptionId={helpId}
+        required={props.required}
+      />
       <div className="relative">
         <select
           ref={ref}
           id={selectId}
           aria-invalid={error ? true : undefined}
-          aria-describedby={[describedBy, help ? helpId : '', error ? errorId : ''].filter(Boolean).join(' ') || undefined}
+          aria-describedby={
+            [describedBy, help ? helpId : '', error ? errorId : ''].filter(Boolean).join(' ') ||
+            undefined
+          }
           className={`w-full appearance-none rounded-field border-[1.5px] bg-white px-4 py-3.5 pr-10 text-base text-ink outline-none focus:border-2 focus:border-brand ${
             error ? 'border-2 border-danger' : 'border-outline'
           } ${className}`}
@@ -52,7 +62,9 @@ export const SelectField = forwardRef<HTMLSelectElement, Props>(function SelectF
         </span>
       </div>
       {error ? (
-        <span id={errorId} className="mt-1.5 block text-[13px] font-medium text-danger">{error}</span>
+        <span id={errorId} className="mt-1.5 block text-[13px] font-medium text-danger">
+          {error}
+        </span>
       ) : null}
     </div>
   );

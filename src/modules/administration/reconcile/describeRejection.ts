@@ -30,13 +30,34 @@ export const CATEGORY_LABEL: Record<RejectionCategory, string> = {
 };
 
 export const rejectionAdvice = (rejection: SyncRejection): string => {
-  if (rejection.category === 'dependency') return 'Resolve the linked records first, then resubmit this original proposal. Its contents have been retained.';
-  if (rejection.reason.startsWith('held:')) return 'Review the patient registration first. Related records remain held with it.';
-  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') return 'Another configuration version arrived first. Sync and open the current register configuration before preparing a new draft. This refused snapshot remains available in the details.';
-  if (rejection.entityType === 'appointment' && rejection.operation === 'patch') return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';
-  if (rejection.category === 'validation') return 'Some details do not meet the server’s requirements. A records officer should review the record and check that the app and server versions agree before retrying.';
-  if (rejection.category === 'authorization') return 'The server did not allow this action for its author. Ask an authorized staff member to review the change before applying it in their name.';
-  if (rejection.category === 'identity') return 'The server could not confirm the device or staff identity. Ask a facility administrator to check access.';
+  if (rejection.category === 'dependency') {
+    return 'Resolve the linked records first, then resubmit this original proposal. Its contents have been retained.';
+  }
+
+  if (rejection.reason.startsWith('held:')) {
+    return 'Review the patient registration first. Related records remain held with it.';
+  }
+
+  if (rejection.entityType === 'register_definition' && rejection.category === 'conflict') {
+    return 'Another configuration version arrived first. Sync and open the current register configuration before preparing a new draft. This refused snapshot remains available in the details.';
+  }
+
+  if (rejection.entityType === 'appointment' && rejection.operation === 'patch') {
+    return 'Open the current booking and review its attendance, date and history. Record the intended action there; booking history cannot be overwritten from this queue.';
+  }
+
+  if (rejection.category === 'validation') {
+    return 'Some details do not meet the server’s requirements. A records officer should review the record and check that the app and server versions agree before retrying.';
+  }
+
+  if (rejection.category === 'authorization') {
+    return 'The server did not allow this action for its author. Ask an authorized staff member to review the change before applying it in their name.';
+  }
+
+  if (rejection.category === 'identity') {
+    return 'The server could not confirm the device or staff identity. Ask a facility administrator to check access.';
+  }
+
   return 'Another saved record conflicts with this change. Compare the values before deciding which should stand.';
 };
 
@@ -53,39 +74,82 @@ export type RejectionKind =
   | 'nothing_kept';
 
 const isPatientIdClash = (rejection: SyncRejection) =>
-  rejection.category === 'conflict' && rejection.entityType === 'patient' && rejection.operation === 'put' && Boolean(rejection.refusedRecord);
+  rejection.category === 'conflict' &&
+  rejection.entityType === 'patient' &&
+  rejection.operation === 'put' &&
+  Boolean(rejection.refusedRecord);
 
 /**
  * Every refusal is a decision for a person (SCHEMA.md §7) — this says which.
  * A held record stays with its patient only while that patient's clash is
  * still open; once that is resolved or discarded it is decided on its own.
  */
-export const kindOf = (rejection: SyncRejection, open: readonly SyncRejection[] = []): RejectionKind => {
+export const kindOf = (
+  rejection: SyncRejection,
+  open: readonly SyncRejection[] = [],
+): RejectionKind => {
   if (rejection.reason.startsWith('held:')) {
-    const patientId = rejection.entityType === 'patient' ? rejection.entityId : rejection.refusedRecord?.patientId;
+    const patientId =
+      rejection.entityType === 'patient' ? rejection.entityId : rejection.refusedRecord?.patientId;
+
     const clashOpen = open.some(
-      (candidate) => isPatientIdClash(candidate) && candidate.entityId === patientId && candidate.deviceId === rejection.deviceId,
+      (candidate) =>
+        isPatientIdClash(candidate) &&
+        candidate.entityId === patientId &&
+        candidate.deviceId === rejection.deviceId,
     );
-    if (clashOpen) return 'held';
+
+    if (clashOpen) {
+      return 'held';
+    }
   }
-  if (rejection.category === 'conflict' && rejection.conflicts?.length) return 'column_conflict';
-  if (isPatientIdClash(rejection)) return 'patient_id_clash';
+
+  if (rejection.category === 'conflict' && rejection.conflicts?.length) {
+    return 'column_conflict';
+  }
+
+  if (isPatientIdClash(rejection)) {
+    return 'patient_id_clash';
+  }
+
   return rejection.refusedRecord || rejection.refusedChanges ? 'refused_write' : 'nothing_kept';
 };
 
 /** Fields every record carries that say nothing about what was written. */
-const BOOKKEEPING = new Set(['id', 'type', 'facilityId', 'schemaVersion', 'createdBy', 'createdOn', 'deviceId', 'updatedBy', 'updatedOn']);
+const BOOKKEEPING = new Set([
+  'id',
+  'type',
+  'facilityId',
+  'schemaVersion',
+  'createdBy',
+  'createdOn',
+  'deviceId',
+  'updatedBy',
+  'updatedOn',
+]);
 
 /** What a refused write contained, as label/value rows — so it is read before it is applied or discarded. */
 export const keptRows = (rejection: SyncRejection): { label: string; value: string }[] =>
   Object.entries(rejection.refusedChanges ?? rejection.refusedRecord ?? {})
-    .filter(([field, value]) => !BOOKKEEPING.has(field) && value !== undefined && value !== null && value !== '')
+    .filter(
+      ([field, value]) =>
+        !BOOKKEEPING.has(field) && value !== undefined && value !== null && value !== '',
+    )
     .map(([field, value]) => ({ label: field, value: shownValue(value) }));
 
 /** A value from either side of a conflict, shown plainly. */
 export const shownValue = (value: unknown): string => {
-  if (value === undefined || value === null || value === '') return '—';
-  if (Array.isArray(value)) return value.join(', ') || '—';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (value === undefined || value === null || value === '') {
+    return '—';
+  }
+
+  if (Array.isArray(value)) {
+    return value.join(', ') || '—';
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
   return String(value);
 };

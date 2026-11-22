@@ -26,9 +26,16 @@ export const PinKeypad = ({ onDigit, action, tone = 'light' }: Props) => {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+        return;
+      }
+
       if (/^\d$/.test(event.key)) {
         event.preventDefault();
         handlers.current.onDigit(event.key);
@@ -37,12 +44,13 @@ export const PinKeypad = ({ onDigit, action, tone = 'light' }: Props) => {
         handlers.current.action?.onPress();
       }
     };
+
     window.addEventListener('keydown', onKeyDown);
+
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const key =
-    tone === 'dark' ? 'bg-white/10 text-white' : 'bg-surface-container text-ink';
+  const key = tone === 'dark' ? 'bg-white/10 text-white' : 'bg-surface-container text-ink';
   const actionColor = tone === 'dark' ? 'text-brand-on-dark' : 'text-ink-muted';
 
   return (

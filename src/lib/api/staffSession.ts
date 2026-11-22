@@ -1,3 +1,4 @@
+//
 import type { AuthorizationContext, StaffSession } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, staffRequest } from './client';
@@ -13,47 +14,143 @@ import { ApiError, staffRequest } from './client';
  */
 type Held = StaffSession & { deviceId: string; lastUsed: number };
 const TAB_KEY = 'geneus.staffSession';
+
 const restore = (): Held | undefined => {
   try {
     const raw: unknown = JSON.parse(sessionStorage.getItem(TAB_KEY) ?? 'null');
     const h = raw as Held | null;
-    return h && typeof h.token === 'string' && typeof h.staffId === 'string' && typeof h.deviceId === 'string' && typeof h.expiresOn === 'string' && typeof h.idleMinutes === 'number' && typeof h.lastUsed === 'number' ? h : undefined;
-  } catch { return undefined; }
-};
-const persist = (value: Held | undefined) => {
-  try { if (value) sessionStorage.setItem(TAB_KEY, JSON.stringify(value)); else sessionStorage.removeItem(TAB_KEY); } catch { /* storage unavailable: the session lasts this page */ }
-};
-let held: Held | undefined = typeof sessionStorage === 'undefined' ? undefined : restore();
-const hold = (value: Held | undefined) => { held = value; persist(value); };
-export const STAFF_SESSION_EVENT = 'geneus:staffSession';
-const changed = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event(STAFF_SESSION_EVENT)); };
-const credential = () => { const device = getDeviceCredential(); if (!device) throw new Error('This device is not enrolled'); return device.credential; };
 
-export const staffSessionToken = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>): string | undefined => {
-  if (!held || held.staffId !== context.userId || held.deviceId !== context.deviceId) return undefined;
+    return h &&
+      typeof h.token === 'string' &&
+      typeof h.staffId === 'string' &&
+      typeof h.deviceId === 'string' &&
+      typeof h.expiresOn === 'string' &&
+      typeof h.idleMinutes === 'number' &&
+      typeof h.lastUsed === 'number'
+      ? h
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const persist = (value: Held | undefined) => {
+  try {
+    if (value) {
+      sessionStorage.setItem(TAB_KEY, JSON.stringify(value));
+    } else {
+      sessionStorage.removeItem(TAB_KEY);
+    }
+  } catch {
+    /* storage unavailable: the session lasts this page */
+  }
+};
+
+let held: Held | undefined = typeof sessionStorage === 'undefined' ? undefined : restore();
+
+const hold = (value: Held | undefined) => {
+  held = value;
+  persist(value);
+};
+
+export const STAFF_SESSION_EVENT = 'geneus:staffSession';
+
+const changed = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(STAFF_SESSION_EVENT));
+  }
+};
+
+const credential = () => {
+  const device = getDeviceCredential();
+
+  if (!device) {
+    throw new Error('This device is not enrolled');
+  }
+
+  return device.credential;
+};
+
+export const staffSessionToken = (
+  context: Pick<AuthorizationContext, 'userId' | 'deviceId'>,
+): string | undefined => {
+  if (!held || held.staffId !== context.userId || held.deviceId !== context.deviceId) {
+    return undefined;
+  }
+
   const now = Date.now();
-  if (Date.parse(held.expiresOn) <= now || now - held.lastUsed > held.idleMinutes * 60_000) { hold(undefined); changed(); return undefined; }
+
+  if (Date.parse(held.expiresOn) <= now || now - held.lastUsed > held.idleMinutes * 60_000) {
+    hold(undefined);
+    changed();
+
+    return undefined;
+  }
+
   return held.token;
 };
-export const staffSessionExpires = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>) => (staffSessionToken(context) ? held!.expiresOn : undefined);
-export const touchStaffSession = () => { if (held) hold({ ...held, lastUsed: Date.now() }); };
-const keep = (session: StaffSession, deviceId: string) => { hold({ ...session, deviceId, lastUsed: Date.now() }); changed(); return session; };
+
+export const staffSessionExpires = (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>) =>
+  staffSessionToken(context) ? held!.expiresOn : undefined;
+
+export const touchStaffSession = () => {
+  if (held) {
+    hold({ ...held, lastUsed: Date.now() });
+  }
+};
+
+const keep = (session: StaffSession, deviceId: string) => {
+  hold({ ...session, deviceId, lastUsed: Date.now() });
+  changed();
+
+  return session;
+};
 
 /** Proves the PIN to the server. Refusals: wrong_pin, locked, pin_not_enrolled, unknown_staff. */
-export const openStaffSession = async (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>, pin: string) =>
-  keep(await staffRequest<StaffSession>('/staff/session', credential(), undefined, { staffId: context.userId, pin }), context.deviceId);
+export const openStaffSession = async (
+  context: Pick<AuthorizationContext, 'userId' | 'deviceId'>,
+  pin: string,
+) =>
+  keep(
+    await staffRequest<StaffSession>('/staff/session', credential(), undefined, {
+      staffId: context.userId,
+      pin,
+    }),
+    context.deviceId,
+  );
 
 /** Registers the person's PIN with the server for this device, proven by an administrator's PIN code or a code to their own email. */
-export const enrolStaffPin = async (staffId: string, deviceId: string, pin: string, proof: { setupCode: string } | { emailCode: string }) =>
-  keep(await staffRequest<StaffSession>('/staff/session/enrol', credential(), undefined, { staffId, pin, ...proof }), deviceId);
+export const enrolStaffPin = async (
+  staffId: string,
+  deviceId: string,
+  pin: string,
+  proof: { setupCode: string } | { emailCode: string },
+) =>
+  keep(
+    await staffRequest<StaffSession>('/staff/session/enrol', credential(), undefined, {
+      staffId,
+      pin,
+      ...proof,
+    }),
+    deviceId,
+  );
 
 /** Ends the session on the server and here. Safe to call when there is none. */
 export const endStaffSession = async () => {
   const ending = held;
-  hold(undefined); changed();
-  if (ending) await staffRequest('/staff/session/end', credential(), ending.token).catch(() => undefined);
+  hold(undefined);
+  changed();
+
+  if (ending) {
+    // Best effort: the session is already cleared on this device, and the server expires it anyway.
+    await staffRequest('/staff/session/end', credential(), ending.token).catch(() => undefined);
+  }
 };
-export const forgetStaffSession = () => { hold(undefined); changed(); };
+
+export const forgetStaffSession = () => {
+  hold(undefined);
+  changed();
+};
 
 /**
  * A PIN setup code just used on this device, kept briefly so the new PIN can be
@@ -61,17 +158,46 @@ export const forgetStaffSession = () => { hold(undefined); changed(); };
  * server must accept before the PIN is saved here at all.
  */
 const pendingCodes = new Map<string, { code: string; until: number; online: boolean }>();
-export const rememberSetupCode = (staffId: string, code: string, online = false) => pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000, online });
-export const takeSetupCode = (staffId: string) => { const entry = pendingCodes.get(staffId); pendingCodes.delete(staffId); return entry && entry.until > Date.now() ? entry.code : undefined; };
+
+export const rememberSetupCode = (staffId: string, code: string, online = false) =>
+  pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000, online });
+
+export const takeSetupCode = (staffId: string) => {
+  const entry = pendingCodes.get(staffId);
+  pendingCodes.delete(staffId);
+
+  return entry && entry.until > Date.now() ? entry.code : undefined;
+};
+
 /** The invitation code waiting to be accepted online for this person, without using it up. */
 export const pendingInvitationCode = (staffId: string): string | undefined => {
   const entry = pendingCodes.get(staffId);
+
   return entry?.online && entry.until > Date.now() ? entry.code : undefined;
 };
 
 /** Signs the person in with the server too, when online. Never blocks or fails the local sign-in. */
-export const openStaffSessionQuietly = async (context: Pick<AuthorizationContext, 'userId' | 'deviceId'>, pin: string): Promise<'open' | 'not_enrolled' | 'offline' | 'refused'> => {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return 'offline';
-  try { await openStaffSession(context, pin); return 'open'; }
-  catch (cause) { return cause instanceof ApiError && cause.code === 'pin_not_enrolled' ? 'not_enrolled' : cause instanceof ApiError && cause.code === 'offline' ? 'offline' : 'refused'; }
+export const openStaffSessionQuietly = async (
+  context: Pick<AuthorizationContext, 'userId' | 'deviceId'>,
+  pin: string,
+): Promise<'open' | 'not_enrolled' | 'offline' | 'refused'> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return 'offline';
+  }
+
+  try {
+    await openStaffSession(context, pin);
+
+    return 'open';
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'pin_not_enrolled') {
+      return 'not_enrolled';
+    }
+
+    if (cause instanceof ApiError && cause.code === 'offline') {
+      return 'offline';
+    }
+
+    return 'refused';
+  }
 };

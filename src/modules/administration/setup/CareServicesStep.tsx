@@ -1,78 +1,225 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { VISIT_TYPE_NAMES, VisitType, type AnyDocument, type ServiceOffering } from '@shared';
-import { Button, Icon, SelectField, Sheet, SheetCancelButton, Tag, TextField, useToast } from '@/ui';
-import { useAuthorizationContext } from '@/session';
+import {
+  Button,
+  Icon,
+  SelectField,
+  Sheet,
+  SheetCancelButton,
+  Tag,
+  TextField,
+  useToast,
+} from '@/ui';
+import { useAuthorizationContext, StaffVerification, useStaffVerification } from '@/session';
 import type { WorkforceData } from '@/data/repos/workforce';
 import { RecordEditor } from '@/modules/operations/workforce/RecordEditor';
 import { WorkspaceLoading } from '@/modules/operations/workforce/Workspaces';
 import { useWorkforce } from '@/modules/operations/workforce/useWorkforce';
 import { humanize } from '@/modules/operations/workforce/presentation';
-import { StaffVerification, useStaffVerification } from '@/modules/insurance/StaffVerification';
 import {
-  addCareService, CARE_SERVICE_PRESETS, carePlaces, careServiceStatus, CATEGORY_LABELS, CUSTOM_CATEGORIES, defaultPlacement,
-  existingCareService, routableTeams, type CareCategory, type CarePreset,
+  addCareService,
+  CARE_SERVICE_PRESETS,
+  carePlaces,
+  careServiceStatus,
+  CATEGORY_LABELS,
+  CUSTOM_CATEGORIES,
+  defaultPlacement,
+  existingCareService,
+  routableTeams,
+  type CareCategory,
+  type CarePreset,
 } from './careServices';
 import { careServiceOfferings } from './setupProgress';
 
 const INTAKE: { value: ServiceOffering['intakePolicy']; label: string }[] = [
-  { value: 'both', label: 'Walk-in and booked' }, { value: 'walk_in', label: 'Walk-in only' }, { value: 'scheduled', label: 'Booked only' },
+  { value: 'both', label: 'Walk-in and booked' },
+  { value: 'walk_in', label: 'Walk-in only' },
+  { value: 'scheduled', label: 'Booked only' },
 ];
-const intakeLabel = (value: string) => INTAKE.find((i) => i.value === value)?.label ?? humanize(value);
+
+const intakeLabel = (value: string) =>
+  INTAKE.find((i) => i.value === value)?.label ?? humanize(value);
 
 /**
  * Which visits a custom service records: what booking and registration offer
  * for it. None means patients are not booked for it (it is reached another way).
  */
-const VisitKindsField = ({ value, onChange }: { value: VisitType[]; onChange: (value: VisitType[]) => void }) =>
+const VisitKindsField = ({
+  value,
+  onChange,
+}: {
+  value: VisitType[];
+  onChange: (value: VisitType[]) => void;
+}) => (
   <fieldset>
     <legend className="text-sm font-bold">Visits recorded as</legend>
-    <p className="text-xs text-ink-muted">Booking and registration offer this service for these kinds of visit. Leave all clear if patients are not booked for it.</p>
-    <div className="mt-2 grid gap-1 sm:grid-cols-2">{VisitType.options.map((type) => <label key={type} className="flex min-h-11 items-center gap-2 text-sm">
-      <input type="checkbox" checked={value.includes(type)} onChange={(e) => onChange(e.target.checked ? [...value, type] : value.filter((t) => t !== type))} />{VISIT_TYPE_NAMES[type]}
-    </label>)}</div>
-  </fieldset>;
+    <p className="text-xs text-ink-muted">
+      Booking and registration offer this service for these kinds of visit. Leave all clear if
+      patients are not booked for it.
+    </p>
+    <div className="mt-2 grid gap-1 sm:grid-cols-2">
+      {VisitType.options.map((type) => (
+        <label key={type} className="flex min-h-11 items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={value.includes(type)}
+            onChange={(e) =>
+              onChange(e.target.checked ? [...value, type] : value.filter((t) => t !== type))
+            }
+          />
+          {VISIT_TYPE_NAMES[type]}
+        </label>
+      ))}
+    </div>
+  </fieldset>
+);
 
 /** Choose the team and place, with the name and category asked only for a custom service. */
-const AddCareServiceSheet = ({ preset, data, onClose, onSaved }: { preset?: CarePreset; data: WorkforceData; onClose: () => void; onSaved: () => void }) => {
-  const context = useAuthorizationContext(), toast = useToast();
+const AddCareServiceSheet = ({
+  preset,
+  data,
+  onClose,
+  onSaved,
+}: {
+  preset?: CarePreset;
+  data: WorkforceData;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const context = useAuthorizationContext();
+  const toast = useToast();
   const start = defaultPlacement(preset, data);
-  const [name, setName] = useState(preset?.name ?? ''), [category, setCategory] = useState<CareCategory>(preset?.category ?? 'consultation');
-  const [intakePolicy, setIntake] = useState<ServiceOffering['intakePolicy']>(preset?.intakePolicy ?? 'both');
+  const [name, setName] = useState(preset?.name ?? '');
+  const [category, setCategory] = useState<CareCategory>(preset?.category ?? 'consultation');
+
+  const [intakePolicy, setIntake] = useState<ServiceOffering['intakePolicy']>(
+    preset?.intakePolicy ?? 'both',
+  );
+
   const [visitTypes, setVisitTypes] = useState<VisitType[]>(preset?.visitTypes ?? ['general']);
-  const [unitId, setUnit] = useState(start.unitId), [locationId, setLocation] = useState(start.locationId);
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [unitId, setUnit] = useState(start.unitId);
+  const [locationId, setLocation] = useState(start.locationId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   // Configuration is saved on the server in the person's name; the wizard sits outside Settings, so confirm here.
   const { verified } = useStaffVerification();
-  const teams = routableTeams(data.units), places = carePlaces(data.locations);
+  const teams = routableTeams(data.units);
+  const places = carePlaces(data.locations);
+
   const save = async () => {
-    if (busy) return;
-    setBusy(true); setError('');
+    if (busy) {
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+
     try {
-      await addCareService({ key: preset?.key, name, category, intakePolicy, visitTypes, unitId, locationId }, data, context);
+      await addCareService(
+        { key: preset?.key, name, category, intakePolicy, visitTypes, unitId, locationId },
+        data,
+        context,
+      );
+
       toast(`${name.trim()} added`);
-      onSaved(); onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'The care service could not be added'); } finally { setBusy(false); }
+      onSaved();
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The care service could not be added');
+    } finally {
+      setBusy(false);
+    }
   };
-  return <Sheet title={preset ? `Add ${preset.name}` : 'Add a care service'} eyebrow="Care services" onClose={onClose} closeDisabled={busy}>
-    <div className="space-y-4">
-      {preset ? <p className="text-sm text-ink-muted">{preset.description}</p> : <>
-        <TextField label="Name" name="care_service_name" value={name} onChange={(e) => setName(e.target.value)} placeholder="For example, Eye clinic" />
-        <SelectField label="Kind of care" name="care_service_category" value={category} onChange={(e) => setCategory(e.target.value as CareCategory)} options={CUSTOM_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))} />
-        <SelectField label="Patients accepted" name="care_service_intake" value={intakePolicy} onChange={(e) => setIntake(e.target.value as ServiceOffering['intakePolicy'])} options={INTAKE} />
-        <VisitKindsField value={visitTypes} onChange={setVisitTypes} />
-      </>}
-      {teams.length ? <SelectField label="Responsible team" name="care_service_team" value={unitId} onChange={(e) => setUnit(e.target.value)} options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-        : <p className="rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">Add a team first. <Link className="font-bold underline" to="/setup?step=teams">Go to Teams & units</Link></p>}
-      {places.length ? <SelectField label="Where it happens" name="care_service_place" value={locationId} onChange={(e) => setLocation(e.target.value)} options={places.map((l) => ({ value: l.id, label: `${l.name} · ${humanize(l.kind)}` }))} />
-        : <p className="rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">Add a place first. <Link className="font-bold underline" to="/setup?step=places">Go to Places & beds</Link></p>}
-      <p className="text-xs text-ink-muted">Staff assignments, opening hours and other details can be added later from the service.</p>
-      <StaffVerification purpose="Adding a care service" />
-      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-      <Button loading={busy} disabled={busy || !verified || !teams.length || !places.length} onClick={save}>Add care service</Button>
-      <SheetCancelButton>Cancel</SheetCancelButton>
-    </div>
-  </Sheet>;
+
+  return (
+    <Sheet
+      title={preset ? `Add ${preset.name}` : 'Add a care service'}
+      eyebrow="Care services"
+      onClose={onClose}
+      closeDisabled={busy}
+    >
+      <div className="space-y-4">
+        {preset ? (
+          <p className="text-sm text-ink-muted">{preset.description}</p>
+        ) : (
+          <>
+            <TextField
+              label="Name"
+              name="care_service_name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="For example, Eye clinic"
+            />
+            <SelectField
+              label="Kind of care"
+              name="care_service_category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as CareCategory)}
+              options={CUSTOM_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+            />
+            <SelectField
+              label="Patients accepted"
+              name="care_service_intake"
+              value={intakePolicy}
+              onChange={(e) => setIntake(e.target.value as ServiceOffering['intakePolicy'])}
+              options={INTAKE}
+            />
+            <VisitKindsField value={visitTypes} onChange={setVisitTypes} />
+          </>
+        )}
+        {teams.length ? (
+          <SelectField
+            label="Responsible team"
+            name="care_service_team"
+            value={unitId}
+            onChange={(e) => setUnit(e.target.value)}
+            options={teams.map((t) => ({ value: t.id, label: t.name }))}
+          />
+        ) : (
+          <p className="rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">
+            Add a team first.{' '}
+            <Link className="font-bold underline" to="/setup?step=teams">
+              Go to Teams & units
+            </Link>
+          </p>
+        )}
+        {places.length ? (
+          <SelectField
+            label="Where it happens"
+            name="care_service_place"
+            value={locationId}
+            onChange={(e) => setLocation(e.target.value)}
+            options={places.map((l) => ({ value: l.id, label: `${l.name} · ${humanize(l.kind)}` }))}
+          />
+        ) : (
+          <p className="rounded-field border border-amber-border bg-amber-bg p-3 text-sm text-amber-text">
+            Add a place first.{' '}
+            <Link className="font-bold underline" to="/setup?step=places">
+              Go to Places & beds
+            </Link>
+          </p>
+        )}
+        <p className="text-xs text-ink-muted">
+          Staff assignments, opening hours and other details can be added later from the service.
+        </p>
+        <StaffVerification purpose="Adding a care service" />
+        {error ? (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+        <Button
+          loading={busy}
+          disabled={busy || !verified || !teams.length || !places.length}
+          onClick={save}
+        >
+          Add care service
+        </Button>
+        <SheetCancelButton>Cancel</SheetCancelButton>
+      </div>
+    </Sheet>
+  );
 };
 
 /**
@@ -86,49 +233,228 @@ export const CareServicesStep = ({ mode = 'setup' }: { mode?: 'setup' | 'setting
   const [editing, setEditing] = useState<AnyDocument>();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+
   // Keep the list on screen while it refreshes after a save; the placeholder is only for the first load.
-  if (!query.data) return <WorkspaceLoading error={query.error} reload={query.reload} />;
+  if (!query.data) {
+    return <WorkspaceLoading error={query.error} reload={query.reload} />;
+  }
+
   const data = query.data;
   const allowed = context.permissions.includes('service:manage');
-  const services = careServiceOfferings(data.offerings, data.definitions).sort((a, b) => a.name.localeCompare(b.name));
-  const filtered = services.filter((o) => o.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const categoryOf = (o: ServiceOffering): CareCategory => data.definitions.find((d) => d.id === o.serviceDefinitionId)?.category ?? 'other';
-  const groups = (Object.keys(CATEGORY_LABELS) as CareCategory[]).map((c) => ({ category: c, items: filtered.filter((o) => categoryOf(o) === c) })).filter((g) => g.items.length);
-  const place = (o: ServiceOffering) => o.locationIds.map((id) => data.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ');
-  const team = (o: ServiceOffering) => data.units.find((u) => u.id === o.unitId || u.unitId === o.unitId)?.name;
+
+  const services = careServiceOfferings(data.offerings, data.definitions).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
+  const filtered = services.filter((o) =>
+    o.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  const categoryOf = (o: ServiceOffering): CareCategory =>
+    data.definitions.find((d) => d.id === o.serviceDefinitionId)?.category ?? 'other';
+
+  const groups = (Object.keys(CATEGORY_LABELS) as CareCategory[])
+    .map((c) => ({ category: c, items: filtered.filter((o) => categoryOf(o) === c) }))
+    .filter((g) => g.items.length);
+
+  const place = (o: ServiceOffering) =>
+    o.locationIds
+      .map((id) => data.locations.find((l) => l.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+
+  const team = (o: ServiceOffering) =>
+    data.units.find((u) => u.id === o.unitId || u.unitId === o.unitId)?.name;
+
   const available = CARE_SERVICE_PRESETS.filter((p) => !existingCareService(p, data));
 
-  return <div className="space-y-5">
-    <section aria-labelledby="care-services-list" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h3 id="care-services-list" className="font-bold">Your care services{mode === 'settings' ? ` (${services.length})` : ''}</h3>
-        {mode === 'settings' && allowed ? <Button fullWidth={false} variant="outlined" onClick={() => setShowAdd((before) => !before)} aria-expanded={showAdd} aria-controls="care-services-add-section"><Icon name="plus" className="h-4 w-4" />{showAdd ? 'Close service choices' : 'Add care services'}</Button> : null}
-      </div>
-      {mode === 'settings' ? <TextField label="Find a care service" type="search" value={search} onChange={(e) => setSearch(e.target.value)} /> : null}
-      {groups.length ? groups.map((group) => <div key={group.category}>
-        <h4 className="text-xs font-bold uppercase tracking-wide text-ink-muted">{CATEGORY_LABELS[group.category]}</h4>
-        <ul className="mt-1 divide-y divide-outline-soft rounded-field border border-outline-soft">{group.items.map((o) => {
-          const status = careServiceStatus(o, data);
-          return <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
-            <div className="min-w-0"><p className="font-bold">{mode === 'settings' ? <Link to={`/facility/services/${encodeURIComponent(o.id)}`} className="text-brand underline">{o.name}</Link> : o.name}</p><p className="text-xs text-ink-muted">{[team(o), place(o), intakeLabel(o.intakePolicy), o.visitTypes.length ? o.visitTypes.map((t) => VISIT_TYPE_NAMES[t]).join(', ') : 'Not booked as a visit'].filter(Boolean).join(' · ')}</p></div>
-            <div className="flex items-center gap-2"><Tag tone={status.tone}>{status.label}</Tag>
-              {allowed ? <Button fullWidth={false} variant="outlined" disabled={data.pending.has(o.id)} onClick={() => setEditing(o)}>Edit</Button> : null}</div>
-          </li>;
-        })}</ul>
-      </div>) : <p className="rounded-field border border-dashed border-outline p-4 text-sm text-ink-muted">{services.length ? 'No care services match your search.' : mode === 'settings' ? 'No care services yet. Select Add care services to choose the care your facility provides.' : 'No care services yet. Choose the kinds of care this hospital provides below.'}</p>}
-    </section>
+  const renderServicesSummary = () => {
+    if (services.length) {
+      return 'No care services match your search.';
+    }
 
-    {allowed && (mode === 'setup' || showAdd) ? <section id="care-services-add-section" aria-labelledby="care-services-add" className="space-y-3">
-      <h3 id="care-services-add" className="font-bold">Add care services</h3>
-      {available.length ? <ul className="grid gap-2 sm:grid-cols-2">{available.map((p) => <li key={p.key}>
-        <button type="button" onClick={() => setAdding({ preset: p })} className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-field border border-outline-soft p-3 text-left hover:border-brand">
-          <span><span className="block text-sm font-bold">{p.name}</span><span className="block text-xs text-ink-muted">{p.description}</span></span>
-          <Icon name="plus" className="h-4 w-4 shrink-0 text-brand" />
-        </button></li>)}</ul> : <p className="text-sm text-ink-muted">All the common care services are added.</p>}
-      <Button fullWidth={false} variant="outlined" onClick={() => setAdding({})}><Icon name="plus" className="h-4 w-4" />Add a custom care service</Button>
-    </section> : !allowed ? <p className="text-sm text-ink-muted">Your role can view these but not change them.</p> : null}
+    if (mode === 'settings') {
+      return 'No care services yet. Select Add care services to choose the care your facility provides.';
+    }
 
-    <p className="text-sm text-ink-muted">Lab tests, medicines and other catalogue items are set up in their own areas: <Link className="font-bold text-brand underline" to="/laboratory/settings/tests">Lab catalogue</Link> and <Link className="font-bold text-brand underline" to="/stock">Pharmacy stock</Link>.</p>
-    {adding ? <AddCareServiceSheet preset={adding.preset} data={data} onClose={() => setAdding(undefined)} onSaved={query.reload} /> : null}
-    {editing ? <RecordEditor key={editing.id} kind="service_offering" previous={editing} data={data} onClose={() => setEditing(undefined)} onSaved={query.reload} /> : null}
-  </div>;
+    return 'No care services yet. Choose the kinds of care this hospital provides below.';
+  };
+
+  const renderAddService = () => {
+    if (allowed && (mode === 'setup' || showAdd)) {
+      return (
+        <section
+          id="care-services-add-section"
+          aria-labelledby="care-services-add"
+          className="space-y-3"
+        >
+          <h3 id="care-services-add" className="font-bold">
+            Add care services
+          </h3>
+          {available.length ? (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {available.map((p) => (
+                <li key={p.key}>
+                  <button
+                    type="button"
+                    onClick={() => setAdding({ preset: p })}
+                    className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-field border border-outline-soft p-3 text-left hover:border-brand"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold">{p.name}</span>
+                      <span className="block text-xs text-ink-muted">{p.description}</span>
+                    </span>
+                    <Icon name="plus" className="h-4 w-4 shrink-0 text-brand" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-muted">All the common care services are added.</p>
+          )}
+          <Button fullWidth={false} variant="outlined" onClick={() => setAdding({})}>
+            <Icon name="plus" className="h-4 w-4" />
+            Add a custom care service
+          </Button>
+        </section>
+      );
+    }
+
+    if (!allowed) {
+      return (
+        <p className="text-sm text-ink-muted">Your role can view these but not change them.</p>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="space-y-5">
+      <section aria-labelledby="care-services-list" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 id="care-services-list" className="font-bold">
+            Your care services{mode === 'settings' ? ` (${services.length})` : ''}
+          </h3>
+          {mode === 'settings' && allowed ? (
+            <Button
+              fullWidth={false}
+              variant="outlined"
+              onClick={() => setShowAdd((before) => !before)}
+              aria-expanded={showAdd}
+              aria-controls="care-services-add-section"
+            >
+              <Icon name="plus" className="h-4 w-4" />
+              {showAdd ? 'Close service choices' : 'Add care services'}
+            </Button>
+          ) : null}
+        </div>
+        {mode === 'settings' ? (
+          <TextField
+            label="Find a care service"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        ) : null}
+        {groups.length ? (
+          groups.map((group) => (
+            <div key={group.category}>
+              <h4 className="text-xs font-bold uppercase tracking-wide text-ink-muted">
+                {CATEGORY_LABELS[group.category]}
+              </h4>
+              <ul className="mt-1 divide-y divide-outline-soft rounded-field border border-outline-soft">
+                {group.items.map((o) => {
+                  const status = careServiceStatus(o, data);
+
+                  return (
+                    <li
+                      key={o.id}
+                      className="flex flex-wrap items-center justify-between gap-3 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold">
+                          {mode === 'settings' ? (
+                            <Link
+                              to={`/facility/services/${encodeURIComponent(o.id)}`}
+                              className="text-brand underline"
+                            >
+                              {o.name}
+                            </Link>
+                          ) : (
+                            o.name
+                          )}
+                        </p>
+                        <p className="text-xs text-ink-muted">
+                          {[
+                            team(o),
+                            place(o),
+                            intakeLabel(o.intakePolicy),
+                            o.visitTypes.length
+                              ? o.visitTypes.map((t) => VISIT_TYPE_NAMES[t]).join(', ')
+                              : 'Not booked as a visit',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Tag tone={status.tone}>{status.label}</Tag>
+                        {allowed ? (
+                          <Button
+                            fullWidth={false}
+                            variant="outlined"
+                            disabled={data.pending.has(o.id)}
+                            onClick={() => setEditing(o)}
+                          >
+                            Edit
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
+        ) : (
+          <p className="rounded-field border border-dashed border-outline p-4 text-sm text-ink-muted">
+            {renderServicesSummary()}
+          </p>
+        )}
+      </section>
+
+      {renderAddService()}
+
+      <p className="text-sm text-ink-muted">
+        Lab tests, medicines and other catalogue items are set up in their own areas:{' '}
+        <Link className="font-bold text-brand underline" to="/laboratory/settings/tests">
+          Lab catalogue
+        </Link>{' '}
+        and{' '}
+        <Link className="font-bold text-brand underline" to="/stock">
+          Pharmacy stock
+        </Link>
+        .
+      </p>
+      {adding ? (
+        <AddCareServiceSheet
+          preset={adding.preset}
+          data={data}
+          onClose={() => setAdding(undefined)}
+          onSaved={query.reload}
+        />
+      ) : null}
+      {editing ? (
+        <RecordEditor
+          key={editing.id}
+          kind="service_offering"
+          previous={editing}
+          data={data}
+          onClose={() => setEditing(undefined)}
+          onSaved={query.reload}
+        />
+      ) : null}
+    </div>
+  );
 };

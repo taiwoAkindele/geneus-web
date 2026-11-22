@@ -19,4 +19,4 @@ export const Card = ({ children, className = '', padded = true }: Props) => {
       {children}
     </div>
   );
-}
+};

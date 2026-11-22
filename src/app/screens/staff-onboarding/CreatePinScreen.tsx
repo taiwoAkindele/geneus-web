@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PinDots, PinKeypad } from '@/ui';
-import { isPinSetupApproved, PIN_LENGTH, setPin as storePin, takePinSetupApproval } from '@/session';
+import {
+  isPinSetupApproved,
+  PIN_LENGTH,
+  setPin as storePin,
+  takePinSetupApproval,
+} from '@/session';
 import { useDeviceContext } from '@/data';
 import { ApiError } from '@/lib/api/client';
 import { enrolStaffPin, pendingInvitationCode, takeSetupCode } from '@/lib/api/staffSession';
@@ -28,50 +33,92 @@ export const CreatePinScreen = () => {
   const [refusal, setRefusal] = useState<string>();
   const { deviceId } = useDeviceContext();
 
-  if (!staffId || !isPinSetupApproved(staffId)) return <Navigate to="/login" replace />;
+  if (!staffId || !isPinSetupApproved(staffId)) {
+    return <Navigate to="/login" replace />;
+  }
 
   const onDigit = async (digit: string) => {
-    if (pin.length >= PIN_LENGTH || activating) return;
-    const next = pin + digit;
-    if (next.length < PIN_LENGTH) {
-      setPin(next);
+    if (pin.length >= PIN_LENGTH || activating) {
       return;
     }
+
+    const next = pin + digit;
+
+    if (next.length < PIN_LENGTH) {
+      setPin(next);
+
+      return;
+    }
+
     if (phase === 'choose') {
       setFirstPin(next);
       setPhase('confirm');
       setPin('');
       setError(false);
+
       return;
     }
+
     if (next !== firstPin) {
       setError(true);
       setPin('');
+
       return;
     }
+
     // An emailed invitation is accepted by the server first: only once it has checked the code,
     // the person and the facility is the PIN saved here. A code read aloud works offline as before.
     const invitationCode = pendingInvitationCode(staffId);
+
     if (invitationCode) {
       setActivating(true);
       setRefusal(undefined);
+
       try {
         await enrolStaffPin(staffId, deviceId, next, { setupCode: invitationCode });
         takeSetupCode(staffId);
       } catch (cause) {
-        setRefusal(cause instanceof ApiError && cause.code === 'offline'
-          ? 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.'
-          : 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.');
+        setRefusal(
+          cause instanceof ApiError && cause.code === 'offline'
+            ? 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.'
+            : 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.',
+        );
+
         setPin('');
         setFirstPin('');
         setPhase('choose');
+
         return;
       } finally {
         setActivating(false);
       }
     }
-    if (takePinSetupApproval(staffId)) await storePin(staffId, next);
+
+    if (takePinSetupApproval(staffId)) {
+      await storePin(staffId, next);
+    }
+
     navigate('/login', { replace: true });
+  };
+
+  const renderHeading = () => {
+    if (activating) {
+      return 'Checking your invitation with Geneus…';
+    }
+
+    if (refusal) {
+      return <span className="font-semibold text-danger">{refusal}</span>;
+    }
+
+    if (error) {
+      return <span className="font-semibold text-danger">PINs didn&rsquo;t match — try again</span>;
+    }
+
+    if (phase === 'choose') {
+      return 'Choose your PIN';
+    }
+
+    return 'Confirm your PIN';
   };
 
   return (
@@ -88,28 +135,21 @@ export const CreatePinScreen = () => {
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           {upgrade ? (
-            <>PINs are now 6 digits, to keep patient records safer. Choose a new one &mdash; you&rsquo;ll use it from now on.</>
+            <>
+              PINs are now 6 digits, to keep patient records safer. Choose a new one &mdash;
+              you&rsquo;ll use it from now on.
+            </>
           ) : (
             <>
-              You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a 6-digit PIN &mdash;
-              you&rsquo;ll use it to sign in at the start of every shift.
+              You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a
+              6-digit PIN &mdash; you&rsquo;ll use it to sign in at the start of every shift.
             </>
           )}
         </p>
 
         <PinDots length={PIN_LENGTH} filled={pin.length} className="mb-2 mt-9" />
         <div className="text-[13px] text-ink-muted" role={refusal ? 'alert' : undefined}>
-          {activating ? (
-            'Checking your invitation with Geneus…'
-          ) : refusal ? (
-            <span className="font-semibold text-danger">{refusal}</span>
-          ) : error ? (
-            <span className="font-semibold text-danger">PINs didn&rsquo;t match — try again</span>
-          ) : phase === 'choose' ? (
-            'Choose your PIN'
-          ) : (
-            'Confirm your PIN'
-          )}
+          {renderHeading()}
         </div>
 
         <div className="mt-6 w-full max-w-[300px]">

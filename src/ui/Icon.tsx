@@ -122,6 +122,7 @@ type Props = {
 
 export const Icon = ({ name, className = 'h-5 w-5', title }: Props) => {
   const Glyph = ICONS[name];
+
   return (
     <Glyph
       className={`flex-none ${className}`}

@@ -1,11 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { canReadPatientChart,type SyncRejection } from '@shared';
+import { canReadPatientChart, type SyncRejection } from '@shared';
 import { Button, Sheet, Tag } from '@/ui';
-import { patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { patientChartPath } from '@/modules/front-desk/patients';
 import { useAuthorizationContext } from '@/session';
-import { RetainedDocument } from '@/modules/clinical/documents/RetainedDocument';
-import { CATEGORY_LABEL, keptRows, RECORD_LABEL, rejectionAdvice, shownValue, type RejectionKind } from './describeRejection';
+import { RetainedDocument } from '@/modules/clinical/documents';
+import {
+  CATEGORY_LABEL,
+  keptRows,
+  RECORD_LABEL,
+  rejectionAdvice,
+  shownValue,
+  type RejectionKind,
+} from './describeRejection';
+
+/** What kind of change was refused, in words. */
+const OPERATION_WORDS: Record<string, string> = {
+  patch: 'change',
+  delete: 'removal',
+};
 
 type Props = {
   rejection: SyncRejection;
@@ -28,7 +41,14 @@ type Props = {
 };
 
 const formatWhen = (iso: string | undefined): string =>
-  iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  iso
+    ? new Date(iso).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
 
 const Rows = ({ rows }: { rows: { label: string; value: string }[] }) => (
   <dl className="mt-3 space-y-1 rounded-[11px] bg-surface-muted p-3 text-[13px]">
@@ -62,19 +82,160 @@ export const RejectionCard = ({
   onApplyAgain,
   onDiscard,
 }: Props) => {
-  const context=useAuthorizationContext();
+  const context = useAuthorizationContext();
   const [chosen, setChosen] = useState<string[]>([]);
   const [intent, setIntent] = useState<'discard' | 'retry'>();
   const refused = rejection.refusedRecord;
-  const patientId = rejection.entityType === 'patient' ? rejection.entityId : typeof refused?.patientId === 'string' ? refused.patientId : undefined;
-  const patientName = patientId && kind !== 'held' && kind !== 'patient_id_clash' ? patientNameOf(patientId) : undefined;
+
+  const patientIdFor = () => {
+    if (rejection.entityType === 'patient') {
+      return rejection.entityId;
+    }
+
+    return typeof refused?.patientId === 'string' ? refused.patientId : undefined;
+  };
+
+  const patientId = patientIdFor();
+
+  const patientName =
+    patientId && kind !== 'held' && kind !== 'patient_id_clash'
+      ? patientNameOf(patientId)
+      : undefined;
+
   const confirmDiscard = () => setIntent('discard');
   const confirmRetry = () => setIntent('retry');
+
   const toggle = (column: string) =>
     setChosen((now) => (now.includes(column) ? now.filter((c) => c !== column) : [...now, column]));
-  const what = rejection.operation === 'patch' ? 'change' : rejection.operation === 'delete' ? 'removal' : 'new record';
 
-  if(!canReadPatientChart(context)&&['encounter','encounter_entry','clinical_event','visit_document','library_document','referral','handoff','inpatient_event','ward_care_event'].includes(rejection.entityType))return <div className="rounded-card border border-outline-soft p-4 text-sm">A clinical change needs review. Permission to view medical history is required to inspect or resolve it.</div>;
+  const what = OPERATION_WORDS[rejection.operation] ?? 'new record';
+
+  if (
+    !canReadPatientChart(context) &&
+    [
+      'encounter',
+      'encounter_entry',
+      'clinical_event',
+      'visit_document',
+      'library_document',
+      'referral',
+      'handoff',
+      'inpatient_event',
+      'ward_care_event',
+    ].includes(rejection.entityType)
+  ) {
+    return (
+      <div className="rounded-card border border-outline-soft p-4 text-sm">
+        A clinical change needs review. Permission to view medical history is required to inspect or
+        resolve it.
+      </div>
+    );
+  }
+
+  const renderResolution = () => {
+    if (kind === 'held') {
+      return (
+        <p className="mt-2 text-[12px] text-ink-muted">
+          Decided together with its patient’s registration.
+        </p>
+      );
+    }
+
+    if (canResolve) {
+      return (
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {kind === 'column_conflict' ? (
+              <>
+                <Button
+                  variant="primary"
+                  fullWidth={false}
+                  className="px-4"
+                  disabled={busy}
+                  onClick={onKeepServer}
+                >
+                  Keep what is saved
+                </Button>
+                <Button
+                  variant="outlined"
+                  fullWidth={false}
+                  className="px-4"
+                  disabled={busy || chosen.length === 0}
+                  onClick={() => onUseDevice(chosen)}
+                >
+                  Use this device’s ticked values
+                </Button>
+              </>
+            ) : null}
+            {kind === 'patient_id_clash' ? (
+              <>
+                <Button
+                  variant="primary"
+                  fullWidth={false}
+                  className="px-4"
+                  disabled={busy}
+                  loading={busy}
+                  onClick={onReRegister}
+                >
+                  Register under a new Patient ID
+                </Button>
+                <Button
+                  variant="ghost"
+                  fullWidth={false}
+                  className="px-4"
+                  disabled={busy}
+                  onClick={confirmDiscard}
+                >
+                  Discard
+                </Button>
+              </>
+            ) : null}
+            {kind !== 'column_conflict' && kind !== 'patient_id_clash' ? (
+              <>
+                {kind === 'refused_write' ? (
+                  <Button
+                    variant="primary"
+                    fullWidth={false}
+                    className="px-4"
+                    disabled={busy || Boolean(applyBlocker)}
+                    loading={busy}
+                    onClick={confirmRetry}
+                  >
+                    Apply again
+                  </Button>
+                ) : null}
+                <Button
+                  variant="outlined"
+                  fullWidth={false}
+                  className="px-4"
+                  disabled={busy}
+                  onClick={confirmDiscard}
+                >
+                  Discard
+                </Button>
+              </>
+            ) : null}
+          </div>
+          {kind === 'refused_write' && applyBlocker ? (
+            <p className="text-[12px] text-ink-muted">{applyBlocker}</p>
+          ) : null}
+          {kind === 'refused_write' && !applyBlocker ? (
+            <p className="text-[12px] text-ink-muted">
+              Applying it again saves it in your name; the original author and time stay on this
+              record.
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <p className="mt-2 text-[12px] text-ink-muted">
+        A records officer or facility admin decides this.
+      </p>
+    );
+  };
+
   return (
     <div className="rounded-card border border-outline-soft bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -91,14 +252,61 @@ export const RejectionCard = ({
         <Tag tone="amber">{kind === 'held' ? 'Held with its patient' : 'Needs a decision'}</Tag>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
-        <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b> {rejectionAdvice(rejection)}
+        <b className="text-ink">{CATEGORY_LABEL[rejection.category]}.</b>{' '}
+        {rejectionAdvice(rejection)}
       </p>
-      {patientName && patientId ? <p className="mt-3 text-sm"><span className="font-bold">{patientName}</span> · <Link to={patientChartPath(patientId,'details')} className="inline-flex min-h-[44px] items-center font-bold text-brand underline">Open patient record</Link></p> : null}
-      {['library_document','visit_document'].includes(rejection.entityType)?<RetainedDocument rejection={rejection}/>:null}
-      {['encounter_entry','clinical_event','ward_care_event'].includes(rejection.entityType)&&rejection.refusedRecord?.actorContext?<Link to="/clinical-reviews" className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline">Independent clinical review · preserve original authorship</Link>:null}
-      {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? <Link to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review current booking</Link> : null}
-      {rejection.entityType === 'register_definition' && typeof rejection.refusedRecord?.registerId === 'string' ? <Link to={`/registers/${encodeURIComponent(rejection.refusedRecord.registerId)}/configure`} className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline">Review register configuration</Link> : null}
-      <details className="mt-3 rounded-field border border-outline-soft p-3 text-sm"><summary className="cursor-pointer font-semibold text-ink-soft">Technical details for review or support</summary><p className="mt-3 break-words text-xs text-ink-muted">{rejection.reason.replace(/^held: /, '')}</p><p className="mt-2 break-all font-mono text-xs">{rejection.entityType} · {rejection.entityId}</p>{kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}</details>
+      {patientName && patientId ? (
+        <p className="mt-3 text-sm">
+          <span className="font-bold">{patientName}</span> ·{' '}
+          <Link
+            to={patientChartPath(patientId, 'details')}
+            className="inline-flex min-h-[44px] items-center font-bold text-brand underline"
+          >
+            Open patient record
+          </Link>
+        </p>
+      ) : null}
+      {['library_document', 'visit_document'].includes(rejection.entityType) ? (
+        <RetainedDocument rejection={rejection} />
+      ) : null}
+      {['encounter_entry', 'clinical_event', 'ward_care_event'].includes(rejection.entityType) &&
+      rejection.refusedRecord?.actorContext ? (
+        <Link
+          to="/clinical-reviews"
+          className="inline-flex min-h-11 items-center text-sm font-bold text-brand underline"
+        >
+          Independent clinical review · preserve original authorship
+        </Link>
+      ) : null}
+      {rejection.entityType === 'appointment' && rejection.operation === 'patch' ? (
+        <Link
+          to={`/appointments?booking=${encodeURIComponent(rejection.entityId)}`}
+          className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline"
+        >
+          Review current booking
+        </Link>
+      ) : null}
+      {rejection.entityType === 'register_definition' &&
+      typeof rejection.refusedRecord?.registerId === 'string' ? (
+        <Link
+          to={`/registers/${encodeURIComponent(rejection.refusedRecord.registerId)}/configure`}
+          className="mt-3 inline-flex min-h-[44px] items-center font-bold text-brand underline"
+        >
+          Review register configuration
+        </Link>
+      ) : null}
+      <details className="mt-3 rounded-field border border-outline-soft p-3 text-sm">
+        <summary className="cursor-pointer font-semibold text-ink-soft">
+          Technical details for review or support
+        </summary>
+        <p className="mt-3 break-words text-xs text-ink-muted">
+          {rejection.reason.replace(/^held: /, '')}
+        </p>
+        <p className="mt-2 break-all font-mono text-xs">
+          {rejection.entityType} · {rejection.entityId}
+        </p>
+        {kind === 'refused_write' || kind === 'held' ? <Rows rows={keptRows(rejection)} /> : null}
+      </details>
 
       {kind === 'column_conflict' ? (
         <table className="mt-3 w-full text-left text-[13px]">
@@ -114,7 +322,12 @@ export const RejectionCard = ({
               <tr key={conflict.column} className="border-t border-outline-soft">
                 <th className="py-1.5 pr-2 font-semibold text-ink-soft">
                   <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={chosen.includes(conflict.column)} disabled={!canResolve} onChange={() => toggle(conflict.column)} />
+                    <input
+                      type="checkbox"
+                      checked={chosen.includes(conflict.column)}
+                      disabled={!canResolve}
+                      onChange={() => toggle(conflict.column)}
+                    />
                     {conflict.column}
                   </label>
                 </th>
@@ -130,7 +343,9 @@ export const RejectionCard = ({
         <div className="mt-3 rounded-[11px] bg-surface-muted p-3 text-[13px] leading-relaxed">
           <div className="font-bold text-ink">{shownValue(refused.fullName)}</div>
           <div className="text-ink-soft">
-            {[refused.sex, refused.ageYears ?? refused.dateOfBirth, refused.phone, refused.address].map(shownValue).join(' · ')}
+            {[refused.sex, refused.ageYears ?? refused.dateOfBirth, refused.phone, refused.address]
+              .map(shownValue)
+              .join(' · ')}
           </div>
           <div className="mt-1 text-ink-muted">
             Another device registered a different person as {rejection.entityId} first.
@@ -141,51 +356,47 @@ export const RejectionCard = ({
         </div>
       ) : null}
 
-      {kind === 'held' ? (
-        <p className="mt-2 text-[12px] text-ink-muted">Decided together with its patient’s registration.</p>
-      ) : canResolve ? (
-        <div className="mt-3 space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {kind === 'column_conflict' ? (
-              <>
-                <Button variant="primary" fullWidth={false} className="px-4" disabled={busy} onClick={onKeepServer}>
-                  Keep what is saved
-                </Button>
-                <Button variant="outlined" fullWidth={false} className="px-4" disabled={busy || chosen.length === 0} onClick={() => onUseDevice(chosen)}>
-                  Use this device’s ticked values
-                </Button>
-              </>
-            ) : kind === 'patient_id_clash' ? (
-              <>
-                <Button variant="primary" fullWidth={false} className="px-4" disabled={busy} loading={busy} onClick={onReRegister}>
-                  Register under a new Patient ID
-                </Button>
-                <Button variant="ghost" fullWidth={false} className="px-4" disabled={busy} onClick={confirmDiscard}>
-                  Discard
-                </Button>
-              </>
-            ) : (
-              <>
-                {kind === 'refused_write' ? (
-                  <Button variant="primary" fullWidth={false} className="px-4" disabled={busy || Boolean(applyBlocker)} loading={busy} onClick={confirmRetry}>
-                    Apply again
-                  </Button>
-                ) : null}
-                <Button variant="outlined" fullWidth={false} className="px-4" disabled={busy} onClick={confirmDiscard}>
-                  Discard
-                </Button>
-              </>
-            )}
+      {renderResolution()}
+      {intent ? (
+        <Sheet
+          title={intent === 'discard' ? 'Discard this refused change?' : 'Apply this change again?'}
+          onClose={() => setIntent(undefined)}
+          closeDisabled={busy}
+        >
+          <p className="text-sm leading-relaxed">
+            {intent === 'discard'
+              ? 'This ends review without applying the refused change. Existing server records stay unchanged. The refusal and your discard decision remain in the audit history.'
+              : 'This saves the change in your name and queues it for upload. It may be refused again if the underlying problem has not been corrected.'}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button
+              fullWidth={false}
+              variant="outlined"
+              disabled={busy}
+              onClick={() => setIntent(undefined)}
+            >
+              Keep reviewing
+            </Button>
+            <Button
+              fullWidth={false}
+              variant={intent === 'discard' ? 'danger-outline' : 'primary'}
+              loading={busy}
+              onClick={() => {
+                const action = intent;
+                setIntent(undefined);
+
+                if (action === 'discard') {
+                  onDiscard();
+                } else {
+                  onApplyAgain();
+                }
+              }}
+            >
+              {intent === 'discard' ? 'Confirm discard' : 'Confirm retry'}
+            </Button>
           </div>
-          {kind === 'refused_write' && applyBlocker ? <p className="text-[12px] text-ink-muted">{applyBlocker}</p> : null}
-          {kind === 'refused_write' && !applyBlocker ? (
-            <p className="text-[12px] text-ink-muted">Applying it again saves it in your name; the original author and time stay on this record.</p>
-          ) : null}
-        </div>
-      ) : (
-        <p className="mt-2 text-[12px] text-ink-muted">A records officer or facility admin decides this.</p>
-      )}
-      {intent ? <Sheet title={intent === 'discard' ? 'Discard this refused change?' : 'Apply this change again?'} onClose={() => setIntent(undefined)} closeDisabled={busy}><p className="text-sm leading-relaxed">{intent === 'discard' ? 'This ends review without applying the refused change. Existing server records stay unchanged. The refusal and your discard decision remain in the audit history.' : 'This saves the change in your name and queues it for upload. It may be refused again if the underlying problem has not been corrected.'}</p><div className="mt-5 flex flex-wrap gap-3"><Button fullWidth={false} variant="outlined" disabled={busy} onClick={() => setIntent(undefined)}>Keep reviewing</Button><Button fullWidth={false} variant={intent === 'discard' ? 'danger-outline' : 'primary'} loading={busy} onClick={() => { const action = intent; setIntent(undefined); if (action === 'discard') onDiscard(); else onApplyAgain(); }}>{intent === 'discard' ? 'Confirm discard' : 'Confirm retry'}</Button></div></Sheet> : null}
+        </Sheet>
+      ) : null}
     </div>
   );
 };

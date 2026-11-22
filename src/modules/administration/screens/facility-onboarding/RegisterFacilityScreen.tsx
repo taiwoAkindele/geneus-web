@@ -14,6 +14,7 @@ import { FacilityDetailsFields } from './FacilityDetailsFields';
 const endOfToday = (): string => {
   const end = new Date();
   end.setHours(23, 59, 0, 0);
+
   return end.toISOString();
 };
 
@@ -28,7 +29,11 @@ type PendingRegistration = { facilityCode: string; facilityName: string; admin: 
 
 const readPending = (): PendingRegistration | undefined => {
   const raw = sessionStorage.getItem(PENDING_KEY);
-  if (!raw) return undefined;
+
+  if (!raw) {
+    return undefined;
+  }
+
   try {
     return JSON.parse(raw) as PendingRegistration;
   } catch {
@@ -52,7 +57,14 @@ export const RegisterFacilityScreen = () => {
   // this must fire once per registration, not once per render that sees a facility.
   const finishing = useRef(false);
 
-  const [details, setDetails] = useState<FacilityDetails>({ name: '', code: '', state: '', lga: '', level: 'phc' });
+  const [details, setDetails] = useState<FacilityDetails>({
+    name: '',
+    code: '',
+    state: '',
+    lga: '',
+    level: 'phc',
+  });
+
   const { name, code, state, lga, level } = details;
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -63,13 +75,24 @@ export const RegisterFacilityScreen = () => {
   const [saving, setSaving] = useState(false);
 
   const facilityCode = (code || suggestCode(name)).toUpperCase();
+
   const complete = Boolean(
-    name.trim() && facilityCode && state.trim() && lga.trim() && adminName.trim() && codeSentTo && /^\d{6}$/.test(emailCode.trim()),
+    name.trim() &&
+    facilityCode &&
+    state.trim() &&
+    lga.trim() &&
+    adminName.trim() &&
+    codeSentTo &&
+    /^\d{6}$/.test(emailCode.trim()),
   );
 
   const sendCode = async () => {
-    if (!adminEmail.trim() || !inviteToken || sendingCode) return;
+    if (!adminEmail.trim() || !inviteToken || sendingCode) {
+      return;
+    }
+
     setSendingCode(true);
+
     try {
       const sent = await sendRegistrationEmailCode(adminEmail.trim(), inviteToken);
       setCodeSentTo(sent.sentTo);
@@ -83,20 +106,33 @@ export const RegisterFacilityScreen = () => {
 
   // The facility has landed: finish what registration owes, then on to the PIN.
   useEffect(() => {
-    if (!pending || !facility || finishing.current) return;
+    if (!pending || !facility || finishing.current) {
+      return;
+    }
+
     finishing.current = true;
     sessionStorage.removeItem(PENDING_KEY);
     (async () => {
       // Whoever registers the facility is on duty now, or nobody could get in.
       // The admin assigns their own first shift: they hold roster:assign.
       await assignShift(
-        { staffId: pending.admin.staffId, day: today(), startsAt: new Date().toISOString(), endsAt: endOfToday() },
+        {
+          staffId: pending.admin.staffId,
+          day: today(),
+          startsAt: new Date().toISOString(),
+          endsAt: endOfToday(),
+        },
         authorizationFor({ staff: pending.admin, facilityId: pending.facilityCode, deviceId }),
       );
+
       // The first admin sets their PIN unapproved: nobody else exists yet to approve it.
       approvePinSetup(pending.admin.staffId);
       navigate('/onboarding/accept', {
-        state: { staffId: pending.admin.staffId, fullName: pending.admin.fullName, role: 'Facility Admin' },
+        state: {
+          staffId: pending.admin.staffId,
+          fullName: pending.admin.fullName,
+          role: 'Facility Admin',
+        },
       });
     })().catch((cause: unknown) => {
       finishing.current = false;
@@ -105,14 +141,22 @@ export const RegisterFacilityScreen = () => {
     });
   }, [pending, facility, deviceId, navigate, toast]);
 
-  if (pending) return <SyncingFacility facilityName={pending.facilityName} />;
+  if (pending) {
+    return <SyncingFacility facilityName={pending.facilityName} />;
+  }
 
   // Registration is only reachable by spending an invite code.
-  if (!inviteToken) return <Navigate to="/onboarding/start" replace />;
+  if (!inviteToken) {
+    return <Navigate to="/onboarding/start" replace />;
+  }
 
   const create = async () => {
-    if (!complete || saving) return;
+    if (!complete || saving) {
+      return;
+    }
+
     setSaving(true);
+
     try {
       const { admin, device } = await registerFacility({
         code: facilityCode,
@@ -126,6 +170,7 @@ export const RegisterFacilityScreen = () => {
         deviceId,
         inviteToken,
       });
+
       // From here the facility exists on the server and this device is enrolled:
       // the rest waits for the facility to sync down (the effect above), however
       // long that takes, and survives the remount that enrolling causes.
@@ -144,11 +189,16 @@ export const RegisterFacilityScreen = () => {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col md:max-w-lg">
         <header className="px-5 pb-3 pt-5">
           <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Register your facility</h1>
-          <p className="mt-1 text-[13px] text-ink-muted">This creates your facility code &amp; admin account.</p>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            This creates your facility code &amp; admin account.
+          </p>
         </header>
 
         <div className="flex-1 space-y-4 px-5 py-2">
-          <FacilityDetailsFields value={{ ...details, code: code || suggestCode(name) }} onChange={(patch) => setDetails((current) => ({ ...current, ...patch }))} />
+          <FacilityDetailsFields
+            value={{ ...details, code: code || suggestCode(name) }}
+            onChange={(patch) => setDetails((current) => ({ ...current, ...patch }))}
+          />
 
           <TextField
             label="Your full name"
@@ -173,7 +223,12 @@ export const RegisterFacilityScreen = () => {
                 setCodeSentTo(undefined);
               }}
             />
-            <Button variant="secondary" disabled={!adminEmail.trim()} loading={sendingCode} onClick={sendCode}>
+            <Button
+              variant="secondary"
+              disabled={!adminEmail.trim()}
+              loading={sendingCode}
+              onClick={sendCode}
+            >
               {codeSentTo ? 'Send a new code' : 'Send code'}
             </Button>
           </div>
@@ -194,7 +249,12 @@ export const RegisterFacilityScreen = () => {
         </div>
 
         <footer className="border-t border-outline-soft bg-surface px-5 pb-6 pt-4">
-          <Button variant="primary" disabled={!complete || saving} loading={saving} onClick={create}>
+          <Button
+            variant="primary"
+            disabled={!complete || saving}
+            loading={saving}
+            onClick={create}
+          >
             Create facility
           </Button>
         </footer>

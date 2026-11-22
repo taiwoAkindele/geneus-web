@@ -10,7 +10,19 @@ import { fieldKindsFor } from './contractShape';
 export type Row = Record<string, unknown>;
 
 const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
-  patient: ['sex', 'address', 'dateOfBirth', 'ageYears', 'ageObservedOn', 'phone', 'nin', 'occupation', 'religion', 'legacyPaperRef', 'identityEvidenceNote'],
+  patient: [
+    'sex',
+    'address',
+    'dateOfBirth',
+    'ageYears',
+    'ageObservedOn',
+    'phone',
+    'nin',
+    'occupation',
+    'religion',
+    'legacyPaperRef',
+    'identityEvidenceNote',
+  ],
   fee_item: ['departmentId'],
   unit: ['parentId'],
   location: ['parentId', 'unitId', 'capacity', 'description'],
@@ -23,12 +35,17 @@ const CLEARABLE: Partial<Record<DocType, readonly string[]>> = {
 export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
   const kinds = fieldKindsFor(type);
   const row: Row = {};
+
   for (const [field, value] of Object.entries(record)) {
-    if (field === 'type') continue;
+    if (field === 'type') {
+      continue;
+    }
+
     if (value === undefined || value === null) {
       row[field] = null;
       continue;
     }
+
     switch (kinds[field]) {
       case 'boolean':
         row[field] = value ? 1 : 0;
@@ -40,6 +57,7 @@ export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
         row[field] = value;
     }
   }
+
   return row;
 };
 
@@ -51,13 +69,21 @@ export const toRow = (type: DocType, record: Record<string, unknown>): Row => {
 export const decodeValues = (type: DocType, row: Row): Record<string, unknown> => {
   const kinds = fieldKindsFor(type);
   const record: Record<string, unknown> = {};
+
   for (const [field, value] of Object.entries(row)) {
     if (value === null || value === undefined) {
-      if (value === null && CLEARABLE[type]?.includes(field)) record[field] = null;
+      if (value === null && CLEARABLE[type]?.includes(field)) {
+        record[field] = null;
+      }
+
       continue;
     }
+
     // PowerSync's own columns (`_metadata`) are not part of the record.
-    if (field.startsWith('_')) continue;
+    if (field.startsWith('_')) {
+      continue;
+    }
+
     switch (kinds[field]) {
       case 'boolean':
         record[field] = value === 1 || value === true || value === '1';
@@ -72,6 +98,7 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
         record[field] = value;
     }
   }
+
   return record;
 };
 
@@ -82,11 +109,23 @@ export const decodeValues = (type: DocType, row: Row): Record<string, unknown> =
  * screen is better off with an odd record than with no list at all.
  */
 export const fromRow = <T extends AnyDocument>(type: DocType, row: Row): T => {
-  const decoded = { ...Object.fromEntries(Object.entries(decodeValues(type, row)).filter(([, value]) => value !== null)), type };
+  const decoded = {
+    ...Object.fromEntries(
+      Object.entries(decodeValues(type, row)).filter(([, value]) => value !== null),
+    ),
+    type,
+  };
+
   const parsed = parseDocument(decoded);
+
   if (!parsed.success) {
-    console.warn(`record ${String(row.id)} in ${type} does not match the contract`, parsed.error.issues);
+    console.warn(
+      `record ${String(row.id)} in ${type} does not match the contract`,
+      parsed.error.issues,
+    );
+
     return decoded as T;
   }
+
   return { ...decoded, ...(parsed.data as object) } as T;
 };

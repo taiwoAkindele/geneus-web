@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { AppBar, Button, useToast } from '@/ui';
 import { editStaff, type StaffDetails } from '@/data/repos/staff';
 import { useAuth, useAuthorizationContext } from '@/session';
-import { StaffForm } from '@/modules/operations/staff/StaffForm';
+import { StaffForm } from '@/modules/operations/staff';
 
 export const RolesPermissionsScreen = () => {
   const navigate = useNavigate();
@@ -11,28 +11,83 @@ export const RolesPermissionsScreen = () => {
   const state = useLocation().state as { staffId?: string } | null;
   const [params] = useSearchParams();
   const staffId = params.get('staff') ?? state?.staffId;
-  useEffect(() => { document.title = 'Edit staff · Geneus Health'; }, []);
+  useEffect(() => {
+    document.title = 'Edit staff · Geneus Health';
+  }, []);
+
   const { roster, loading, error, reload } = useAuth();
   const context = useAuthorizationContext();
-  if (!staffId) return <Navigate to="/admin/staff" replace />;
+
+  if (!staffId) {
+    return <Navigate to="/admin/staff" replace />;
+  }
+
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
+
   const save = async (details: StaffDetails) => {
-    if (!entry) return;
+    if (!entry) {
+      return;
+    }
+
     await editStaff(entry.staff, details, context);
     toast(`${details.fullName} updated`);
     navigate('/admin/staff/' + encodeURIComponent(entry.staff.staffId));
   };
-  return <div className="min-h-screen bg-surface">
-    <AppBar title="Edit details & access" onBack={() => navigate(staffId ? '/admin/staff/' + encodeURIComponent(staffId) : '/admin/staff')} />
-    <div className="mx-auto w-full max-w-xl px-5 py-4">
-      <h1 className="mb-4 text-2xl font-extrabold">Staff details &amp; access</h1>
-      {loading ? <div role="status" aria-label="Loading staff member" className="h-32 animate-pulse rounded-card bg-surface-muted" />
-        : error ? <div role="alert">Staff could not be read.<Button variant="ghost" onClick={reload}>Try again</Button></div>
-        : !entry ? <p className="text-sm text-ink-muted">That staff member is no longer on the active roster.</p>
-        : <StaffForm key={entry.staff.id} initial={entry.staff}
-          canEditName={context.permissions.includes('staff:manage')}
-          canEditAccess={context.permissions.includes('staff:permission')}
-          submitLabel="Save staff changes" onSave={save} />}
+
+  const renderStaffEditor = () => {
+    if (loading) {
+      return (
+        <div
+          role="status"
+          aria-label="Loading staff member"
+          className="h-32 animate-pulse rounded-card bg-surface-muted"
+        />
+      );
+    }
+
+    if (error) {
+      return (
+        <div role="alert">
+          Staff could not be read.
+          <Button variant="ghost" onClick={reload}>
+            Try again
+          </Button>
+        </div>
+      );
+    }
+
+    if (!entry) {
+      return (
+        <p className="text-sm text-ink-muted">
+          That staff member is no longer on the active roster.
+        </p>
+      );
+    }
+
+    return (
+      <StaffForm
+        key={entry.staff.id}
+        initial={entry.staff}
+        canEditName={context.permissions.includes('staff:manage')}
+        canEditAccess={context.permissions.includes('staff:permission')}
+        submitLabel="Save staff changes"
+        onSave={save}
+      />
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-surface">
+      <AppBar
+        title="Edit details & access"
+        onBack={() =>
+          navigate(staffId ? '/admin/staff/' + encodeURIComponent(staffId) : '/admin/staff')
+        }
+      />
+      <div className="mx-auto w-full max-w-xl px-5 py-4">
+        <h1 className="mb-4 text-2xl font-extrabold">Staff details &amp; access</h1>
+        {renderStaffEditor()}
+      </div>
     </div>
-  </div>;
+  );
 };

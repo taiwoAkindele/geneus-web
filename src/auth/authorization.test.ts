@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { recordServerContact } from '@/data/deviceCredential';
-import { assertAllowed, AuthorizationError, authorizationFor, isAllowed, nobody } from './authorization';
+import {
+  assertAllowed,
+  AuthorizationError,
+  authorizationFor,
+  isAllowed,
+  nobody,
+} from './authorization';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-const staff = (role: Parameters<typeof authorizationFor>[0]['staff']['role'], permission: 'read_only' | 'read_write' = 'read_write') => ({
+const staff = (
+  role: Parameters<typeof authorizationFor>[0]['staff']['role'],
+  permission: 'read_only' | 'read_write' = 'read_write',
+) => ({
   staffId: `staff:${role}`,
   role,
   permission,
@@ -29,11 +38,18 @@ describe('assertAllowed', () => {
   });
 
   it('refuses a nurse an admin-only action, naming the permission', () => {
-    expect(() => assertAllowed(contextFor(staff('nurse')), 'staff:manage')).toThrow(AuthorizationError);
+    expect(() => assertAllowed(contextFor(staff('nurse')), 'staff:manage')).toThrow(
+      AuthorizationError,
+    );
+
     try {
       assertAllowed(contextFor(staff('nurse')), 'staff:manage');
     } catch (cause) {
-      expect((cause as AuthorizationError).denial).toEqual({ kind: 'not_granted', permission: 'staff:manage' });
+      expect((cause as AuthorizationError).denial).toEqual({
+        kind: 'not_granted',
+        permission: 'staff:manage',
+      });
+
       expect((cause as AuthorizationError).message).toMatch(/role doesn't allow/);
     }
   });
@@ -51,6 +67,7 @@ describe('assertAllowed', () => {
     expect(isAllowed(admin, 'staff:manage')).toBe(false);
     expect(isAllowed(admin, 'device:enroll')).toBe(false);
     expect(isAllowed(admin, 'patient:update')).toBe(true);
+
     try {
       assertAllowed(admin, 'staff:manage');
     } catch (cause) {
@@ -76,17 +93,29 @@ describe('assertAllowed', () => {
     expect(anonymous.permissions).toEqual([]);
     expect(isAllowed(anonymous, 'patient:create')).toBe(false);
   });
-  it('uses a newer trusted server contact when the signed-in context has an older snapshot',()=>{
-    const admin=contextFor(staff('facility_admin'),ago(2*DAY));recordServerContact(ago(HOUR));
-    expect(isAllowed(admin,'staff:manage')).toBe(true);
+
+  it('uses a newer trusted server contact when the signed-in context has an older snapshot', () => {
+    const admin = contextFor(staff('facility_admin'), ago(2 * DAY));
+    recordServerContact(ago(HOUR));
+    expect(isAllowed(admin, 'staff:manage')).toBe(true);
   });
 });
 
 describe('authorizationFor', () => {
   it('builds the context from the staff record, facility and device — never from anything else', () => {
-    const context = authorizationFor({ staff: staff('doctor'), facilityId: 'OOE-PHC', deviceId: 'device-1' });
+    const context = authorizationFor({
+      staff: staff('doctor'),
+      facilityId: 'OOE-PHC',
+      deviceId: 'device-1',
+    });
 
-    expect(context).toMatchObject({ userId: 'staff:doctor', facilityId: 'OOE-PHC', deviceId: 'device-1', role: 'doctor' });
+    expect(context).toMatchObject({
+      userId: 'staff:doctor',
+      facilityId: 'OOE-PHC',
+      deviceId: 'device-1',
+      role: 'doctor',
+    });
+
     expect(context.permissions).toContain('referral:update');
     expect(context.permissions).not.toContain('staff:manage');
     expect(context.policyVersion).toBeGreaterThan(0);

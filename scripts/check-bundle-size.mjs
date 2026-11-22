@@ -17,7 +17,9 @@ const gzipKb = (file) => gzipSync(readFileSync(`${dist}/${file}`)).length / 1024
 
 const entry = html.match(/src="\/(assets\/index-[^"]+\.js)"/)?.[1];
 if (!entry) throw new Error('no entry script in dist/index.html — run npm run build first');
-const preloaded = [...html.matchAll(/modulepreload[^>]*href="\/(assets\/[^"]+\.js)"/g)].map((match) => match[1]);
+const preloaded = [...html.matchAll(/modulepreload[^>]*href="\/(assets\/[^"]+\.js)"/g)].map(
+  (match) => match[1],
+);
 const initial = [entry, ...preloaded];
 
 const initialKb = initial.reduce((total, file) => total + gzipKb(file), 0);
@@ -25,7 +27,10 @@ const wasm = readdirSync(`${dist}/assets`).filter((file) => file.endsWith('.wasm
 
 for (const file of initial) console.log(`  ${gzipKb(file).toFixed(1).padStart(7)} KB gz  ${file}`);
 console.log(`\n  initial JS: ${initialKb.toFixed(1)} KB gzipped (budget ${BUDGET_KB} KB)`);
-for (const file of wasm) console.log(`  runtime asset, loaded once after enrollment: ${gzipKb(`assets/${file}`).toFixed(0)} KB gz  assets/${file}`);
+for (const file of wasm)
+  console.log(
+    `  runtime asset, loaded once after enrollment: ${gzipKb(`assets/${file}`).toFixed(0)} KB gz  assets/${file}`,
+  );
 
 if (initialKb > BUDGET_KB) {
   console.error(`\n  over budget by ${(initialKb - BUDGET_KB).toFixed(1)} KB`);

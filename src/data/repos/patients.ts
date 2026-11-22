@@ -1,9 +1,28 @@
-import { Patient, patientAge, patientIdentificationIssues, patientIdentitySnapshot, provisionalPatientName, type AuthorizationContext, type Charge, type FeeItem } from '@shared';
+import {
+  Patient,
+  patientAge,
+  patientIdentificationIssues,
+  patientIdentitySnapshot,
+  provisionalPatientName,
+  type AuthorizationContext,
+  type Charge,
+  type FeeItem,
+} from '@shared';
 import { mintPatientId } from '@/lib/patientId';
-import { allOfType, fieldValuesOf, envelope, findRecord, insertRecord, insertRecords, updateRecord, type NewRecord } from '../db';
+import {
+  allOfType,
+  fieldValuesOf,
+  envelope,
+  findRecord,
+  insertRecord,
+  insertRecords,
+  updateRecord,
+  type NewRecord,
+} from '../db';
 import { listFeeItems, newCharge, patientBillingFacts } from './billing';
 
 export const listPatients = () => allOfType<Patient>('patient');
+
 /** Patient IDs only, for issuing the next number without parsing every record. */
 export const listPatientIds = () => fieldValuesOf('patient', 'patientId');
 
@@ -13,8 +32,29 @@ export const getPatient = (patientId: string) => findRecord<Patient>('patient', 
 /** What the front desk records about a patient (PRD §10 — NASADOR, plus phone and the paper folder). */
 export type PatientDetails = Pick<
   Patient,
-  'fullName' | 'address' | 'sex' | 'ageYears' | 'dateOfBirth' | 'phone' | 'occupation' | 'religion' | 'legacyPaperRef'
-> & Partial<Pick<Patient, 'dobEstimated' | 'ageObservedOn' | 'nin' | 'identityEvidence' | 'identityEvidenceNote' | 'identityStatus' | 'provisionalReason' | 'identificationNote'>>;
+  | 'fullName'
+  | 'address'
+  | 'sex'
+  | 'ageYears'
+  | 'dateOfBirth'
+  | 'phone'
+  | 'occupation'
+  | 'religion'
+  | 'legacyPaperRef'
+> &
+  Partial<
+    Pick<
+      Patient,
+      | 'dobEstimated'
+      | 'ageObservedOn'
+      | 'nin'
+      | 'identityEvidence'
+      | 'identityEvidenceNote'
+      | 'identityStatus'
+      | 'provisionalReason'
+      | 'identificationNote'
+    >
+  >;
 
 /**
  * Registers a new patient under a Patient ID minted here, offline. The
@@ -23,28 +63,50 @@ export type PatientDetails = Pick<
 /** What a registration has prepared, for records saved in the same write (an identity decision, a first booking). */
 export type RegisteredBundle = { patient: Patient; fees: FeeItem[]; charges: Charge[] };
 
-export const registerPatient = async (details: PatientDetails, context: AuthorizationContext, extraRecords?: (patientId: string, created: RegisteredBundle) => NewRecord[]): Promise<Patient> => {
+export const registerPatient = async (
+  details: PatientDetails,
+  context: AuthorizationContext,
+  extraRecords?: (patientId: string, created: RegisteredBundle) => NewRecord[],
+): Promise<Patient> => {
   const existing = await listPatientIds();
-  const patientId = mintPatientId(
-    context.facilityId,
-    existing,
-  );
+  const patientId = mintPatientId(context.facilityId, existing);
+
   const patient = Patient.parse({
     ...envelope(context),
     ...details,
-    ...(details.identityStatus === 'provisional' ? { fullName: provisionalPatientName(patientId) } : {}),
+    ...(details.identityStatus === 'provisional'
+      ? { fullName: provisionalPatientName(patientId) }
+      : {}),
     id: patientId,
     type: 'patient',
     patientId,
     allergies: [],
   });
+
   // Visit-dependent policy cannot be decided until booking supplies the visit type.
   const allFees = await listFeeItems();
-  const fees = allFees.filter((fee) => fee.active && fee.chargeWhen === 'first_visit' && !fee.exemptions.some((rule) => rule.visitTypes));
-  const charges = fees.map((fee) => newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context));
-  await insertRecords(context, [{ permission: 'patient:create', type: 'patient', record: patient }, ...charges.map((record) => ({
-    permission: 'charge:create' as const, type: 'charge' as const, record,
-  })), ...(extraRecords?.(patientId, { patient, fees: allFees, charges }) ?? [])]);
+
+  const fees = allFees.filter(
+    (fee) =>
+      fee.active &&
+      fee.chargeWhen === 'first_visit' &&
+      !fee.exemptions.some((rule) => rule.visitTypes),
+  );
+
+  const charges = fees.map((fee) =>
+    newCharge(fee, { patientId, facts: patientBillingFacts(patient) }, context),
+  );
+
+  await insertRecords(context, [
+    { permission: 'patient:create', type: 'patient', record: patient },
+    ...charges.map((record) => ({
+      permission: 'charge:create' as const,
+      type: 'charge' as const,
+      record,
+    })),
+    ...(extraRecords?.(patientId, { patient, fees: allFees, charges }) ?? []),
+  ]);
+
   return patient;
 };
 
@@ -60,26 +122,48 @@ export const updatePatient = async (
   context: AuthorizationContext,
 ): Promise<Patient> => {
   const current = await findRecord<Patient>('patient', patientId);
-  if (!current) throw new Error(`no patient ${patientId} to change`);
-  const next: Record<string, unknown> = { ...details, ...(details.identityStatus === 'provisional' ? { fullName: provisionalPatientName(patientId) } : {}) };
+
+  if (!current) {
+    throw new Error(`no patient ${patientId} to change`);
+  }
+
+  const next: Record<string, unknown> = {
+    ...details,
+    ...(details.identityStatus === 'provisional'
+      ? { fullName: provisionalPatientName(patientId) }
+      : {}),
+  };
+
   const changedOn = new Date().toISOString();
+
   if (current.identityStatus === 'provisional' && details.identityStatus === 'identified') {
     next.identifiedBy = context.userId;
     next.identifiedOn = changedOn;
     next.identificationBase = patientIdentitySnapshot(current);
   }
+
   const proposed = Patient.parse({ ...current, ...next });
   const issues = patientIdentificationIssues(current, proposed, context.userId, changedOn);
-  if (issues.length) throw new Error(issues.join('; '));
+
+  if (issues.length) {
+    throw new Error(issues.join('; '));
+  }
+
   if (details.ageYears === patientAge(current) && details.dateOfBirth === current.dateOfBirth) {
     next.ageYears = current.ageYears;
     next.ageObservedOn = current.ageObservedOn;
   }
+
   const changes = Object.fromEntries(
-    Object.entries(next).filter(([field, value]) => value !== current[field as keyof Patient])
+    Object.entries(next)
+      .filter(([field, value]) => value !== current[field as keyof Patient])
       .map(([field, value]) => [field, value === undefined ? null : value]),
   ) as Partial<Patient>;
-  if (Object.keys(changes).length === 0) return current;
+
+  if (Object.keys(changes).length === 0) {
+    return current;
+  }
+
   return updateRecord<Patient>(context, 'patient:update', 'patient', patientId, changes, changedOn);
 };
 

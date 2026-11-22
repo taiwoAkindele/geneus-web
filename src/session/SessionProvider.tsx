@@ -1,21 +1,52 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { rolesFor, type AuthorizationContext, type RosterShift, type Staff } from '@shared';
 import { useDeviceContext, useLiveQuery } from '@/data';
-import { extendShift as persistExtension, findShift, listShifts, listStaff } from '@/data/repos/staff';
+import {
+  extendShift as persistExtension,
+  findShift,
+  listShifts,
+  listStaff,
+} from '@/data/repos/staff';
 import { authorizationFor, nobody, freshAuthorization } from '@/auth/authorization';
 import { lastServerContactOn } from '@/data/deviceCredential';
 import { listOpenRejections } from '@/data/repos/syncRejections';
 import { entriesAtSteps } from '@/data/repos/encounters';
 import { listPatients } from '@/data/repos/patients';
-import { RESULT_ALERT_STEPS, resultAlerts } from '@/modules/clinical/encounter/resultAlerts';
-import { visitRecordPath } from '@/modules/front-desk/patients/patientRoutes';
+import { RESULT_ALERT_STEPS, resultAlerts } from '@/modules/clinical/encounter';
+import { visitRecordPath } from '@/modules/front-desk/patients';
 import { checkPin, needsLongerPin } from './credentials';
-import { endStaffSession, enrolStaffPin, forgetStaffSession, openStaffSessionQuietly, takeSetupCode } from '@/lib/api/staffSession';
+import {
+  endStaffSession,
+  enrolStaffPin,
+  forgetStaffSession,
+  openStaffSessionQuietly,
+  takeSetupCode,
+} from '@/lib/api/staffSession';
 import { approvePinSetup } from './pinApproval';
-import { accessFor, maySignIn, mayStaySignedIn, SESSION_IDLE_MS, shiftEnd, type Access } from './accessPolicy';
+import {
+  accessFor,
+  maySignIn,
+  mayStaySignedIn,
+  SESSION_IDLE_MS,
+  shiftEnd,
+  type Access,
+} from './accessPolicy';
 import { shiftEndLabel, shiftRangeLabel } from './shiftLabels';
 import { checkShiftSignature, isFrozen } from './signInChecks';
-import { canContinueFacilitySession, clearFacilityIdentity, pendingFacilityIdentity } from './facilityIdentity';
+import {
+  canContinueFacilitySession,
+  clearFacilityIdentity,
+  pendingFacilityIdentity,
+} from './facilityIdentity';
 import { activeWorkspace, isWorkspaceSwitching } from '@/data/facilityWorkspaces';
 import { getDatabase } from '@/data/database';
 import { waitForFirstSync } from '@/data/sync';
@@ -40,10 +71,19 @@ export type SessionUser = {
   roles: Staff['role'][];
   canWrite: boolean;
 };
+
 export type Facility = { name: string; code: string };
-export type Shift = { label: string; endsAtLabel: string; endsOn: string; minutesLeft: number; ended: boolean };
+
+export type Shift = {
+  label: string;
+  endsAtLabel: string;
+  endsOn: string;
+  minutesLeft: number;
+  ended: boolean;
+};
 
 export type NotificationKind = 'referral' | 'conflict' | 'shift' | 'result';
+
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
@@ -108,8 +148,10 @@ const ACTIVITY_WRITE_MS = 15_000;
 
 const readLastActivity = (): number | undefined => {
   const stored = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
+
   return Number.isFinite(stored) && stored > 0 ? stored : undefined;
 };
+
 const EXTENSION_MINUTES = 240;
 
 const initialsOf = (fullName: string): string =>
@@ -136,44 +178,87 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [facilityIdentity, setFacilityIdentity] = useState(pendingFacilityIdentity);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const rejections = useLiveQuery(listOpenRejections);
+
   // Results back from the laboratory for tests this clinician ordered; each alert ends once the result is reviewed.
-  const results = useLiveQuery(useCallback(async () => {
-    if (!staffId) return [];
-    const [entries, patients] = await Promise.all([entriesAtSteps(RESULT_ALERT_STEPS), listPatients()]);
-    const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
-    return resultAlerts(entries, staffId).map((alert) => ({ ...alert, name: names.get(alert.patientId) ?? alert.patientId }));
-  }, [staffId]));
-  const notifications = useMemo<AppNotification[]>(() => [
-    ...(results.data ?? []).map((alert) => ({
-      id: 'result:' + alert.id, kind: 'result' as const, title: alert.critical ? `Critical result: ${alert.tests.join(', ')}` : `${alert.tests.join(', ')} result${alert.tests.length === 1 ? '' : 's'} ready`,
-      body: alert.name, to: visitRecordPath(alert.patientId, alert.encounterId) + '&task=result_review', read: readIds.has('result:' + alert.id),
-    })),
-    ...(rejections.data ?? []).map((rejection) => ({
-      id: rejection.id, kind: 'conflict' as const, title: 'A record needs review',
-      body: 'A queued change was refused. Open Sync & device to review it.', to: '/sync', read: readIds.has(rejection.id),
-    })),
-  ], [results.data, rejections.data, readIds]);
+  const results = useLiveQuery(
+    useCallback(async () => {
+      if (!staffId) {
+        return [];
+      }
+
+      const [entries, patients] = await Promise.all([
+        entriesAtSteps(RESULT_ALERT_STEPS),
+        listPatients(),
+      ]);
+
+      const names = new Map(patients.map((patient) => [patient.patientId, patient.fullName]));
+
+      return resultAlerts(entries, staffId).map((alert) => ({
+        ...alert,
+        name: names.get(alert.patientId) ?? alert.patientId,
+      }));
+    }, [staffId]),
+  );
+
+  const notifications = useMemo<AppNotification[]>(
+    () => [
+      ...(results.data ?? []).map((alert) => ({
+        id: 'result:' + alert.id,
+        kind: 'result' as const,
+        title: alert.critical
+          ? `Critical result: ${alert.tests.join(', ')}`
+          : `${alert.tests.join(', ')} result${alert.tests.length === 1 ? '' : 's'} ready`,
+        body: alert.name,
+        to: visitRecordPath(alert.patientId, alert.encounterId) + '&task=result_review',
+        read: readIds.has('result:' + alert.id),
+      })),
+      ...(rejections.data ?? []).map((rejection) => ({
+        id: rejection.id,
+        kind: 'conflict' as const,
+        title: 'A record needs review',
+        body: 'A queued change was refused. Open Sync & device to review it.',
+        to: '/sync',
+        read: readIds.has(rejection.id),
+      })),
+    ],
+    [results.data, rejections.data, readIds],
+  );
+
   useEffect(() => setReadIds(new Set()), [staffId]);
   const [now, setNow] = useState(() => Date.now());
   const lastActivity = useRef<number | undefined>(readLastActivity());
 
   const load = useCallback(async () => {
     const [staff, shifts] = await Promise.all([listStaff(), listShifts()]);
+
     return { staff: staff.filter((member) => member.active), shifts };
   }, []);
 
   const { data, loading, error: rosterError, reload: reloadRoster } = useLiveQuery(load);
-  const roster = useMemo<RosterEntry[]>(() => (data?.staff ?? []).map((member) => ({ staff: member, shift: findShift(data?.shifts ?? [], member.staffId, now) })), [data, now]);
+
+  const roster = useMemo<RosterEntry[]>(
+    () =>
+      (data?.staff ?? []).map((member) => ({
+        staff: member,
+        shift: findShift(data?.shifts ?? [], member.staffId, now),
+      })),
+    [data, now],
+  );
 
   // Coarse on purpose: every consumer re-renders on this, and the visible
   // per-second countdown is derived locally by useShiftCountdown.
   // A phone wakes from sleep with timers far behind; re-check at once rather than up to 30 s later.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000);
+
     const onVisible = () => {
-      if (document.visibilityState === 'visible') setNow(Date.now());
+      if (document.visibilityState === 'visible') {
+        setNow(Date.now());
+      }
     };
+
     document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
@@ -182,12 +267,24 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   // Check expiry before accepting input: a sleeping tab must not revive an expired session.
   useEffect(() => {
-    if (!staffId) return;
+    if (!staffId) {
+      return;
+    }
+
     let written = 0;
+
     const touched = (event: Event) => {
       const at = Date.now();
-      if (lastActivity.current === undefined || at - lastActivity.current >= SESSION_IDLE_MS || at < lastActivity.current) {
-        if ((event.type === 'pointerdown' || event.type === 'keydown') && event.cancelable) event.preventDefault();
+
+      if (
+        lastActivity.current === undefined ||
+        at - lastActivity.current >= SESSION_IDLE_MS ||
+        at < lastActivity.current
+      ) {
+        if ((event.type === 'pointerdown' || event.type === 'keydown') && event.cancelable) {
+          event.preventDefault();
+        }
+
         event.stopImmediatePropagation();
         localStorage.removeItem(SIGNED_IN_KEY);
         localStorage.removeItem(LAST_ACTIVITY_KEY);
@@ -196,17 +293,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         // The idle lock ends the server session too, not only the local sign-in.
         void endStaffSession();
         setNow(at);
+
         return;
       }
+
       lastActivity.current = at;
-      if (at - written < ACTIVITY_WRITE_MS) return;
+
+      if (at - written < ACTIVITY_WRITE_MS) {
+        return;
+      }
+
       written = at;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
     };
+
     window.addEventListener('pointerdown', touched, true);
     window.addEventListener('keydown', touched, true);
     window.addEventListener('wheel', touched, { passive: true });
     window.addEventListener('touchmove', touched, { passive: true });
+
     return () => {
       window.removeEventListener('pointerdown', touched, true);
       window.removeEventListener('keydown', touched, true);
@@ -216,13 +321,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [staffId]);
 
   const entry = roster.find((candidate) => candidate.staff.staffId === staffId);
+
   // `now` is a coarse display tick. Input can update lastActivity between
   // ticks, so comparing it with `now` mistakes fresh activity for a clock
   // rollback when a database/sync refresh renders this provider again.
-  const active = Boolean(!facilityIdentity && entry && mayStaySignedIn(entry, Date.now(), lastActivity.current));
+  const active = Boolean(
+    !facilityIdentity && entry && mayStaySignedIn(entry, Date.now(), lastActivity.current),
+  );
 
   const signOut = useCallback(() => {
-    if (isWorkspaceSwitching()) return;
+    if (isWorkspaceSwitching()) {
+      return;
+    }
+
     void clearFacilityIdentity();
     setFacilityIdentity(undefined);
     localStorage.removeItem(SIGNED_IN_KEY);
@@ -236,49 +347,133 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   // A fresh online organization check links the same person to a different local
   // membership. Wait for its replica, then apply that facility's login rules.
   useEffect(() => {
-    if (!facilityIdentity || loading || !data || !facility?.code) return;
+    if (!facilityIdentity || loading || !data || !facility?.code) {
+      return;
+    }
+
     let cancelled = false;
+
     void (async () => {
       try {
-        if (!activeWorkspace()?.prepared && !await waitForFirstSync(getDatabase())) throw new Error('First sync is required');
+        if (!activeWorkspace()?.prepared && !(await waitForFirstSync(getDatabase()))) {
+          throw new Error('First sync is required');
+        }
+
         const snapshot = await load();
-        const member = snapshot.staff.find((candidate) => candidate.staffId === facilityIdentity.staffId);
+
+        const member = snapshot.staff.find(
+          (candidate) => candidate.staffId === facilityIdentity.staffId,
+        );
+
         const shift = findShift(snapshot.shifts, facilityIdentity.staffId, Date.now());
-        const accepted = member && canContinueFacilitySession(facilityIdentity, { facilityId: facility.code, deviceId, staff: member, shift, lastServerContact: lastServerContactOn() }) &&
-          !(accessFor(member) === 'shift' && shift && await checkShiftSignature(shift) === 'invalid');
-        if (cancelled) return;
-        if (!accepted) { signOut(); return; }
-        if (!entry) { reloadRoster(); return; }
+
+        const accepted =
+          member &&
+          canContinueFacilitySession(facilityIdentity, {
+            facilityId: facility.code,
+            deviceId,
+            staff: member,
+            shift,
+            lastServerContact: lastServerContactOn(),
+          }) &&
+          !(
+            accessFor(member) === 'shift' &&
+            shift &&
+            (await checkShiftSignature(shift)) === 'invalid'
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!accepted) {
+          signOut();
+
+          return;
+        }
+
+        if (!entry) {
+          reloadRoster();
+
+          return;
+        }
+
         await clearFacilityIdentity();
-        if (!cancelled) setFacilityIdentity(undefined);
-      } catch { if (!cancelled) signOut(); }
+
+        if (!cancelled) {
+          setFacilityIdentity(undefined);
+        }
+      } catch {
+        if (!cancelled) {
+          signOut();
+        }
+      }
     })();
-    return () => { cancelled = true; };
-  }, [facilityIdentity, loading, data, facility?.code, deviceId, entry, load, reloadRoster, signOut]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    facilityIdentity,
+    loading,
+    data,
+    facility?.code,
+    deviceId,
+    entry,
+    load,
+    reloadRoster,
+    signOut,
+  ]);
 
   // Shift end never expires an authenticated session. Deactivation and staff
   // inactivity still clear the saved identity so reactivation cannot revive it.
   useEffect(() => {
-    if (!facilityIdentity && staffId && !loading && !rosterError && data && (!entry || !active)) signOut();
+    if (!facilityIdentity && staffId && !loading && !rosterError && data && (!entry || !active)) {
+      signOut();
+    }
   }, [facilityIdentity, staffId, loading, rosterError, data, entry, active, signOut]);
 
   const signIn = useCallback(
     async (candidateId: string, pin: string): Promise<SignInRefusal | undefined> => {
       const candidate = roster.find((member) => member.staff.staffId === candidateId);
-      if (!candidate) return { reason: 'unknown-staff' };
-      if (isFrozen(lastServerContactOn())) return { reason: 'sync-required' };
-      const pinCheck = await checkPin(candidateId, pin);
-      if (!pinCheck.ok) {
-        return pinCheck.reason === 'locked' ? { reason: 'locked', retryAt: pinCheck.retryAt } : { reason: 'wrong-pin' };
+
+      if (!candidate) {
+        return { reason: 'unknown-staff' };
       }
+
+      if (isFrozen(lastServerContactOn())) {
+        return { reason: 'sync-required' };
+      }
+
+      const pinCheck = await checkPin(candidateId, pin);
+
+      if (!pinCheck.ok) {
+        return pinCheck.reason === 'locked'
+          ? { reason: 'locked', retryAt: pinCheck.retryAt }
+          : { reason: 'wrong-pin' };
+      }
+
       if (needsLongerPin(candidateId)) {
         // The right old PIN is itself the approval to replace it.
         approvePinSetup(candidateId);
+
         return { reason: 'pin-upgrade' };
       }
+
       const currentShift = findShift(data?.shifts ?? [], candidateId, Date.now());
-      if (!maySignIn({ staff: candidate.staff, shift: currentShift }, Date.now())) return { reason: 'off-shift' };
-      if (accessFor(candidate.staff) === 'shift' && currentShift && (await checkShiftSignature(currentShift)) === 'invalid') return { reason: 'shift-altered' };
+
+      if (!maySignIn({ staff: candidate.staff, shift: currentShift }, Date.now())) {
+        return { reason: 'off-shift' };
+      }
+
+      if (
+        accessFor(candidate.staff) === 'shift' &&
+        currentShift &&
+        (await checkShiftSignature(currentShift)) === 'invalid'
+      ) {
+        return { reason: 'shift-altered' };
+      }
+
       const signedInAt = Date.now();
       lastActivity.current = signedInAt;
       localStorage.setItem(LAST_ACTIVITY_KEY, String(signedInAt));
@@ -290,14 +485,27 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       // Prove the PIN to the server too, when online, so it knows who is acting: a just-used PIN code
       // registers the new PIN first. Never blocks or fails sign-in; offline work carries on regardless.
       const setupCode = takeSetupCode(candidateId);
-      void (setupCode && navigator.onLine ? enrolStaffPin(candidateId, deviceId, pin, { setupCode }).catch(() => openStaffSessionQuietly({ userId: candidateId, deviceId }, pin)) : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
+      void (setupCode && navigator.onLine
+        ? enrolStaffPin(candidateId, deviceId, pin, { setupCode }).catch(() =>
+            openStaffSessionQuietly({ userId: candidateId, deviceId }, pin),
+          )
+        : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
+
       return undefined;
     },
     [roster, data, deviceId],
   );
 
   const auth = useMemo<AuthValue>(
-    () => ({ signedIn: active, loading: loading || Boolean(facilityIdentity), error: rosterError, reload: reloadRoster, roster, signIn, signOut }),
+    () => ({
+      signedIn: active,
+      loading: loading || Boolean(facilityIdentity),
+      error: rosterError,
+      reload: reloadRoster,
+      roster,
+      signIn,
+      signOut,
+    }),
     [active, loading, facilityIdentity, roster, signIn, signOut, rosterError, reloadRoster],
   );
 
@@ -312,8 +520,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   // Extending is a supervisor's permission (PRD §14.1); anyone else is refused
   // by the repository, and the refusal surfaces like any other write error.
   const extend = useCallback(async () => {
-    if (!entry?.shift) throw new Error('There is no active shift to extend');
-    await persistExtension(entry.shift, new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(), authorization);
+    if (!entry?.shift) {
+      throw new Error('There is no active shift to extend');
+    }
+
+    await persistExtension(
+      entry.shift,
+      new Date(Date.now() + EXTENSION_MINUTES * 60_000).toISOString(),
+      authorization,
+    );
   }, [entry, authorization]);
 
   const markAllRead = useCallback(
@@ -322,15 +537,21 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const session = useMemo<SessionValue | null>(() => {
-    if (!entry || !active) return null;
+    if (!entry || !active) {
+      return null;
+    }
+
     const { staff, shift } = entry;
     const access = accessFor(staff);
+
     return {
       user: {
         staffId: staff.staffId,
         name: staff.fullName,
         initials: initialsOf(staff.fullName),
-        role: rolesFor(staff).map((role) => ROLE_LABELS[role] ?? role).join(' + '),
+        role: rolesFor(staff)
+          .map((role) => ROLE_LABELS[role] ?? role)
+          .join(' + '),
         roles: rolesFor(staff),
         roleId: staff.role,
         canWrite: staff.permission === 'read_write',
@@ -355,7 +576,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       extendShift: extend,
       markAllRead,
     };
-  }, [entry, active, facility, authorization, notifications, now, extend, markAllRead, rejections.loading, rejections.error, results.loading, results.error]);
+  }, [
+    entry,
+    active,
+    facility,
+    authorization,
+    notifications,
+    now,
+    extend,
+    markAllRead,
+    rejections.loading,
+    rejections.error,
+    results.loading,
+    results.error,
+  ]);
 
   return (
     <AuthContext.Provider value={auth}>
@@ -366,7 +600,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = (): AuthValue => {
   const auth = useContext(AuthContext);
-  if (!auth) throw new Error('useAuth must be used within a SessionProvider');
+
+  if (!auth) {
+    throw new Error('useAuth must be used within a SessionProvider');
+  }
+
   return auth;
 };
 
@@ -378,7 +616,8 @@ export const useAuth = (): AuthValue => {
 export const useAuthorizationContext = (): AuthorizationContext => {
   const session = useContext(SessionContext);
   const { facility, deviceId } = useDeviceContext();
-  const contact=lastServerContactOn();
+  const contact = lastServerContactOn();
+
   return useMemo(
     () => freshAuthorization(session?.authorization ?? nobody(facility?.code ?? '', deviceId)),
     [session?.authorization, facility?.code, deviceId, contact],
@@ -388,6 +627,10 @@ export const useAuthorizationContext = (): AuthorizationContext => {
 /** Only valid behind the shift guard — screens outside it have no signed-in staff. */
 export const useSession = (): SessionValue => {
   const session = useContext(SessionContext);
-  if (!session) throw new Error('useSession requires signed-in staff (render inside RequireShift)');
+
+  if (!session) {
+    throw new Error('useSession requires signed-in staff (render inside RequireShift)');
+  }
+
   return session;
 };

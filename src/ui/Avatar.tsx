@@ -32,4 +32,4 @@ export const Avatar = ({ children, tone = 'green', size = 'md', className = '' }
       {children}
     </span>
   );
-}
+};

@@ -9,7 +9,42 @@ import { listDefinitions, listEntries } from '@/data/repos/registers';
 import { listStockItems, listStockMovements } from '@/data/repos/stock';
 
 const load = async () => {
-  const [encounters, entries, patients, identities, definitions, registerEntries, items, movements, appointments, offerings] = await Promise.all([listEncounters(), listEncounterEntries(), listPatients(), listIdentityEvents(), listDefinitions(), listEntries(), listStockItems(), listStockMovements(), listAppointments(), allOfType<ServiceOffering>('service_offering')]);
-  return { encounters, entries, patients, identities, definitions, registerEntries, items, movements, appointments, offerings };
+  const [
+    encounters,
+    entries,
+    patients,
+    identities,
+    definitions,
+    registerEntries,
+    items,
+    movements,
+    appointments,
+    offerings,
+  ] = await Promise.all([
+    listEncounters(),
+    listEncounterEntries(),
+    listPatients(),
+    listIdentityEvents(),
+    listDefinitions(),
+    listEntries(),
+    listStockItems(),
+    listStockMovements(),
+    listAppointments(),
+    allOfType<ServiceOffering>('service_offering'),
+  ]);
+
+  return {
+    encounters,
+    entries,
+    patients,
+    identities,
+    definitions,
+    registerEntries,
+    items,
+    movements,
+    appointments,
+    offerings,
+  };
 };
+
 export const useMonthlyReport = () => useLiveQuery(load);

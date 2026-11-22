@@ -16,26 +16,39 @@ export type FakeDatabase = LocalDatabase & {
 
 const tableOf = (sql: string): string | undefined => /FROM\s+(\w+)/i.exec(sql)?.[1];
 
-export const fakeDatabase = (seed: Record<string, Record<string, unknown>[]> = {}): FakeDatabase => {
+export const fakeDatabase = (
+  seed: Record<string, Record<string, unknown>[]> = {},
+): FakeDatabase => {
   const statements: Statement[] = [];
   const rows = structuredClone(seed);
   const transactions: CrudTransaction[] = [];
-  const getOptional=async<T>(sql:string,parameters:unknown[]=[])=>((rows[tableOf(sql)??'']??[]).find((row)=>row.id===parameters[0])??null) as T|null;
+
+  const getOptional = async <T>(sql: string, parameters: unknown[] = []) =>
+    ((rows[tableOf(sql) ?? ''] ?? []).find((row) => row.id === parameters[0]) ?? null) as T | null;
+
   return {
     statements,
     rows,
     transactions,
-    writeTransaction: async (callback) => callback({ execute: async (sql, parameters = []) => { statements.push({ sql, parameters }); },getOptional }),
+    writeTransaction: async (callback) =>
+      callback({
+        execute: async (sql, parameters = []) => {
+          statements.push({ sql, parameters });
+        },
+        getOptional,
+      }),
     execute: async (sql, parameters = []) => {
       statements.push({ sql, parameters });
     },
     getAll: async <T>(sql: string, parameters: unknown[] = []) => {
       const table = rows[tableOf(sql) ?? ''] ?? [];
       const field = /WHERE\s+"?(\w+)"?\s*=\s*\?/i.exec(sql)?.[1];
+
       return (field ? table.filter((row) => row[field] === parameters[0]) : table) as T[];
     },
     getOptional: async <T>(sql: string, parameters: unknown[] = []) => {
       const table = rows[tableOf(sql) ?? ''] ?? [];
+
       return (table.find((row) => row.id === parameters[0]) ?? null) as T | null;
     },
     onChangeWithCallback: () => () => undefined,

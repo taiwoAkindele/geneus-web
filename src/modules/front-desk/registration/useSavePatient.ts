@@ -12,15 +12,22 @@ import { amountsDue, type RegistrationVisit } from './visitFees';
 import { identityReviewRecords, type RegistrationDecision } from '@/data/repos/patientIdentity';
 import { coverRecord } from '@/data/repos/insurance';
 import { newPatientContact, tidyEmail } from '@/data/repos/patientContacts';
-import type { CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
+import type { CoverFieldsValue } from '@/modules/finance/insurance';
 
 /** Where a newly registered and booked patient goes next, shown on their record. */
 export type RegistrationOutcome = { patientId: string; message: string };
 
 const outcomeOf = (patientId: string, booked: boolean, charges: readonly Charge[]): string => {
-  if (!booked) return `Registered — ${patientId}`;
+  if (!booked) {
+    return `Registered — ${patientId}`;
+  }
+
   const due = amountsDue(charges);
-  if (due.length) return `Registered — ${patientId}. Booked for now · ${due.join(' + ')} to pay at the cashier.`;
+
+  if (due.length) {
+    return `Registered — ${patientId}. Booked for now · ${due.join(' + ')} to pay at the cashier.`;
+  }
+
   return `Registered — ${patientId}. Booked for now · nothing to pay, ready for the nurse station.`;
 };
 
@@ -38,41 +45,103 @@ export const useSavePatient = () => {
   const saving = useRef(false);
 
   return useCallback(
-    async (values: RegistrationValues, editingPatientId?: string, decision?: RegistrationDecision, visit?: RegistrationVisit, cover?: CoverFieldsValue) => {
-      if (saving.current) return;
+    async (
+      values: RegistrationValues,
+      editingPatientId?: string,
+      decision?: RegistrationDecision,
+      visit?: RegistrationVisit,
+      cover?: CoverFieldsValue,
+    ) => {
+      if (saving.current) {
+        return;
+      }
+
       saving.current = true;
+
       try {
         const details = toPatientDetails(values);
         // The email is recorded at registration; a registered patient's email is changed from their personal details.
         const email = editingPatientId ? undefined : tidyEmail(values.email ?? '');
         const charges: Charge[] = [];
         const booked = Boolean(visit) && !editingPatientId;
+
         const patient = editingPatientId
           ? await updatePatient(editingPatientId, details, context)
           : await registerPatient(details, context, (patientId, created) => {
-            const extra: NewRecord[] = [...identityReviewRecords(patientId, decision, context)];
-            // Insurance chosen at registration is saved with the patient, as cover not yet checked.
-            if (email) extra.push(newPatientContact(patientId, email, context));
-            if (cover) extra.push({ permission: 'cover:record', type: 'patient_cover', record: coverRecord({ ...cover, patientId }, context) });
-            charges.push(...created.charges);
-            if (visit) {
-              const booking = newPatientBookingRecords({ patientId, reason: visit.reason, visitType: visit.visitType, offeringId: visit.offeringId }, context, created);
-              charges.push(...booking.filter((record) => record.type === 'charge').map((record) => record.record as Charge));
-              extra.push(...booking);
-            }
-            return extra;
-          });
-        const message = editingPatientId ? 'Patient details saved' : outcomeOf(patient.patientId, booked, charges);
+              const extra: NewRecord[] = [...identityReviewRecords(patientId, decision, context)];
+
+              // Insurance chosen at registration is saved with the patient, as cover not yet checked.
+              if (email) {
+                extra.push(newPatientContact(patientId, email, context));
+              }
+
+              if (cover) {
+                extra.push({
+                  permission: 'cover:record',
+                  type: 'patient_cover',
+                  record: coverRecord({ ...cover, patientId }, context),
+                });
+              }
+
+              charges.push(...created.charges);
+
+              if (visit) {
+                const booking = newPatientBookingRecords(
+                  {
+                    patientId,
+                    reason: visit.reason,
+                    visitType: visit.visitType,
+                    offeringId: visit.offeringId,
+                  },
+                  context,
+                  created,
+                );
+
+                charges.push(
+                  ...booking
+                    .filter((record) => record.type === 'charge')
+                    .map((record) => record.record as Charge),
+                );
+
+                extra.push(...booking);
+              }
+
+              return extra;
+            });
+
+        const message = editingPatientId
+          ? 'Patient details saved'
+          : outcomeOf(patient.patientId, booked, charges);
+
         toast(message);
-        try { await clearDraft(editingPatientId ?? 'new'); }
-        catch { toast('Patient saved. Draft cleanup could not finish; keep this device and retry cleanup.', { tone: 'error' }); }
-        const outcome: RegistrationOutcome | undefined = editingPatientId ? undefined : { patientId: patient.patientId, message };
-        navigate('/patients/profile', { state: { patientId: patient.patientId, outcome }, replace: true });
-      } catch (cause) {
-        toast(cause instanceof Error ? cause.message : 'Could not save the patient — please try again', {
-          tone: 'error',
+
+        try {
+          await clearDraft(editingPatientId ?? 'new');
+        } catch {
+          toast(
+            'Patient saved. Draft cleanup could not finish; keep this device and retry cleanup.',
+            { tone: 'error' },
+          );
+        }
+
+        const outcome: RegistrationOutcome | undefined = editingPatientId
+          ? undefined
+          : { patientId: patient.patientId, message };
+
+        navigate('/patients/profile', {
+          state: { patientId: patient.patientId, outcome },
+          replace: true,
         });
-      } finally { saving.current = false; }
+      } catch (cause) {
+        toast(
+          cause instanceof Error ? cause.message : 'Could not save the patient — please try again',
+          {
+            tone: 'error',
+          },
+        );
+      } finally {
+        saving.current = false;
+      }
     },
     [context, navigate, toast, clearDraft],
   );

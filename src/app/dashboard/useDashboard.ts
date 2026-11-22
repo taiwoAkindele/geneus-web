@@ -12,17 +12,66 @@ export const useDashboard = (access: ReturnType<typeof dashboardAccess>) => {
     const refresh = () => setToday(calendarDate());
     const timer = window.setInterval(refresh, 60_000);
     document.addEventListener('visibilitychange', refresh);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, []);
-  const care = useLiveQuery(useCallback(async () => {
-    if (!access.care) return undefined;
-    const [encounters, entries, patients] = await Promise.all([listEncounters(), listEncounterEntries(), listPatients()]);
-    return careSnapshot(encounters, entries, patients, today);
-  }, [access.care, today]), ['encounter', 'encounter_entry', 'patient']);
-  const billing = useLiveQuery(useCallback(async () => {
-    if (!access.billing) return undefined;
-    const [charges, payments, adjustments, patients] = await Promise.all([listCharges(), listPayments(), listAdjustments(), listPatients()]);
-    return billingSnapshot(charges, payments, adjustments, patients, today, await balanceCoverage(charges));
-  }, [access.billing, today]), ['charge', 'payment', 'billing_adjustment', 'patient', 'sync_rejection', 'refund', 'patient_cover', 'cover_check', 'coverage_election', 'coverage_allocation', 'cover_schedule']);
+
+  const care = useLiveQuery(
+    useCallback(async () => {
+      if (!access.care) {
+        return undefined;
+      }
+
+      const [encounters, entries, patients] = await Promise.all([
+        listEncounters(),
+        listEncounterEntries(),
+        listPatients(),
+      ]);
+
+      return careSnapshot(encounters, entries, patients, today);
+    }, [access.care, today]),
+    ['encounter', 'encounter_entry', 'patient'],
+  );
+
+  const billing = useLiveQuery(
+    useCallback(async () => {
+      if (!access.billing) {
+        return undefined;
+      }
+
+      const [charges, payments, adjustments, patients] = await Promise.all([
+        listCharges(),
+        listPayments(),
+        listAdjustments(),
+        listPatients(),
+      ]);
+
+      return billingSnapshot(
+        charges,
+        payments,
+        adjustments,
+        patients,
+        today,
+        await balanceCoverage(charges),
+      );
+    }, [access.billing, today]),
+    [
+      'charge',
+      'payment',
+      'billing_adjustment',
+      'patient',
+      'sync_rejection',
+      'refund',
+      'patient_cover',
+      'cover_check',
+      'coverage_election',
+      'coverage_allocation',
+      'cover_schedule',
+    ],
+  );
+
   return { care, billing, today };
 };

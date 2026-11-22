@@ -31,8 +31,8 @@ export const AuthShell = () => (
           One patient. One record. Every level of care.
         </h2>
         <p className="mt-4 max-w-[38ch] text-[15px] leading-relaxed text-brand-on-dark">
-          Register once and your facility code, admin account and staff invites are ready in
-          minutes — works offline from day one.
+          Register once and your facility code, admin account and staff invites are ready in minutes
+          — works offline from day one.
         </p>
         <div className="mt-6 flex gap-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-brand-accent-soft" />

@@ -11,5 +11,6 @@ export const usePatient = (patientId: string | undefined): LiveQuery<Patient | u
     async () => (patientId ? getPatient(patientId) : undefined),
     [patientId],
   );
+
   return useLiveQuery(load);
 };

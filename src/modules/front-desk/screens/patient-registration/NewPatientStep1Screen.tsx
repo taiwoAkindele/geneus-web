@@ -1,3 +1,4 @@
+//
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -10,37 +11,75 @@ import { listFeeItems } from '@/data/repos/billing';
 import { listPatients, type PatientDetails } from '@/data/repos/patients';
 import { recordExistingSelection } from '@/data/repos/patientIdentity';
 import { useAuthorizationContext } from '@/session';
-import { CareServiceVisitFields } from '@/modules/front-desk/careServices/CareServiceVisitFields';
+import { CareServiceVisitFields } from '@/modules/front-desk/careServices';
 import type { CareVisitChoice } from '@/data/repos/careServices';
 import {
-  EMPTY_REGISTRATION, amountsDue, factsFromForm, newPatientFees, parseAge, toPatientDetails, useNextPatientNumber, useRegistrationDraft, useSavePatient, visitFor,
-  type RegistrationNavState, type RegistrationValues,
+  EMPTY_REGISTRATION,
+  amountsDue,
+  factsFromForm,
+  newPatientFees,
+  parseAge,
+  toPatientDetails,
+  useNextPatientNumber,
+  useRegistrationDraft,
+  useSavePatient,
+  visitFor,
+  type RegistrationNavState,
+  type RegistrationValues,
+  RegistrationRecoveryGate,
+  RegistrationRecoveryStatus,
+  sexCode,
+  sexFromCode,
 } from '@/modules/front-desk/registration';
-import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/modules/front-desk/search';
-import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/modules/front-desk/registration/RegistrationRecoveryPrompt';
+import {
+  currentAge,
+  findLikelyMatches,
+  usePatients,
+  type MatchReason,
+} from '@/modules/front-desk/search';
 import type { DuplicateNavState } from './DuplicateCheckScreen';
 import { tidyEmail } from '@/data/repos/patientContacts';
-import { RegistrationPayment, coverIssue, emptyCover, type CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
+import {
+  RegistrationPayment,
+  coverIssue,
+  emptyCover,
+  type CoverFieldsValue,
+} from '@/modules/finance/insurance';
 
 const todayIso = (): string => calendarDate();
 const OCCUPATIONS = ['Trader', 'Farmer', 'Student', 'Civil servant', 'Artisan'];
-const REASON_LABEL: Record<MatchReason, string> = { name: 'Name', phone: 'Phone', age: 'Age', sex: 'Sex', address: 'Address' };
+
+const REASON_LABEL: Record<MatchReason, string> = {
+  name: 'Name',
+  phone: 'Phone',
+  age: 'Age',
+  sex: 'Sex',
+  address: 'Address',
+};
 
 type FormValues = Omit<RegistrationValues, 'identificationNote'>;
 
 /** What has been typed so far, as matching input; undefined until there is a name to compare. */
 const typedDetails = (values: FormValues): PatientDetails | undefined => {
-  if (values.identityStatus === 'provisional' || values.fullName.trim().length < 3) return undefined;
+  if (values.identityStatus === 'provisional' || values.fullName.trim().length < 3) {
+    return undefined;
+  }
+
   const age = parseAge(values.age);
+
   return {
     fullName: values.fullName.trim(),
-    sex: values.sex === 'F' ? 'female' : values.sex === 'M' ? 'male' : undefined,
-    ageYears: age !== undefined && Number.isInteger(age) && age >= 0 && age <= 130 ? age : undefined,
+    sex: sexFromCode(values.sex),
+    ageYears:
+      age !== undefined && Number.isInteger(age) && age >= 0 && age <= 130 ? age : undefined,
     ageObservedOn: todayIso(),
-    dateOfBirth: values.dateOfBirth && validCalendarDate(values.dateOfBirth) ? values.dateOfBirth : undefined,
+    dateOfBirth:
+      values.dateOfBirth && validCalendarDate(values.dateOfBirth) ? values.dateOfBirth : undefined,
     phone: values.phone.trim() || undefined,
     address: values.address.trim() || undefined,
-    occupation: undefined, religion: undefined, legacyPaperRef: undefined,
+    occupation: undefined,
+    religion: undefined,
+    legacyPaperRef: undefined,
   };
 };
 
@@ -64,30 +103,61 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
   const [withVisit, setWithVisit] = useState(canBook);
   const [care, setCare] = useState<CareVisitChoice>({ visitType: 'general' });
   const [saveError, setSaveError] = useState('');
-  const [payment, setPayment] = useState<'self_pay' | 'insurance'>('self_pay'); const [cover, setCover] = useState<CoverFieldsValue>(emptyCover);
+  const [payment, setPayment] = useState<'self_pay' | 'insurance'>('self_pay');
+  const [cover, setCover] = useState<CoverFieldsValue>(emptyCover);
   const [opening, setOpening] = useState(false);
 
-  const { control, register, handleSubmit, getValues, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({ defaultValues: values });
+  const {
+    control,
+    register,
+    handleSubmit,
+    getValues,
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({ defaultValues: values });
+
   const live = watch();
   const provisional = live.identityStatus === 'provisional';
   const visitType = !editing && !provisional && canBook && withVisit ? care.visitType : undefined;
 
   useEffect(() => {
     const subscription = watch((partial) => keep(partial));
+
     return () => subscription.unsubscribe();
   }, [watch, keep]);
 
   const typed = typedDetails(live);
-  const matches = useMemo(() => (!editing && typed && patients.data ? findLikelyMatches(typed, patients.data).slice(0, 2) : []), [editing, JSON.stringify(typed), patients.data]);
+
+  const matches = useMemo(
+    () =>
+      !editing && typed && patients.data ? findLikelyMatches(typed, patients.data).slice(0, 2) : [],
+    [editing, JSON.stringify(typed), patients.data],
+  );
+
   const lines = newPatientFees(fees.data ?? [], factsFromForm(live, visitType), Boolean(visitType));
   const due = amountsDue(lines);
 
   const openExisting = async (patientId: string) => {
-    if (opening) return;
-    setOpening(true); setSaveError('');
-    try { await recordExistingSelection(patientId, context); await clear(); navigate('/patients/profile', { state: { patientId }, replace: true }); }
-    catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Could not open the existing record. Try again.'); }
-    finally { setOpening(false); }
+    if (opening) {
+      return;
+    }
+
+    setOpening(true);
+    setSaveError('');
+
+    try {
+      await recordExistingSelection(patientId, context);
+      await clear();
+      navigate('/patients/profile', { state: { patientId }, replace: true });
+    } catch (cause) {
+      setSaveError(
+        cause instanceof Error ? cause.message : 'Could not open the existing record. Try again.',
+      );
+    } finally {
+      setOpening(false);
+    }
   };
 
   const save = async (form: FormValues) => {
@@ -96,38 +166,152 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
     const complete: RegistrationValues = { ...values, ...form };
     const visit = visitType ? visitFor(visitType, care.offeringId) : undefined;
     const insured = !editing && !provisional && payment === 'insurance' ? cover : undefined;
-    if (insured && coverIssue(insured)) { setSaveError(coverIssue(insured)!); return; }
+
+    if (insured && coverIssue(insured)) {
+      setSaveError(coverIssue(insured)!);
+
+      return;
+    }
+
     try {
-      if (provisional || editing) return await savePatient(complete, state.patientId);
+      if (provisional || editing) {
+        return await savePatient(complete, state.patientId);
+      }
+
       const found = findLikelyMatches(toPatientDetails(complete), await listPatients());
+
       if (found.length > 0) {
-        const duplicate: DuplicateNavState = { matchIds: found.map((match) => match.patient.patientId), visit, ...(insured ? { cover: insured } : {}) };
+        const duplicate: DuplicateNavState = {
+          matchIds: found.map((match) => match.patient.patientId),
+          visit,
+          ...(insured ? { cover: insured } : {}),
+        };
+
         return navigate('/patients/duplicate', { state: duplicate });
       }
+
       return await savePatient(complete, undefined, undefined, visit, insured);
-    } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'The duplicate check could not be completed. Try again.'); }
+    } catch (cause) {
+      setSaveError(
+        cause instanceof Error
+          ? cause.message
+          : 'The duplicate check could not be completed. Try again.',
+      );
+    }
   };
 
   // Age or date of birth: an elderly patient with no records still gets registered (PRD §10).
-  const ageOrBirth = () => (provisional || getValues('age').trim() || getValues('dateOfBirth') ? true : 'Give an age or a date of birth');
+  const ageOrBirth = () =>
+    provisional || getValues('age').trim() || getValues('dateOfBirth')
+      ? true
+      : 'Give an age or a date of birth';
 
-  if (editing && values.identityStatus !== 'provisional' && (!values.fullName || !values.sex)) return <Navigate to="/patients/profile" state={{ patientId: state.patientId }} replace />;
+  if (editing && values.identityStatus !== 'provisional' && (!values.fullName || !values.sex)) {
+    return <Navigate to="/patients/profile" state={{ patientId: state.patientId }} replace />;
+  }
 
-  const submitLabel = provisional ? editing ? 'Save provisional details' : 'Create provisional record'
-    : editing ? 'Save changes'
-    : !visitType ? 'Register patient'
-    : fees.loading ? 'Register & book visit'
-    : due.length ? 'Register & send to cashier' : 'Register & send to nurse station';
+  const submitLabelFor = () => {
+    if (provisional) {
+      return editing ? 'Save provisional details' : 'Create provisional record';
+    }
+
+    if (editing) {
+      return 'Save changes';
+    }
+
+    if (!visitType) {
+      return 'Register patient';
+    }
+
+    if (fees.loading) {
+      return 'Register & book visit';
+    }
+
+    // Money due goes to the cashier first; otherwise straight to the nurse station.
+    return due.length ? 'Register & send to cashier' : 'Register & send to nurse station';
+  };
+
+  const submitLabel = submitLabelFor();
 
   const optional = (label: string) => `${label} (optional)`;
   const sectionTitle = 'text-lg font-extrabold text-ink';
+
+  const renderFeeLines = () => {
+    if (fees.loading) {
+      return (
+        <p role="status" className="text-sm text-ink-muted">
+          Reading fees…
+        </p>
+      );
+    }
+
+    if (fees.error) {
+      return (
+        <p role="alert" className="text-sm text-amber-text">
+          Fees could not be read. They are still applied when you save.
+        </p>
+      );
+    }
+
+    if (lines.length) {
+      return (
+        <div className="rounded-field bg-surface-muted p-3 text-sm">
+          <table className="w-full">
+            <caption className="sr-only">Fees for this registration</caption>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.feeId} className="border-b border-outline-soft last:border-0">
+                  <td className="py-1.5 pr-3">
+                    {line.name}
+                    {line.exemptReason ? (
+                      <span className="block text-xs text-ink-muted">
+                        Exempt · {line.exemptReason}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 text-right font-mono">
+                    {line.exemptReason ? (
+                      <>
+                        <s className="text-ink-muted">
+                          {formatMoney(line.listPriceMinor, line.currency)}
+                        </s>{' '}
+                        {formatMoney(0, line.currency)}
+                      </>
+                    ) : (
+                      formatMoney(line.amountMinor, line.currency)
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="pt-2 font-bold">To pay now</td>
+                <td className="pt-2 text-right font-mono font-bold">
+                  {due.length ? due.join(' + ') : 'Nothing'}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppBar
         title={editing ? 'Edit patient' : 'New patient'}
         onBack={() => navigate(-1)}
-        right={<div className="flex items-center gap-2">{provisional ? <span className="font-mono text-[11px] text-ink-muted">Provisional registration</span> : null}</div>}
+        right={
+          <div className="flex items-center gap-2">
+            {provisional ? (
+              <span className="font-mono text-[11px] text-ink-muted">Provisional registration</span>
+            ) : null}
+          </div>
+        }
       />
       {/* Wide on desktop (sections use two or three columns); one column on phones. */}
       <form
@@ -138,37 +322,131 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
         <div className="flex-1 space-y-7 px-5 py-4 md:px-8 md:py-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <RegistrationRecoveryStatus />
-            {!editing ? <button type="button" onClick={() => { void clear().catch(() => {}); reset(EMPTY_REGISTRATION); }} className="ml-auto min-h-11 text-sm font-bold text-brand">Clear form</button> : null}
+            {!editing ? (
+              <button
+                type="button"
+                onClick={() => {
+                  // A failed draft write is shown through the recovery status, not thrown here.
+                  void clear().catch(() => {});
+                  reset(EMPTY_REGISTRATION);
+                }}
+                className="ml-auto min-h-11 text-sm font-bold text-brand"
+              >
+                Clear form
+              </button>
+            ) : null}
           </div>
-          {!editing ? <Controller control={control} name="identityStatus" render={({ field }) => <label className="flex min-h-11 max-w-2xl items-start gap-3 rounded-field border border-outline p-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={field.value === 'provisional'} onChange={(event) => field.onChange(event.target.checked ? 'provisional' : 'identified')} /><span className="font-semibold">Patient identity is not known<span className="mt-1 block font-normal text-ink-muted">Emergency registration. Record only what is known and add identity later.</span></span></label>} /> : null}
+          {!editing ? (
+            <Controller
+              control={control}
+              name="identityStatus"
+              render={({ field }) => (
+                <label className="flex min-h-11 max-w-2xl items-start gap-3 rounded-field border border-outline p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0"
+                    checked={field.value === 'provisional'}
+                    onChange={(event) =>
+                      field.onChange(event.target.checked ? 'provisional' : 'identified')
+                    }
+                  />
+                  <span className="font-semibold">
+                    Patient identity is not known
+                    <span className="mt-1 block font-normal text-ink-muted">
+                      Emergency registration. Record only what is known and add identity later.
+                    </span>
+                  </span>
+                </label>
+              )}
+            />
+          ) : null}
 
           <section aria-labelledby="registration-patient" className="space-y-4">
-            <h2 id="registration-patient" className={sectionTitle}>Patient</h2>
+            <h2 id="registration-patient" className={sectionTitle}>
+              Patient
+            </h2>
             <div className="grid gap-4 md:grid-cols-2">
-              {provisional ? <div className="space-y-2 md:col-span-2"><p className="text-sm text-ink-soft">A distinct temporary label and patient ID will be created. Leave unknown details blank; care can begin immediately.</p><TextField label="Reason for provisional registration" maxLength={500} hint="Why identity is unknown and any details that help distinguish this patient." error={errors.provisionalReason?.message} {...register('provisionalReason', { validate: (value) => !provisional || value.trim().length >= 3 || 'Explain why identity is not yet known' })} /></div> : <TextField
-                label="Full name"
-                placeholder="e.g. Amaka Okoro"
-                autoComplete="off"
-                error={errors.fullName?.message}
-                {...register('fullName', { validate: (name) => provisional || Boolean(name.trim()) || 'Enter the patient’s name' })}
-              />}
-              <TextField label={optional('Phone')} type="tel" inputMode="tel" hint="Best way to find them again" placeholder="0803 555 0147" {...register('phone')} />
-              {!editing ? <TextField label={optional('Email')} type="email" inputMode="email" autoComplete="off" hint="Bills and receipts are sent by SMS and email" placeholder="e.g. amaka@example.com" error={errors.email?.message}
-                {...register('email', { validate: (value) => { try { tidyEmail(value ?? ''); return true; } catch (cause) { return (cause as Error).message; } } })} /> : null}
+              {provisional ? (
+                <div className="space-y-2 md:col-span-2">
+                  <p className="text-sm text-ink-soft">
+                    A distinct temporary label and patient ID will be created. Leave unknown details
+                    blank; care can begin immediately.
+                  </p>
+                  <TextField
+                    label="Reason for provisional registration"
+                    maxLength={500}
+                    hint="Why identity is unknown and any details that help distinguish this patient."
+                    error={errors.provisionalReason?.message}
+                    {...register('provisionalReason', {
+                      validate: (value) =>
+                        !provisional ||
+                        value.trim().length >= 3 ||
+                        'Explain why identity is not yet known',
+                    })}
+                  />
+                </div>
+              ) : (
+                <TextField
+                  label="Full name"
+                  placeholder="e.g. Amaka Okoro"
+                  autoComplete="off"
+                  error={errors.fullName?.message}
+                  {...register('fullName', {
+                    validate: (name) =>
+                      provisional || Boolean(name.trim()) || 'Enter the patient’s name',
+                  })}
+                />
+              )}
+              <TextField
+                label={optional('Phone')}
+                type="tel"
+                inputMode="tel"
+                hint="Best way to find them again"
+                placeholder="0803 555 0147"
+                {...register('phone')}
+              />
+              {!editing ? (
+                <TextField
+                  label={optional('Email')}
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  hint="Bills and receipts are sent by SMS and email"
+                  placeholder="e.g. amaka@example.com"
+                  error={errors.email?.message}
+                  {...register('email', {
+                    validate: (value) => {
+                      try {
+                        tidyEmail(value ?? '');
+
+                        return true;
+                      } catch (cause) {
+                        return (cause as Error).message;
+                      }
+                    },
+                  })}
+                />
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)]">
               <Controller
                 control={control}
                 name="sex"
-                rules={{ validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex' }}
+                rules={{
+                  validate: (value) => provisional || Boolean(value) || 'Choose the patient’s sex',
+                }}
                 render={({ field }) => (
                   <SelectField
                     {...field}
                     label="Sex"
                     required={!provisional}
                     error={errors.sex?.message}
-                    options={[{ value: '', label: provisional ? 'Unknown' : 'Choose sex' }, { value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }]}
+                    options={[
+                      { value: '', label: provisional ? 'Unknown' : 'Choose sex' },
+                      { value: 'F', label: 'Female' },
+                      { value: 'M', label: 'Male' },
+                    ]}
                   />
                 )}
               />
@@ -181,7 +459,10 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
                 {...register('age', {
                   validate: {
                     ageOrBirth,
-                    wholeYears: (age) => age.trim() === '' || (Number.isInteger(Number(age)) && Number(age) >= 0 && Number(age) <= 130) || '0–130 years',
+                    wholeYears: (age) =>
+                      age.trim() === '' ||
+                      (Number.isInteger(Number(age)) && Number(age) >= 0 && Number(age) <= 130) ||
+                      '0–130 years',
                   },
                 })}
               />
@@ -189,11 +470,21 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
                 <TextField
                   label="Date of birth"
                   type="date"
-                  hint={provisional ? 'Leave blank when unknown' : 'Leave blank if only an estimated age is known'}
+                  hint={
+                    provisional
+                      ? 'Leave blank when unknown'
+                      : 'Leave blank if only an estimated age is known'
+                  }
                   max={todayIso()}
                   error={errors.dateOfBirth?.message}
                   {...register('dateOfBirth', {
-                    validate: (date) => !date || (validCalendarDate(date) && date <= todayIso() && (!getValues('age').trim() || yearsBetween(date, todayIso()) === Number(getValues('age')))) || 'Check the birth date and age; they must agree',
+                    validate: (date) =>
+                      !date ||
+                      (validCalendarDate(date) &&
+                        date <= todayIso() &&
+                        (!getValues('age').trim() ||
+                          yearsBetween(date, todayIso()) === Number(getValues('age')))) ||
+                      'Check the birth date and age; they must agree',
                   })}
                 />
               </div>
@@ -202,93 +493,206 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
               label={provisional ? optional('Address') : 'Address'}
               placeholder="e.g. 14 Odo-Ona Elewe, Ibadan"
               error={errors.address?.message}
-              {...register('address', { validate: (address) => provisional || Boolean(address.trim()) || 'Enter where the patient lives' })}
+              {...register('address', {
+                validate: (address) =>
+                  provisional || Boolean(address.trim()) || 'Enter where the patient lives',
+              })}
             />
 
             {matches.length ? (
-              <section aria-label="Possible existing record" className="space-y-3 rounded-card border-2 border-slate bg-slate-bg p-4 text-slate-text">
+              <section
+                aria-label="Possible existing record"
+                className="space-y-3 rounded-card border-2 border-slate bg-slate-bg p-4 text-slate-text"
+              >
                 <h3 className="font-extrabold">Is this the same person?</h3>
                 {matches.map((match) => (
                   <div key={match.patient.patientId} className="flex flex-wrap items-center gap-3">
-                    <Avatar tone="green" size="sm">{match.patient.fullName.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase()}</Avatar>
+                    <Avatar tone="green" size="sm">
+                      {match.patient.fullName
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((part) => part[0] ?? '')
+                        .join('')
+                        .toUpperCase()}
+                    </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold">{match.patient.fullName}</div>
-                      <div className="text-[13px]">{[match.patient.sex === 'female' ? 'F' : match.patient.sex === 'male' ? 'M' : 'Sex not recorded', currentAge(match.patient), match.patient.phone].filter((part) => part !== undefined && part !== '').join(' · ')}</div>
-                      <div className="break-all font-mono text-xs">{match.patient.patientId} · matches on {match.reasons.map((reason) => REASON_LABEL[reason].toLowerCase()).join(', ')}</div>
+                      <div className="text-[13px]">
+                        {[
+                          sexCode(match.patient.sex) || 'Sex not recorded',
+                          currentAge(match.patient),
+                          match.patient.phone,
+                        ]
+                          .filter((part) => part !== undefined && part !== '')
+                          .join(' · ')}
+                      </div>
+                      <div className="break-all font-mono text-xs">
+                        {match.patient.patientId} · matches on{' '}
+                        {match.reasons
+                          .map((reason) => REASON_LABEL[reason].toLowerCase())
+                          .join(', ')}
+                      </div>
                     </div>
-                    <Button type="button" fullWidth={false} className="px-4" disabled={opening} loading={opening} onClick={() => void openExisting(match.patient.patientId)}>Yes — open this record</Button>
+                    <Button
+                      type="button"
+                      fullWidth={false}
+                      className="px-4"
+                      disabled={opening}
+                      loading={opening}
+                      onClick={() => void openExisting(match.patient.patientId)}
+                    >
+                      Yes — open this record
+                    </Button>
                   </div>
                 ))}
-                <p className="text-xs">If not, carry on. You will be asked once more before anything is saved.</p>
+                <p className="text-xs">
+                  If not, carry on. You will be asked once more before anything is saved.
+                </p>
               </section>
             ) : null}
           </section>
 
           {!provisional ? (
-            <section aria-labelledby="registration-other" className="space-y-4 border-t border-outline-soft pt-6">
-              <div><h2 id="registration-other" className={sectionTitle}>Other details</h2><p className="mt-1 text-sm text-ink-muted">Record what the patient can tell you; anything marked optional can be left blank.</p></div>
+            <section
+              aria-labelledby="registration-other"
+              className="space-y-4 border-t border-outline-soft pt-6"
+            >
+              <div>
+                <h2 id="registration-other" className={sectionTitle}>
+                  Other details
+                </h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Record what the patient can tell you; anything marked optional can be left blank.
+                </p>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <TextField label={optional('Occupation')} placeholder="e.g. Trader" autoComplete="off" {...register('occupation')} />
+                  <TextField
+                    label={optional('Occupation')}
+                    placeholder="e.g. Trader"
+                    autoComplete="off"
+                    {...register('occupation')}
+                  />
                   <div className="mt-2.5 flex flex-wrap gap-2">
-                    {OCCUPATIONS.map((o) => <ChoiceChip key={o} selected={live.occupation === o} onClick={() => setValue('occupation', live.occupation === o ? '' : o)}>{o}{live.occupation === o ? ' ✓' : ''}</ChoiceChip>)}
+                    {OCCUPATIONS.map((o) => (
+                      <ChoiceChip
+                        key={o}
+                        selected={live.occupation === o}
+                        onClick={() => setValue('occupation', live.occupation === o ? '' : o)}
+                      >
+                        {o}
+                        {live.occupation === o ? ' ✓' : ''}
+                      </ChoiceChip>
+                    ))}
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1.5 flex min-h-5 items-center text-[13px] font-semibold text-ink-soft">{optional('Religion')}</div>
-                  <Controller control={control} name="religion" render={({ field }) => (
-                    <SegmentedControl ariaLabel="Religion (optional)" value={field.value} onChange={(religion) => field.onChange(field.value === religion ? '' : religion)} options={[{ value: 'christianity', label: 'Christianity' }, { value: 'islam', label: 'Islam' }, { value: 'other', label: 'Other' }]} />
-                  )} />
+                  <div className="mb-1.5 flex min-h-5 items-center text-[13px] font-semibold text-ink-soft">
+                    {optional('Religion')}
+                  </div>
+                  <Controller
+                    control={control}
+                    name="religion"
+                    render={({ field }) => (
+                      <SegmentedControl
+                        ariaLabel="Religion (optional)"
+                        value={field.value}
+                        onChange={(religion) =>
+                          field.onChange(field.value === religion ? '' : religion)
+                        }
+                        options={[
+                          { value: 'christianity', label: 'Christianity' },
+                          { value: 'islam', label: 'Islam' },
+                          { value: 'other', label: 'Other' },
+                        ]}
+                      />
+                    )}
+                  />
                 </div>
-                <TextField label={optional('Old folder / card number')} hint="Kept so nothing from the paper file is lost" placeholder="e.g. paper file 2023/1187" autoComplete="off" {...register('folder')} />
-                <TextField label={optional('NIN')} inputMode="numeric" autoComplete="off" hint="11 digits. Registration does not require a NIN." error={errors.nin?.message} {...register('nin', { validate: (value) => !value.trim() || /^\d{11}$/.test(value.replace(/\s/g, '')) || 'Enter 11 digits or leave blank' })} />
-                <label className="block text-[13px] font-semibold text-ink-soft">Identity information
-                  <select className="mt-1.5 w-full rounded-field border-[1.5px] border-outline bg-white px-4 py-3.5 text-base text-ink" {...register('identityEvidence')}>
+                <TextField
+                  label={optional('Old folder / card number')}
+                  hint="Kept so nothing from the paper file is lost"
+                  placeholder="e.g. paper file 2023/1187"
+                  autoComplete="off"
+                  {...register('folder')}
+                />
+                <TextField
+                  label={optional('NIN')}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  hint="11 digits. Registration does not require a NIN."
+                  error={errors.nin?.message}
+                  {...register('nin', {
+                    validate: (value) =>
+                      !value.trim() ||
+                      /^\d{11}$/.test(value.replace(/\s/g, '')) ||
+                      'Enter 11 digits or leave blank',
+                  })}
+                />
+                <label className="block text-[13px] font-semibold text-ink-soft">
+                  Identity information
+                  <select
+                    className="mt-1.5 w-full rounded-field border-[1.5px] border-outline bg-white px-4 py-3.5 text-base text-ink"
+                    {...register('identityEvidence')}
+                  >
                     <option value="reported">Reported by patient / representative</option>
                     <option value="document_seen">Staff checked an identity document</option>
                   </select>
-                  <span className="mt-1.5 block text-[13px] font-normal text-ink-muted">A checked document is a staff observation, not verification by an identity provider.</span>
+                  <span className="mt-1.5 block text-[13px] font-normal text-ink-muted">
+                    A checked document is a staff observation, not verification by an identity
+                    provider.
+                  </span>
                 </label>
-                {live.identityEvidence === 'document_seen' ? <TextField label="Evidence checked" hint="Document type and what was checked. Do not copy the full identifier here." error={errors.identityEvidenceNote?.message} {...register('identityEvidenceNote', { validate: (value) => getValues('identityEvidence') !== 'document_seen' || Boolean(value.trim()) || 'Describe the evidence checked' })} /> : null}
+                {live.identityEvidence === 'document_seen' ? (
+                  <TextField
+                    label="Evidence checked"
+                    hint="Document type and what was checked. Do not copy the full identifier here."
+                    error={errors.identityEvidenceNote?.message}
+                    {...register('identityEvidenceNote', {
+                      validate: (value) =>
+                        getValues('identityEvidence') !== 'document_seen' ||
+                        Boolean(value.trim()) ||
+                        'Describe the evidence checked',
+                    })}
+                  />
+                ) : null}
               </div>
             </section>
           ) : null}
 
-          {!editing && !provisional ? <RegistrationPayment method={payment} onMethod={setPayment} cover={cover} onCover={setCover} /> : null}
+          {!editing && !provisional ? (
+            <RegistrationPayment
+              method={payment}
+              onMethod={setPayment}
+              cover={cover}
+              onCover={setCover}
+            />
+          ) : null}
 
           {!editing && !provisional && canBook ? (
-            <section aria-labelledby="registration-visit" className="space-y-4 border-t border-outline-soft pt-6">
-              <h2 id="registration-visit" className={sectionTitle}>Visit today</h2>
+            <section
+              aria-labelledby="registration-visit"
+              className="space-y-4 border-t border-outline-soft pt-6"
+            >
+              <h2 id="registration-visit" className={sectionTitle}>
+                Visit today
+              </h2>
               <div className="grid items-start gap-4 md:grid-cols-2">
                 <div className="space-y-3">
                   <SelectField
                     label="Visit today"
                     value={withVisit ? 'yes' : ''}
                     onChange={(event) => setWithVisit(event.target.value === 'yes')}
-                    options={[{ value: 'yes', label: 'Yes — the patient is here for care' }, { value: '', label: 'No visit today — register only' }]}
+                    options={[
+                      { value: 'yes', label: 'Yes — the patient is here for care' },
+                      { value: '', label: 'No visit today — register only' },
+                    ]}
                   />
-                  {withVisit ? <CareServiceVisitFields arrival="walk_in" value={care} onChange={setCare} /> : null}
+                  {withVisit ? (
+                    <CareServiceVisitFields arrival="walk_in" value={care} onChange={setCare} />
+                  ) : null}
                 </div>
-                <div aria-live="polite">
-                  {fees.loading ? <p role="status" className="text-sm text-ink-muted">Reading fees…</p>
-                    : fees.error ? <p role="alert" className="text-sm text-amber-text">Fees could not be read. They are still applied when you save.</p>
-                    : lines.length ? (
-                      <div className="rounded-field bg-surface-muted p-3 text-sm">
-                        <table className="w-full">
-                          <caption className="sr-only">Fees for this registration</caption>
-                          <tbody>
-                            {lines.map((line) => (
-                              <tr key={line.feeId} className="border-b border-outline-soft last:border-0">
-                                <td className="py-1.5 pr-3">{line.name}{line.exemptReason ? <span className="block text-xs text-ink-muted">Exempt · {line.exemptReason}</span> : null}</td>
-                                <td className="whitespace-nowrap py-1.5 text-right font-mono">{line.exemptReason ? <><s className="text-ink-muted">{formatMoney(line.listPriceMinor, line.currency)}</s> {formatMoney(0, line.currency)}</> : formatMoney(line.amountMinor, line.currency)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot><tr><td className="pt-2 font-bold">To pay now</td><td className="pt-2 text-right font-mono font-bold">{due.length ? due.join(' + ') : 'Nothing'}</td></tr></tfoot>
-                        </table>
-                      </div>
-                    ): null}
-                </div>
+                <div aria-live="polite">{renderFeeLines()}</div>
               </div>
             </section>
           ) : null}
@@ -299,12 +703,22 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
           {!editing && !provisional && nextNumber ? (
             <div className="rounded-[14px] bg-brand-tint px-4 py-2.5">
               <div className="text-xs text-brand-strong">A Patient ID will be created</div>
-              <div className="font-mono text-lg font-semibold text-brand">{nextNumber}-<span className="opacity-50">••</span></div>
+              <div className="font-mono text-lg font-semibold text-brand">
+                {nextNumber}-<span className="opacity-50">••</span>
+              </div>
             </div>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
           <div className="w-full md:w-auto md:min-w-[320px]">
-            {saveError ? <p role="alert" className="mb-3 text-sm text-danger">{saveError}</p> : null}
-            <Button variant="primary" type="submit" disabled={isSubmitting} loading={isSubmitting}>{submitLabel}</Button>
+            {saveError ? (
+              <p role="alert" className="mb-3 text-sm text-danger">
+                {saveError}
+              </p>
+            ) : null}
+            <Button variant="primary" type="submit" disabled={isSubmitting} loading={isSubmitting}>
+              {submitLabel}
+            </Button>
           </div>
         </footer>
       </form>
@@ -314,5 +728,10 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
 
 export const NewPatientStep1Screen = () => {
   const state = (useLocation().state as RegistrationNavState) ?? {};
-  return <RegistrationRecoveryGate key={state.patientId ?? 'new'} draftKey={state.patientId ?? 'new'}><RegistrationForm key={state.patientId ?? 'new'} state={state} /></RegistrationRecoveryGate>;
+
+  return (
+    <RegistrationRecoveryGate key={state.patientId ?? 'new'} draftKey={state.patientId ?? 'new'}>
+      <RegistrationForm key={state.patientId ?? 'new'} state={state} />
+    </RegistrationRecoveryGate>
+  );
 };

@@ -4,40 +4,134 @@ import { calendarDate } from '@/lib/calendarDate';
 import type { BillingData } from './useBilling';
 
 /** Each allocation is filtered before summing, so reports and their scope agree. */
-export const collectionAllocations = (data: Pick<BillingData, 'charges' | 'payments' | 'patients'>, filters: { currency: string; from: string; to: string; departmentId: string; search: string }) => {
+export const collectionAllocations = (
+  data: Pick<BillingData, 'charges' | 'payments' | 'patients'>,
+  filters: { currency: string; from: string; to: string; departmentId: string; search: string },
+) => {
   const charges = new Map(data.charges.map((charge) => [charge.id, charge]));
   const names = new Map(data.patients.map((patient) => [patient.patientId, patient.fullName]));
   const term = filters.search.trim().toLowerCase();
+
   return data.payments.flatMap((payment) => {
-    if (payment.method === 'waiver' || payment.currency !== filters.currency || (filters.from && calendarDate(payment.createdOn) < filters.from) || (filters.to && calendarDate(payment.createdOn) > filters.to)) return [];
+    if (
+      payment.method === 'waiver' ||
+      payment.currency !== filters.currency ||
+      (filters.from && calendarDate(payment.createdOn) < filters.from) ||
+      (filters.to && calendarDate(payment.createdOn) > filters.to)
+    ) {
+      return [];
+    }
+
     return payment.allocations.flatMap((allocation) => {
       const charge = charges.get(allocation.chargeId);
-      if (!charge || (filters.departmentId && (filters.departmentId === '__general__' ? Boolean(charge.departmentId) : charge.departmentId !== filters.departmentId))) return [];
-      if (term && !`${names.get(payment.patientId) ?? ''} ${payment.patientId} ${charge.description} ${payment.receiptNumber} ${payment.reference ?? ''}`.toLowerCase().includes(term)) return [];
-      return [{ payment, charge, amountMinor: (payment.reverses ? -1 : 1) * allocation.amountMinor }];
+
+      if (
+        !charge ||
+        (filters.departmentId &&
+          (filters.departmentId === '__general__'
+            ? Boolean(charge.departmentId)
+            : charge.departmentId !== filters.departmentId))
+      ) {
+        return [];
+      }
+
+      if (
+        term &&
+        !`${names.get(payment.patientId) ?? ''} ${payment.patientId} ${charge.description} ${payment.receiptNumber} ${payment.reference ?? ''}`
+          .toLowerCase()
+          .includes(term)
+      ) {
+        return [];
+      }
+
+      return [
+        { payment, charge, amountMinor: (payment.reverses ? -1 : 1) * allocation.amountMinor },
+      ];
     });
   });
 };
 
-export const billingRows = (charges: readonly Charge[], payments: readonly Payment[], adjustments: readonly BillingAdjustment[], coverage?: BalanceCoverage) =>
+type ChargeStatus = 'Credit' | 'Awaiting cover' | 'Settled' | 'Part paid' | 'Unpaid';
+
+const chargeStatus = (row: {
+  balanceMinor: number;
+  undeterminedMinor: number;
+  settledMinor: number;
+}): ChargeStatus => {
+  if (row.balanceMinor < 0) {
+    return 'Credit';
+  }
+
+  // Nothing is due yet only because the insurer's share is still undecided.
+  if (row.balanceMinor === 0 && row.undeterminedMinor > 0) {
+    return 'Awaiting cover';
+  }
+
+  if (row.balanceMinor <= 0) {
+    return 'Settled';
+  }
+
+  if (row.settledMinor > 0) {
+    return 'Part paid';
+  }
+
+  return 'Unpaid';
+};
+
+export const billingRows = (
+  charges: readonly Charge[],
+  payments: readonly Payment[],
+  adjustments: readonly BillingAdjustment[],
+  coverage?: BalanceCoverage,
+) =>
   chargeBalances(charges, payments, adjustments, coverage).map((row) => {
-    const receipts = payments.filter((p) => p.allocations.some((a) => a.chargeId === row.charge.id));
+    const receipts = payments.filter((p) =>
+      p.allocations.some((a) => a.chargeId === row.charge.id),
+    );
+
     const reasons = adjustments.filter((a) => a.chargeId === row.charge.id).map((a) => a.reason);
-    const status = row.balanceMinor < 0 ? 'Credit' : row.balanceMinor === 0 && row.undeterminedMinor > 0 ? 'Awaiting cover' : row.balanceMinor <= 0 ? 'Settled' : row.settledMinor > 0 ? 'Part paid' : 'Unpaid';
+    const status = chargeStatus(row);
+
     return { ...row, receipts, reasons, status };
   });
 
-export const transferAllocated = (id: string, payments: readonly Payment[]) => payments
-  .filter((p) => p.incomingTransferId === id)
-  .reduce((n, p) => n + (p.reverses ? -1 : 1) * p.amountMinor, 0);
+export const transferAllocated = (id: string, payments: readonly Payment[]) =>
+  payments
+    .filter((p) => p.incomingTransferId === id)
+    .reduce((n, p) => n + (p.reverses ? -1 : 1) * p.amountMinor, 0);
 
-export const totalsFor = (rows: ReturnType<typeof billingRows>) => rows.reduce((n, r) => ({
-  original: n.original + r.charge.listPriceMinor,
-  exempt: n.exempt + (r.charge.exemptionReason ? r.charge.listPriceMinor : 0),
-  discounted: n.discounted + r.discountMinor, waived: n.waived + r.waivedMinor,
-  collected: n.collected + r.receipts.filter((p) => p.method !== 'waiver').reduce((v, p) => v +
-    (p.reverses ? -1 : 1) * p.allocations.filter((a) => a.chargeId === r.charge.id).reduce((s, a) => s + a.amountMinor, 0), 0),
-  outstanding: n.outstanding + Math.max(0, r.balanceMinor),
-  refunded: n.refunded + r.refundedMinor,
-  undetermined: n.undetermined + r.undeterminedMinor,
-}), { original: 0, exempt: 0, discounted: 0, waived: 0, collected: 0, outstanding: 0, refunded: 0, undetermined: 0 });
+export const totalsFor = (rows: ReturnType<typeof billingRows>) =>
+  rows.reduce(
+    (n, r) => ({
+      original: n.original + r.charge.listPriceMinor,
+      exempt: n.exempt + (r.charge.exemptionReason ? r.charge.listPriceMinor : 0),
+      discounted: n.discounted + r.discountMinor,
+      waived: n.waived + r.waivedMinor,
+      collected:
+        n.collected +
+        r.receipts
+          .filter((p) => p.method !== 'waiver')
+          .reduce(
+            (v, p) =>
+              v +
+              (p.reverses ? -1 : 1) *
+                p.allocations
+                  .filter((a) => a.chargeId === r.charge.id)
+                  .reduce((s, a) => s + a.amountMinor, 0),
+            0,
+          ),
+      outstanding: n.outstanding + Math.max(0, r.balanceMinor),
+      refunded: n.refunded + r.refundedMinor,
+      undetermined: n.undetermined + r.undeterminedMinor,
+    }),
+    {
+      original: 0,
+      exempt: 0,
+      discounted: 0,
+      waived: 0,
+      collected: 0,
+      outstanding: 0,
+      refunded: 0,
+      undetermined: 0,
+    },
+  );
