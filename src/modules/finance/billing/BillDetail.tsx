@@ -11,6 +11,8 @@ import {CATEGORY_LABELS} from './feeForm';
 import {ReceivePayment} from './ReceivePayment';
 import {AdjustBill} from './AdjustBill';
 import {PatientStatement} from './PatientStatement';
+import {PatientLinkPanel,canMakePatientLinks} from './PatientLinkPanel';
+import {messageActivity,messagesFor} from '@/data/repos/patientContacts';
 import {BillingReviewList} from './BillingReviewList';
 import {BillStatus,QuestionFlag,displayMoney,whenText} from './billingUi';
 
@@ -19,7 +21,7 @@ type Event={id:string;at:string;text:string;by:string;amount?:number;payment?:Pa
 /** One bill: who it's for, what is due, one way to receive payment; everything else is in the ⋯ menu. */
 export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,onOpenPatient}:{bill:BillDocument;data:BillingData;transfer?:IncomingTransfer;questions:readonly BillingQuestion[];onBack:()=>void;onReceipt:(p:Payment,fresh:boolean)=>void;onSaved:()=>void;onOpenPatient:(patientId:string)=>void})=>{
  const context=useAuthorizationContext(),toast=useToast(),root=useRef<HTMLDivElement>(null);
- const [sheet,setSheet]=useState<'pay'|'adjust'|'statement'|'questions'|undefined>(transfer?'pay':undefined),[error,setError]=useState('');
+ const [sheet,setSheet]=useState<'pay'|'adjust'|'statement'|'questions'|'link'|undefined>(transfer?'pay':undefined),[error,setError]=useState('');
  const summaries=useLiveQuery(useCallback(()=>allWhere<CoverageFinancialSummary>('coverage_financial_summary','patientId',bill.patientId),[bill.patientId]),['coverage_financial_summary']);
  const money=(n:number)=>displayMoney(n,bill.currency),patient=data.patients.find(p=>p.patientId===bill.patientId);
  const staff=(id:string)=>data.staff.find(s=>s.staffId===id)?.fullName??id;
@@ -27,11 +29,14 @@ export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,
  const insured=bill.rows.some(r=>r.coverage)||bill.pending>0;
  const canReceive=context.permissions.includes('payment:receive')&&bill.due>0;
  const raisedBy=bill.rows.map(r=>r.charge).sort((a,b)=>a.createdOn.localeCompare(b.createdOn))[0];
+ const sends=useLiveQuery(useCallback(()=>messagesFor(bill.id),[bill.id]),['patient_message']);
  const events:Event[]=[
+  // Each SMS or email of this bill to the patient, with its outcome.
+  ...(sends.data??[]).map(m=>({id:m.id,at:m.createdOn,text:messageActivity(m).text,by:m.automatic?'Automatically':staff(m.createdBy)})),
   ...(raisedBy?[{id:'raised',at:raisedBy.createdOn,text:`Bill raised · ${bill.rows.length} ${bill.rows.length===1?'item':'items'}`,by:staff(raisedBy.createdBy)}]:[]),
   ...[...new Map(bill.rows.flatMap(r=>r.receipts).map(p=>[p.id,p])).values()].map(p=>({id:p.id,at:p.createdOn,payment:p,by:staff(p.createdBy),
    amount:(p.reverses?-1:1)*p.allocations.filter(a=>chargeIds.includes(a.chargeId)).reduce((n,a)=>n+a.amountMinor,0),
-   text:p.reverses?'Payment reversed':p.method==='waiver'?'Waived':p.method==='cash'?'Cash received':'Bank transfer applied'})),
+   text:p.reverses?'Payment reversed':p.method==='waiver'?'Waived':p.method==='cash'?'Cash received':p.method==='online'?'Paid online':'Bank transfer applied'})),
   ...data.adjustments.filter(a=>chargeIds.includes(a.chargeId)).map(a=>({id:a.id,at:a.createdOn,by:staff(a.createdBy),amount:-a.amountMinor,text:`${a.dispenseEntryId?'Medicine return credit':a.kind==='discount'?'Discount':'Waiver'} · ${a.reason}`})),
   ...data.coverage.refunds.filter(r=>r.allocations.some(a=>chargeIds.includes(a.chargeId))).map(r=>({id:r.id,at:r.createdOn,by:staff(r.createdBy),amount:-r.allocations.filter(a=>chargeIds.includes(a.chargeId)).reduce((n,a)=>n+a.amountMinor,0),text:`Refund handed back · ${r.method}`})),
  ].sort((a,b)=>b.at.localeCompare(a.at));
@@ -54,7 +59,7 @@ export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,
      <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Amount due</p>
      <p className="text-3xl font-extrabold tabular-nums">{money(bill.due)}</p>
      <div className="flex flex-wrap items-center gap-2"><BillStatus status={bill.status}/>{bill.pending?<span className="text-xs text-ink-muted">+ {money(bill.pending)} waiting for insurance</span>:null}{bill.credit?<span className="text-xs text-ink-muted">Credit {money(bill.credit)}</span>:null}</div>
-     <div className="print-hide flex items-center gap-2"><span className="rounded-field border-[1.5px] border-outline"><ActionMenu compact label="More actions for this bill" actions={[{label:'Print bill',icon:'print',onSelect:print},{label:'Patient statement',onSelect:()=>setSheet('statement')},{label:'Adjust bill',onSelect:()=>setSheet('adjust')}]}/></span>
+     <div className="print-hide flex items-center gap-2"><span className="rounded-field border-[1.5px] border-outline"><ActionMenu compact label="More actions for this bill" actions={[{label:'Print bill',icon:'print',onSelect:print},{label:'Patient statement',onSelect:()=>setSheet('statement')},...(canMakePatientLinks(context)?[{label:'Send to patient',onSelect:()=>setSheet('link')}]:[]),{label:'Adjust bill',onSelect:()=>setSheet('adjust')}]}/></span>
       {canReceive?<Button fullWidth={false} className="hidden lg:inline-flex" onClick={()=>setSheet('pay')}>Receive payment</Button>:null}</div>
     </div>
    </header>
@@ -68,10 +73,11 @@ export const BillDetail=({bill,data,transfer,questions,onBack,onReceipt,onSaved,
   {error?<p role="alert" className="text-sm text-danger">{error}</p>:null}
   <section className="rounded-card border border-outline-soft bg-white p-4 md:p-5"><h2 className="font-bold">Activity</h2>
    <ol className="mt-2 divide-y divide-outline-soft">{events.map(e=><li key={e.id} className="grid grid-cols-[72px_1fr_auto] items-start gap-3 py-3 text-sm tabular-nums"><span className="text-ink-muted">{whenText(e.at)}</span><span className="min-w-0">{e.text}{e.amount?<strong className="ml-1">{money(e.amount)}</strong>:null}<span className="block text-xs text-ink-muted">{e.by}</span></span>{e.payment?<Button variant="ghost" fullWidth={false} className="!px-2 !py-1 text-sm" onClick={()=>onReceipt(e.payment!,false)}>Receipt</Button>:<span/>}</li>)}
-    {events.length<2?<li className="py-3 text-sm text-ink-muted">No payments yet.</li>:null}</ol></section>
+    {events.filter(e=>!e.id.startsWith('patient_message:')).length<2?<li className="py-3 text-sm text-ink-muted">No payments yet.</li>:null}</ol></section>
   {canReceive?<div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 border-t border-outline-soft bg-white px-4 py-3 lg:hidden"><Button onClick={()=>setSheet('pay')}>Receive {money(bill.due)}</Button></div>:null}
   {sheet==='pay'?<ReceivePayment key={transfer?.id??'pay'} patientId={bill.patientId} chargeIds={chargeIds} data={data} transfer={transfer} onClose={()=>setSheet(undefined)} onReceipt={p=>{setSheet(undefined);onReceipt(p,true);}} onSaved={onSaved}/>:null}
   {sheet==='adjust'?<AdjustBill patientId={bill.patientId} chargeIds={chargeIds} data={data} onClose={()=>setSheet(undefined)} onSaved={onSaved} onOpenPatient={id=>{setSheet(undefined);onOpenPatient(id);}}/>:null}
+  {sheet==='link'?<Sheet placement="side" title="Send to patient" eyebrow={`${patient?.fullName??bill.patientId} · ${bill.reference}`} onClose={()=>setSheet(undefined)}><PatientLinkPanel label="bill" patientId={bill.patientId} request={{kind:'bill',billKey:bill.id}}/></Sheet>:null}
   {sheet==='statement'?<PatientStatement patientId={bill.patientId} currencies={[bill.currency]} onClose={()=>setSheet(undefined)}/>:null}
   {sheet==='questions'?<Sheet placement="side" wide title="Billing questions" eyebrow={patient?.fullName??bill.patientId} onClose={()=>setSheet(undefined)}><BillingReviewList data={data} patientId={bill.patientId}/></Sheet>:null}
  </div>;

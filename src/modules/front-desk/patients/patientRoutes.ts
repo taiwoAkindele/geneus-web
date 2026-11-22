@@ -4,6 +4,15 @@ import { canReadPatientChart, type AuthorizationContext } from '@shared';
 export const opensChartFirst = (context: Pick<AuthorizationContext, 'role' | 'permissions'>): boolean =>
   canReadPatientChart(context) && !['records_officer', 'cashier'].includes(context.role);
 
+/** Each module has its own patient list, whoever opens it: the front desk's administrative list and the clinicians' chart list. */
+export const FRONT_DESK_PATIENTS = '/frontdesk/patients';
+export const CLINICAL_PATIENTS = '/clinical/patients';
+/** Where "Patients" goes when no list was named (a fallback or an old link): the clinician's list for those who open charts first. */
+export const patientListPath = (context: Pick<AuthorizationContext, 'role' | 'permissions'>): string => opensChartFirst(context) ? CLINICAL_PATIENTS : FRONT_DESK_PATIENTS;
+/** A `from` address that returns to one of the patient lists, so Back goes to the list the user came from. */
+export const isPatientListReturn = (from: string | null | undefined): from is string =>
+  Boolean(from) && [FRONT_DESK_PATIENTS, CLINICAL_PATIENTS].some((list) => from === list || from!.startsWith(list + '?'));
+
 export const PATIENT_TABS ={ now: 'Now', history: 'History', clinical: 'Clinical record', details: 'Details' } as const;
 export type PatientTab = keyof typeof PATIENT_TABS;
 

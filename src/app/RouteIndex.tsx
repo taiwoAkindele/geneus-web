@@ -12,7 +12,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: 'Daily use',
     items: [
       { to: '/home', label: 'Facility home', note: 'Signed-in hub' },
-      { to: '/patients/search', label: 'Patient search', note: '' },
+      { to: '/frontdesk/patients', label: 'Front desk patients', note: '' },
+      { to: '/clinical/patients', label: 'Clinical patients', note: 'Needs chart access' },
       { to: '/patients/identity', label: 'Patient identity review', note: 'Compare duplicates and review linked IDs' },
       { to: '/patients/new', label: 'New patient', note: 'One screen; optional visit booking' },
       { to: '/patients/new/details', label: 'New patient (old step 2 address)', note: 'Redirects' },

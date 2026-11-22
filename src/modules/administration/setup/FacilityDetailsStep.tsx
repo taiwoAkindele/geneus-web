@@ -19,12 +19,12 @@ export const COUNTRIES = [
 ] as const;
 export const countryDefaults = (code: string) => COUNTRIES.find((c) => c.code === code) ?? COUNTRIES[0];
 
-type Form = FacilityDetails & { country: string; currency: string; address: string; phone: string; timeZone: string };
+type Form = FacilityDetails & { country: string; currency: string; address: string; phone: string; email: string; timeZone: string };
 /** What registration already captured, with Nigeria and its zone and currency where nothing was said. */
 export const facilityForm = (facility: Facility): Form => {
   const country = facility.country ?? 'NG', defaults = countryDefaults(country);
   return { code: facility.code, name: facility.name, state: facility.state, lga: facility.lga, level: facility.level as FacilityDetails['level'],
-    country, currency: facility.currency ?? defaults.currency, address: facility.address ?? '', phone: facility.phone ?? '', timeZone: facility.timeZone ?? defaults.timeZone };
+    country, currency: facility.currency ?? defaults.currency, address: facility.address ?? '', phone: facility.phone ?? '', email: facility.email ?? '', timeZone: facility.timeZone ?? defaults.timeZone };
 };
 
 const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () => void }) => {
@@ -44,7 +44,7 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
   const save = async () => {
     if (busy || needsZoneConfirmation) return;
     const details = FacilityDetailsUpdate.safeParse({ name: form.name, level: form.level, state: form.state, lga: form.lga, country: form.country, currency: form.currency,
-      ...(form.address.trim() ? { address: form.address.trim() } : {}), ...(form.phone.trim() ? { phone: form.phone.trim() } : {}) });
+      ...(form.address.trim() ? { address: form.address.trim() } : {}), ...(form.phone.trim() ? { phone: form.phone.trim() } : {}), email: form.email.trim() });
     if (!details.success) { setError(details.error.issues.map((i) => i.message).join('. ')); return; }
     setBusy(true); setError('');
     let detailsSaved = false;
@@ -71,6 +71,7 @@ const DetailsForm = ({ facility, onClose }: { facility: Facility; onClose?: () =
       <label className="flex min-h-11 items-center gap-2"><input type="checkbox" disabled={busy} checked={zoneConfirmed} onChange={(event) => setZoneConfirmed(event.target.checked)} />I confirm {form.timeZone} is this facility's local time zone</label>
     </div> : null}
     <TextField label="Phone (optional)" name="facility_phone" type="tel" disabled={busy} value={form.phone} onChange={(e) => patch({ phone: e.target.value })} />
+    <TextField label="Email (optional)" name="facility_email" type="email" inputMode="email" disabled={busy} value={form.email} onChange={(e) => patch({ email: e.target.value })} hint="Printed on bills and receipts. Patients' replies to emails go here." />
     <TextField label="Address (optional)" name="facility_address" disabled={busy} value={form.address} onChange={(e) => patch({ address: e.target.value })} />
     {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
     <StaffVerification purpose="Changing facility details"><div className={onClose ? 'grid grid-cols-2 gap-3' : ''}>
@@ -95,7 +96,7 @@ export const FacilityDetailsStep = ({ mode = 'setup' }: { mode?: 'setup' | 'sett
   const summary = <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
     ['Facility', facility.name], ['Facility code', facility.code], ['Level of care', levelNames[facility.level]],
     ['Country', COUNTRIES.find((c) => c.code === values.country)?.name ?? values.country], ['State', facility.state], ['LGA', facility.lga],
-    ['Address', facility.address], ['Phone', facility.phone], ['Currency', values.currency], ['Time zone', facility.timeZone],
+    ['Address', facility.address], ['Phone', facility.phone], ['Email', facility.email], ['Currency', values.currency], ['Time zone', facility.timeZone],
   ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-ink-muted">{label}</dt><dd className="break-words font-bold">{value || 'Not set'}</dd></div>)}</dl>;
   // The server lets only a writable facility administrator change these.
   if (!(context.role === 'facility_admin' || context.roles?.includes('facility_admin')) || !context.permissions.includes('staff:manage')) return summary;

@@ -23,6 +23,8 @@ type Props<T> = {
   uniformHeaders?: boolean;
   /** Centre cells vertically, for scan-heavy worklists whose rows mix one- and two-line values with a menu button. */
   centerRows?: boolean;
+  /** Keep every cell and header on one line; a wide table scrolls sideways. Pair long values with `Truncate`. */
+  singleLine?: boolean;
   /**
    * Set when the caller reads one page from the database: `rows` is that page,
    * already sorted, and `total` counts every matching row. The table then only
@@ -32,7 +34,7 @@ type Props<T> = {
 };
 
 /** A single sortable, paginated table; columns may hide secondary details on phones. */
-export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, page: controlledPage, onPageChange, sort: controlledSort, onSortChange, uniformHeaders = false, centerRows = false, total }: Props<T>) => {
+export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, page: controlledPage, onPageChange, sort: controlledSort, onSortChange, uniformHeaders = false, centerRows = false, singleLine = false, total }: Props<T>) => {
   const paged = total !== undefined;
   const [storedSort, setStoredSort] = useState<{ key: string; descending: boolean }>();
   const sort = controlledSort ?? storedSort;
@@ -61,7 +63,7 @@ export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, pag
         <caption className="sr-only">{caption}</caption>
         <thead className="border-b border-outline bg-surface-container text-[12px] text-ink-soft">
           <tr>{columns.map((column) => (
-            <th key={column.key} scope="col" className={`px-3 py-2 font-bold md:px-4 ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
+            <th key={column.key} scope="col" className={`px-3 py-2 font-bold md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
               aria-sort={column.sortValue ? sort?.key === column.key ? sort.descending ? 'descending' : 'ascending' : 'none' : undefined}>
               {column.sortValue ? (
                 <button type="button" className={`inline-flex min-h-[44px] items-center gap-2 text-left ${uniformHeaders ? 'text-[12px] font-bold' : ''}`}
@@ -76,7 +78,7 @@ export const DataTable = <T,>({ caption, rows, columns, rowKey, selectedKey, pag
           {visible.map((row) => (
             <tr key={rowKey(row)} aria-selected={selectedKey === undefined ? undefined : rowKey(row) === selectedKey}
               className={rowKey(row) === selectedKey ? 'bg-brand-wash' : 'hover:bg-surface focus-within:bg-brand-wash'}>
-              {columns.map((column) => <td key={column.key} className={`px-3 md:px-4 ${centerRows ? 'py-3 align-middle' : 'py-4 align-top'} ${column.align === 'right' ? 'text-right tabular-nums' : ''} ${column.className ?? ''}`}>{column.render(row)}</td>)}
+              {columns.map((column) => <td key={column.key} className={`px-3 md:px-4 ${singleLine ? 'whitespace-nowrap' : ''} ${centerRows ? 'py-3 align-middle' : 'py-4 align-top'} ${column.align === 'right' ? 'text-right tabular-nums' : ''} ${column.className ?? ''}`}>{column.render(row)}</td>)}
             </tr>
           ))}
         </tbody>

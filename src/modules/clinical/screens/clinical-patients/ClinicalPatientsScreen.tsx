@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { patientSexLabel } from '@shared';
-import { Button, DataTable, Icon, SectionTabs, Tag, type TableColumn } from '@/ui';
+import { ActionMenu, Button, DataTable, Icon, SectionTabs, Tag, type TableColumn } from '@/ui';
 import { currentAge, searchPatients } from '@/modules/front-desk/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
 import { DIRECTORY_TYPES, loadPatientDirectory, type PatientDirectoryRow } from '@/data/repos/patientDirectory';
 import { PatientChartAccess } from '@/modules/front-desk/patients/PatientChartAccess';
 import { loadPatientClinicalSummaries, type PatientClinicalSummary } from '@/modules/front-desk/patients/clinicalSummary';
-import { patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { CLINICAL_PATIENTS, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
 import { ScanPatientCard } from '@/modules/front-desk/patients/ScanPatientCard';
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -39,7 +39,8 @@ export const ClinicalPatientList = () => {
     const ids = new Set(searchPatients(rows.flatMap((row) => row.searchRecords), query, context.facilityId).map((patient) => patient.patientId));
     return rows.filter((row) => row.ids.some((id) => ids.has(id)) && (care === 'all' || (care === 'inpatient' ? Boolean(row.stay) : !row.stay && Boolean(row.lastVisit))));
   }, [rows, query, care, context.facilityId]);
-  const chart = (row: PatientDirectoryRow) => navigate(patientChartPath(row.patient.patientId, 'now', { from: '/patients/search?' + params }));
+  const chart = (row: PatientDirectoryRow) => navigate(patientChartPath(row.patient.patientId, 'now', { from: CLINICAL_PATIENTS + '?' + params }));
+  const details = (row: PatientDirectoryRow) => navigate(patientChartPath(row.patient.patientId, 'details', { from: CLINICAL_PATIENTS + '?' + params }));
   const sortKey = params.get('sort'), sort = ['patient', 'lastVisit'].includes(sortKey ?? '') ? { key: sortKey!, descending: params.get('descending') === '1' } : { key: 'lastVisit', descending: true };
   const columns: TableColumn<PatientDirectoryRow>[] = [
     { key: 'patient', label: 'Patient', sortValue: (row) => row.patient.fullName, render: (row) => <div className="min-w-[140px] max-w-[260px]">
@@ -51,7 +52,10 @@ export const ClinicalPatientList = () => {
     { key: 'problems', label: 'Active problems', className: 'hidden lg:table-cell', render: (row) => { const problems = clinical?.get(row.patient.id)?.problems ?? []; return problems.length ? <div className="flex flex-wrap gap-1">{problems.slice(0, 2).map((p) => <Tag key={p}>{p}</Tag>)}{problems.length > 2 ? <Tag>+{problems.length - 2}</Tag> : null}</div> : <span className="text-ink-soft">None recorded</span>; } },
     { key: 'status', label: 'Status', className: 'hidden md:table-cell', render: (row) => <Status row={row} summary={clinical?.get(row.patient.id)} /> },
     { key: 'lastVisit', label: 'Last visit', className: 'hidden md:table-cell', sortValue: (row) => row.lastVisit?.openedOn ?? '', render: (row) => row.lastVisit ? day(row.lastVisit.openedOn) : <span className="text-ink-soft">—</span> },
-    { key: 'action', label: 'Action', render: (row) => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => chart(row)}>View chart</Button> },
+    { key: 'actions', label: 'Actions', align: 'right', className: 'w-[6%]', render: (row) => <ActionMenu compact openOnHover label={`Actions for ${row.patient.fullName}`} title={row.patient.fullName} actions={[
+      { label: 'View chart', onSelect: () => chart(row) },
+      { label: 'View details', onSelect: () => details(row) },
+    ]} /> },
   ];
   return <div className="min-h-screen space-y-5 bg-white px-4 py-5 md:px-8">
     <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[28px] font-extrabold">Patients</h1>{context.permissions.includes('patient:create') ? <Button fullWidth={false} onClick={() => navigate('/patients/new')}><Icon name="plus" className="h-4 w-4" />Register patient</Button> : null}</header>

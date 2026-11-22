@@ -32,3 +32,4 @@ export { SelectOrTextField } from './SelectOrTextField';
 export { FieldLabel } from './FieldHelp';
 export type { FieldExplanation } from './FieldHelp';
 export { ToggleSwitch } from './ToggleSwitch';
+export { Truncate } from './Truncate';

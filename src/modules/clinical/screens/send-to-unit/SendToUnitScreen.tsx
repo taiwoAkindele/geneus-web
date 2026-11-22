@@ -90,7 +90,7 @@ export const SendToUnitScreen = () => {
     return (
       <div className="min-h-screen bg-surface px-5 py-8 text-center text-[14px] text-ink-muted">
         Send a patient from their profile or encounter.{' '}
-        <button type="button" className="font-bold text-brand" onClick={() => navigate('/patients/search')}>
+        <button type="button" className="font-bold text-brand" onClick={() => navigate('/clinical/patients')}>
           Find a patient
         </button>
       </div>

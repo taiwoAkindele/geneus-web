@@ -30,16 +30,16 @@ export const workspacesFor = (context: WorkspaceContext): Workspace[] => {
   const reports = roleIn(context, 'facility_admin', 'records_officer', 'doctor', 'nurse', 'chew', 'supervisor') || has(context, 'register_entry:create', 'register_definition:publish');
   const modules: Workspace[] = [
     // Front desk work starts at the patient list; its Overview only repeated the menu (GEN-6).
-    { id: 'front-desk', label: 'Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', start: '/patients/search', links: [
+    { id: 'front-desk', label: 'Front Desk', description: 'Registration, appointments and arrivals', icon: 'patients', start: '/frontdesk/patients', links: [
       // Registration starts from the patient list's Register patient button, so its pages belong to Patients.
-      { ...link('patients', 'Patients', 'Find a patient and open their shared record.', '/patients/search', 'search'), also: ['/patients/new', '/patients/duplicate'] },
+      { ...link('patients', 'Patients', 'Find a patient and open their shared record.', '/frontdesk/patients', 'search'), also: ['/patients/new', '/patients/duplicate'] },
       ...(appointments ? [link('appointments', 'Appointments & arrivals', 'Plan bookings and record attendance.', '/appointments', 'clock')] : []),
       ...(has(context, 'patient_identity:review', 'patient_identity:resolve') ? [link('identity', 'Identity review', 'Review potential duplicate patient identities.', '/patients/identity', 'patients')] : []),
     ] },
     { id: 'clinical', label: 'Clinical', description: 'Consultation, laboratory and pharmacy', icon: 'encounter', links: [
       // In order of use. Results reach the visit and alert the ordering clinician, so there is no results page;
       // Handoffs & unit queue (/units) stays reachable by address but is hidden until a facility needs it.
-      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [{ ...link('clinical-patients', 'Patients', 'Find a patient and open their chart.', '/patients/search', 'patients'), also: ['/clinical/patients'] }] : []),
+      ...(keys.has('encounters') && (consultation || lab || pharmacy) ? [{ ...link('clinical-patients', 'Patients', 'Find a patient and open their chart.', '/clinical/patients', 'patients') }] : []),
       ...(has(context, 'admission:manage') ? [link('admissions', 'Wards & admissions', 'Receive requests, allocate beds and manage inpatient stays.', '/admissions', 'patients')] : []),
       ...(keys.has('encounters') && lab ? [link('laboratory', 'Laboratory', 'Open and completed test requests.', '/laboratory', 'laboratory')] : []),
       ...(keys.has('encounters') && pharmacy ? [link('pharmacy', 'Pharmacy', 'Open and completed prescriptions.', '/pharmacy', 'pharmacy')] : []),

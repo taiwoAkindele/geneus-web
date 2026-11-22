@@ -7,6 +7,15 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Patient bill checkout (22 November 2026)
+
+Public bill links offer hosted checkout and confirm payments with the server on
+return. Patients can retry confirmation and download their receipt after payment.
+These pages load without staff sign-in, device storage or the offline database.
+Excess checkout funds appear in Payment history for staff to allocate. The staff
+workspace continues to load through the existing secure-storage startup. See
+[implementation and validation](../docs/PATIENT-CHECKOUT-IMPLEMENTATION-2026-11-22.md).
+
 ### Billing design adoption (19 November 2026)
 
 The approved Bills / Payments prototype is applied locally. New manual bills use optional charge billId metadata; existing history is untouched. Price upload uses verified fee-only atomic configuration batches. Billing setup reuses existing catalogue and receiving-account settings. Migration 0043 and canonical shared contract promotion must precede new clients; no Git promotion or deployment has been performed. See [implementation and validation](../docs/billing-design-implementation-2026-11-19/README.md).

@@ -19,6 +19,7 @@ import {
 import { currentAge, findLikelyMatches, usePatients, type MatchReason } from '@/modules/front-desk/search';
 import { RegistrationRecoveryGate, RegistrationRecoveryStatus } from '@/modules/front-desk/registration/RegistrationRecoveryPrompt';
 import type { DuplicateNavState } from './DuplicateCheckScreen';
+import { tidyEmail } from '@/data/repos/patientContacts';
 import { RegistrationPayment, coverIssue, emptyCover, type CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 
 const todayIso = (): string => calendarDate();
@@ -152,6 +153,8 @@ const RegistrationForm = ({ state }: { state: NonNullable<RegistrationNavState> 
                 {...register('fullName', { validate: (name) => provisional || Boolean(name.trim()) || 'Enter the patient’s name' })}
               />}
               <TextField label={optional('Phone')} type="tel" inputMode="tel" hint="Best way to find them again" placeholder="0803 555 0147" {...register('phone')} />
+              {!editing ? <TextField label={optional('Email')} type="email" inputMode="email" autoComplete="off" hint="Bills and receipts are sent by SMS and email" placeholder="e.g. amaka@example.com" error={errors.email?.message}
+                {...register('email', { validate: (value) => { try { tidyEmail(value ?? ''); return true; } catch (cause) { return (cause as Error).message; } } })} /> : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)]">

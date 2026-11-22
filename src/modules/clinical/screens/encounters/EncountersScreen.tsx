@@ -17,5 +17,5 @@ export const EncountersScreen = () => {
   if (station === 'results') return <Navigate to="/laboratory?tab=completed" replace />;
   const next = new URLSearchParams(params); next.delete('queue');
   // Clinical staff land on their patient list; front desk staff on theirs.
-  return <Navigate to={(canReadPatientChart(context) ? '/clinical/patients' : '/patients/search') + (next.size ? '?' + next : '')} replace />;
+  return <Navigate to={(canReadPatientChart(context) ? '/clinical/patients' : '/frontdesk/patients') + (next.size ? '?' + next : '')} replace />;
 };

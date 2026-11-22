@@ -11,6 +11,7 @@ import { toPatientDetails, type RegistrationValues } from './registrationValues'
 import { amountsDue, type RegistrationVisit } from './visitFees';
 import { identityReviewRecords, type RegistrationDecision } from '@/data/repos/patientIdentity';
 import { coverRecord } from '@/data/repos/insurance';
+import { newPatientContact, tidyEmail } from '@/data/repos/patientContacts';
 import type { CoverFieldsValue } from '@/modules/insurance/InsuranceAtCare';
 
 /** Where a newly registered and booked patient goes next, shown on their record. */
@@ -42,6 +43,8 @@ export const useSavePatient = () => {
       saving.current = true;
       try {
         const details = toPatientDetails(values);
+        // The email is recorded at registration; a registered patient's email is changed from their personal details.
+        const email = editingPatientId ? undefined : tidyEmail(values.email ?? '');
         const charges: Charge[] = [];
         const booked = Boolean(visit) && !editingPatientId;
         const patient = editingPatientId
@@ -49,6 +52,7 @@ export const useSavePatient = () => {
           : await registerPatient(details, context, (patientId, created) => {
             const extra: NewRecord[] = [...identityReviewRecords(patientId, decision, context)];
             // Insurance chosen at registration is saved with the patient, as cover not yet checked.
+            if (email) extra.push(newPatientContact(patientId, email, context));
             if (cover) extra.push({ permission: 'cover:record', type: 'patient_cover', record: coverRecord({ ...cover, patientId }, context) });
             charges.push(...created.charges);
             if (visit) {

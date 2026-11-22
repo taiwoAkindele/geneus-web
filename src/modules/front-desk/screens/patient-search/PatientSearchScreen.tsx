@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { patientSexLabel } from '@shared';
-import { Button, DataTable, Icon, SelectField, Tag } from '@/ui';
+import { canReadPatientChart, patientSexLabel, type Patient } from '@shared';
+import { ActionMenu, Button, DataTable, Icon, SelectField, Tag, Truncate } from '@/ui';
 import { currentAge, searchPatients } from '@/modules/front-desk/search';
 import { useAuthorizationContext } from '@/session';
 import { useLiveQuery } from '@/data';
@@ -9,15 +9,17 @@ import { DIRECTORY_TYPES, loadPatientDirectory, type PatientDirectoryRow } from 
 import { balanceCoverage, chargeBalances, listAdjustments, listCharges, listPayments } from '@/data/repos/billing';
 import { balanceOwed, todayStatus } from '@/modules/front-desk/patients/directoryView';
 import { ScanPatientCard } from '@/modules/front-desk/patients/ScanPatientCard';
-import { opensChartFirst, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
-import { ClinicalPatientList } from '@/modules/clinical/screens/clinical-patients/ClinicalPatientsScreen';
+import { FRONT_DESK_PATIENTS, patientChartPath } from '@/modules/front-desk/patients/patientRoutes';
+import { PersonalDetailsEditor } from '@/modules/front-desk/patients/PersonalDetails';
+import { currentContactsByPatient } from '@/data/repos/patientContacts';
 
 /** The first registration across linked records is when this patient was created. */
 const createdOn = (row: PatientDirectoryRow) => row.searchRecords.map(patient => patient.createdOn).sort()[0] ?? row.patient.createdOn;
 
-const AdmissionStatus = ({ row }: { row: PatientDirectoryRow }) => row.stay ? <><Tag tone="green">Admitted</Tag><p className="mt-1 text-xs text-ink-soft">{row.stay.ward} · {row.stay.bed}</p>{row.stay.pending ? <p className="mt-1 text-xs text-amber-text">Pending server confirmation</p> : null}</> : <Tag>Not admitted</Tag>;
+const AdmissionStatus = ({ row }: { row: PatientDirectoryRow }) => row.stay ? <><Tag tone="green">Admitted</Tag><Truncate text={`${row.stay.ward} · ${row.stay.bed}`} className="mt-1 max-w-[180px] text-xs text-ink-soft" />{row.stay.pending ? <p className="mt-1 text-xs text-amber-text">Pending server confirmation</p> : null}</> : <Tag>Not admitted</Tag>;
 
-const FrontDeskPatientList = () => {
+/** The front desk's patient list: administrative facts, contact details and the front desk's actions, for anyone who opens it. */
+export const FrontDeskPatientsScreen = () => {
   const navigate = useNavigate(), [params, setParams] = useSearchParams(), context = useAuthorizationContext();
   const directory = useLiveQuery(useCallback(() => loadPatientDirectory(context), [context.userId, context.facilityId, context.deviceId]), DIRECTORY_TYPES);
   const query = params.get('q') ?? params.get('visitQuery') ?? '';
@@ -42,7 +44,12 @@ const FrontDeskPatientList = () => {
     const ids = new Set(searchPatients(searchable, query, context.facilityId).map(patient => patient.patientId));
     return rows.filter(row => row.ids.some(id => ids.has(id)) && (!care || care === 'all' || (care === 'today' ? Boolean(todayStatus(row)) : care === 'balance' ? owed(row).length > 0 : care === 'inpatient' ? Boolean(row.stay) : !row.stay && Boolean(row.lastVisit))));
   }, [rows, query, care, context.facilityId, context.permissions.join('|'), balances.data]);
-  const open = (id: string) => navigate(patientChartPath(id, 'details', { from: '/patients/search?' + params }));
+  const open = (id: string) => navigate(patientChartPath(id, 'details', { from: FRONT_DESK_PATIENTS + '?' + params }));
+  const chart = (id: string) => navigate(patientChartPath(id, 'now', { from: FRONT_DESK_PATIENTS + '?' + params }));
+  const canEdit = context.permissions.includes('patient:update'), canChart = canReadPatientChart(context);
+  const [editing, setEditing] = useState<Patient>();
+  const contacts = useLiveQuery(useCallback(() => currentContactsByPatient(), []), ['patient_contact']);
+  const emailOf = (row: PatientDirectoryRow) => contacts.data?.get(row.patient.patientId)?.email;
   const page = Number(params.get('page') ?? 0);
   // Newest registrations first unless the user picks another sort.
   const sortKey = params.get('sort'), sort = ['patient', 'created'].includes(sortKey ?? '') ? { key: sortKey!, descending: params.get('descending') === '1' } : { key: 'created', descending: true };
@@ -53,19 +60,23 @@ const FrontDeskPatientList = () => {
       <div className="w-full sm:w-60"><SelectField label="Show" value={care} onChange={event => change('care', event.target.value === 'all' ? '' : event.target.value)} options={views.map(view => ({ value: view.value, label: view.label + (view.count !== undefined && !directory.loading && !directory.error ? ` (${view.count})` : '') }))} /></div>
       <ScanPatientCard onRead={value => change('q', value)} />
     </div>
-    {directory.loading ? <p role="status">Reading patients...</p> : directory.error ? <div role="alert"><p>Patients could not be read.</p><Button onClick={directory.reload}>Try again</Button></div> : <><p className="text-sm text-ink-soft">{found.length} of {rows.length} patients</p>{found.length ? <DataTable caption="Patients" uniformHeaders rows={found} rowKey={row => row.patient.id} page={Number.isInteger(page) && page >= 0 ? page : 0} onPageChange={value => setParams(current => { const next = new URLSearchParams(current); next.set('page', String(value)); return next; }, { replace: true })} sort={sort} onSortChange={value => setParams(current => { const next = new URLSearchParams(current); next.set('sort', value.key); next.set('descending', value.descending ? '1' : '0'); next.delete('page'); return next; }, { replace: true })} columns={[
-      { key: 'patient', label: 'Patient', sortValue: row => row.patient.fullName, render: row => <div className="min-w-[120px] max-w-[260px]"><button type="button" className="min-h-0 text-left text-sm font-bold text-brand underline" onClick={() => open(row.patient.patientId)}>{row.patient.fullName}</button>{row.patient.identityStatus === 'provisional' ? <Tag tone="amber" className="ml-2">Provisional</Tag> : null}<p className="text-xs text-ink-soft">{currentAge(row.patient) ?? 'Age not recorded'} · {patientSexLabel(row.patient.sex)}</p><p className="mt-1 break-all font-mono text-xs text-ink-soft md:hidden">{row.patient.patientId}</p><div className="mt-2 md:hidden"><AdmissionStatus row={row} /></div></div> },
-      { key: 'patientId', label: 'Patient ID', className: 'hidden md:table-cell', render: row => <span className="break-all font-mono">{row.patient.patientId}</span> },
-      { key: 'phone', label: 'Phone', className: 'hidden lg:table-cell', render: row => row.patient.phone ?? <span className="text-ink-soft">—</span> },
-      { key: 'folder', label: 'Folder no.', className: 'hidden lg:table-cell', render: row => row.patient.legacyPaperRef ? <span className="font-mono">{row.patient.legacyPaperRef}</span> : <span className="text-ink-soft">—</span> },
+    {directory.loading ? <p role="status">Reading patients...</p> : directory.error ? <div role="alert"><p>Patients could not be read.</p><Button onClick={directory.reload}>Try again</Button></div> : <><p className="text-sm text-ink-soft">{found.length} of {rows.length} patients</p>{found.length ? <DataTable caption="Patients" uniformHeaders singleLine rows={found} rowKey={row => row.patient.id} page={Number.isInteger(page) && page >= 0 ? page : 0} onPageChange={value => setParams(current => { const next = new URLSearchParams(current); next.set('page', String(value)); return next; }, { replace: true })} sort={sort} onSortChange={value => setParams(current => { const next = new URLSearchParams(current); next.set('sort', value.key); next.set('descending', value.descending ? '1' : '0'); next.delete('page'); return next; }, { replace: true })} columns={[
+      { key: 'patient', label: 'Patient', sortValue: row => row.patient.fullName, render: row => <div className="min-w-[120px] max-w-[220px]"><button type="button" className="block min-h-0 max-w-full text-left text-sm font-bold text-brand underline" onClick={() => open(row.patient.patientId)}><Truncate text={row.patient.fullName} /></button>{row.patient.identityStatus === 'provisional' ? <Tag tone="amber" className="ml-2">Provisional</Tag> : null}<p className="text-xs text-ink-soft">{currentAge(row.patient) ?? 'Age not recorded'} · {patientSexLabel(row.patient.sex)}</p><p className="mt-1 font-mono text-xs text-ink-soft md:hidden">{row.patient.patientId}</p>{row.patient.phone ? <p className="text-xs text-ink-soft md:hidden">{row.patient.phone}</p> : null}<div className="mt-2 md:hidden"><AdmissionStatus row={row} /></div></div> },
+      { key: 'patientId', label: 'Patient ID', className: 'hidden md:table-cell', render: row => <span className="font-mono">{row.patient.patientId}</span> },
+      { key: 'phone', label: 'Phone', className: 'hidden md:table-cell', render: row => row.patient.phone ? <span className="whitespace-nowrap">{row.patient.phone}</span> : <span className="text-ink-soft">—</span> },
+      { key: 'email', label: 'Email', className: 'hidden lg:table-cell', render: row => emailOf(row) ? <Truncate text={emailOf(row)!} className="max-w-[200px]" /> : <span className="text-ink-soft">—</span> },
+      { key: 'folder', label: 'Folder no.', className: 'hidden lg:table-cell', render: row => row.patient.legacyPaperRef ? <Truncate text={row.patient.legacyPaperRef} className="max-w-[140px] font-mono" /> : <span className="text-ink-soft">—</span> },
       { key: 'created', label: 'Created at', className: 'hidden md:table-cell', sortValue: createdOn, render: row => { const created = new Date(createdOn(row)); return <>{created.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}<p className="text-xs text-ink-soft">{created.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p></>; } },
-      { key: 'today', label: 'Today', className: 'hidden md:table-cell', render: row => todayStatus(row) ?? <span className="text-ink-soft">—</span> },
+      { key: 'today', label: 'Today', className: 'hidden md:table-cell', render: row => todayStatus(row) ? <Truncate text={todayStatus(row)!} className="max-w-[180px]" /> : <span className="text-ink-soft">—</span> },
       { key: 'status', label: 'Status', className: 'hidden md:table-cell', render: row => <AdmissionStatus row={row} /> },
       ...(canBill ? [{ key: 'balance', label: 'Balance', className: 'hidden lg:table-cell', render: (row: PatientDirectoryRow) => owed(row).length ? <span className="whitespace-nowrap font-mono font-bold text-amber-text">{owed(row).join(' + ')}</span> : <span className="text-ink-soft">—</span> }] : []),
-      { key: 'actions', label: 'Action', render: row => <Button variant="outlined" fullWidth={false} className="px-3 text-sm" onClick={() => open(row.patient.patientId)}>View details</Button> },
+      { key: 'actions', label: 'Actions', align: 'right', className: 'w-[6%]', render: row => <ActionMenu compact openOnHover label={`Actions for ${row.patient.fullName}`} title={row.patient.fullName} actions={[
+        { label: 'View details', onSelect: () => open(row.patient.patientId) },
+        ...(canEdit ? [{ label: 'Edit patient details', onSelect: () => setEditing(row.patient) }] : []),
+        ...(canChart ? [{ label: 'View chart', onSelect: () => chart(row.patient.patientId) }] : []),
+      ]} /> },
     ]} /> : <p className="rounded-field border border-dashed border-outline p-6">{rows.length ? 'No patients match these filters.' : 'No patients registered on this device yet.'}</p>}</>}
+    {editing ? <PersonalDetailsEditor key={editing.patientId} patient={editing} onClose={() => setEditing(undefined)} onSaved={directory.reload} /> : null}
   </div>;
 };
 
-/** One patient list for every module: clinicians see care facts and open the chart; front desk and cashiers see administrative facts and open details. */
-export const PatientSearchScreen = () => opensChartFirst(useAuthorizationContext()) ? <ClinicalPatientList /> : <FrontDeskPatientList />;
