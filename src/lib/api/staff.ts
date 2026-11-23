@@ -2,6 +2,7 @@ import type {
   AuthorizationContext,
   DeviceCredential,
   EmailSent,
+  InvitationCheckResult,
   PinSetupCodeIssued,
 } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
@@ -129,12 +130,16 @@ export type ContactActivation = {
   email?: { address: string; verified: true };
   invitation?: InvitationView;
   activation: { serverPinDevices: number; lastPinRegisteredOn?: string };
+  /** Whether their email has a Geneus password, for new devices and a forgotten PIN. */
+  password: 'set' | 'not_set';
   nextSendAllowedOn?: string;
 };
 
 export type StaffOnboardingSummary = {
   staffId: string;
   activated: boolean;
+  hasEmail: boolean;
+  passwordSet: boolean;
   invitation?: { status: InvitationStatus; delivery: InvitationDelivery; expiresOn: string };
 };
 
@@ -178,8 +183,18 @@ export const staffOnboardingSummaries = (
  * Whether `code` is this person's invitation code, before they choose a PIN.
  * The person has no PIN yet, so only the device signs the call. Spends nothing.
  */
-export const checkInvitationCode = (staffId: string, code: string): Promise<void> =>
-  asDevice<void>(staffPath(staffId, 'invitations/check'), { code });
+export const checkInvitationCode = (
+  staffId: string,
+  code: string,
+): Promise<InvitationCheckResult> =>
+  asDevice<InvitationCheckResult>(staffPath(staffId, 'invitations/check'), { code });
+
+/**
+ * For an invited email that already has a password: emails a code proving the
+ * person accepting owns it, instead of typing that password. Spends nothing.
+ */
+export const requestInvitationAccountCode = (staffId: string, code: string) =>
+  asDevice<EmailSent>(staffPath(staffId, 'invitations/account-code'), { code });
 
 /* ---------------- Invitation links: opened by the person invited ---------------- */
 

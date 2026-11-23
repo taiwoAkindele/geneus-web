@@ -95,6 +95,14 @@ const ProfileSheet = ({ onClose }: { onClose: () => void }) => {
         ) : null}
         <button
           type="button"
+          onClick={() => go('/account/password')}
+          className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-outline-soft px-4 py-3.5 text-left text-[15px] font-semibold"
+        >
+          <Icon name="lock" className="h-5 w-5 text-brand" />
+          Change password
+        </button>
+        <button
+          type="button"
           onClick={() => go('/sync')}
           className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-outline-soft px-4 py-3.5 text-left text-[15px] font-semibold"
         >

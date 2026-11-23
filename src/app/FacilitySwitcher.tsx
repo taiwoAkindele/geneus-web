@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { OrganizationFacilityDirectory } from '@shared';
 import { useSession } from '@/session';
-import { listFacilityWorkspaces, switchFacilityWorkspace } from '@/data/facilityWorkspaces';
+import {
+  listFacilityWorkspaces,
+  switchFacilityWorkspace,
+  workspaceDeviceSecret,
+} from '@/data/facilityWorkspaces';
 import {
   cacheFacilityDirectory,
   cachedFacilityDirectory,
@@ -151,16 +155,36 @@ export const FacilitySwitcher = () => {
     setBusy(true);
     setError('');
 
+    /**
+     * Without the server, the person stays signed in only when the destination's
+     * own records link the same person (checked there by SessionProvider).
+     */
+    const offlineSwitch = (deviceId: string) =>
+      switchFacilityWorkspace(
+        deviceId,
+        undefined,
+        user.personId
+          ? {
+              sourceStaffId: user.staffId,
+              facilityId: choice.id,
+              deviceId,
+              personId: user.personId,
+              createdOn: Date.now(),
+            }
+          : undefined,
+      );
+
     try {
       if (navigator.onLine === false) {
         if (!existing?.prepared) {
           throw new Error('Connect to the internet to set up this facility on this device');
         }
 
-        await switchFacilityWorkspace(existing.deviceId);
+        await offlineSwitch(existing.deviceId);
       } else {
+        // The device's own secret proves it, so the server may sign the person in on it.
         const proof = existing
-          ? { deviceId: existing.deviceId }
+          ? { deviceId: existing.deviceId, deviceSecret: workspaceDeviceSecret(existing.deviceId) }
           : await facilityOpeningProof(facility.code, user.staffId, choice.id);
 
         const access = await resolveOrganizationFacility(
@@ -171,14 +195,14 @@ export const FacilitySwitcher = () => {
         );
 
         if (!access) {
-          await switchFacilityWorkspace(existing!.deviceId);
+          await offlineSwitch(existing!.deviceId);
 
           return;
         }
 
         await switchFacilityWorkspace(
-          access.device?.deviceId ?? existing!.deviceId,
-          access.device,
+          existing ? existing.deviceId : (access.device?.deviceId ?? proof.deviceId),
+          existing ? undefined : access.device,
           {
             sourceStaffId: user.staffId,
             facilityId: access.facilityId,
@@ -187,6 +211,7 @@ export const FacilitySwitcher = () => {
             personId: access.personId,
             createdOn: Date.now(),
           },
+          access.session,
         );
       }
     } catch (cause) {

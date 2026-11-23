@@ -143,6 +143,30 @@ const PinApprovalScreen = lazy(() =>
   })),
 );
 
+const PasswordSignInScreen = lazy(() =>
+  import('@/app/screens/staff-onboarding/PasswordSignInScreen').then((m) => ({
+    default: m.PasswordSignInScreen,
+  })),
+);
+
+const ForgotPasswordScreen = lazy(() =>
+  import('@/app/screens/staff-onboarding/ForgotPasswordScreen').then((m) => ({
+    default: m.ForgotPasswordScreen,
+  })),
+);
+
+const ChangePasswordScreen = lazy(() =>
+  import('@/app/screens/staff-onboarding/ChangePasswordScreen').then((m) => ({
+    default: m.ChangePasswordScreen,
+  })),
+);
+
+const SetFirstPasswordScreen = lazy(() =>
+  import('@/app/screens/staff-onboarding/SetFirstPasswordScreen').then((m) => ({
+    default: m.SetFirstPasswordScreen,
+  })),
+);
+
 const InvitationScreen = lazy(() =>
   import('@/app/screens/staff-onboarding/InvitationScreen').then((m) => ({
     default: m.InvitationScreen,
@@ -456,7 +480,11 @@ const App = () => {
                         <Route element={<RequireFacility />}>
                           <Route path="/login" element={<ShiftLoginScreen />} />
                           <Route path="/onboarding/approve" element={<PinApprovalScreen />} />
+                          {/* A reset is recorded against one of the facility's devices. */}
+                          <Route path="/sign-in/forgot" element={<ForgotPasswordScreen />} />
                         </Route>
+                        {/* Email and password: on a facility device, or to set up a device enrolled nowhere. */}
+                        <Route path="/sign-in" element={<PasswordSignInScreen />} />
                         <Route path="/onboarding/start" element={<MagicLinkScreen />} />
                         <Route path="/onboarding/join" element={<JoinFacilityScreen />} />
                         <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
@@ -471,6 +499,11 @@ const App = () => {
                         <Route element={<RequireShift />}>
                           <Route element={<AppShell />}>
                             <Route path="/home" element={<FacilityHomeScreen />} />
+                            <Route path="/account/password" element={<ChangePasswordScreen />} />
+                            <Route
+                              path="/account/password/set"
+                              element={<SetFirstPasswordScreen />}
+                            />
                             <Route path="/workspace/:moduleId" element={<WorkspaceScreen />} />
                             <Route
                               path={FRONT_DESK_PATIENTS}

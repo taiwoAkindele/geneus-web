@@ -1,5 +1,35 @@
 import type { InvitationLinkView } from '@/lib/api/staff';
 
+/**
+ * The token for this tab only, so the screen survives being remounted once the
+ * device enrols, and the person can come back to it if accepting is refused.
+ * Storage can be unavailable (private mode); the token in hand still works then.
+ */
+const TOKEN_KEY = 'geneus.invitationToken';
+
+export const keepInvitationToken = (token: string | undefined) => {
+  try {
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {
+    /* the token in hand is enough */
+  }
+};
+
+export const keptInvitationToken = (): string | undefined => {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The invitation was accepted, or can no longer be: nothing more to come back to. */
+export const forgetInvitationToken = () => keepInvitationToken(undefined);
+
 /** The token from an invitation link's fragment (`#token=…`). The fragment never reaches a server. */
 export const invitationTokenFromHash = (hash: string): string | undefined => {
   const token = new URLSearchParams(hash.replace(/^#/, '')).get('token')?.trim();

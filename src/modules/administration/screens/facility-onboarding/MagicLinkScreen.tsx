@@ -53,8 +53,19 @@ export const MagicLinkScreen = () => {
           on this device.
         </p>
 
+        {facility ? null : (
+          <div className="mt-8 rounded-[22px] bg-white p-5 text-ink">
+            <p className="text-[15px]">Already work at a facility that uses Geneus?</p>
+            <div className="mt-4">
+              <Button variant="primary" onClick={() => navigate('/sign-in')}>
+                Sign in with your email
+              </Button>
+            </div>
+          </div>
+        )}
+
         <form
-          className="mt-8 rounded-[22px] bg-white p-5 text-ink"
+          className="mt-6 rounded-[22px] bg-white p-5 text-ink"
           onSubmit={(event) => {
             event.preventDefault();
             void submit();

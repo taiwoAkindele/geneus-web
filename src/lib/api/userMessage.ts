@@ -15,6 +15,21 @@ const BY_CODE: Record<string, string> = {
   attribution_mismatch: 'Your sign-in changed. Sign in again, then try again.',
   not_configured: 'This needs server setup first. Ask your system administrator.',
   invalid_signature: 'The request could not be verified.',
+  // Staff passwords: fixed wording, because a server message that mentions a password is never shown.
+  wrong_password: 'That email or password is not right.',
+  locked: 'Too many wrong attempts. Try again in a few minutes.',
+  not_at_facility: "You're not set up at this facility. Ask its administrator to add you.",
+  invalid_code: 'That code is not right, or has expired. Ask for a new one.',
+  invalid_pin_grant: 'Your sign-in has expired. Sign in with your email and password again.',
+  existing_account:
+    'This email already has a Geneus password. Enter it, or use the code we email you.',
+  no_existing_account: 'This email has no Geneus password yet. Choose one.',
+  invalid_account_code: 'That email code is not right, or has expired.',
+  invitation_email_mismatch:
+    'Your password cannot be set from this invitation. Use "Forgot password" with the email your administrator has on file.',
+  device_already_enrolled: 'This device is already set up. Sign in from its facility screen.',
+  email_not_configured: "Geneus can't send email yet. Ask your system administrator.",
+  no_email: 'Your account has no email yet. Ask your administrator to add one.',
 };
 
 const PROVIDER: Record<string, string> = {

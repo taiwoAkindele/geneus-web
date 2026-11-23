@@ -258,6 +258,20 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
             )}
           </dd>
         </div>
+        <div>
+          <dt className="font-semibold">Password</dt>
+          <dd className="mt-1">
+            {state.password === 'set' ? (
+              <Tag tone="green">Set</Tag>
+            ) : (
+              <span className="text-ink-muted">
+                {state.email
+                  ? 'Not set yet. They are asked to set one when they next sign in online, or choose one when accepting an invitation.'
+                  : 'Needs a verified email first. Send an invitation to their email.'}
+              </span>
+            )}
+          </dd>
+        </div>
       </dl>
       {summary ? (
         <p
@@ -363,6 +377,25 @@ export const useOnboardingSummaries = () => {
 };
 
 /** A short label for a person who was invited and has not yet activated; nothing otherwise. */
+/**
+ * Whether this person can sign in on a new device or recover a forgotten PIN
+ * on their own: that takes a verified email with a password. Undefined when
+ * all is in place, or nothing is known (offline, no session).
+ */
+export const accountTag = (
+  summary: StaffOnboardingSummary | undefined,
+): { tone: 'amber' | 'neutral'; label: string } | undefined => {
+  if (!summary) {
+    return undefined;
+  }
+
+  if (!summary.hasEmail) {
+    return { tone: 'amber', label: 'No email' };
+  }
+
+  return summary.passwordSet ? undefined : { tone: 'neutral', label: 'No password yet' };
+};
+
 export const onboardingTag = (
   summary: StaffOnboardingSummary | undefined,
 ): { tone: 'amber' | 'neutral'; label: string } | undefined => {

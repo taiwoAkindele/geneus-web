@@ -1,4 +1,5 @@
 export {
+  accountTag,
   ContactActivationSection,
   onboardingTag,
   useOnboardingSummaries,

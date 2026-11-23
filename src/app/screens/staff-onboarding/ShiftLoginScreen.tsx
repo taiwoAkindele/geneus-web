@@ -95,15 +95,19 @@ export const ShiftLoginScreen = () => {
   // Old 4-digit PINs still work once, so the keypad completes at their length.
   const digits = staffId ? pinLength(staffId) : 6;
 
-  /** Setting a PIN — first time or forgotten — always needs someone's approval first. */
-  const askForApproval = (entry: RosterEntry, reset: boolean) =>
-    navigate('/onboarding/approve', {
-      state: {
-        staffId: entry.staff.staffId,
-        fullName: entry.staff.fullName,
-        role: roleLabel(entry.staff),
-        reset,
-      },
+  /**
+   * Setting a PIN on this device — first time here, or forgotten — starts with
+   * the person's email and password, which proves who they are.
+   */
+  const signInWithEmail = (entry?: RosterEntry) =>
+    navigate('/sign-in', {
+      state: entry
+        ? {
+            staffId: entry.staff.staffId,
+            fullName: entry.staff.fullName,
+            role: roleLabel(entry.staff),
+          }
+        : undefined,
     });
 
   const choose = (entry: RosterEntry) => {
@@ -113,7 +117,7 @@ export const ShiftLoginScreen = () => {
       return;
     }
 
-    askForApproval(entry, false);
+    signInWithEmail(entry);
   };
 
   const onDigit = async (digit: string) => {
@@ -205,6 +209,15 @@ export const ShiftLoginScreen = () => {
                 : failureMessage(failure)}
             </div>
           ) : null}
+          {failure?.reason === 'locked' ? (
+            <button
+              type="button"
+              onClick={() => signInWithEmail(selected)}
+              className="mt-2 block w-full min-h-[44px] text-center text-[13px] font-bold text-brand underline"
+            >
+              Sign in with your email and password instead
+            </button>
+          ) : null}
         </>
       );
     }
@@ -250,6 +263,13 @@ export const ShiftLoginScreen = () => {
               No staff on this device yet — a facility admin invites them first.
             </p>
           ) : null}
+          <button
+            type="button"
+            onClick={() => signInWithEmail()}
+            className="mt-1 min-h-[44px] text-center text-[13px] font-bold text-brand underline"
+          >
+            New on this device? Sign in with your email
+          </button>
         </div>
       </>
     );
@@ -318,7 +338,7 @@ export const ShiftLoginScreen = () => {
           {selected ? (
             <button
               type="button"
-              onClick={() => askForApproval(selected, true)}
+              onClick={() => signInWithEmail(selected)}
               className="mt-5 min-h-0 text-[13px] font-semibold text-brand-accent-soft"
             >
               Forgot PIN?

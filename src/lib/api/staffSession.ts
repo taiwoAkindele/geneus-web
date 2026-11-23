@@ -1,5 +1,5 @@
 //
-import type { AuthorizationContext, StaffSession } from '@shared';
+import type { AuthorizationContext, ExistingAccountProof, StaffSession } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, staffRequest } from './client';
 
@@ -106,6 +106,15 @@ const keep = (session: StaffSession, deviceId: string) => {
   return session;
 };
 
+/**
+ * Holds a session the server opened for this person on another of this
+ * device's facility workspaces, as a facility switch does, before the page
+ * reloads into that workspace.
+ */
+export const adoptStaffSession = (session: StaffSession, deviceId: string): void => {
+  keep(session, deviceId);
+};
+
 /** Proves the PIN to the server. Refusals: wrong_pin, locked, pin_not_enrolled, unknown_staff. */
 export const openStaffSession = async (
   context: Pick<AuthorizationContext, 'userId' | 'deviceId'>,
@@ -119,12 +128,23 @@ export const openStaffSession = async (
     context.deviceId,
   );
 
-/** Registers the person's PIN with the server for this device, proven by an administrator's PIN code or a code to their own email. */
+/**
+ * What proves the person when their PIN is registered: the permission from
+ * signing in with their password here; an administrator's PIN code or an
+ * emailed invitation code (which also settles their password); or a code to
+ * their own email.
+ */
+export type PinEnrolmentProof =
+  | { pinGrant: string }
+  | { setupCode: string; password?: string; existingAccount?: ExistingAccountProof }
+  | { emailCode: string };
+
+/** Registers the person's PIN with the server for this device. */
 export const enrolStaffPin = async (
   staffId: string,
   deviceId: string,
   pin: string,
-  proof: { setupCode: string } | { emailCode: string },
+  proof: PinEnrolmentProof,
 ) =>
   keep(
     await staffRequest<StaffSession>('/staff/session/enrol', credential(), undefined, {
@@ -168,6 +188,41 @@ export const takeSetupCode = (staffId: string) => {
 
   return entry && entry.until > Date.now() ? entry.code : undefined;
 };
+
+/**
+ * The permission a password sign-in gave to register this person's PIN on this
+ * device, kept in memory until the PIN is chosen. It expires on the server too.
+ */
+const pinGrants = new Map<string, { grant: string; until: number }>();
+
+export const rememberPinGrant = (staffId: string, grant: string, expiresOn: string) =>
+  pinGrants.set(staffId, { grant, until: Date.parse(expiresOn) });
+
+/** The waiting grant, without using it up: the server spends it only when the PIN is accepted. */
+export const pendingPinGrant = (staffId: string): string | undefined => {
+  const entry = pinGrants.get(staffId);
+
+  return entry && entry.until > Date.now() ? entry.grant : undefined;
+};
+
+export const forgetPinGrant = (staffId: string) => pinGrants.delete(staffId);
+
+/**
+ * How accepting an invitation settles the person's password: a first one they
+ * chose, or proof they own the one their email already has. Held in memory
+ * until the PIN is chosen, and sent with the invitation code.
+ */
+export type InvitationAccount = { password: string } | { existingAccount: ExistingAccountProof };
+
+const invitationAccounts = new Map<string, InvitationAccount>();
+
+export const rememberInvitationAccount = (staffId: string, account: InvitationAccount) =>
+  invitationAccounts.set(staffId, account);
+
+export const pendingInvitationAccount = (staffId: string): InvitationAccount | undefined =>
+  invitationAccounts.get(staffId);
+
+export const forgetInvitationAccount = (staffId: string) => invitationAccounts.delete(staffId);
 
 /** The invitation code waiting to be accepted online for this person, without using it up. */
 export const pendingInvitationCode = (staffId: string): string | undefined => {
