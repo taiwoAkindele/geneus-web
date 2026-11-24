@@ -63,7 +63,6 @@ const INDEXES: Partial<Record<DocType, IndexShorthand>> = {
   roster_shift: { staff: ['staffId'] },
   sync_rejection: { open: ['resolvedOn'] },
   audit_event: { source: ['entityId'] },
-  pin_setup_code: { staff: ['staffId'] },
   service_offering: { unit: ['unitId'] },
   practitioner_profile: { staff: ['staffId'] },
   authority_snapshot: { staff: ['staffId'] },

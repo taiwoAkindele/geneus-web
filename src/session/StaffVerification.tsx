@@ -4,12 +4,15 @@ import { Button, TextField } from '@/ui';
 import { ApiError } from '@/lib/api/client';
 import {
   enrolStaffPin,
+  forgetPinGrant,
+  forgetStaffSession,
   openStaffSession,
   staffSessionExpires,
   staffSessionToken,
   STAFF_SESSION_EVENT,
 } from '@/lib/api/staffSession';
-import { requestWorkforceCode } from '@/lib/api/workforce';
+import { signInWithPassword } from '@/lib/api/staffPassword';
+import { userMessage } from '@/lib/api/userMessage';
 import { useSyncStatus } from '@/data';
 
 /**
@@ -42,15 +45,11 @@ export const useStaffVerification = () => {
 };
 
 const refusalText = (cause: unknown): string => {
-  if (cause instanceof ApiError) {
-    return REFUSALS[cause.code] ?? cause.message;
+  if (cause instanceof ApiError && REFUSALS[cause.code]) {
+    return REFUSALS[cause.code];
   }
 
-  if (cause instanceof Error) {
-    return cause.message;
-  }
-
-  return 'Could not confirm';
+  return userMessage(cause, 'Could not confirm it is you. Try again.');
 };
 
 const digits = (value: string) => value.replace(/\D/g, '').slice(0, 6);
@@ -59,9 +58,30 @@ const REFUSALS: Record<string, string> = {
   wrong_pin: 'That PIN is not right.',
   locked: 'Too many wrong PINs. Wait a few minutes, then try again.',
   unknown_staff: 'This account is not active here.',
-  invalid_setup_code:
-    'That PIN code is not right, has expired or was already used. Ask your administrator for a new one.',
-  invalid_email_code: 'That email code is not right, or has expired.',
+};
+
+/**
+ * Registers the PIN the person just typed with the server, proven by their email
+ * and password: for a PIN set on this device before the server knew it. Their
+ * password must be their own — not someone else's who happens to know it.
+ */
+const registerWithPassword = async (
+  context: { userId: string; deviceId: string },
+  email: string,
+  password: string,
+  pin: string,
+) => {
+  const session = await signInWithPassword(email, password);
+
+  if (session.staffId !== context.userId) {
+    forgetPinGrant(session.staffId);
+    forgetStaffSession();
+
+    throw new Error('That email belongs to someone else. Use your own email and password.');
+  }
+
+  await enrolStaffPin(context.userId, context.deviceId, pin, { pinGrant: session.pinGrant });
+  forgetPinGrant(context.userId);
 };
 
 /**
@@ -90,9 +110,10 @@ export const StaffVerification = ({
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [enrol, setEnrol] = useState<'choose' | 'setup' | 'email'>();
-  const [proof, setProof] = useState('');
-  const [sentTo, setSentTo] = useState('');
+  // The server has never seen this PIN: the person proves it is them with their password, once.
+  const [registering, setRegistering] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const previouslyVerified = useRef(false);
 
   if (verified) {
@@ -112,11 +133,11 @@ export const StaffVerification = ({
     try {
       await action();
       setPin('');
-      setProof('');
-      setEnrol(undefined);
+      setPassword('');
+      setRegistering(false);
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'pin_not_enrolled') {
-        setEnrol('choose');
+        setRegistering(true);
         setError('');
       } else {
         setError(refusalText(cause));
@@ -148,7 +169,7 @@ export const StaffVerification = ({
             {error}
           </p>
         ) : null}
-        {!enrol ? (
+        {!registering ? (
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={(e) => {
@@ -176,92 +197,58 @@ export const StaffVerification = ({
             </Button>
           </form>
         ) : (
-          <div className="space-y-3 rounded-field border border-amber-border bg-amber-bg p-3 text-sm">
+          <form
+            className="space-y-3 rounded-field border border-amber-border bg-amber-bg p-3 text-sm"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(() => registerWithPassword(context, email, password, pin));
+            }}
+          >
             <p>
-              <strong>Your PIN is not yet registered with the server on this device.</strong> Prove
-              it is you once, and your PIN works online from then on.
+              <strong>Your PIN is not yet registered with the server on this device.</strong> Sign
+              in with your email and password once, and your PIN works online from then on.
             </p>
-            {enrol === 'choose' ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outlined" fullWidth={false} onClick={() => setEnrol('setup')}>
-                  I have a PIN code from my administrator
-                </Button>
-                <Button
-                  variant="ghost"
-                  fullWidth={false}
-                  loading={busy}
-                  onClick={() =>
-                    void (async () => {
-                      setBusy(true);
-                      setError('');
-
-                      try {
-                        setSentTo((await requestWorkforceCode(context)).sentTo);
-                        setEnrol('email');
-                      } catch (cause) {
-                        setError(cause instanceof Error ? cause.message : 'Could not send a code');
-                      } finally {
-                        setBusy(false);
-                      }
-                    })()
-                  }
-                >
-                  Email me a code
-                </Button>
-              </div>
-            ) : (
-              <form
-                className="space-y-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(() =>
-                    enrolStaffPin(
-                      context.userId,
-                      context.deviceId,
-                      pin,
-                      enrol === 'setup' ? { setupCode: proof } : { emailCode: proof },
-                    ),
-                  );
-                }}
+            <TextField
+              label="Email"
+              type="email"
+              autoComplete="username"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <TextField
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <TextField
+              label="Your PIN"
+              type="password"
+              inputMode="numeric"
+              value={pin}
+              onChange={(e) => setPin(digits(e.target.value))}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                fullWidth={false}
+                loading={busy}
+                disabled={!online || pin.length !== 6 || !email.trim() || !password}
               >
-                {enrol === 'email' ? <p>We sent a 6-digit code to {sentTo}.</p> : null}
-                <TextField
-                  label={
-                    enrol === 'setup' ? 'PIN code from your administrator' : 'Code from the email'
-                  }
-                  value={proof}
-                  onChange={(e) =>
-                    setProof(enrol === 'email' ? digits(e.target.value) : e.target.value)
-                  }
-                />
-                <TextField
-                  label="Your PIN"
-                  type="password"
-                  inputMode="numeric"
-                  value={pin}
-                  onChange={(e) => setPin(digits(e.target.value))}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    type="submit"
-                    fullWidth={false}
-                    loading={busy}
-                    disabled={pin.length !== 6 || !proof.trim()}
-                  >
-                    Register my PIN
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    fullWidth={false}
-                    onClick={() => setEnrol('choose')}
-                  >
-                    Back
-                  </Button>
-                </div>
-              </form>
-            )}
-          </div>
+                Register my PIN
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                fullWidth={false}
+                onClick={() => setRegistering(false)}
+              >
+                Back
+              </Button>
+            </div>
+          </form>
         )}
       </section>
       <div hidden={!verified}>{verified || previouslyVerified.current ? children : null}</div>

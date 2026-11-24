@@ -141,19 +141,13 @@ export const PasswordSignInScreen = () => {
       >
         {enrolled ? 'Sign in' : 'Continue'}
       </Button>
-      {enrolled ? (
-        <Link
-          to="/sign-in/forgot"
-          state={{ email }}
-          className="block text-center text-sm font-bold text-brand underline"
-        >
-          Forgot password?
-        </Link>
-      ) : (
-        <p className="text-center text-[13px] text-ink-muted">
-          Forgot your password? Reset it from any of your facility&rsquo;s devices.
-        </p>
-      )}
+      <Link
+        to="/sign-in/forgot"
+        state={{ email }}
+        className="block min-h-[44px] text-center text-sm font-bold text-brand underline"
+      >
+        Forgot password?
+      </Link>
     </form>
   );
 
@@ -228,24 +222,12 @@ export const PasswordSignInScreen = () => {
             </p>
           ) : (
             <p>
-              Setting up a new facility, or have a device code?{' '}
+              Setting up a new facility?{' '}
               <Link to="/onboarding/start" className="font-bold text-white underline">
-                Use a code
+                Start here
               </Link>
             </p>
           )}
-          {enrolled && from.staffId ? (
-            <p>
-              No password yet?{' '}
-              <button
-                type="button"
-                onClick={() => navigate('/onboarding/approve', { state: { ...from, reset: true } })}
-                className="min-h-0 font-bold text-white underline"
-              >
-                Ask an administrator to approve your PIN
-              </button>
-            </p>
-          ) : null}
         </div>
       </div>
     </div>

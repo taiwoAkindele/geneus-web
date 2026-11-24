@@ -130,9 +130,8 @@ export const openStaffSession = async (
 
 /**
  * What proves the person when their PIN is registered: the permission from
- * signing in with their password here; an administrator's PIN code or an
- * emailed invitation code (which also settles their password); or a code to
- * their own email.
+ * signing in with their password here, or an emailed invitation's code
+ * (which also settles their password).
  */
 export type PinEnrolmentProof =
   | { pinGrant: string }
@@ -173,21 +172,16 @@ export const forgetStaffSession = () => {
 };
 
 /**
- * A PIN setup code just used on this device, kept briefly so the new PIN can be
- * registered with the server. `online`: an emailed invitation code, which the
- * server must accept before the PIN is saved here at all.
+ * The code an invitation link was exchanged for on this device, kept briefly
+ * until the person chooses their PIN: the server accepts the invitation and
+ * the PIN together, before the PIN is saved here at all.
  */
-const pendingCodes = new Map<string, { code: string; until: number; online: boolean }>();
+const pendingCodes = new Map<string, { code: string; until: number }>();
 
-export const rememberSetupCode = (staffId: string, code: string, online = false) =>
-  pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000, online });
+export const rememberInvitationCode = (staffId: string, code: string) =>
+  pendingCodes.set(staffId, { code, until: Date.now() + 30 * 60_000 });
 
-export const takeSetupCode = (staffId: string) => {
-  const entry = pendingCodes.get(staffId);
-  pendingCodes.delete(staffId);
-
-  return entry && entry.until > Date.now() ? entry.code : undefined;
-};
+export const forgetInvitationCode = (staffId: string) => pendingCodes.delete(staffId);
 
 /**
  * The permission a password sign-in gave to register this person's PIN on this
@@ -228,7 +222,7 @@ export const forgetInvitationAccount = (staffId: string) => invitationAccounts.d
 export const pendingInvitationCode = (staffId: string): string | undefined => {
   const entry = pendingCodes.get(staffId);
 
-  return entry?.online && entry.until > Date.now() ? entry.code : undefined;
+  return entry && entry.until > Date.now() ? entry.code : undefined;
 };
 
 /** Signs the person in with the server too, when online. Never blocks or fails the local sign-in. */

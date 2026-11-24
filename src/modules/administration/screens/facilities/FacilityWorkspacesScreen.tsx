@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDeviceContext } from '@/data';
 import { listFacilityWorkspaces, switchFacilityWorkspace } from '@/data/facilityWorkspaces';
-import { joinFacility } from '@/lib/api/devices';
-import { Button, TextField } from '@/ui';
+import { Button } from '@/ui';
 import { useAuth, useSession } from '@/session';
 import { AppHeader } from '@/app/AppHeader';
 
@@ -20,7 +19,6 @@ const CreationLink = () => {
 export const FacilityWorkspacesScreen = () => {
   const { deviceId } = useDeviceContext();
   const { signedIn } = useAuth();
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const entries = listFacilityWorkspaces();
@@ -91,35 +89,13 @@ export const FacilityWorkspacesScreen = () => {
             </li>
           ))}
         </ul>
-        <section className="space-y-3 border-t border-outline-soft pt-5">
-          <h2 className="text-lg font-bold">Connect an existing facility</h2>
-          <p className="text-sm text-ink-soft">
-            Connect to the internet and enter an enrollment code issued by that facility’s
-            administrator. Use this option when the receiving administrator must approve this
-            device.
+        <section className="space-y-2 border-t border-outline-soft pt-5 text-sm text-ink-soft">
+          <h2 className="text-lg font-bold text-ink">Add another facility</h2>
+          <p>
+            Open it from the facility switcher if you work there. If this device can&rsquo;t be set
+            up for it from there, ask that facility&rsquo;s administrator to send you an invitation
+            that may set up this device.
           </p>
-          <TextField
-            label="Facility enrollment code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <Button
-            disabled={busy || !code.trim()}
-            loading={busy}
-            onClick={() =>
-              void run(async () => {
-                const issued = await joinFacility(
-                  code,
-                  `device:${crypto.randomUUID()}`,
-                  'Additional facility workspace',
-                );
-
-                await switchFacilityWorkspace(issued.deviceId, issued);
-              })
-            }
-          >
-            Enroll & open facility
-          </Button>
         </section>
       </main>
     </>

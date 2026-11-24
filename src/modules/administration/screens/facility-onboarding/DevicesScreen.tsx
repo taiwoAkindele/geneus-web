@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { decide, type Device, type DeviceBlockReason } from '@shared';
 import { useDeviceContext, useLiveQuery, useSyncStatus } from '@/data';
 import { listDevices } from '@/data/repos/devices';
@@ -293,14 +292,6 @@ export const DevicesScreen = () => {
             Enrolled devices, recent server contact and access status.
           </p>
         </div>
-        {context.permissions.includes('device:enroll') ? (
-          <Link
-            to="/admin/devices/add"
-            className="inline-flex min-h-[52px] items-center rounded-field bg-brand px-4 py-3 font-bold text-white"
-          >
-            Add device
-          </Link>
-        ) : null}
       </header>
       {renderDeviceList()}
       {notice ? (

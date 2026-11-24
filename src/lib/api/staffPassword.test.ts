@@ -11,6 +11,7 @@ import {
   changePassword,
   confirmNewDeviceSignIn,
   ownPasswordStatus,
+  requestPasswordReset,
   setFirstPassword,
   signInWithPassword,
 } from './staffPassword';
@@ -216,5 +217,19 @@ describe('a first password for staff who signed in before passwords', () => {
     );
     expect(accountTag({ ...base, hasEmail: true, passwordSet: true })).toBeUndefined();
     expect(accountTag(undefined)).toBeUndefined();
+  });
+});
+
+describe('resetting a password', () => {
+  it('works on a device set up nowhere, and records the facility device when there is one', async () => {
+    const fetch = vi.fn(async () => json({ sentTo: 'n•••@example.org' }, 202));
+    vi.stubGlobal('fetch', fetch);
+
+    await requestPasswordReset('nurse@example.org');
+    expect(lastCall(fetch).headers.authorization).toBeUndefined();
+
+    await enrolHere();
+    await requestPasswordReset('nurse@example.org');
+    expect(lastCall(fetch).headers.authorization).toBe('Bearer device:A.synthetic');
   });
 });

@@ -78,14 +78,22 @@ export const confirmNewDeviceSignIn = async (
   return result;
 };
 
+/**
+ * A reset works on any device: the emailed code is the proof. A facility
+ * device still sends its credential, so the reset is recorded against it.
+ */
+const asAnyDevice = <T>(path: string, body: unknown) => {
+  const device = getDeviceCredential();
+
+  return device ? postAsDevice<T>(path, device.credential, body) : post<T>(path, body);
+};
+
 /** Emails a reset code. The answer is the same whether or not the email is known. */
 export const requestPasswordReset = (email: string) =>
-  postAsDevice<Pick<EmailSent, 'sentTo'>>('/staff/password/reset/request', deviceCredential(), {
-    email,
-  });
+  asAnyDevice<Pick<EmailSent, 'sentTo'>>('/staff/password/reset/request', { email });
 
 export const resetPassword = (email: string, code: string, password: string) =>
-  postAsDevice<void>('/staff/password/reset', deviceCredential(), { email, code, password });
+  asAnyDevice<void>('/staff/password/reset', { email, code, password });
 
 /** Needs the signed-in person's server session; the current password proves it is them. */
 export const changePassword = (

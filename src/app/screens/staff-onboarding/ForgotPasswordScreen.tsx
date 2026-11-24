@@ -9,7 +9,7 @@ import { NewPasswordFields, newPasswordProblem } from './NewPasswordFields';
  * Forgotten password (SCHEMA.md §10): a 6-digit code goes to the email, and the
  * code with a new password sets it. Resetting signs the person out of every
  * device; their PIN on each device is chosen again after their next password
- * sign-in. Needs one of the facility's devices, which records the reset.
+ * sign-in. Works on any device: the emailed code is the proof.
  */
 export const ForgotPasswordScreen = () => {
   const navigate = useNavigate();

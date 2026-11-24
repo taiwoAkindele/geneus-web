@@ -446,11 +446,9 @@ export const StaffForm = ({
                 Review allowed actions
               </summary>
               <ul className="max-h-64 list-disc space-y-2 overflow-y-auto pl-5 pr-1 text-xs">
-                {effective.map((item) =>
-                  item !== 'pin_setup_code:claim' ? (
-                    <li key={item}>{PERMISSION_LABELS[item]}</li>
-                  ) : null,
-                )}
+                {effective.map((item) => (
+                  <li key={item}>{PERMISSION_LABELS[item]}</li>
+                ))}
               </ul>
             </details>
           ) : null}

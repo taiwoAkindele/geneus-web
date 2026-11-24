@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Role } from '@shared';
 import { Button, TextField } from '@/ui';
 import { useDeviceContext } from '@/data';
@@ -15,7 +15,7 @@ import {
 } from '@/lib/api/staff';
 import {
   rememberInvitationAccount,
-  rememberSetupCode,
+  rememberInvitationCode,
   type InvitationAccount,
 } from '@/lib/api/staffSession';
 import { ROLE_LABELS } from '@/modules/operations/staff';
@@ -179,7 +179,7 @@ export const InvitationScreen = () => {
   }, [step]);
 
   /**
-   * On a facility device: swap the link for a one-time setup code, and learn
+   * On a facility device: swap the link for a one-time code, and learn
    * whether the email already has a password, which the next step settles.
    * The token is kept until the PIN is accepted, so a refusal can come back here.
    */
@@ -191,7 +191,7 @@ export const InvitationScreen = () => {
 
   /** The password is settled: approved here, go to choosing the PIN. All of it is sent together. */
   const toChoosePin = (pending: PendingAccount, settled: InvitationAccount) => {
-    rememberSetupCode(pending.staffId, pending.code, true);
+    rememberInvitationCode(pending.staffId, pending.code);
     rememberInvitationAccount(pending.staffId, settled);
     approvePinSetup(pending.staffId);
     navigate('/onboarding/accept', {
@@ -434,18 +434,9 @@ export const InvitationScreen = () => {
           This device isn’t set up for {view.facilityName}. Open this link on one of{' '}
           {view.facilityName}’s phones or computers, or ask your administrator to add this device.
         </p>
-        {credential ? (
-          <Button variant="outlined" onClick={() => navigate('/login')}>
-            Go to sign-in
-          </Button>
-        ) : (
-          <Link
-            to="/onboarding/join"
-            className="inline-flex min-h-[44px] items-center font-bold text-brand underline"
-          >
-            I have a device code from my administrator
-          </Link>
-        )}
+        <Button variant="outlined" onClick={() => navigate(credential ? '/login' : '/sign-in')}>
+          {credential ? 'Go to sign-in' : 'Sign in with your email'}
+        </Button>
       </Card>
     );
   }

@@ -3,7 +3,6 @@ import type {
   DeviceCredential,
   EmailSent,
   InvitationCheckResult,
-  PinSetupCodeIssued,
 } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, post, postAsDevice, staffRequest } from './client';
@@ -62,23 +61,6 @@ const asProvenPerson = async <T>(
 
 const staffPath = (staffId: string, rest: string) =>
   `/staff/${encodeURIComponent(staffId)}/${rest}`;
-
-/**
- * Asks geneus-server for a one-time code that lets `staffId` set their PIN on
- * a facility device. Online only: the server checks the signed-in person's
- * own session holds `staff:manage` and is the only one that ever sees the plain code.
- */
-export const issuePinSetupCode = (
-  context: AuthorizationContext,
-  staffId: string,
-): Promise<PinSetupCodeIssued> =>
-  asProvenPerson<PinSetupCodeIssued>(context, staffPath(staffId, 'pin-codes'), {
-    issuedBy: context.userId,
-  });
-
-/** A facility admin who forgot their PIN: the server emails them a PIN setup code (SCHEMA.md §10). */
-export const emailPinSetupCode = (staffId: string): Promise<EmailSent> =>
-  asDevice<EmailSent>(staffPath(staffId, 'pin-codes/email'));
 
 /** Step one of a facility admin setting their own recovery email: codes go to the new address (and the current one). */
 export const requestRecoveryEmailCode = (
@@ -144,7 +126,7 @@ export type StaffOnboardingSummary = {
 };
 
 /**
- * Emails `staffId` an invitation link, with a PIN setup code as a fallback.
+ * Emails `staffId` an invitation link to choose their password and PIN.
  * Without `email`, it goes to their verified address, which administrators see
  * only masked. `allowNewDevice` lets the link set up one device that is not yet
  * enrolled; the server allows it only for someone who may add devices. The
@@ -226,7 +208,7 @@ export const enrolDeviceFromInvitation = (
     deviceLabel: deviceLabel.trim(),
   });
 
-/** As a device enrolled at the invitation's facility: a fresh one-time PIN setup code for the person invited. */
+/** As a device enrolled at the invitation's facility: a fresh one-time code that accepts the invitation. */
 export const invitationLinkCode = (token: string): Promise<{ staffId: string; code: string }> =>
   asDevice<{ staffId: string; code: string }>('/invitations/link/code', { token });
 

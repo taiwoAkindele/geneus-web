@@ -46,8 +46,12 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: 'Facility onboarding & admin',
     items: [
-      { to: '/onboarding/start', label: 'Get started (magic link)', note: 'Flow entry' },
-      { to: '/onboarding/join', label: 'Join an existing facility', note: 'Second device' },
+      { to: '/onboarding/start', label: 'Get started', note: 'Flow entry' },
+      {
+        to: '/onboarding/create-account',
+        label: 'Create an account',
+        note: 'Ask Geneus for a facility',
+      },
       { to: '/admin/devices', label: 'Add a device (admin)', note: '' },
       { to: '/onboarding/register', label: 'Register facility', note: 'From the link' },
       { to: '/admin', label: 'Admin dashboard', note: 'Set up the team' },

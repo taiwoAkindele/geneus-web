@@ -84,6 +84,12 @@ const MagicLinkSentScreen = lazy(() =>
   })),
 );
 
+const CreateAccountScreen = lazy(() =>
+  import('@/modules/administration/screens/facility-onboarding/CreateAccountScreen').then((m) => ({
+    default: m.CreateAccountScreen,
+  })),
+);
+
 const RegisterFacilityScreen = lazy(() =>
   import('@/modules/administration/screens/facility-onboarding/RegisterFacilityScreen').then(
     (m) => ({
@@ -95,18 +101,6 @@ const RegisterFacilityScreen = lazy(() =>
 const InviteStaffScreen = lazy(() =>
   import('@/modules/administration/screens/facility-onboarding/InviteStaffScreen').then((m) => ({
     default: m.InviteStaffScreen,
-  })),
-);
-
-const JoinFacilityScreen = lazy(() =>
-  import('@/modules/administration/screens/facility-onboarding/JoinFacilityScreen').then((m) => ({
-    default: m.JoinFacilityScreen,
-  })),
-);
-
-const AddDeviceScreen = lazy(() =>
-  import('@/modules/administration/screens/facility-onboarding/AddDeviceScreen').then((m) => ({
-    default: m.AddDeviceScreen,
   })),
 );
 
@@ -134,12 +128,6 @@ const CreatePinScreen = lazy(() =>
 const ShiftLoginScreen = lazy(() =>
   import('@/app/screens/staff-onboarding/ShiftLoginScreen').then((m) => ({
     default: m.ShiftLoginScreen,
-  })),
-);
-
-const PinApprovalScreen = lazy(() =>
-  import('@/app/screens/staff-onboarding/PinApprovalScreen').then((m) => ({
-    default: m.PinApprovalScreen,
   })),
 );
 
@@ -413,6 +401,12 @@ const OperatorConsoleScreen = lazy(() =>
   })),
 );
 
+const FacilityRequestReviewScreen = lazy(() =>
+  import('@/app/screens/operator/FacilityRequestReviewScreen').then((m) => ({
+    default: m.FacilityRequestReviewScreen,
+  })),
+);
+
 const InsuranceSettingsScreen = lazy(() =>
   import('@/modules/finance/screens/insurance/InsuranceSettingsScreen').then((m) => ({
     default: m.InsuranceSettingsScreen,
@@ -471,6 +465,11 @@ const App = () => {
                       <Route path="/facilities" element={<FacilityWorkspacesScreen />} />
                       {/* Geneus staff only: no facility or device enrollment, its own sign-in. */}
                       <Route path="/operator" element={<OperatorConsoleScreen />} />
+                      {/* Opened from the email a facility sign-up request sends each operator; the link is the credential. */}
+                      <Route
+                        path="/operator/facility-request"
+                        element={<FacilityRequestReviewScreen />}
+                      />
                       {/* Default screen is the staff shift-login. */}
                       <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -479,15 +478,18 @@ const App = () => {
                         {/* A device with no facility can only register one. */}
                         <Route element={<RequireFacility />}>
                           <Route path="/login" element={<ShiftLoginScreen />} />
-                          <Route path="/onboarding/approve" element={<PinApprovalScreen />} />
-                          {/* A reset is recorded against one of the facility's devices. */}
-                          <Route path="/sign-in/forgot" element={<ForgotPasswordScreen />} />
                         </Route>
                         {/* Email and password: on a facility device, or to set up a device enrolled nowhere. */}
                         <Route path="/sign-in" element={<PasswordSignInScreen />} />
+                        {/* The emailed code is the proof, so this works on any device. */}
+                        <Route path="/sign-in/forgot" element={<ForgotPasswordScreen />} />
                         <Route path="/onboarding/start" element={<MagicLinkScreen />} />
-                        <Route path="/onboarding/join" element={<JoinFacilityScreen />} />
                         <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
+                        <Route
+                          path="/onboarding/create-account"
+                          element={<CreateAccountScreen />}
+                        />
+                        {/* Opened from the approval email: registers the facility on this device. */}
                         <Route path="/onboarding/register" element={<RegisterFacilityScreen />} />
                         <Route path="/onboarding/accept" element={<CreatePinScreen />} />
                         {/* Opened from an invitation email, on any device: it decides what this device needs. */}
@@ -822,7 +824,6 @@ const App = () => {
                               path="/admin/devices"
                               element={<MovedTo to="/settings/devices" />}
                             />
-                            <Route path="/admin/devices/add" element={<AddDeviceScreen />} />
                           </Route>
                           {/* Duplicate check is a modal-style screen — outside the shell for now */}
                           <Route

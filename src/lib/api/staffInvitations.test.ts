@@ -4,18 +4,13 @@ import { memoryStorage } from '@/lib/testing/memoryStorage';
 import { resetSecureStorageForTests } from '@/lib/secureStorage';
 import { saveDeviceCredential } from '@/data/deviceCredential';
 import { VerificationRequired } from './insurance';
-import {
-  checkInvitationCode,
-  invitationNeedsAttention,
-  issuePinSetupCode,
-  sendStaffInvitation,
-} from './staff';
+import { checkInvitationCode, invitationNeedsAttention, sendStaffInvitation } from './staff';
 import {
   forgetStaffSession,
   openStaffSession,
   pendingInvitationCode,
-  rememberSetupCode,
-  takeSetupCode,
+  forgetInvitationCode,
+  rememberInvitationCode,
 } from './staffSession';
 
 /**
@@ -76,20 +71,19 @@ const signInWithServer = async () => {
   await openStaffSession(admin, '135790');
 };
 
-describe('PIN authority and invitations', () => {
-  it('sends the PIN-proven session, and the person it belongs to, when issuing a PIN code', async () => {
+describe('invitations', () => {
+  it('sends the PIN-proven session when inviting someone', async () => {
     await signInWithServer();
 
     const fetch = vi.fn(async () =>
-      json({ code: 'K7M2QX9R', expiresOn: new Date().toISOString() }, 201),
+      json({ invitation: { id: 'i', destination: 'n•••@example.org' } }, 201),
     );
 
     vi.stubGlobal('fetch', fetch);
-    await issuePinSetupCode(admin, 'staff:nurse');
+    await sendStaffInvitation(admin, 'staff:nurse', 'nurse@example.org');
     const call = lastCall(fetch);
-    expect(call.url).toMatch(/\/staff\/staff%3Anurse\/pin-codes$/);
+    expect(call.url).toMatch(/\/staff\/staff%3Anurse\/invitations$/);
     expect(call.headers['x-staff-session']).toBe('session-token');
-    expect(call.body).toEqual({ issuedBy: 'staff:admin' });
   });
 
   it('asks for the PIN again when the server no longer accepts the session', async () => {
@@ -100,7 +94,7 @@ describe('PIN authority and invitations', () => {
       ),
     );
 
-    await expect(issuePinSetupCode(admin, 'staff:nurse')).rejects.toBeInstanceOf(
+    await expect(sendStaffInvitation(admin, 'staff:nurse')).rejects.toBeInstanceOf(
       VerificationRequired,
     );
   });
@@ -131,16 +125,13 @@ describe('PIN authority and invitations', () => {
 });
 
 describe('a code waiting to be registered', () => {
-  it('holds an emailed invitation code for online acceptance, unlike a code read aloud', () => {
-    rememberSetupCode('staff:spoken', 'SPOKEN12');
-    expect(pendingInvitationCode('staff:spoken')).toBeUndefined();
-    rememberSetupCode('staff:emailed', 'EMAILED1', true);
-    expect(pendingInvitationCode('staff:emailed')).toBe('EMAILED1');
+  it('holds an invitation code until the PIN is chosen, and forgets it after', () => {
+    rememberInvitationCode('staff:invited', 'EMAILED1');
     // Looking does not use it up.
-    expect(pendingInvitationCode('staff:emailed')).toBe('EMAILED1');
-    expect(takeSetupCode('staff:emailed')).toBe('EMAILED1');
-    expect(pendingInvitationCode('staff:emailed')).toBeUndefined();
-    takeSetupCode('staff:spoken');
+    expect(pendingInvitationCode('staff:invited')).toBe('EMAILED1');
+    expect(pendingInvitationCode('staff:invited')).toBe('EMAILED1');
+    forgetInvitationCode('staff:invited');
+    expect(pendingInvitationCode('staff:invited')).toBeUndefined();
   });
 });
 

@@ -13,11 +13,11 @@ import { ApiError } from '@/lib/api/client';
 import {
   enrolStaffPin,
   forgetInvitationAccount,
+  forgetInvitationCode,
   forgetPinGrant,
   pendingInvitationAccount,
   pendingInvitationCode,
   pendingPinGrant,
-  takeSetupCode,
 } from '@/lib/api/staffSession';
 import { userMessage } from '@/lib/api/userMessage';
 import { forgetInvitationToken } from './invitationLink';
@@ -80,7 +80,7 @@ const registerWithServer = async (staffId: string, deviceId: string, pin: string
       ...pendingInvitationAccount(staffId),
     });
 
-    takeSetupCode(staffId);
+    forgetInvitationCode(staffId);
     forgetInvitationAccount(staffId);
     forgetInvitationToken();
   }
@@ -141,7 +141,7 @@ export const CreatePinScreen = () => {
     }
 
     // The server accepts it first when this sign-up needs it: only then is the PIN saved here.
-    // A code read aloud, or an administrator's approval on site, works offline as before.
+    // Registering a facility (its first admin) or upgrading a 4-digit PIN needs no server step.
     setActivating(true);
     setRefusal(undefined);
 

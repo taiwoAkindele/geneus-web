@@ -1,10 +1,11 @@
 /**
  * Who may set a PIN on this device right now (SCHEMA.md §10). Setting one is
  * never open to whoever is holding the phone: it takes an approval, granted by
- * one of three things —
+ * one of these —
  *
- *   - a PIN setup code an admin issued for that person (from anywhere),
- *   - an admin or supervisor on site entering their own PIN here,
+ *   - signing in with their email and password on this device,
+ *   - accepting an invitation emailed to them,
+ *   - the right old 4-digit PIN, when replacing it with a 6-digit one,
  *   - registering the facility, for its first admin, because nobody else
  *     exists yet to approve them.
  *

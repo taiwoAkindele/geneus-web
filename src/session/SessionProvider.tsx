@@ -26,10 +26,8 @@ import { visitRecordPath } from '@/modules/front-desk/patients';
 import { checkPin, needsLongerPin } from './credentials';
 import {
   endStaffSession,
-  enrolStaffPin,
   forgetStaffSession,
   openStaffSessionQuietly,
-  takeSetupCode,
 } from '@/lib/api/staffSession';
 import { approvePinSetup } from './pinApproval';
 import {
@@ -495,14 +493,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setNow(Date.now());
       forgetStaffSession();
       setStaffId(candidateId);
-      // Prove the PIN to the server too, when online, so it knows who is acting: a just-used PIN code
-      // registers the new PIN first. Never blocks or fails sign-in; offline work carries on regardless.
-      const setupCode = takeSetupCode(candidateId);
-      void (setupCode && navigator.onLine
-        ? enrolStaffPin(candidateId, deviceId, pin, { setupCode }).catch(() =>
-            openStaffSessionQuietly({ userId: candidateId, deviceId }, pin),
-          )
-        : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
+      // Prove the PIN to the server too, when online, so it knows who is acting.
+      // Never blocks or fails sign-in; offline work carries on regardless.
+      void openStaffSessionQuietly({ userId: candidateId, deviceId }, pin);
 
       return undefined;
     },
