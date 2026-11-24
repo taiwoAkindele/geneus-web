@@ -32,7 +32,7 @@ const onDeenrolled = async (): Promise<void> => {
   await forgetActiveWorkspace();
 
   if (typeof window !== 'undefined') {
-    window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/onboarding/start');
+    window.location.replace(listFacilityWorkspaces().length ? '/facilities' : '/sign-in');
   }
 };
 

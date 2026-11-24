@@ -46,7 +46,6 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: 'Facility onboarding & admin',
     items: [
-      { to: '/onboarding/start', label: 'Get started', note: 'Flow entry' },
       {
         to: '/onboarding/create-account',
         label: 'Create an account',

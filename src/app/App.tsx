@@ -26,12 +26,6 @@ import { RouteIndex } from './RouteIndex';
  * ships as a separate chunk — route-level code splitting matters on the cheap
  * phones this product targets. Screens live under `@/modules/<module>/screens/<feature>/` (app-level screens under `@/app/screens/`).
  */
-const MagicLinkScreen = lazy(() =>
-  import('@/modules/administration/screens/facility-onboarding/MagicLinkScreen').then((m) => ({
-    default: m.MagicLinkScreen,
-  })),
-);
-
 const FacilityWorkspacesScreen = lazy(() =>
   import('@/modules/administration/screens/facilities/FacilityWorkspacesScreen').then((m) => ({
     default: m.FacilityWorkspacesScreen,
@@ -483,7 +477,11 @@ const App = () => {
                         <Route path="/sign-in" element={<PasswordSignInScreen />} />
                         {/* The emailed code is the proof, so this works on any device. */}
                         <Route path="/sign-in/forgot" element={<ForgotPasswordScreen />} />
-                        <Route path="/onboarding/start" element={<MagicLinkScreen />} />
+                        {/* The old start screen: sign-in now leads, with "Create an account" on it. */}
+                        <Route
+                          path="/onboarding/start"
+                          element={<Navigate to="/sign-in" replace />}
+                        />
                         <Route path="/onboarding/link-sent" element={<MagicLinkSentScreen />} />
                         <Route
                           path="/onboarding/create-account"
