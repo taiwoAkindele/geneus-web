@@ -4,7 +4,8 @@ import { SyncingFacility } from './SyncingFacility';
 
 /**
  * A device with no facility record has nothing to show and nothing to stamp
- * records with. Unenrolled, it can only register a facility; enrolled but not
+ * records with. Unenrolled, it starts at email sign-in, which sets the device
+ * up (and links to "Create an account" for a new facility); enrolled but not
  * yet synced, it waits — the facility exists on the server and is on its way.
  */
 export const RequireFacility = () => {
@@ -14,5 +15,5 @@ export const RequireFacility = () => {
     return <Outlet />;
   }
 
-  return enrolled ? <SyncingFacility /> : <Navigate to="/onboarding/start" replace />;
+  return enrolled ? <SyncingFacility /> : <Navigate to="/sign-in" replace />;
 };

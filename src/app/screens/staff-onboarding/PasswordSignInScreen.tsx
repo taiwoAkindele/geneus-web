@@ -222,9 +222,9 @@ export const PasswordSignInScreen = () => {
             </p>
           ) : (
             <p>
-              Setting up a new facility?{' '}
-              <Link to="/onboarding/start" className="font-bold text-white underline">
-                Start here
+              New to Geneus?{' '}
+              <Link to="/onboarding/create-account" className="font-bold text-white underline">
+                Create an account
               </Link>
             </p>
           )}

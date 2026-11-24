@@ -108,7 +108,7 @@ export const CreateAccountScreen = () => {
               device you will use there.
             </p>
             <div className="mt-6">
-              <Button variant="outlined" onClick={() => navigate('/onboarding/start')}>
+              <Button variant="outlined" onClick={() => navigate('/sign-in')}>
                 Done
               </Button>
             </div>
@@ -191,7 +191,7 @@ export const CreateAccountScreen = () => {
           >
             Send request
           </Button>
-          <Button variant="outlined" onClick={() => navigate('/onboarding/start')}>
+          <Button variant="outlined" onClick={() => navigate('/sign-in')}>
             Back
           </Button>
         </footer>

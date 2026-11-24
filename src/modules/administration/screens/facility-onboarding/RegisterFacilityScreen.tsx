@@ -192,7 +192,7 @@ export const RegisterFacilityScreen = () => {
   }
 
   if (link.kind !== 'ready' || !token) {
-    return <RegistrationLinkProblem state={link} onStart={() => navigate('/onboarding/start')} />;
+    return <RegistrationLinkProblem state={link} onStart={() => navigate('/sign-in')} />;
   }
 
   const { view } = link;
@@ -328,7 +328,7 @@ const RegistrationLinkProblem = ({ state, onStart }: { state: LinkState; onStart
         <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Register your facility</h1>
         <p className="text-[15px] text-ink-soft">{message}</p>
         <Button variant="outlined" onClick={onStart}>
-          Back to the start
+          Back to sign-in
         </Button>
       </div>
     </div>
