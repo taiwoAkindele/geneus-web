@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { FacilityDetails, Staff } from '@shared';
-import { Button, TextField, useToast } from '@/ui';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { FacilityRegistrationView, Staff } from '@shared';
+import { Button, PulseLoader, TextField, useToast } from '@/ui';
 import { useDeviceContext } from '@/data';
-import { suggestCode } from '@/data/repos/facility';
 import { assignShift, today } from '@/data/repos/staff';
 import { authorizationFor } from '@/auth/authorization';
-import { registerFacility, sendRegistrationEmailCode } from '@/lib/api/facilities';
+import { openRegistrationLink, registerFacility } from '@/lib/api/facilities';
+import { userMessage } from '@/lib/api/userMessage';
+import { keepLinkToken, keptLinkToken, tokenFromHash } from '@/lib/linkToken';
 import { SyncingFacility } from '@/app/SyncingFacility';
 import { approvePinSetup } from '@/session';
-import { FacilityDetailsFields } from './FacilityDetailsFields';
+import {
+  NewPasswordFields,
+  newPasswordProblem,
+} from '@/app/screens/staff-onboarding/NewPasswordFields';
+import { FACILITY_LEVEL_LABELS } from './facilityLevels';
 
 const endOfToday = (): string => {
   const end = new Date();
@@ -17,6 +22,9 @@ const endOfToday = (): string => {
 
   return end.toISOString();
 };
+
+/** The registration link's token, kept for this tab so a reload still finds it. */
+const TOKEN_KEY = 'geneus.registrationToken';
 
 /**
  * Enrolling swaps the provider tree and remounts this screen, and a slow first
@@ -41,68 +49,105 @@ const readPending = (): PendingRegistration | undefined => {
   }
 };
 
+/** An existing password only has to be entered; a first one must meet the rules and be typed twice. */
+const registrationPasswordProblem = (
+  hasPassword: boolean,
+  password: string,
+  confirmation: string,
+): string | undefined => {
+  if (!hasPassword) {
+    return newPasswordProblem(password, confirmation);
+  }
+
+  if (!password) {
+    return 'Enter your Geneus password.';
+  }
+
+  return undefined;
+};
+
+type LinkState =
+  | { kind: 'loading' }
+  | { kind: 'missing' }
+  | { kind: 'refused'; message: string }
+  | { kind: 'ready'; view: FacilityRegistrationView };
+
+/** Reads the token from the link (then clears it from the address bar), or from this tab. */
+const useRegistrationToken = (): string | undefined => {
+  const { hash } = useLocation();
+  const [fromLink] = useState(() => tokenFromHash(hash));
+  const [token] = useState(() => fromLink ?? keptLinkToken(TOKEN_KEY));
+
+  useEffect(() => {
+    if (!fromLink) {
+      return;
+    }
+
+    keepLinkToken(TOKEN_KEY, fromLink);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [fromLink]);
+
+  return token;
+};
+
+/** What the link was approved for, loaded once. */
+const useRegistrationLink = (token: string | undefined): LinkState => {
+  const [state, setState] = useState<LinkState>(() =>
+    token ? { kind: 'loading' } : { kind: 'missing' },
+  );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    let current = true;
+
+    openRegistrationLink(token)
+      .then((view) => {
+        if (current) {
+          setState({ kind: 'ready', view });
+        }
+      })
+      .catch((cause: unknown) => {
+        if (current) {
+          setState({
+            kind: 'refused',
+            message: userMessage(cause, 'This registration link cannot be used.'),
+          });
+        }
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [token]);
+
+  return state;
+};
+
 /**
- * Registers the facility and its first account. This is the one online step:
- * the server has to create the facility, its first admin and this device's
- * credential before any record can exist. The credential is stored, sync is
- * started, and the facility and admin come down before the admin sets a PIN.
+ * Registers the facility Geneus approved, from the link in the approval email.
+ * This is the one online step: the server creates the facility, its first
+ * admin and this device's credential before any record can exist. The admin
+ * chooses their password here (or enters the one their email already has),
+ * then their PIN once the facility has synced down.
  */
 export const RegisterFacilityScreen = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { deviceId, enroll, facility } = useDeviceContext();
-  const { inviteToken } = (useLocation().state ?? {}) as { inviteToken?: string };
+  const token = useRegistrationToken();
+  const link = useRegistrationLink(token);
   const [pending, setPending] = useState<PendingRegistration | undefined>(() => readPending());
   // The facility record re-renders on every local change (it is a live query), so
   // this must fire once per registration, not once per render that sees a facility.
   const finishing = useRef(false);
 
-  const [details, setDetails] = useState<FacilityDetails>({
-    name: '',
-    code: '',
-    state: '',
-    lga: '',
-    level: 'phc',
-  });
-
-  const { name, code, state, lga, level } = details;
-  const [adminName, setAdminName] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
-  const [emailCode, setEmailCode] = useState('');
-  /** Where the code went; the code field appears once it has. */
-  const [codeSentTo, setCodeSentTo] = useState<string>();
-  const [sendingCode, setSendingCode] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
-
-  const facilityCode = (code || suggestCode(name)).toUpperCase();
-
-  const complete = Boolean(
-    name.trim() &&
-    facilityCode &&
-    state.trim() &&
-    lga.trim() &&
-    adminName.trim() &&
-    codeSentTo &&
-    /^\d{6}$/.test(emailCode.trim()),
-  );
-
-  const sendCode = async () => {
-    if (!adminEmail.trim() || !inviteToken || sendingCode) {
-      return;
-    }
-
-    setSendingCode(true);
-
-    try {
-      const sent = await sendRegistrationEmailCode(adminEmail.trim(), inviteToken);
-      setCodeSentTo(sent.sentTo);
-      setEmailCode('');
-    } catch (cause) {
-      toast(cause instanceof Error ? cause.message : 'Could not send the code');
-    } finally {
-      setSendingCode(false);
-    }
-  };
 
   // The facility has landed: finish what registration owes, then on to the PIN.
   useEffect(() => {
@@ -125,7 +170,8 @@ export const RegisterFacilityScreen = () => {
         authorizationFor({ staff: pending.admin, facilityId: pending.facilityCode, deviceId }),
       );
 
-      // The first admin sets their PIN unapproved: nobody else exists yet to approve it.
+      // Registering proved the admin with their password; the server's PIN
+      // permission came back with it and is used by the PIN screen.
       approvePinSetup(pending.admin.staffId);
       navigate('/onboarding/accept', {
         state: {
@@ -137,7 +183,7 @@ export const RegisterFacilityScreen = () => {
     })().catch((cause: unknown) => {
       finishing.current = false;
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-      toast(cause instanceof Error ? cause.message : 'Could not finish registration');
+      toast(userMessage(cause, 'Could not finish registration. Try again.'), { tone: 'error' });
     });
   }, [pending, facility, deviceId, navigate, toast]);
 
@@ -145,41 +191,51 @@ export const RegisterFacilityScreen = () => {
     return <SyncingFacility facilityName={pending.facilityName} />;
   }
 
-  // Registration is only reachable by spending an invite code.
-  if (!inviteToken) {
-    return <Navigate to="/onboarding/start" replace />;
+  if (link.kind !== 'ready' || !token) {
+    return <RegistrationLinkProblem state={link} onStart={() => navigate('/onboarding/start')} />;
   }
 
+  const { view } = link;
+
+  const passwordProblem = registrationPasswordProblem(view.hasPassword, password, confirmation);
+
   const create = async () => {
-    if (!complete || saving) {
+    if (saving) {
+      return;
+    }
+
+    if (passwordProblem) {
+      setError(passwordProblem);
+
       return;
     }
 
     setSaving(true);
+    setError(undefined);
 
     try {
-      const { admin, device } = await registerFacility({
-        code: facilityCode,
-        name: name.trim(),
-        state: state.trim(),
-        lga: lga.trim(),
-        level,
-        adminFullName: adminName.trim(),
-        adminEmail: adminEmail.trim(),
-        emailCode: emailCode.trim(),
-        deviceId,
-        inviteToken,
-      });
+      const { admin, device } = await registerFacility({ token, deviceId, password });
+
+      keepLinkToken(TOKEN_KEY, undefined);
 
       // From here the facility exists on the server and this device is enrolled:
       // the rest waits for the facility to sync down (the effect above), however
       // long that takes, and survives the remount that enrolling causes.
-      const registration: PendingRegistration = { facilityCode, facilityName: name.trim(), admin };
+      const registration: PendingRegistration = {
+        facilityCode: view.facility.code,
+        facilityName: view.facility.name,
+        admin,
+      };
+
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(registration));
       setPending(registration);
+      toast(`${view.facility.name} is registered.`, { tone: 'success' });
       await enroll(device);
     } catch (cause) {
-      toast(cause instanceof Error ? cause.message : 'Could not create the facility');
+      const message = userMessage(cause, 'Could not register the facility. Try again.');
+
+      setError(message);
+      toast(message, { tone: 'error' });
       setSaving(false);
     }
   };
@@ -190,74 +246,90 @@ export const RegisterFacilityScreen = () => {
         <header className="px-5 pb-3 pt-5">
           <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Register your facility</h1>
           <p className="mt-1 text-[13px] text-ink-muted">
-            This creates your facility code &amp; admin account.
+            Geneus approved these details. Registering sets up this device for the facility.
           </p>
         </header>
 
         <div className="flex-1 space-y-4 px-5 py-2">
-          <FacilityDetailsFields
-            value={{ ...details, code: code || suggestCode(name) }}
-            onChange={(patch) => setDetails((current) => ({ ...current, ...patch }))}
-          />
-
-          <TextField
-            label="Your full name"
-            hint="You become the facility admin and set a PIN next."
-            placeholder="e.g. Amaka Okoro"
-            name="admin_name"
-            value={adminName}
-            onChange={(e) => setAdminName(e.target.value)}
-          />
-
-          <div className="space-y-2">
-            <TextField
-              label="Your email"
-              hint="If you ever forget your PIN, a PIN code can be emailed here. We send a code now to check it."
-              placeholder="e.g. amaka@example.org"
-              name="admin_email"
-              type="email"
-              autoComplete="email"
-              value={adminEmail}
-              onChange={(e) => {
-                setAdminEmail(e.target.value);
-                setCodeSentTo(undefined);
-              }}
+          <dl className="space-y-2 rounded-[18px] border border-outline-soft p-4 text-[15px]">
+            <ApprovedDetail label="Facility" value={view.facility.name} />
+            <ApprovedDetail label="Facility code" value={view.facility.code} />
+            <ApprovedDetail
+              label="Level of care"
+              value={FACILITY_LEVEL_LABELS[view.facility.level]}
             />
-            <Button
-              variant="secondary"
-              disabled={!adminEmail.trim()}
-              loading={sendingCode}
-              onClick={sendCode}
-            >
-              {codeSentTo ? 'Send a new code' : 'Send code'}
-            </Button>
-          </div>
-
-          {codeSentTo ? (
-            <TextField
-              label="Code from the email"
-              hint={`Sent to ${codeSentTo}. It lasts 15 minutes.`}
-              placeholder="6 digits"
-              name="admin_email_code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={emailCode}
-              onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
+            <ApprovedDetail
+              label="Location"
+              value={`${view.facility.lga}, ${view.facility.state}`}
             />
-          ) : null}
+            <ApprovedDetail label="Admin" value={`${view.adminFullName} · ${view.sentTo}`} />
+          </dl>
+
+          {view.hasPassword ? (
+            <TextField
+              label="Your Geneus password"
+              hint="This email already has a Geneus password. Enter it: registering does not change it."
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              error={error}
+              disabled={saving}
+            />
+          ) : (
+            <NewPasswordFields
+              label="Choose your password"
+              password={password}
+              confirmation={confirmation}
+              onPassword={setPassword}
+              onConfirmation={setConfirmation}
+              error={error}
+              disabled={saving}
+            />
+          )}
         </div>
 
         <footer className="border-t border-outline-soft bg-surface px-5 pb-6 pt-4">
-          <Button
-            variant="primary"
-            disabled={!complete || saving}
-            loading={saving}
-            onClick={create}
-          >
-            Create facility
+          <Button variant="primary" disabled={saving} loading={saving} onClick={create}>
+            Register facility
           </Button>
         </footer>
+      </div>
+    </div>
+  );
+};
+
+const ApprovedDetail = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex justify-between gap-4">
+    <dt className="text-ink-muted">{label}</dt>
+    <dd className="text-right font-semibold">{value}</dd>
+  </div>
+);
+
+/** Loading the link, or why it cannot be used. */
+const RegistrationLinkProblem = ({ state, onStart }: { state: LinkState; onStart: () => void }) => {
+  if (state.kind === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface sm:min-h-0">
+        <PulseLoader label="Opening your registration link" />
+      </div>
+    );
+  }
+
+  const message =
+    state.kind === 'refused'
+      ? state.message
+      : 'Open the registration link from the approval email. To ask Geneus for a facility, use Create an account.';
+
+  return (
+    <div className="flex min-h-screen flex-col bg-surface px-5 pt-12 sm:min-h-0">
+      <div className="mx-auto w-full max-w-md space-y-4">
+        <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Register your facility</h1>
+        <p className="text-[15px] text-ink-soft">{message}</p>
+        <Button variant="outlined" onClick={onStart}>
+          Back to the start
+        </Button>
       </div>
     </div>
   );

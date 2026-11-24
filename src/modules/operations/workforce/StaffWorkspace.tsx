@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   currentFacilityRevisions,
-  mayApprovePin,
   withReviewerAuthority,
   type AnyDocument,
   type RosterShift,
 } from '@shared';
 import { ActionMenu, Button, SectionTabs, Tag } from '@/ui';
-import { useAuth, useAuthorizationContext, useSession } from '@/session';
+import { useAuthorizationContext } from '@/session';
 import { accessFor, accessLabel } from '@/session/accessPolicy';
 import { shiftRangeLabel } from '@/session/shiftLabels';
 import {
-  PinCodeSheet,
   RemoveAccessSheet,
   SignInWindowSheet,
   ContactActivationSection,
@@ -29,7 +27,7 @@ import { useWorkforce } from './useWorkforce';
 import { humanize } from './presentation';
 import { PrivateEvidence } from './PrivateEvidence';
 
-type Sheet = { kind: 'window'; shift?: RosterShift } | { kind: 'pin' } | { kind: 'remove' };
+type Sheet = { kind: 'window'; shift?: RosterShift } | { kind: 'remove' };
 const panel = 'rounded-card border border-outline-soft bg-white p-5';
 
 /**
@@ -39,8 +37,6 @@ const panel = 'rounded-card border border-outline-soft bg-white p-5';
  * coverage. Access here is this facility's only.
  */
 export const StaffWorkspace = () => {
-  const { roster } = useAuth();
-  const { user } = useSession();
   const [sheet, setSheet] = useState<Sheet>();
   const { staffId } = useParams();
   const query = useWorkforce();
@@ -128,7 +124,6 @@ export const StaffWorkspace = () => {
   const zone = data.facility?.timeZone || 'Africa/Lagos';
   const can = (permission: string) => context.permissions.includes(permission as never);
   const self = staff.staffId === context.userId;
-  const actor = roster.find((entry) => entry.staff.staffId === user.staffId);
   const access = accessFor(staff);
 
   const windows = data.roster
@@ -145,15 +140,6 @@ export const StaffWorkspace = () => {
             label: 'Add sign-in window',
             icon: 'clock' as const,
             onSelect: () => setSheet({ kind: 'window' }),
-          },
-        ]
-      : []),
-    ...(can('staff:manage') && staff.active && !self && actor && mayApprovePin(actor.staff, staff)
-      ? [
-          {
-            label: 'Issue PIN setup code',
-            icon: 'lock' as const,
-            onSelect: () => setSheet({ kind: 'pin' }),
           },
         ]
       : []),
@@ -478,9 +464,6 @@ export const StaffWorkspace = () => {
       ) : null}
       {sheet?.kind === 'window' ? (
         <SignInWindowSheet staff={staff} shift={sheet.shift} onClose={closeSheet} />
-      ) : null}
-      {sheet?.kind === 'pin' ? (
-        <PinCodeSheet staff={staff} onClose={() => setSheet(undefined)} />
       ) : null}
       {sheet?.kind === 'remove' ? <RemoveAccessSheet staff={staff} onClose={closeSheet} /> : null}
     </div>

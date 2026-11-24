@@ -7,7 +7,7 @@ export const AccountSecurity = () => (
     <section className="rounded-card border border-outline-soft bg-white p-5">
       <h2 className="text-lg font-bold">Administrator account recovery</h2>
       <p className="mt-1 text-sm text-ink-muted">
-        Where a PIN code is sent if you forget your PIN.
+        Where password reset codes are sent if you forget your password.
       </p>
       <div className="mt-4">
         <RecoveryEmailCard />

@@ -26,10 +26,8 @@ import { visitRecordPath } from '@/modules/front-desk/patients';
 import { checkPin, needsLongerPin } from './credentials';
 import {
   endStaffSession,
-  enrolStaffPin,
   forgetStaffSession,
   openStaffSessionQuietly,
-  takeSetupCode,
 } from '@/lib/api/staffSession';
 import { approvePinSetup } from './pinApproval';
 import {
@@ -70,6 +68,8 @@ export type SessionUser = {
   roleId: Staff['role'];
   roles: Staff['role'][];
   canWrite: boolean;
+  /** Links this person's memberships at other facilities, so a switch keeps them signed in. */
+  personId?: string;
 };
 
 export type Facility = { name: string; code: string };
@@ -361,11 +361,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
         const snapshot = await load();
 
-        const member = snapshot.staff.find(
-          (candidate) => candidate.staffId === facilityIdentity.staffId,
+        // Online the server named the membership; offline it is the active one linking this person.
+        const member = snapshot.staff.find((candidate) =>
+          facilityIdentity.staffId
+            ? candidate.staffId === facilityIdentity.staffId
+            : candidate.active && candidate.personId === facilityIdentity.personId,
         );
 
-        const shift = findShift(snapshot.shifts, facilityIdentity.staffId, Date.now());
+        const shift = member ? findShift(snapshot.shifts, member.staffId, Date.now()) : undefined;
 
         const accepted =
           member &&
@@ -386,8 +389,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        if (!accepted) {
+        if (!member || !accepted) {
           signOut();
+
+          return;
+        }
+
+        if (member.staffId !== staffId) {
+          localStorage.setItem(SIGNED_IN_KEY, member.staffId);
+          setStaffId(member.staffId);
 
           return;
         }
@@ -420,6 +430,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     facility?.code,
     deviceId,
     entry,
+    staffId,
     load,
     reloadRoster,
     signOut,
@@ -482,14 +493,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setNow(Date.now());
       forgetStaffSession();
       setStaffId(candidateId);
-      // Prove the PIN to the server too, when online, so it knows who is acting: a just-used PIN code
-      // registers the new PIN first. Never blocks or fails sign-in; offline work carries on regardless.
-      const setupCode = takeSetupCode(candidateId);
-      void (setupCode && navigator.onLine
-        ? enrolStaffPin(candidateId, deviceId, pin, { setupCode }).catch(() =>
-            openStaffSessionQuietly({ userId: candidateId, deviceId }, pin),
-          )
-        : openStaffSessionQuietly({ userId: candidateId, deviceId }, pin));
+      // Prove the PIN to the server too, when online, so it knows who is acting.
+      // Never blocks or fails sign-in; offline work carries on regardless.
+      void openStaffSessionQuietly({ userId: candidateId, deviceId }, pin);
 
       return undefined;
     },
@@ -555,6 +561,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         roles: rolesFor(staff),
         roleId: staff.role,
         canWrite: staff.permission === 'read_write',
+        personId: staff.personId,
       },
       facility: { name: facility?.name ?? '', code: facility?.code ?? '' },
       authorization,

@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import type { PinSetupCodeIssued, RosterShift, Staff } from '@shared';
+import type { RosterShift, Staff } from '@shared';
 import { Button, Sheet, SheetCancelButton, SegmentedControl, TextField, useToast } from '@/ui';
 import { calendarDate } from '@/lib/calendarDate';
 import { assignShift, removeStaff, today } from '@/data/repos/staff';
-import { issuePinSetupCode } from '@/lib/api/staff';
-import { StaffVerification, useAuthorizationContext } from '@/session';
+import { useAuthorizationContext } from '@/session';
 import { fullDayEnd, shiftWindow } from './shiftWindow';
 
 /**
@@ -167,92 +166,6 @@ export const SignInWindowSheet = ({
         </Button>
         <SheetCancelButton disabled={saving} />
       </div>
-    </Sheet>
-  );
-};
-
-/**
- * A one-time code that lets this person set or reset their PIN on any of the
- * facility's phones — so the admin need not be there. Issued by the server on
- * request (online only); shown once and never stored on this phone.
- */
-export const PinCodeSheet = ({ staff, onClose }: { staff: Staff; onClose: () => void }) => {
-  const context = useAuthorizationContext();
-  const [issued, setIssued] = useState<PinSetupCodeIssued>();
-  const [error, setError] = useState<string>();
-  const [creating, setCreating] = useState(false);
-  const first = staff.fullName.split(' ')[0];
-
-  const create = async () => {
-    if (creating) {
-      return;
-    }
-
-    setCreating(true);
-    setError(undefined);
-
-    try {
-      setIssued(await issuePinSetupCode(context, staff.staffId));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create a code');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return (
-    <Sheet onClose={onClose} closeDisabled={creating} eyebrow="PIN code" title={staff.fullName}>
-      {issued ? (
-        <>
-          <div className="rounded-card bg-brand-tint px-4 py-5 text-center font-mono text-[28px] font-extrabold tracking-[0.2em] text-brand">
-            {issued.code}
-          </div>
-          <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
-            Read this to {first}. On the sign-in screen they tap their name, choose &ldquo;I have a
-            code from my admin&rdquo; and set a new PIN. It works once, until{' '}
-            {new Date(issued.expiresOn).toLocaleString('en-GB', {
-              weekday: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-            , and replaces any earlier code. Their phone needs to sync once before the code works
-            there.
-          </p>
-        </>
-      ) : (
-        <>
-          <p className="text-[13px] leading-relaxed text-ink-muted">
-            Creates a one-time code that lets {first} set or reset their PIN on this
-            facility&rsquo;s phones, without you being there. Any earlier code stops working. Needs
-            an internet connection.
-          </p>
-          {error ? <p className="mt-3 text-[13px] font-semibold text-danger">{error}</p> : null}
-        </>
-      )}
-      {issued ? (
-        <Button variant="outlined" className="mt-5" onClick={onClose}>
-          Done
-        </Button>
-      ) : (
-        <div className="mt-5 space-y-3">
-          <StaffVerification requireServerSession purpose="Issuing a PIN code">
-            <div className="flex flex-wrap gap-2.5">
-              <Button
-                variant="primary"
-                fullWidth={false}
-                className="flex-1"
-                loading={creating}
-                onClick={create}
-              >
-                Create code
-              </Button>
-              <Button variant="outlined" fullWidth={false} className="px-6" onClick={onClose}>
-                Cancel
-              </Button>
-            </div>
-          </StaffVerification>
-        </div>
-      )}
     </Sheet>
   );
 };

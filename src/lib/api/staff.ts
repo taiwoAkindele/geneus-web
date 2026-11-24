@@ -2,7 +2,7 @@ import type {
   AuthorizationContext,
   DeviceCredential,
   EmailSent,
-  PinSetupCodeIssued,
+  InvitationCheckResult,
 } from '@shared';
 import { getDeviceCredential } from '@/data/deviceCredential';
 import { ApiError, post, postAsDevice, staffRequest } from './client';
@@ -62,23 +62,6 @@ const asProvenPerson = async <T>(
 const staffPath = (staffId: string, rest: string) =>
   `/staff/${encodeURIComponent(staffId)}/${rest}`;
 
-/**
- * Asks geneus-server for a one-time code that lets `staffId` set their PIN on
- * a facility device. Online only: the server checks the signed-in person's
- * own session holds `staff:manage` and is the only one that ever sees the plain code.
- */
-export const issuePinSetupCode = (
-  context: AuthorizationContext,
-  staffId: string,
-): Promise<PinSetupCodeIssued> =>
-  asProvenPerson<PinSetupCodeIssued>(context, staffPath(staffId, 'pin-codes'), {
-    issuedBy: context.userId,
-  });
-
-/** A facility admin who forgot their PIN: the server emails them a PIN setup code (SCHEMA.md §10). */
-export const emailPinSetupCode = (staffId: string): Promise<EmailSent> =>
-  asDevice<EmailSent>(staffPath(staffId, 'pin-codes/email'));
-
 /** Step one of a facility admin setting their own recovery email: codes go to the new address (and the current one). */
 export const requestRecoveryEmailCode = (
   context: AuthorizationContext,
@@ -129,17 +112,21 @@ export type ContactActivation = {
   email?: { address: string; verified: true };
   invitation?: InvitationView;
   activation: { serverPinDevices: number; lastPinRegisteredOn?: string };
+  /** Whether their email has a Geneus password, for new devices and a forgotten PIN. */
+  password: 'set' | 'not_set';
   nextSendAllowedOn?: string;
 };
 
 export type StaffOnboardingSummary = {
   staffId: string;
   activated: boolean;
+  hasEmail: boolean;
+  passwordSet: boolean;
   invitation?: { status: InvitationStatus; delivery: InvitationDelivery; expiresOn: string };
 };
 
 /**
- * Emails `staffId` an invitation link, with a PIN setup code as a fallback.
+ * Emails `staffId` an invitation link to choose their password and PIN.
  * Without `email`, it goes to their verified address, which administrators see
  * only masked. `allowNewDevice` lets the link set up one device that is not yet
  * enrolled; the server allows it only for someone who may add devices. The
@@ -178,8 +165,18 @@ export const staffOnboardingSummaries = (
  * Whether `code` is this person's invitation code, before they choose a PIN.
  * The person has no PIN yet, so only the device signs the call. Spends nothing.
  */
-export const checkInvitationCode = (staffId: string, code: string): Promise<void> =>
-  asDevice<void>(staffPath(staffId, 'invitations/check'), { code });
+export const checkInvitationCode = (
+  staffId: string,
+  code: string,
+): Promise<InvitationCheckResult> =>
+  asDevice<InvitationCheckResult>(staffPath(staffId, 'invitations/check'), { code });
+
+/**
+ * For an invited email that already has a password: emails a code proving the
+ * person accepting owns it, instead of typing that password. Spends nothing.
+ */
+export const requestInvitationAccountCode = (staffId: string, code: string) =>
+  asDevice<EmailSent>(staffPath(staffId, 'invitations/account-code'), { code });
 
 /* ---------------- Invitation links: opened by the person invited ---------------- */
 
@@ -211,7 +208,7 @@ export const enrolDeviceFromInvitation = (
     deviceLabel: deviceLabel.trim(),
   });
 
-/** As a device enrolled at the invitation's facility: a fresh one-time PIN setup code for the person invited. */
+/** As a device enrolled at the invitation's facility: a fresh one-time code that accepts the invitation. */
 export const invitationLinkCode = (token: string): Promise<{ staffId: string; code: string }> =>
   asDevice<{ staffId: string; code: string }>('/invitations/link/code', { token });
 

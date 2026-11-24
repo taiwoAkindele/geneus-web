@@ -5,7 +5,6 @@ import {
   assertSourceSession,
   canContinueFacilitySession,
   reuseAccountPin,
-  sharesAccountPin,
   type FacilitySwitchIdentity,
 } from './facilityIdentity';
 
@@ -110,30 +109,19 @@ describe('same person switching independently provisioned memberships', () => {
     );
   });
 
-  it('requires the already trusted destination PIN and respects independent resets and lockouts', () => {
-    const pin = { salt: 'synthetic-salt', hash: 'synthetic-hash', iterations: 100000, digits: 6 };
-    const source = JSON.stringify({ 'staff:A': pin });
-    const target = JSON.stringify({ 'staff:B': pin });
-    expect(sharesAccountPin(source, target, 'staff:A', 'staff:B', now)).toBe(true);
-    expect(sharesAccountPin(source, undefined, 'staff:A', 'staff:B', now)).toBe(false);
+  it('continues an offline switch by the person the destination record links, whatever their PIN there', () => {
+    const offline = { ...identity, staffId: undefined };
+
+    expect(canContinueFacilitySession(offline, target, now)).toBe(true);
     expect(
-      sharesAccountPin(
-        JSON.stringify({ 'staff:A': { ...pin, hash: 'new-after-source-reset' } }),
-        target,
-        'staff:A',
-        'staff:B',
+      canContinueFacilitySession(
+        offline,
+        { ...target, staff: { ...staff, personId: 'person:other' } },
         now,
       ),
     ).toBe(false);
-
     expect(
-      sharesAccountPin(
-        source,
-        JSON.stringify({ 'staff:B': { ...pin, lockedUntil: now + 60000 } }),
-        'staff:A',
-        'staff:B',
-        now,
-      ),
+      canContinueFacilitySession(offline, { ...target, staff: { ...staff, active: false } }, now),
     ).toBe(false);
   });
 });

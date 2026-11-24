@@ -1,5 +1,6 @@
 export { MagicLinkScreen } from './MagicLinkScreen';
 export { MagicLinkSentScreen } from './MagicLinkSentScreen';
+export { CreateAccountScreen } from './CreateAccountScreen';
 export { RegisterFacilityScreen } from './RegisterFacilityScreen';
 export { AdminDashboardScreen } from './AdminDashboardScreen';
 export { InviteStaffScreen } from './InviteStaffScreen';

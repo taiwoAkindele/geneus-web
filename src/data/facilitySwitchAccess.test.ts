@@ -6,6 +6,7 @@ import { fakeDatabase } from './testing/fakeDatabase';
 import { saveDeviceCredential } from './deviceCredential';
 import { ensureFacilityWorkspace, switchFacilityWorkspace } from './facilityWorkspaces';
 import { pendingFacilityIdentity } from '@/session/facilityIdentity';
+import { staffSessionToken } from '@/lib/api/staffSession';
 
 afterEach(() => {
   setDatabaseForTests(undefined);
@@ -13,7 +14,7 @@ afterEach(() => {
   resetSecureStorageForTests();
 });
 
-it('provisioning and enrollment alone do not initialize a destination PIN or bypass destination sign-in', async () => {
+it('a switch carries the person and their server session, never their PIN', async () => {
   vi.stubGlobal('localStorage', memoryStorage());
   resetSecureStorageForTests();
 
@@ -44,7 +45,7 @@ it('provisioning and enrollment alone do not initialize a destination PIN or byp
   localStorage.setItem('geneus.lastActivityOn', String(Date.now()));
   setDatabaseForTests(fakeDatabase());
   const replace = vi.fn();
-  vi.stubGlobal('window', { location: { replace } });
+  vi.stubGlobal('window', { location: { replace }, dispatchEvent: vi.fn() });
   vi.stubGlobal('navigator', {
     onLine: true,
     locks: {
@@ -53,17 +54,32 @@ it('provisioning and enrollment alone do not initialize a destination PIN or byp
     },
   });
 
-  await switchFacilityWorkspace(target.deviceId, target, {
-    sourceStaffId: 'staff:A',
-    facilityId: 'B',
-    deviceId: target.deviceId,
+  vi.stubGlobal('sessionStorage', memoryStorage());
+
+  const session = {
+    token: 'server-session-at-B',
     staffId: 'staff:B',
-    personId: 'person:linked',
-    createdOn: Date.now(),
-  });
+    expiresOn: new Date(Date.now() + 60 * 60_000).toISOString(),
+    idleMinutes: 30,
+  };
+
+  await switchFacilityWorkspace(
+    target.deviceId,
+    target,
+    {
+      sourceStaffId: 'staff:A',
+      facilityId: 'B',
+      deviceId: target.deviceId,
+      staffId: 'staff:B',
+      personId: 'person:linked',
+      createdOn: Date.now(),
+    },
+    session,
+  );
 
   expect(secureGet('geneus.credentials')).toBeNull();
-  expect(pendingFacilityIdentity()).toBeUndefined();
-  expect(localStorage.getItem('geneus.signedInStaffId')).toBeNull();
-  expect(replace).toHaveBeenCalledWith('/login');
+  expect(pendingFacilityIdentity()?.staffId).toBe('staff:B');
+  expect(localStorage.getItem('geneus.signedInStaffId')).toBe('staff:B');
+  expect(staffSessionToken({ userId: 'staff:B', deviceId: target.deviceId })).toBe(session.token);
+  expect(replace).toHaveBeenCalledWith('/home');
 });

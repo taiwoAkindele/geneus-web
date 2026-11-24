@@ -52,10 +52,7 @@ const invitationSummary = (
     case 'revoked':
       return {
         tone: 'neutral',
-        text:
-          invitation.revokedReason === 'pin_code_issued'
-            ? 'Replaced by a PIN code given in person.'
-            : `Withdrawn ${when(invitation.revokedOn!)}.`,
+        text: `Withdrawn ${when(invitation.revokedOn!)}.`,
       };
 
     case 'pending':
@@ -68,7 +65,7 @@ const invitationSummary = (
         case 'not_configured':
           return {
             tone: 'amber',
-            text: 'Email is not set up on this server, so nothing was sent. Give them a PIN code in person instead.',
+            text: 'Email is not set up on this server, so nothing was sent. Ask your system administrator to set it up, then send again.',
           };
         case 'sending':
           return {
@@ -258,6 +255,20 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
             )}
           </dd>
         </div>
+        <div>
+          <dt className="font-semibold">Password</dt>
+          <dd className="mt-1">
+            {state.password === 'set' ? (
+              <Tag tone="green">Set</Tag>
+            ) : (
+              <span className="text-ink-muted">
+                {state.email
+                  ? 'Not set yet. They are asked to set one when they next sign in online, or choose one when accepting an invitation.'
+                  : 'Needs a verified email first. Send an invitation to their email.'}
+              </span>
+            )}
+          </dd>
+        </div>
       </dl>
       {summary ? (
         <p
@@ -277,7 +288,7 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
               inputMode="email"
               value={email}
               placeholder={invitation?.destination ?? 'e.g. amaka@example.org'}
-              hint="We email them a one-time code to set their PIN on one of this facility's devices. The code is never shown to you."
+              hint="We email them a link to choose their password and PIN. You never see a code."
               onChange={(event) => setEmail(event.target.value)}
             />
           ) : null}
@@ -308,9 +319,7 @@ const Details = ({ staff, canInvite }: { staff: Staff; canInvite: boolean }) => 
             <p className="text-xs text-ink-muted">You can send again in a minute.</p>
           ) : null}
           {waiting ? (
-            <p className="text-xs text-ink-muted">
-              Sending again replaces the earlier code. A code read aloud also replaces it.
-            </p>
+            <p className="text-xs text-ink-muted">Sending again replaces the earlier invitation.</p>
           ) : null}
         </div>
       ) : null}
@@ -363,6 +372,25 @@ export const useOnboardingSummaries = () => {
 };
 
 /** A short label for a person who was invited and has not yet activated; nothing otherwise. */
+/**
+ * Whether this person can sign in on a new device or recover a forgotten PIN
+ * on their own: that takes a verified email with a password. Undefined when
+ * all is in place, or nothing is known (offline, no session).
+ */
+export const accountTag = (
+  summary: StaffOnboardingSummary | undefined,
+): { tone: 'amber' | 'neutral'; label: string } | undefined => {
+  if (!summary) {
+    return undefined;
+  }
+
+  if (!summary.hasEmail) {
+    return { tone: 'amber', label: 'No email' };
+  }
+
+  return summary.passwordSet ? undefined : { tone: 'neutral', label: 'No password yet' };
+};
+
 export const onboardingTag = (
   summary: StaffOnboardingSummary | undefined,
 ): { tone: 'amber' | 'neutral'; label: string } | undefined => {

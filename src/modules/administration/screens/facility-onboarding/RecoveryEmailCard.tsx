@@ -6,7 +6,7 @@ import { useAuthorizationContext, useSession, StaffVerification } from '@/sessio
 const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 
 /**
- * The signed-in facility admin's recovery email: where a PIN code is sent if
+ * The signed-in facility admin's recovery email: where a password reset code is sent if
  * they forget their PIN (SCHEMA.md §10). The address lives on the server only,
  * so this card can set it but never shows it. Replacing one already on file
  * needs a second code, sent to that address.
@@ -70,7 +70,7 @@ export const RecoveryEmailCard = () => {
       <div>
         <div className="text-[15px] font-bold">Recovery email</div>
         <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
-          If you forget your PIN, a PIN code can be emailed here. Add one, or change it. Needs an
+          If you forget your password, a reset code is emailed here. Add one, or change it. Needs an
           internet connection.
         </p>
       </div>

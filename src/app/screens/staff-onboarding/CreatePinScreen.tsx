@@ -6,13 +6,85 @@ import {
   PIN_LENGTH,
   setPin as storePin,
   takePinSetupApproval,
+  useAuth,
 } from '@/session';
 import { useDeviceContext } from '@/data';
 import { ApiError } from '@/lib/api/client';
-import { enrolStaffPin, pendingInvitationCode, takeSetupCode } from '@/lib/api/staffSession';
+import {
+  enrolStaffPin,
+  forgetInvitationAccount,
+  forgetInvitationCode,
+  forgetPinGrant,
+  pendingInvitationAccount,
+  pendingInvitationCode,
+  pendingPinGrant,
+} from '@/lib/api/staffSession';
+import { userMessage } from '@/lib/api/userMessage';
+import { forgetInvitationToken } from './invitationLink';
 
-/** `upgrade`: they signed in with an old 4-digit PIN and are replacing it. */
-type AcceptState = { staffId?: string; fullName?: string; role?: string; upgrade?: boolean };
+/**
+ * `upgrade`: they signed in with an old 4-digit PIN and are replacing it.
+ * `viaPassword`: they just signed in with their email and password.
+ */
+type AcceptState = {
+  staffId?: string;
+  fullName?: string;
+  role?: string;
+  upgrade?: boolean;
+  viaPassword?: boolean;
+};
+
+/** Refusals about the invitation's password, answered back on the invitation screen. */
+const ACCOUNT_REFUSALS = new Set([
+  'existing_account',
+  'no_existing_account',
+  'wrong_password',
+  'invalid_account_code',
+  'invitation_email_mismatch',
+  'locked',
+]);
+
+/** Why the server did not take the PIN, in words the person can act on. */
+const refusalMessage = (cause: unknown): string => {
+  if (cause instanceof ApiError && cause.code === 'offline') {
+    return 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.';
+  }
+
+  if (cause instanceof ApiError && cause.code === 'invalid_setup_code') {
+    return 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.';
+  }
+
+  return userMessage(cause, 'Your PIN was not saved. Try again.');
+};
+
+/**
+ * Registers the new PIN with the server before it is saved here, when this
+ * sign-up needs it: after a password sign-in (its permission), or when
+ * accepting an emailed invitation (its code, and the password it settles).
+ */
+const registerWithServer = async (staffId: string, deviceId: string, pin: string) => {
+  const pinGrant = pendingPinGrant(staffId);
+
+  if (pinGrant) {
+    await enrolStaffPin(staffId, deviceId, pin, { pinGrant });
+    forgetPinGrant(staffId);
+
+    return;
+  }
+
+  const invitationCode = pendingInvitationCode(staffId);
+
+  if (invitationCode) {
+    await enrolStaffPin(staffId, deviceId, pin, {
+      setupCode: invitationCode,
+      ...pendingInvitationAccount(staffId),
+    });
+
+    forgetInvitationCode(staffId);
+    forgetInvitationAccount(staffId);
+    forgetInvitationToken();
+  }
+};
 
 /**
  * 3.1 Accept invite · create PIN. The staff member sets a 6-digit PIN in two
@@ -24,7 +96,8 @@ type AcceptState = { staffId?: string; fullName?: string; role?: string; upgrade
  */
 export const CreatePinScreen = () => {
   const navigate = useNavigate();
-  const { staffId, fullName, role, upgrade } = (useLocation().state ?? {}) as AcceptState;
+  const { staffId, fullName, role, upgrade, viaPassword } = (useLocation().state ??
+    {}) as AcceptState;
   const [phase, setPhase] = useState<'choose' | 'confirm'>('choose');
   const [firstPin, setFirstPin] = useState('');
   const [pin, setPin] = useState('');
@@ -32,6 +105,7 @@ export const CreatePinScreen = () => {
   const [activating, setActivating] = useState(false);
   const [refusal, setRefusal] = useState<string>();
   const { deviceId } = useDeviceContext();
+  const { signIn } = useAuth();
 
   if (!staffId || !isPinSetupApproved(staffId)) {
     return <Navigate to="/login" replace />;
@@ -66,44 +140,46 @@ export const CreatePinScreen = () => {
       return;
     }
 
-    // An emailed invitation is accepted by the server first: only once it has checked the code,
-    // the person and the facility is the PIN saved here. A code read aloud works offline as before.
-    const invitationCode = pendingInvitationCode(staffId);
+    // The server accepts it first when this sign-up needs it: only then is the PIN saved here.
+    // Registering a facility (its first admin) or upgrading a 4-digit PIN needs no server step.
+    setActivating(true);
+    setRefusal(undefined);
 
-    if (invitationCode) {
-      setActivating(true);
-      setRefusal(undefined);
+    try {
+      await registerWithServer(staffId, deviceId, next);
+    } catch (cause) {
+      setActivating(false);
 
-      try {
-        await enrolStaffPin(staffId, deviceId, next, { setupCode: invitationCode });
-        takeSetupCode(staffId);
-      } catch (cause) {
-        setRefusal(
-          cause instanceof ApiError && cause.code === 'offline'
-            ? 'Can’t reach Geneus. Your PIN was not saved — connect to the internet and enter it again.'
-            : 'Your invitation code was not accepted — it may have expired or been replaced. Ask your administrator to send a new one.',
-        );
-
-        setPin('');
-        setFirstPin('');
-        setPhase('choose');
+      if (cause instanceof ApiError && ACCOUNT_REFUSALS.has(cause.code)) {
+        navigate('/onboarding/invitation', {
+          replace: true,
+          state: { accountError: userMessage(cause, 'Check your password and try again.') },
+        });
 
         return;
-      } finally {
-        setActivating(false);
       }
+
+      setRefusal(refusalMessage(cause));
+      setPin('');
+      setFirstPin('');
+      setPhase('choose');
+
+      return;
     }
 
     if (takePinSetupApproval(staffId)) {
       await storePin(staffId, next);
     }
 
-    navigate('/login', { replace: true });
+    // Straight in, under this facility's sign-in rules; the PIN screen explains anything that stops it.
+    const stopped = await signIn(staffId, next);
+    setActivating(false);
+    navigate(stopped ? '/login' : '/home', { replace: true });
   };
 
   const renderHeading = () => {
     if (activating) {
-      return 'Checking your invitation with Geneus…';
+      return 'Saving your PIN…';
     }
 
     if (refusal) {
@@ -139,12 +215,19 @@ export const CreatePinScreen = () => {
               PINs are now 6 digits, to keep patient records safer. Choose a new one &mdash;
               you&rsquo;ll use it from now on.
             </>
-          ) : (
+          ) : null}
+          {!upgrade && viaPassword ? (
+            <>
+              Choose a 6-digit PIN for this device. You&rsquo;ll use it to sign in here from now on,
+              even without internet.
+            </>
+          ) : null}
+          {!upgrade && !viaPassword ? (
             <>
               You joined as a <b className="text-brand">{role ?? 'staff member'}</b>. Create a
               6-digit PIN &mdash; you&rsquo;ll use it to sign in at the start of every shift.
             </>
-          )}
+          ) : null}
         </p>
 
         <PinDots length={PIN_LENGTH} filled={pin.length} className="mb-2 mt-9" />

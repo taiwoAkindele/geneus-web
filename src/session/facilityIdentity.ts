@@ -6,11 +6,16 @@ import { isFrozen } from './signInChecks';
 
 const KEY = 'geneus.facilitySwitchIdentity';
 
+/**
+ * Who is carried across a facility switch. `staffId` is the destination
+ * membership the server confirmed online; offline it is unknown, and the
+ * destination's own synced staff record that links the same `personId` is used.
+ */
 const Identity = z.object({
   sourceStaffId: z.string().min(1),
   facilityId: z.string().min(1),
   deviceId: z.string().min(1),
-  staffId: z.string().min(1),
+  staffId: z.string().min(1).optional(),
   personId: z.string().min(1),
   createdOn: z.number().finite(),
 });
@@ -57,7 +62,7 @@ export const canContinueFacilitySession = (
   target.facilityId === identity.facilityId &&
   target.deviceId === identity.deviceId &&
   target.staff.facilityId === identity.facilityId &&
-  target.staff.staffId === identity.staffId &&
+  (!identity.staffId || target.staff.staffId === identity.staffId) &&
   target.staff.personId === identity.personId &&
   target.staff.active &&
   now >= identity.createdOn &&
@@ -80,42 +85,4 @@ export const reuseAccountPin = (
   }
 
   return JSON.stringify(target);
-};
-
-/** A PIN reset approved at A must never authenticate or replace a different PIN at B. */
-export const sharesAccountPin = (
-  sourceRaw: string | undefined,
-  targetRaw: string | undefined,
-  sourceStaffId: string,
-  targetStaffId: string,
-  now = Date.now(),
-) => {
-  type Pin = {
-    salt?: string;
-    hash?: string;
-    iterations?: number;
-    digits?: number;
-    lockedUntil?: number;
-  };
-
-  const source = sourceRaw
-    ? (JSON.parse(sourceRaw) as Record<string, Pin>)[sourceStaffId]
-    : undefined;
-
-  const target = targetRaw
-    ? (JSON.parse(targetRaw) as Record<string, Pin>)[targetStaffId]
-    : undefined;
-
-  return Boolean(
-    source?.salt &&
-    source.hash &&
-    source.iterations &&
-    source.digits === 6 &&
-    target?.digits === 6 &&
-    source.salt === target.salt &&
-    source.hash === target.hash &&
-    source.iterations === target.iterations &&
-    (source.lockedUntil ?? 0) <= now &&
-    (target.lockedUntil ?? 0) <= now,
-  );
 };

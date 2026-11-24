@@ -43,7 +43,6 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'clinical:release_result': 'Release laboratory results',
   'clinical:dispense': 'Dispense medication',
   'clinical:administer': 'Administer treatments',
-  'pin_setup_code:claim': 'Claim own PIN setup code',
   'patient:create': 'Register patients',
   'patient:update': 'Edit patient details',
   'patient_identity:review': 'Flag patient identity reviews',

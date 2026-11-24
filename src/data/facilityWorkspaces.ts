@@ -1,13 +1,13 @@
-import { DeviceCredential } from '@shared';
+import { DeviceCredential, type StaffSession } from '@shared';
 import { secureGet, secureRemove, secureSet, type SecureName } from '@/lib/secureStorage';
 import {
   assertSourceSession,
   clearFacilityIdentity,
   reuseAccountPin,
   saveFacilityIdentity,
-  sharesAccountPin,
   type FacilitySwitchIdentity,
 } from '@/session/facilityIdentity';
+import { adoptStaffSession } from '@/lib/api/staffSession';
 import { finishFacilitySetup, pendingFacilityCreation } from './facilitySetup';
 
 const KEY = 'geneus.facilityWorkspaces';
@@ -97,7 +97,12 @@ export const recoverWorkspaceActivation = async () => {
 
   if (identity) {
     await saveFacilityIdentity(identity);
-    localStorage.setItem('geneus.signedInStaffId', identity.staffId);
+
+    // Offline, the destination membership is found from its own replica (SessionProvider).
+    if (identity.staffId) {
+      localStorage.setItem('geneus.signedInStaffId', identity.staffId);
+    }
+
     localStorage.setItem('geneus.lastActivityOn', String(identity.createdOn));
   } else {
     await clearFacilityIdentity();
@@ -199,10 +204,16 @@ let switching = false;
 export const isWorkspaceSwitching = () => switching;
 
 /** A full reload discards all old provider/session state; queues remain in their original databases. */
+/**
+ * Opens another facility's workspace on this device. With `identity`, the
+ * person stays signed in there (SessionProvider still applies the destination's
+ * own rules); `session` is the server session the switch opened for them there.
+ */
 export const switchFacilityWorkspace = async (
   deviceId: string,
   issued?: DeviceCredential,
   identity?: FacilitySwitchIdentity,
+  session?: StaffSession,
 ) => {
   if (switching) {
     throw new Error('A facility switch is already in progress');
@@ -238,7 +249,7 @@ export const switchFacilityWorkspace = async (
   releaseTab = undefined;
   tabLock = undefined;
   let moved = false;
-  let continuation = identity;
+  const continuation = identity;
 
   try {
     await navigator.locks.request(
@@ -332,19 +343,8 @@ export const switchFacilityWorkspace = async (
             );
           }
 
-          if (
-            sharesAccountPin(
-              current?.values['geneus.credentials'],
-              target.values['geneus.credentials'],
-              identity.sourceStaffId,
-              identity.staffId,
-            )
-          ) {
-            directory.pendingIdentity = identity;
-          } else {
-            continuation = undefined;
-            delete directory.pendingIdentity;
-          }
+          // The person is carried across; the destination's PIN is never copied or replaced.
+          directory.pendingIdentity = identity;
         } else {
           delete directory.pendingIdentity;
         }
@@ -360,6 +360,11 @@ export const switchFacilityWorkspace = async (
         await write(directory);
         await recoverWorkspaceActivation();
         moved = true;
+
+        if (continuation && session) {
+          adoptStaffSession(session, target.deviceId);
+        }
+
         window.location.replace(continuation ? '/home' : '/login');
       },
     );
@@ -372,6 +377,26 @@ export const switchFacilityWorkspace = async (
       }
     }
   }
+};
+
+/** The secret of a workspace's device credential, to prove that device when switching to it. */
+export const workspaceDeviceSecret = (deviceId: string): string | undefined => {
+  const entry = read().entries.find((e) => e.deviceId === deviceId);
+  const stored = entry?.values['geneus.device'];
+
+  if (!stored) {
+    return undefined;
+  }
+
+  const parsed = DeviceCredential.safeParse(JSON.parse(stored));
+
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  const separator = parsed.data.credential.indexOf('.');
+
+  return separator > 0 ? parsed.data.credential.slice(separator + 1) : undefined;
 };
 
 export const forgetActiveWorkspace = async () => {

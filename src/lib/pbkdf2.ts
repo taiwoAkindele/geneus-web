@@ -1,8 +1,6 @@
 /**
  * PBKDF2-SHA-256 through the browser's own WebCrypto — no dependency. Used for
- * the PINs this device keeps and for checking a PIN setup code against the
- * hash geneus-server synced down, which the server computes the same way
- * (geneus-server/src/staff/pinSetupCodes.ts).
+ * the PINs this device keeps.
  */
 const HASH_BITS = 256;
 

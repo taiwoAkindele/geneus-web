@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Role } from '@shared';
 import { Button, TextField } from '@/ui';
 import { useDeviceContext } from '@/data';
@@ -7,15 +7,35 @@ import { getDeviceCredential } from '@/data/deviceCredential';
 import { listFacilityWorkspaces, switchFacilityWorkspace } from '@/data/facilityWorkspaces';
 import { ApiError } from '@/lib/api/client';
 import {
+  checkInvitationCode,
   enrolDeviceFromInvitation,
   invitationLinkCode,
   openInvitationLink,
   type InvitationLinkView,
 } from '@/lib/api/staff';
-import { rememberSetupCode } from '@/lib/api/staffSession';
+import {
+  rememberInvitationAccount,
+  rememberInvitationCode,
+  type InvitationAccount,
+} from '@/lib/api/staffSession';
 import { ROLE_LABELS } from '@/modules/operations/staff';
 import { approvePinSetup } from '@/session';
-import { invitationStep, invitationTokenFromHash } from './invitationLink';
+import {
+  forgetInvitationToken,
+  invitationStep,
+  invitationTokenFromHash,
+  keepInvitationToken,
+  keptInvitationToken,
+} from './invitationLink';
+import { InvitationAccountStep } from './InvitationAccountStep';
+
+/** The invitation, swapped for a code on this facility device, waiting for its password step. */
+type PendingAccount = {
+  staffId: string;
+  code: string;
+  existingAccount: boolean;
+  invited: InvitationLinkView;
+};
 
 /** In words the person holding the phone can act on; a refusal from the server already is. */
 const explain = (cause: unknown, fallback: string): string => {
@@ -36,40 +56,14 @@ const UNUSABLE: Record<string, string> = {
   locked: 'This invitation stopped working after too many wrong codes.',
 };
 
-/**
- * The token for this tab only, so the screen survives being remounted once the device enrols.
- * Storage can be unavailable (private mode); the token in hand still works then.
- */
-const TOKEN_KEY = 'geneus.invitationToken';
-
-const keepToken = (token: string | undefined) => {
-  try {
-    if (token) {
-      sessionStorage.setItem(TOKEN_KEY, token);
-    } else {
-      sessionStorage.removeItem(TOKEN_KEY);
-    }
-  } catch {
-    /* the token in hand is enough */
-  }
-};
-
-const keptToken = () => {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY) ?? undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 const initialToken = () => {
   const fromLink = invitationTokenFromHash(window.location.hash);
 
   if (fromLink) {
-    keepToken(fromLink);
+    keepInvitationToken(fromLink);
   }
 
-  return fromLink ?? invitationTokenFromHash(`#token=${keptToken() ?? ''}`);
+  return fromLink ?? invitationTokenFromHash(`#token=${keptInvitationToken() ?? ''}`);
 };
 
 const Card = ({ children }: { children: ReactNode }) => (
@@ -108,6 +102,9 @@ export const InvitationScreen = () => {
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const [attempt, setAttempt] = useState(0);
+  const [account, setAccount] = useState<PendingAccount>();
+  // A refusal from choosing the PIN (say, a wrong password) brings the person back here.
+  const { accountError } = (useLocation().state ?? {}) as { accountError?: string };
 
   useEffect(() => {
     document.title = 'Accept invitation · Geneus Health';
@@ -177,22 +174,32 @@ export const InvitationScreen = () => {
   // Nothing more can be done with a link that is accepted or unusable: forget it.
   useEffect(() => {
     if (step === 'done' || step === 'unusable') {
-      keepToken(undefined);
+      forgetInvitationToken();
     }
   }, [step]);
 
-  /** On a facility device: swap the link for a one-time setup code, approved here, and go to choosing the PIN. */
+  /**
+   * On a facility device: swap the link for a one-time code, and learn
+   * whether the email already has a password, which the next step settles.
+   * The token is kept until the PIN is accepted, so a refusal can come back here.
+   */
   const toPinSetup = async (link: string, invited: InvitationLinkView) => {
     const { staffId, code } = await invitationLinkCode(link);
-    rememberSetupCode(staffId, code, true);
-    approvePinSetup(staffId);
-    keepToken(undefined);
+    const { existingAccount } = await checkInvitationCode(staffId, code);
+    setAccount({ staffId, code, existingAccount, invited });
+  };
+
+  /** The password is settled: approved here, go to choosing the PIN. All of it is sent together. */
+  const toChoosePin = (pending: PendingAccount, settled: InvitationAccount) => {
+    rememberInvitationCode(pending.staffId, pending.code);
+    rememberInvitationAccount(pending.staffId, settled);
+    approvePinSetup(pending.staffId);
     navigate('/onboarding/accept', {
       replace: true,
       state: {
-        staffId,
-        fullName: invited.staffName,
-        role: ROLE_LABELS[invited.role as Role] ?? invited.role,
+        staffId: pending.staffId,
+        fullName: pending.invited.staffName,
+        role: ROLE_LABELS[pending.invited.role as Role] ?? pending.invited.role,
       },
     });
   };
@@ -289,7 +296,19 @@ export const InvitationScreen = () => {
 
   let body: ReactNode;
 
-  if (!token) {
+  if (account) {
+    body = (
+      <Card>
+        <InvitationAccountStep
+          existingAccount={account.existingAccount}
+          staffId={account.staffId}
+          invitationCode={account.code}
+          error={accountError}
+          onReady={(settled) => toChoosePin(account, settled)}
+        />
+      </Card>
+    );
+  } else if (!token) {
     body = (
       <Card>
         <p>
@@ -339,9 +358,14 @@ export const InvitationScreen = () => {
     body = (
       <Card>
         <p>
-          This device belongs to {view.facilityName}. Next, choose the 6-digit PIN you’ll use to
-          sign in at the start of every shift.
+          This device belongs to {view.facilityName}. Next, set your password and choose the 6-digit
+          PIN you’ll use to sign in at the start of every shift.
         </p>
+        {accountError && !error ? (
+          <p role="alert" className="text-sm font-semibold text-danger">
+            {accountError}
+          </p>
+        ) : null}
         {status}
         <Button onClick={() => void choosePin()} loading={Boolean(busy)} disabled={Boolean(busy)}>
           Choose my PIN
@@ -410,18 +434,9 @@ export const InvitationScreen = () => {
           This device isn’t set up for {view.facilityName}. Open this link on one of{' '}
           {view.facilityName}’s phones or computers, or ask your administrator to add this device.
         </p>
-        {credential ? (
-          <Button variant="outlined" onClick={() => navigate('/login')}>
-            Go to sign-in
-          </Button>
-        ) : (
-          <Link
-            to="/onboarding/join"
-            className="inline-flex min-h-[44px] items-center font-bold text-brand underline"
-          >
-            I have a device code from my administrator
-          </Link>
-        )}
+        <Button variant="outlined" onClick={() => navigate(credential ? '/login' : '/sign-in')}>
+          {credential ? 'Go to sign-in' : 'Sign in with your email'}
+        </Button>
       </Card>
     );
   }

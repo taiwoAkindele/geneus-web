@@ -8,6 +8,7 @@ import {
   ROLE_LABELS,
   roleLabel,
   onboardingTag,
+  accountTag,
   useOnboardingSummaries,
 } from '@/modules/operations/staff';
 import { usePendingEmailRequests } from './EmailConfirmationsCard';
@@ -132,6 +133,13 @@ export const ManageStaffScreen = () => {
   const invited = (entry: RosterEntry) =>
     entry.staff.active ? onboardingTag(summaries?.get(entry.staff.staffId)) : undefined;
 
+  /** "No email" or "No password yet": whether they can set up a new device or recover a PIN themselves. */
+  const accountBadge = (entry: RosterEntry) => {
+    const tag = entry.staff.active ? accountTag(summaries?.get(entry.staff.staffId)) : undefined;
+
+    return tag ? <Tag tone={tag.tone}>{tag.label}</Tag> : null;
+  };
+
   const presentRoles = [...new Set(roster.flatMap(roles))].sort((a, b) =>
     ROLE_LABELS[a].localeCompare(ROLE_LABELS[b]),
   );
@@ -230,6 +238,7 @@ export const ManageStaffScreen = () => {
                 {invited(entry) ? (
                   <Tag tone={invited(entry)!.tone}>{invited(entry)!.label}</Tag>
                 ) : null}
+                {accountBadge(entry)}
               </div>
             </button>
           ))}
@@ -273,6 +282,7 @@ export const ManageStaffScreen = () => {
                         · <Tag tone={invited(row)!.tone}>{invited(row)!.label}</Tag>
                       </>
                     ) : null}
+                    {accountBadge(row) ? <> · {accountBadge(row)}</> : null}
                   </>
                 ),
               },
