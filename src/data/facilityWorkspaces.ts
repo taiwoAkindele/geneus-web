@@ -8,7 +8,7 @@ import {
   type FacilitySwitchIdentity,
 } from '@/session/facilityIdentity';
 import { adoptStaffSession } from '@/lib/api/staffSession';
-import { finishFacilitySetup, pendingFacilityCreation } from './facilitySetup';
+import { finishFacilitySetup } from './facilitySetup';
 
 const KEY = 'geneus.facilityWorkspaces';
 const ACTIVE = 'geneus.activeFacilityEnrollment';
@@ -320,21 +320,13 @@ export const switchFacilityWorkspace = async (
         }
 
         if (identity) {
-          const creation =
-            current && pendingFacilityCreation(current.facilityId, identity.sourceStaffId);
-
-          const registered = creation?.result;
-
-          // Only the freshly registered first administrator can initialize a PIN
-          // from another workspace. Provisioning alone is never PIN approval.
-          if (
-            issued &&
-            registered?.device.credential === issued.credential &&
-            registered.facility.id === target.facilityId &&
-            registered.admin.staffId === identity.staffId &&
-            registered.admin.personId === identity.personId &&
-            registered.admin.role === 'facility_admin'
-          ) {
+          // One PIN per person on this device. The switch carries someone signed
+          // in here whom the server confirmed as the destination member
+          // (`identity.staffId`, known only online), so the PIN they use here is
+          // set up there when they have none. The server registers it the same
+          // way. Provisioning alone never gives a PIN: this needs the person's
+          // own sign-in, and a PIN already chosen there is never replaced.
+          if (identity.staffId) {
             target.values['geneus.credentials'] = reuseAccountPin(
               current?.values['geneus.credentials'],
               target.values['geneus.credentials'],
@@ -343,7 +335,6 @@ export const switchFacilityWorkspace = async (
             );
           }
 
-          // The person is carried across; the destination's PIN is never copied or replaced.
           directory.pendingIdentity = identity;
         } else {
           delete directory.pendingIdentity;

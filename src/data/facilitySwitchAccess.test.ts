@@ -14,7 +14,7 @@ afterEach(() => {
   resetSecureStorageForTests();
 });
 
-it('a switch carries the person and their server session, never their PIN', async () => {
+it('a switch carries the person, their server session and their PIN', async () => {
   vi.stubGlobal('localStorage', memoryStorage());
   resetSecureStorageForTests();
 
@@ -77,7 +77,10 @@ it('a switch carries the person and their server session, never their PIN', asyn
     session,
   );
 
-  expect(secureGet('geneus.credentials')).toBeNull();
+  // One PIN per person on this device: the PIN used at A now opens B's membership too.
+  expect(JSON.parse(secureGet('geneus.credentials')!)).toEqual({
+    'staff:B': { salt: 'synthetic', hash: 'synthetic', iterations: 100000, digits: 6 },
+  });
   expect(pendingFacilityIdentity()?.staffId).toBe('staff:B');
   expect(localStorage.getItem('geneus.signedInStaffId')).toBe('staff:B');
   expect(staffSessionToken({ userId: 'staff:B', deviceId: target.deviceId })).toBe(session.token);
