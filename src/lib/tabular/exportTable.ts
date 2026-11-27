@@ -15,6 +15,7 @@ export const downloadTable = async (
   sheetName: string,
   rows: readonly (readonly ExportCell[])[],
   format: ExportFormat = 'xlsx',
+  instructions?: readonly (readonly ExportCell[])[],
 ) => {
   if (format === 'csv') {
     downloadCsv(fileName.replace(/\.xlsx$/i, '') + '.csv', rows);
@@ -40,7 +41,17 @@ export const downloadTable = async (
   }
 
   const book = utils.book_new();
+  if (instructions?.length) {
+    const guide = utils.aoa_to_sheet(instructions.map((row) => [...row]));
+    guide['!cols'] = [{ wch: 30 }, { wch: 118 }, { wch: 27 }];
+    utils.book_append_sheet(book, guide, 'Instructions');
+    sheet['!cols'] = (rows[0] ?? []).map((heading) => ({
+      wch: Math.max(16, String(heading).length + 4),
+    }));
+  }
+
   utils.book_append_sheet(book, sheet, sheetName.slice(0, 31));
+
   writeFile(book, fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`, {
     compression: true,
     bookSST: true,
