@@ -119,6 +119,10 @@ describe('module workspaces', () => {
 
     expect(workspacesFor(context('cashier')).map((w) => w.id)).not.toContain('settings');
     expect(moduleSettingsFor('laboratory', context('nurse')).pages).toEqual([]);
+    const { role, permissions } = context('laboratory_staff');
+    expect(moduleSettingsFor('laboratory', { role, permissions }).pages.map((p) => p.key)).toEqual([
+      'tests',
+    ]);
   });
 
   it('keeps clinical and administrative actions out of the cashier workspace', () => {

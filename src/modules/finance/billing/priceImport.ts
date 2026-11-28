@@ -30,6 +30,7 @@ export const previewPrices = (
   rows: readonly unknown[][],
   fees: readonly FeeItem[],
   currency: string,
+  { allowNewLaboratoryFees = true }: { allowNewLaboratoryFees?: boolean } = {},
 ): PriceImportRow[] => {
   if (rows.length < 2) {
     throw new Error('Include a header and at least one price');
@@ -136,6 +137,12 @@ export const previewPrices = (
 
       seen.add(key);
       const fee = row.itemId ? fees.find((f) => f.id === row.itemId) : undefined;
+
+      if (!allowNewLaboratoryFees && category === 'laboratory' && !row.itemId) {
+        throw new Error(
+          'Create the test in Laboratory, then publish its first price under Needs pricing',
+        );
+      }
 
       if (row.itemId && !fee) {
         throw new Error('Item ID was not found on this device');

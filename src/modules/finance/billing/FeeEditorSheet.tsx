@@ -85,6 +85,7 @@ export const FeeEditorSheet = ({
             required
             disabled={Boolean(fee)}
             options={FeeCategory.options
+              .filter((value) => fee || value !== 'laboratory')
               .filter(
                 (value) =>
                   expandedCategories || isLegacyFeeCategory(value) || fee?.category === value,

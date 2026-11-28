@@ -16,7 +16,9 @@ import { createStockItem, recordStockMovement, type stockBalances } from '@/data
 import { downloadCsv } from '@/lib/csv';
 import { useStock } from './useStock';
 import { StockPriceSheet } from './StockPriceSheet';
+import { StockImportSheet } from './StockImportSheet';
 import { pharmacySupported } from '@/data/pharmacySupport';
+import { formatMoney } from '@/lib/money';
 
 const CATEGORIES = {
   drug: 'Medicine',
@@ -302,6 +304,7 @@ export const StockWorkspace = () => {
   const query = useStock();
   const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [moving, setMoving] = useState(false);
   useEffect(() => {
     document.title = 'Medicine & stock · Geneus Health';
@@ -311,6 +314,16 @@ export const StockWorkspace = () => {
   const search = params.get('q') ?? '';
   const filter = params.get('level') ?? '';
   const item = query.data?.items.find((candidate) => candidate.id === params.get('item'));
+
+  const sellingPrice = (stock: StockItem) => {
+    const fee = stock.feeItemId ? query.data?.prices.get(stock.feeItemId) : undefined;
+
+    if (!fee) {
+      return 'Price needed';
+    }
+
+    return `${formatMoney(fee.amountMinor, fee.currency)} per ${stock.unitOfMeasure ?? 'unit'}`;
+  };
 
   const shown = (query.data?.items ?? [])
     .filter(
@@ -370,6 +383,9 @@ export const StockWorkspace = () => {
                 <p className="mt-1 text-xs text-ink-muted">
                   Reorder level: {item.reorderLevel ?? 'Not set'}
                 </p>
+                {item.category === 'drug' ? (
+                  <p className="mt-1 text-sm">Selling price: {sellingPrice(item)}</p>
+                ) : null}
               </div>
               {context.permissions.includes('stock_movement:create') ? (
                 <Button fullWidth={false} onClick={() => setMoving(true)}>
@@ -478,6 +494,11 @@ export const StockWorkspace = () => {
                     <span className="mt-1 block text-xs font-normal text-ink-muted">
                       {CATEGORIES[row.category]}
                     </span>
+                    {row.category === 'drug' ? (
+                      <span className="mt-1 block text-xs font-normal text-ink-muted">
+                        {sellingPrice(row)}
+                      </span>
+                    ) : null}
                   </button>
                 ),
               },
@@ -517,9 +538,19 @@ export const StockWorkspace = () => {
           </p>
         </div>
         {context.permissions.includes('stock_item:manage') ? (
-          <Button fullWidth={false} onClick={() => setAdding(true)}>
-            Add stock item
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outlined"
+              fullWidth={false}
+              disabled={!query.data || Boolean(query.error)}
+              onClick={() => setImporting(true)}
+            >
+              Import medicines
+            </Button>
+            <Button fullWidth={false} onClick={() => setAdding(true)}>
+              Add stock item
+            </Button>
+          </div>
         ) : null}
       </header>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -555,6 +586,13 @@ export const StockWorkspace = () => {
         <StockPriceSheet item={item} onClose={() => setPricing(false)} onSaved={query.reload} />
       ) : null}
       {adding ? <StockForm onClose={() => setAdding(false)} onSaved={query.reload} /> : null}
+      {importing && query.data ? (
+        <StockImportSheet
+          items={query.data.items}
+          onClose={() => setImporting(false)}
+          onSaved={query.reload}
+        />
+      ) : null}
       {moving && item ? (
         <StockForm item={item} onClose={() => setMoving(false)} onSaved={query.reload} />
       ) : null}

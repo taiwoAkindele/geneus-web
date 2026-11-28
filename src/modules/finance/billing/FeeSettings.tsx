@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PriceUpload } from './PriceUpload';
-import { downloadCsv } from '@/lib/csv';
+import { downloadExcel } from '@/lib/excel';
 import { amountInput } from '@/lib/money';
 import type { FeeItem } from '@shared';
 import { Button, useToast } from '@/ui';
@@ -20,6 +21,7 @@ import { FeePoliciesSheet } from './FeePoliciesSheet';
 import { CatalogueReadiness } from './CatalogueReadiness';
 import { useBillingCatalogue } from '@/data/billingCatalogueSupport';
 import { SaveStatus } from '@/app/settings/SettingsLayout';
+import { LaboratoryPendingPrices } from './LaboratoryPendingPrices';
 
 /**
  * Finance → Prices: the facility's price list. Everyone in Billing can
@@ -31,6 +33,7 @@ export const FeeSettings = () => {
   const expandedCategories = useBillingCatalogue(context);
   const toast = useToast();
   const query = useBilling();
+  const [params] = useSearchParams();
   // New prices start in the facility's currency; each fee keeps its own.
   const facilityCurrency = useLiveQuery(getFacility, ['facility']).data?.currency;
   const [editing, setEditing] = useState<FeeItem | 'new'>();
@@ -41,6 +44,7 @@ export const FeeSettings = () => {
   }, []);
 
   const canManage = context.permissions.includes('fee_item:manage');
+  const showPending = canManage && params.get('tab') === 'needs-pricing';
 
   const save = async (draft: FeeDraft) => {
     if (editing && editing !== 'new') {
@@ -98,7 +102,7 @@ export const FeeSettings = () => {
             their price.
           </p>
         </div>
-        {canManage ? (
+        {canManage && !showPending ? (
           <div className="flex flex-wrap gap-2">
             <Button fullWidth={false} disabled={!data} onClick={() => setUpload(true)}>
               Upload prices
@@ -116,7 +120,7 @@ export const FeeSettings = () => {
               fullWidth={false}
               disabled={!data}
               onClick={() =>
-                downloadCsv('current-billing-prices.csv', [
+                void downloadExcel('current-billing-prices.xlsx', 'Prices', [
                   ['Name', 'Category', 'Price', 'Description', 'Item ID'],
                   ...(data?.fees ?? [])
                     .filter((f) => f.active && f.currency === (facilityCurrency ?? 'NGN'))
@@ -127,7 +131,7 @@ export const FeeSettings = () => {
                       f.description ?? '',
                       f.id,
                     ]),
-                ])
+                ]).catch(() => toast('Could not export the prices', { tone: 'error' }))
               }
             >
               Export
@@ -135,8 +139,33 @@ export const FeeSettings = () => {
           </div>
         ) : null}
       </header>
+      {canManage ? (
+        <nav
+          aria-label="Price catalogue views"
+          className="flex flex-wrap gap-3 border-b border-outline-soft text-sm font-bold text-brand"
+        >
+          <Link
+            className="inline-flex min-h-[44px] items-center border-b-2 border-transparent px-2 aria-[current=page]:border-brand"
+            aria-current={showPending ? undefined : 'page'}
+            to="/billing/prices"
+          >
+            Published prices
+          </Link>
+          <Link
+            className="inline-flex min-h-[44px] items-center border-b-2 border-transparent px-2 aria-[current=page]:border-brand"
+            aria-current={showPending ? 'page' : undefined}
+            to="/billing/prices?tab=needs-pricing"
+          >
+            Needs pricing
+          </Link>
+        </nav>
+      ) : null}
       {canManage ? <SaveStatus /> : null}
-      {renderFees()}
+      {showPending ? (
+        <LaboratoryPendingPrices currency={facilityCurrency ?? 'NGN'} onChanged={query.reload} />
+      ) : (
+        renderFees()
+      )}
       {canManage ? (
         <details className="rounded-card border border-outline-soft bg-white p-4">
           <summary className="min-h-[44px] cursor-pointer py-2 text-sm font-semibold">

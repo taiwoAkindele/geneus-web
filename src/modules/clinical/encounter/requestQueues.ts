@@ -12,6 +12,7 @@ import {
   type WardCareEvent,
   type EncounterEntry,
   type EncounterStep,
+  type InvestigationItem,
 } from '@shared';
 
 /**
@@ -32,6 +33,10 @@ export type ServiceRequest = {
   pending: string[];
   completedOn?: string;
   billingPending?: number;
+  requestedBy?: string;
+  investigations?: InvestigationItem[];
+  urgent?: boolean;
+  resultEntryIds?: string[];
   billingReviews?: {
     id: string;
     name: string;
@@ -196,6 +201,10 @@ export const requestQueues = (
         requestedOn: requested.createdOn,
         items: tests,
         pending,
+        requestedBy: requested.createdBy,
+        ...(items
+          ? { investigations: items, urgent: items.some((item) => item.priority === 'urgent') }
+          : {}),
         billingPending: billingReviews?.length,
         billingReviews,
         ...(requested.id !== order?.id ? { superseded: true } : {}),
@@ -206,6 +215,17 @@ export const requestQueues = (
       } else {
         lab.completed.push({
           ...request,
+          resultEntryIds: results
+            .filter((entry) =>
+              ENCOUNTER_STEP_VALUES.lab_results
+                .parse(entry.values)
+                .results.some((result) =>
+                  result.orderItemId
+                    ? items?.some((item) => item.id === result.orderItemId)
+                    : tests.includes(result.test),
+                ),
+            )
+            .map((entry) => entry.id),
           completedOn: results
             .map((e) => e.createdOn)
             .sort()
@@ -303,10 +323,12 @@ export const requestQueues = (
     }
   }
 
-  for (const queue of [lab, pharmacy]) {
-    queue.open.sort(oldestFirst);
-    queue.completed.sort(newestFirst);
-  }
+  lab.open.sort(
+    (a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)) || oldestFirst(a, b),
+  );
+  lab.completed.sort(newestFirst);
+  pharmacy.open.sort(oldestFirst);
+  pharmacy.completed.sort(newestFirst);
 
   return { lab, pharmacy };
 };

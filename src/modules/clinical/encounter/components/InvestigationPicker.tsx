@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef, useState } from 'react';
-import { manualBillCandidates, type FeeItem, type InvestigationItem } from '@shared';
+import { labTestKey, manualBillCandidates, type FeeItem, type InvestigationItem } from '@shared';
 import { useLiveQuery } from '@/data';
 import { useAuthorizationContext } from '@/session';
 import { loadInvestigationCatalogue, selectInvestigation } from '@/data/repos/investigations';
@@ -102,8 +102,13 @@ export const InvestigationPicker = ({
         added: items.some((i) => i.offeringId === r.offering!.id),
         pick: () => done(selectInvestigation(r)),
       })),
-    ...(tests.data?.items ?? [])
-      .filter((f) => f.priceEvidenceVersion === 1)
+    ...(catalogue.data ? (tests.data?.items ?? []) : [])
+      .filter(
+        (fee) =>
+          fee.priceEvidenceVersion === 1 &&
+          (!catalogue.data?.managedFeeIds.has(fee.id) ||
+            catalogue.data.items.some((row) => row.central && row.fee.id === fee.id)),
+      )
       .map((f) => ({
         key: f.id,
         name: f.name,
@@ -115,7 +120,9 @@ export const InvestigationPicker = ({
 
   // Nothing matches: offer to send the typed name to the laboratory as an unlisted request.
   const custom: Option | undefined =
-    term && !options.some((o) => o.name.toLowerCase() === term)
+    term &&
+    !catalogue.data?.unavailableNames.has(labTestKey(term)) &&
+    !options.some((o) => o.name.toLowerCase() === term)
       ? {
           key: 'custom',
           name: `Request "${query.trim()}" by name`,

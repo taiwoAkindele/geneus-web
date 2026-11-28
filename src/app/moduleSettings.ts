@@ -37,6 +37,7 @@ const page = (
 export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): ModuleSettings => {
   if (id === 'laboratory') {
     const templates = has(context, 'result_template:manage');
+    const roles = context.roles ?? [context.role];
 
     return {
       id,
@@ -48,7 +49,9 @@ export const moduleSettingsFor = (id: ModuleSettingsId, context: Viewer): Module
           'tests',
           'Tests',
           '/laboratory/settings/tests',
-          has(context, 'service:manage', 'result_template:manage'),
+          has(context, 'service:manage', 'result_template:manage') ||
+            (roles.includes('laboratory_staff') &&
+              has(context, 'clinical:perform_test', 'clinical:record_result')),
         ),
         ...page('templates', 'Result templates', '/laboratory/settings/templates', templates),
         ...page(

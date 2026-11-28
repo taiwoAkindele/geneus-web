@@ -151,7 +151,7 @@ const arrival = async (writes: readonly ConfigurationWrite[], timeoutMs = 20_000
 
         return w.op === 'put'
           ? Boolean(local)
-          : Boolean(local) && local!.updatedOn === w.changes.updatedOn;
+          : Boolean(local && local.updatedOn === w.changes.updatedOn);
       }),
     );
 
@@ -168,7 +168,7 @@ const arrival = async (writes: readonly ConfigurationWrite[], timeoutMs = 20_000
 export const saveConfiguration = async (
   context: AuthorizationContext,
   writes: readonly ConfigurationWrite[],
-  options?: { billingImport?: boolean },
+  options?: { billingImport?: boolean; stockImport?: ReadonlyMap<string, number> },
 ): Promise<{ arrived: boolean }> => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new ConfigurationSaveError(
@@ -201,15 +201,17 @@ export const saveConfiguration = async (
   announce({ phase: 'saving' });
 
   try {
-    await staffRequest<ConfigurationSaveResponse>(
-      savePath(Boolean(options?.billingImport), policyOnly),
+    const saved = await staffRequest<ConfigurationSaveResponse>(
+      options?.stockImport
+        ? '/config/stock-import'
+        : savePath(Boolean(options?.billingImport), policyOnly),
       device.credential,
       token,
       {
         ...WORKFORCE_VERSIONS,
         transactionId: null,
         mutations: writes.map((w) => {
-          if (!options?.billingImport) {
+          if (!options?.billingImport && !options?.stockImport) {
             return toMutation(w);
           }
 
@@ -217,6 +219,10 @@ export const saveConfiguration = async (
 
           if (!m) {
             m = toMutation(w);
+
+            if (options?.stockImport && m.table === 'stock_item') {
+              m.previous = { amountMinor: options.stockImport.get(m.id) };
+            }
 
             if (m.op === 'patch' && w.op === 'patch' && w.current.type === 'fee_item') {
               m.previous = {
@@ -236,6 +242,10 @@ export const saveConfiguration = async (
       context.userId,
     );
 
+    if (options?.stockImport && (!saved || saved.applied + saved.duplicates !== writes.length)) {
+      throw new Error('Confirmation unavailable. Retry this same import.');
+    }
+
     touchStaffSession();
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'staff_session_required') {
@@ -245,6 +255,12 @@ export const saveConfiguration = async (
     }
 
     if (cause instanceof ApiError && cause.code === 'offline') {
+      if (options?.stockImport) {
+        throw new ConfigurationSaveError(
+          'failed',
+          'Confirmation unavailable. Reconnect and retry this same import.',
+        );
+      }
       announce({ phase: 'refused', message: cause.message });
       throw new ConfigurationSaveError(
         'offline',
@@ -254,14 +270,25 @@ export const saveConfiguration = async (
 
     const message = refusalMessage(cause);
     announce({ phase: 'refused', message });
-    throw new ConfigurationSaveError(
-      cause instanceof ApiError && cause.code === 'configuration_refused' ? 'refused' : 'failed',
-      message,
-    );
+    const refused =
+      cause instanceof ApiError &&
+      (cause.code === 'configuration_refused' ||
+        (options?.stockImport &&
+          cause.status !== undefined &&
+          cause.status >= 400 &&
+          cause.status < 500));
+    throw new ConfigurationSaveError(refused ? 'refused' : 'failed', message);
   }
 
   announce({ phase: 'confirmed' });
-  const arrived = await arrival(writes);
+  const arrived = await arrival(writes).catch((cause: unknown) => {
+    if (options?.stockImport) {
+      // The server already accepted this batch, even if the device database is unavailable.
+      return false;
+    }
+
+    throw cause;
+  });
   announce({
     phase: 'arrived',
     ...(arrived

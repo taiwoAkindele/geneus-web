@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FeeItem, type UploadRequest } from '@shared';
+import { FeeItem, StockItem, type UploadRequest } from '@shared';
 import { authorizationFor } from '@/auth/authorization';
 import { ApiError, staffRequest } from '@/lib/api/client';
 import { forgetStaffSession } from '@/lib/api/staffSession';
@@ -119,5 +119,36 @@ describe('configuration save compatibility and stale editor protection', () => {
 
     expect(forgetStaffSession).toHaveBeenCalledOnce();
     expect(staffRequest).toHaveBeenCalledOnce();
+  });
+
+  it('retries an unconfirmed stock import with the same mutation receipt and reviewed amount', async () => {
+    const record = StockItem.parse({
+      facilityId: context.facilityId,
+      deviceId: context.deviceId,
+      createdBy: context.userId,
+      createdOn: current.createdOn,
+      schemaVersion: 5,
+      id: 'stock:tablet',
+      type: 'stock_item',
+      name: 'Zinc 20 mg',
+      category: 'drug',
+      unitOfMeasure: 'tablet',
+      feeItemId: current.id,
+    });
+    const writes = [{ op: 'put', type: 'stock_item', record }] as const;
+    const options = { stockImport: new Map([[record.id, 12000]]) };
+    vi.mocked(staffRequest)
+      .mockRejectedValueOnce(new ApiError('offline', 'Connection dropped'))
+      .mockResolvedValueOnce({ applied: 0, duplicates: 1, rejected: [] });
+
+    await expect(saveConfiguration(context, writes, options)).rejects.toMatchObject({
+      code: 'failed',
+    });
+    await expect(saveConfiguration(context, writes, options)).resolves.toEqual({ arrived: true });
+
+    const [first, second] = vi.mocked(staffRequest).mock.calls;
+    expect(first[0]).toBe('/config/stock-import');
+    expect(second[3]).toEqual(first[3]);
+    expect((second[3] as UploadRequest).mutations[0].previous).toEqual({ amountMinor: 12000 });
   });
 });

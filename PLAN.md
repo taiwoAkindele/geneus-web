@@ -7,6 +7,15 @@
 
 **Version:** 1.0 (Draft) · **Owner:** Solo founder-builder
 
+### Laboratory worklist and catalogue (28 November 2026)
+
+Laboratory opens on urgent-first requests with visible waiting time, progress, and private
+drafts. Results, the Test catalogue and Result templates are directly reachable. The test
+form and Excel import require a pricing category and structured specimens. Billing has
+an Excel queue for publishing first prices. Apply server migration 0053 and its Sync Streams
+configuration before pilot use. Review legacy test and fee mappings per facility before
+retiring their compatibility path.
+
 ### Patient bill checkout (22 November 2026)
 
 Public bill links offer hosted checkout and confirm payments with the server on
