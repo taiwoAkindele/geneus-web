@@ -1,5 +1,6 @@
 import {
   labTestKey,
+  laboratorySpecimenLabel,
   unitIsRoutable,
   type AuthorizationContext,
   type FeeItem,
@@ -19,6 +20,13 @@ import { getFacility } from './facility';
 import { saveWorkforce } from './workforce';
 import { assertAllowed } from '@/auth/authorization';
 
+type InvestigationChoice =
+  | { central: true; fee: FeeItem; definition?: ServiceDefinition; offering?: ServiceOffering }
+  | { central: false; fee?: FeeItem; definition: ServiceDefinition; offering: ServiceOffering };
+
+const availableOffering = (offering: ServiceOffering) =>
+  offering.configuration === 'active' && offering.resourceReadiness === 'available';
+
 export const loadInvestigationCatalogue = async () => {
   const [definitions, offerings, fees, units, locations, facility] = await Promise.all([
     allOfType<ServiceDefinition>('service_definition'),
@@ -29,6 +37,98 @@ export const loadInvestigationCatalogue = async () => {
     getFacility(),
   ]);
 
+  const managed = definitions.filter((definition) => definition.laboratoryCatalogue);
+  const projected = managed.length
+    ? await getDatabase().getAll<{ id: string }>('SELECT id FROM orderable_laboratory_tests')
+    : [];
+  const orderableIds = new Set(projected.map(({ id }) => id));
+  const eligible = definitions.filter(
+    (definition) =>
+      definition.active &&
+      definition.orderable &&
+      (!definition.laboratoryCatalogue || orderableIds.has(definition.id)),
+  );
+  const eligibleById = new Map(eligible.map((definition) => [definition.id, definition]));
+  const available = offerings.filter(availableOffering);
+  const managedByFee = new Map(
+    managed.flatMap((definition) =>
+      definition.feeItemId ? [[definition.feeItemId, definition] as const] : [],
+    ),
+  );
+  const prices = new Map(fees.filter((fee) => fee.active).map((fee) => [fee.id, fee]));
+  const expanded = billingCatalogueEnabled();
+  const items: InvestigationChoice[] = [];
+
+  if (expanded) {
+    for (const fee of prices.values()) {
+      if (fee.category !== 'laboratory') {
+        continue;
+      }
+
+      const managedDefinition = managedByFee.get(fee.id);
+
+      if (managedDefinition) {
+        const offering = available.find(
+          (candidate) =>
+            candidate.serviceDefinitionId === managedDefinition.id &&
+            candidate.feeItemId === fee.id,
+        );
+
+        if (eligibleById.has(managedDefinition.id) && offering && fee.priceVersion) {
+          items.push({ central: true, fee, definition: managedDefinition, offering });
+        }
+
+        continue;
+      }
+
+      const direct = eligible.find((definition) => definition.feeItemId === fee.id);
+      const offering = direct
+        ? undefined
+        : available.find(
+            (candidate) =>
+              candidate.feeItemId === fee.id &&
+              eligibleById.get(candidate.serviceDefinitionId)?.investigation,
+          );
+      items.push({
+        central: true,
+        fee,
+        definition: direct ?? (offering && eligibleById.get(offering.serviceDefinitionId)),
+        offering,
+      });
+    }
+  }
+
+  for (const offering of available) {
+    const definition = eligibleById.get(offering.serviceDefinitionId);
+
+    if (!definition?.investigation) {
+      continue;
+    }
+
+    const fee = offering.feeItemId ? prices.get(offering.feeItemId) : undefined;
+
+    if (definition.laboratoryCatalogue?.pricingCategory === 'billable' && !fee?.priceVersion) {
+      continue;
+    }
+
+    if (expanded && fee?.category === 'laboratory') {
+      continue;
+    }
+
+    items.push({ central: false, fee, definition, offering });
+  }
+
+  const orderableManaged = new Set(
+    items.flatMap(({ definition }) => (definition?.laboratoryCatalogue ? [definition.id] : [])),
+  );
+  const unavailableNames = new Set(
+    managed
+      .filter(({ id }) => !orderableManaged.has(id))
+      .flatMap((definition) =>
+        [definition.name, ...(definition.investigation?.aliases ?? [])].map(labTestKey),
+      ),
+  );
+
   return {
     definitions,
     offerings,
@@ -36,63 +136,9 @@ export const loadInvestigationCatalogue = async () => {
     units,
     locations,
     facility,
-    items: [
-      ...(billingCatalogueEnabled()
-        ? fees
-            .filter((f) => f.active && f.category === 'laboratory')
-            .map((fee) => {
-              const direct = definitions.find(
-                (d) => d.active && d.orderable && d.feeItemId === fee.id,
-              );
-
-              const offering = direct
-                ? undefined
-                : offerings.find(
-                    (o) =>
-                      o.feeItemId === fee.id &&
-                      o.configuration === 'active' &&
-                      o.resourceReadiness === 'available' &&
-                      definitions.some(
-                        (d) =>
-                          d.id === o.serviceDefinitionId &&
-                          d.active &&
-                          d.orderable &&
-                          d.investigation,
-                      ),
-                  );
-
-              return {
-                fee,
-                central: true as const,
-                definition:
-                  direct ?? definitions.find((d) => d.id === offering?.serviceDefinitionId),
-                offering,
-              };
-            })
-        : []),
-      ...offerings.flatMap((offering) => {
-        const definition = definitions.find(
-          (d) =>
-            d.id === offering.serviceDefinitionId && d.active && d.orderable && d.investigation,
-        );
-
-        if (
-          !definition ||
-          offering.configuration !== 'active' ||
-          offering.resourceReadiness !== 'available'
-        ) {
-          return [];
-        }
-
-        const fee = fees.find((f) => f.id === offering.feeItemId && f.active);
-
-        if (billingCatalogueEnabled() && fee?.category === 'laboratory') {
-          return [];
-        }
-
-        return [{ offering, definition, fee, central: false as const }];
-      }),
-    ],
+    items,
+    managedFeeIds: new Set(managedByFee.keys()),
+    unavailableNames,
   };
 };
 
@@ -111,7 +157,9 @@ export const selectInvestigation = ({
   offeringId: offering?.id,
   catalogueRevision: offering?.revision,
   definitionRevision: definition?.revision,
-  specimen: definition?.investigation?.specimen,
+  specimen: definition?.laboratoryCatalogue
+    ? laboratorySpecimenLabel(definition.laboratoryCatalogue)
+    : definition?.investigation?.specimen,
   priority: 'routine',
   ...(fee
     ? {
@@ -293,8 +341,19 @@ export type CatalogueRow = {
   definition: ServiceDefinition;
   offering?: ServiceOffering;
   fee?: FeeItem;
-  template?: { name: string; parts: number };
+  template?: { id: string; name: string; parts: number };
 };
+
+export const loadLaboratoryPriceDrafts = async () =>
+  (await allOfType<ServiceDefinition>('service_definition'))
+    .filter(
+      (test) =>
+        test.active &&
+        !test.orderable &&
+        !test.feeItemId &&
+        test.laboratoryCatalogue?.pricingCategory === 'billable',
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
 /**
  * One page of this facility's lab tests, read with LIMIT/OFFSET from the local
@@ -308,11 +367,19 @@ export const loadCataloguePage = async (
     page = 0,
     pageSize = 25,
     descending = false,
-  }: { query?: string; page?: number; pageSize?: number; descending?: boolean },
+    status = '',
+  }: { query?: string; page?: number; pageSize?: number; descending?: boolean; status?: string },
 ) => {
   const db = getDatabase();
   const like = `%${query.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const where = `WHERE "facilityId" = ? AND "category" = 'laboratory' AND "active" = 1 AND "investigation" IS NOT NULL AND ("name" LIKE ? ESCAPE '\\' OR "investigation" LIKE ? ESCAPE '\\')`;
+  const draft = `"active" = 1 AND "orderable" = 0 AND "feeItemId" IS NULL AND json_extract("laboratoryCatalogue", '$.pricingCategory') = 'billable'`;
+  const filters: Record<string, string> = {
+    draft,
+    active: '"active" = 1 AND "orderable" = 1',
+    inactive: '"active" = 0',
+  };
+  const availability = Object.hasOwn(filters, status) ? `AND ${filters[status]}` : '';
+  const where = `WHERE "facilityId" = ? AND "category" = 'laboratory' AND "investigation" IS NOT NULL ${availability} AND ("name" LIKE ? ESCAPE '\\' OR "investigation" LIKE ? ESCAPE '\\')`;
   const parameters = [context.facilityId, like, like];
 
   const [count, rows] = await Promise.all([
@@ -354,8 +421,8 @@ export const loadCataloguePage = async (
 
   // The result template in use for each test on this page; a test has at most one.
   const templates = ids.length
-    ? await db.getAll<{ test: string; name: string; parts: number }>(
-        `SELECT j.value AS test, t."name" AS name, json_array_length(t."parts") AS parts FROM ${TABLE_FOR.result_template} t, json_each(t."serviceDefinitionIds") j WHERE t."status" = 'active' AND j.value IN (${marks})`,
+    ? await db.getAll<{ test: string; id: string; name: string; parts: number }>(
+        `SELECT j.value AS test, t.id AS id, t."name" AS name, json_array_length(t."parts") AS parts FROM ${TABLE_FOR.result_template} t, json_each(t."serviceDefinitionIds") j WHERE t."status" = 'active' AND j.value IN (${marks})`,
         ids,
       )
     : [];
@@ -369,7 +436,9 @@ export const loadCataloguePage = async (
       definition,
       offering,
       fee: fees.find((f) => f.id === (definition.feeItemId ?? offering?.feeItemId) && f.active),
-      ...(template ? { template: { name: template.name, parts: Number(template.parts) } } : {}),
+      ...(template
+        ? { template: { id: template.id, name: template.name, parts: Number(template.parts) } }
+        : {}),
     };
   });
 

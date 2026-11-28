@@ -41,6 +41,46 @@ const admin = () =>
 describe('lab test catalogue on the device', () => {
   let store: ReturnType<typeof sqliteTestDatabase>;
 
+  it('requires the server projection before a classified test is selectable', async () => {
+    await store.db.execute(
+      'CREATE TABLE orderable_laboratory_tests(id TEXT PRIMARY KEY, facilityId TEXT)',
+    );
+    await seedTest('Draft screening');
+    await seedTest('Free screening');
+    await store.db.execute(
+      'UPDATE service_definitions SET "laboratoryCatalogue" = ?, "orderable" = 0 WHERE name = ?',
+      [
+        JSON.stringify({ pricingCategory: 'billable', specimenTypes: ['Serum'] }),
+        'Draft screening',
+      ],
+    );
+    await store.db.execute(
+      'UPDATE service_definitions SET "laboratoryCatalogue" = ? WHERE name = ?',
+      [
+        JSON.stringify({
+          pricingCategory: 'non_billable',
+          specimenTypes: ['Serum', 'Plasma'],
+          specimenRequirement: 'any',
+        }),
+        'Free screening',
+      ],
+    );
+
+    const before = await loadInvestigationCatalogue();
+    expect(before.items).toEqual([]);
+    expect(before.unavailableNames.has('draft screening')).toBe(true);
+    await store.db.execute('INSERT INTO orderable_laboratory_tests VALUES (?, ?)', [
+      'service_definition:Free screening',
+      'TEST',
+    ]);
+
+    const after = await loadInvestigationCatalogue();
+    expect(after.items.map(selectInvestigation)).toMatchObject([
+      { name: 'Free screening', specimen: 'Serum or Plasma' },
+    ]);
+    expect(after.items.map(selectInvestigation)[0].feeItemId).toBeUndefined();
+  });
+
   /** Catalogue entries arrive from the server by sync; tests seed them the same way. */
   const seedTest = async (name: string, aliases: string[] = [], facilityId = 'TEST') => {
     const id = `service_definition:${name}`;

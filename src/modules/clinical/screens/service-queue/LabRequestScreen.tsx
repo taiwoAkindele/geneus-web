@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ENCOUNTER_STEP_VALUES, type EncounterEntry } from '@shared';
 import { useAuthorizationContext, useSession } from '@/session';
 import { AuthorizationError } from '@/data';
 import { saveStep } from '@/data/repos/encounters';
+import {
+  discardDraft,
+  LABORATORY_FOLLOW_UP_DRAFT,
+  readDrafts,
+  writeDraft,
+} from '@/data/repos/drafts';
 import {
   useEncounter,
   EntryEditorSheet,
@@ -48,6 +54,8 @@ const LabRequest = () => {
   const patientId = params.get('patient') ?? '';
   const encounterId = params.get('visit') ?? '';
   const navigate = useNavigate();
+  const returnTo = (useLocation().state as { laboratoryReturn?: string } | null)?.laboratoryReturn;
+  const backToLaboratory = returnTo?.startsWith('/laboratory?') ? returnTo : QUEUE;
   const toast = useToast();
   const context = useAuthorizationContext();
   const { user } = useSession();
@@ -57,11 +65,46 @@ const LabRequest = () => {
   // The first results keep a device draft through the visit's own form; later results use the pending tests only.
   const first = !ctl.enc.sig.lab_results;
   const [later, setLater] = useState<EncounterData>();
+  const owner = { staffId: context.userId, patientId, encounterKey: encounterId };
   useEffect(() => {
-    if (!first && !later && ctl.rawEntries.length) {
-      setLater(pendingLabOrder(ctl.rawEntries));
+    if (first || later || !ctl.rawEntries.length) {
+      return;
     }
-  }, [first, later, ctl.rawEntries]);
+
+    let cancelled = false;
+    const pending = pendingLabOrder(ctl.rawEntries);
+    void readDrafts({ staffId: context.userId, patientId, encounterKey: encounterId })
+      .then((drafts) => {
+        if (cancelled) {
+          return;
+        }
+
+        const saved = drafts.find((draft) => draft.step === LABORATORY_FOLLOW_UP_DRAFT)?.data as
+          Pick<EncounterData, 'lab_results' | 'lab_report'> | undefined;
+
+        if (saved?.lab_results && saved.lab_report) {
+          const keys = new Set(pending.lab_order.tests.map((_, index) => orderKey(pending, index)));
+          pending.lab_results = Object.fromEntries(
+            Object.entries(saved.lab_results).filter(([key]) => keys.has(key)),
+          );
+          pending.lab_report = Object.fromEntries(
+            Object.entries(saved.lab_report).filter(([key]) => keys.has(key)),
+          );
+        }
+
+        setLater(pending);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('The previous result draft could not be opened. You can enter results again.');
+          setLater(pending);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [first, later, ctl.rawEntries, context.userId, patientId, encounterId]);
 
   const data = first ? ctl.enc.data : later;
   const [preview, setPreview] = useState<LabSubmission>();
@@ -89,7 +132,7 @@ const LabRequest = () => {
     return (
       <div role="alert" className="space-y-3 p-6">
         <p>{ctl.error?.message ?? 'This patient is not on this device.'}</p>
-        <Button variant="outlined" fullWidth={false} onClick={() => navigate(QUEUE)}>
+        <Button variant="outlined" fullWidth={false} onClick={() => navigate(backToLaboratory)}>
           Back to Laboratory
         </Button>
       </div>
@@ -150,6 +193,33 @@ const LabRequest = () => {
     setPreview(submission);
   };
 
+  const saveDraft = async () => {
+    if (!data || busy.current) {
+      return;
+    }
+
+    busy.current = true;
+    setSaving(true);
+    setError('');
+
+    try {
+      if (first) {
+        await ctl.flushDraft();
+      } else {
+        await writeDraft(owner, LABORATORY_FOLLOW_UP_DRAFT, {
+          lab_results: data.lab_results,
+          lab_report: data.lab_report,
+        });
+      }
+      navigate(backToLaboratory);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save this result draft');
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
+  };
+
   const publish = async () => {
     if (!preview || busy.current) {
       return;
@@ -174,10 +244,13 @@ const LabRequest = () => {
           },
           context,
         );
+        await discardDraft(owner, LABORATORY_FOLLOW_UP_DRAFT).catch(() => {
+          toast('The result was saved. The earlier local draft could not be cleared.');
+        });
       }
 
       toast('Results published on this device. The requesting clinician is alerted once it syncs');
-      navigate(QUEUE);
+      navigate(backToLaboratory);
     } catch (cause) {
       if (!(cause instanceof AuthorizationError)) {
         console.error('Result publish failed', cause);
@@ -220,9 +293,19 @@ const LabRequest = () => {
               Draft on this device · not published
             </p>
           ) : null}
-          <Button disabled={saving} onClick={previewResults}>
-            Preview report
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outlined"
+              fullWidth={false}
+              disabled={saving}
+              onClick={() => void saveDraft()}
+            >
+              Save draft and return
+            </Button>
+            <Button fullWidth={false} disabled={saving} onClick={previewResults}>
+              Preview report
+            </Button>
+          </div>
         </section>
       );
     }
@@ -240,7 +323,7 @@ const LabRequest = () => {
 
   return (
     <div className="min-h-screen space-y-6 bg-white px-4 pb-8 pt-4 md:px-8">
-      <RequestHeader patient={record} back={{ to: QUEUE, label: 'Back to Laboratory' }}>
+      <RequestHeader patient={record} back={{ to: backToLaboratory, label: 'Back to Laboratory' }}>
         {pending.length ? (
           <Tag tone="amber">
             {pending.length === order.tests.length
@@ -270,6 +353,9 @@ const LabRequest = () => {
                   {item?.priority === 'urgent' ? ' · Urgent' : ''}
                   {resulted.has(orderKey(enc.data, index)) ? ' · Resulted' : ''}
                 </Tag>
+                {item?.specimen ? (
+                  <p className="mt-1 text-xs text-ink-soft">{item.specimen}</p>
+                ) : null}
               </li>
             );
           })}

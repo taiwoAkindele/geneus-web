@@ -78,6 +78,17 @@ export const readDrafts = async (owner: DraftOwner): Promise<StoredDraft[]> => {
   });
 };
 
+export const LABORATORY_FOLLOW_UP_DRAFT = 'laboratory_follow_up_results';
+
+export const laboratoryDraftEncounters = async (staffId: string): Promise<Set<string>> => {
+  const rows = await getDatabase().getAll<{ encounterKey: string }>(
+    `SELECT DISTINCT "encounterKey" FROM ${DRAFTS_TABLE} WHERE "staffId" = ? AND "step" IN ('lab_results', '_lab_report', ?)`,
+    [staffId, LABORATORY_FOLLOW_UP_DRAFT],
+  );
+
+  return new Set(rows.map(({ encounterKey }) => encounterKey));
+};
+
 export const writeDraft = async (owner: DraftOwner, step: string, data: unknown): Promise<void> => {
   const id = idOf(owner, step);
   const db = getDatabase();

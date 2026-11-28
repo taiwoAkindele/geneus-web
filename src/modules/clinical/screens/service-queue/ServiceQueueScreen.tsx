@@ -9,6 +9,7 @@ import { PatientChartAccess } from '@/modules/front-desk/patients';
 import { labRequestPath } from './LabRequestScreen';
 import { dispensePath } from './DispenseScreen';
 import { ModuleSettingsMenu } from '@/app/ModuleSettingsMenu';
+import { LaboratoryWorklist } from './LaboratoryWorklist';
 
 type Station = 'lab' | 'pharmacy';
 
@@ -42,7 +43,7 @@ const queueTabFor = (requested: string | null): QueueTab => {
 /** One service's requests: open until resulted or dispensed, then completed. Only a search narrows them. */
 export const ServiceQueueScreen = ({ station }: { station: Station }) => (
   <PatientChartAccess>
-    <ServiceQueue station={station} />
+    {station === 'lab' ? <LaboratoryWorklist /> : <ServiceQueue station={station} />}
   </PatientChartAccess>
 );
 

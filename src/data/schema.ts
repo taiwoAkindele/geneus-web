@@ -117,6 +117,7 @@ const draftsTable = new Table(
 );
 
 export const AppSchema = new Schema({
+  orderable_laboratory_tests: new Table({ facilityId: column.text }),
   patient_statement_snapshots: new Table(
     { patientId: column.text, currency: column.text, cutoff: column.text, data: column.text },
     { localOnly: true, indexes: { patient: ['patientId', 'currency'] } },

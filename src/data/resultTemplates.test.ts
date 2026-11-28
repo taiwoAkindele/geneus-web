@@ -201,6 +201,7 @@ describe('result templates on the device', () => {
   it('shows each catalogue test’s template in use, and none for a test without one', async () => {
     const page = await loadCataloguePage(admin(), {});
     expect(page.items.find((row) => row.definition.name === 'Full blood count')?.template).toEqual({
+      id: 'result_template:fbc',
       name: 'Full blood count',
       parts: 1,
     });

@@ -92,4 +92,7 @@ export const TYPE_FOR: Record<string, DocType> = Object.fromEntries(
   Object.entries(TABLE_FOR).map(([type, table]) => [table, type as DocType]),
 ) as Record<string, DocType>;
 
-export const ALL_TABLES: readonly string[] = Object.values(TABLE_FOR);
+export const ALL_TABLES: readonly string[] = [
+  ...Object.values(TABLE_FOR),
+  'orderable_laboratory_tests',
+];

@@ -1,4 +1,8 @@
 import { organizationRequest } from './organizations';
+import type { AuthorizationContext, LaboratoryTestInput } from '@shared';
+import { getDeviceCredential } from '@/data/deviceCredential';
+import { ApiError, staffRequest } from './client';
+import { forgetStaffSession, staffSessionToken, touchStaffSession } from './staffSession';
 
 /**
  * Lab tests are added only by the server, online: it checks permission and
@@ -30,3 +34,48 @@ export const adoptStandardTests = (actorStaffId: string, keys: string[]) =>
 
 export const addOwnTests = (actorStaffId: string, tests: OwnTest[]) =>
   organizationRequest<AddedTests>('/investigations/tests', actorStaffId, { tests });
+
+const laboratoryCatalogueRequest = async <T>(
+  context: AuthorizationContext,
+  path: string,
+  input: Record<string, unknown>,
+) => {
+  const device = getDeviceCredential();
+
+  if (!device) {
+    throw new Error('This device is not enrolled');
+  }
+
+  try {
+    const result = await staffRequest<T>(
+      path,
+      device.credential,
+      staffSessionToken(context),
+      input,
+      context.userId,
+    );
+    touchStaffSession();
+    return result;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'staff_session_required') {
+      forgetStaffSession();
+    }
+
+    throw cause;
+  }
+};
+
+export const saveLaboratoryTests = (
+  context: AuthorizationContext,
+  tests: readonly LaboratoryTestInput[],
+) => laboratoryCatalogueRequest<AddedTests>(context, '/investigations/catalogue', { tests });
+
+export const retireLaboratoryTest = (
+  context: AuthorizationContext,
+  definitionId: string,
+  revision: number,
+) =>
+  laboratoryCatalogueRequest<{ retired: boolean }>(context, '/investigations/catalogue/retire', {
+    definitionId,
+    revision,
+  });

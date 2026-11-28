@@ -4,7 +4,7 @@ import { useAuthorizationContext, StaffVerification } from '@/session';
 import { Button, Sheet, useToast } from '@/ui';
 import { userMessage } from '@/lib/api/userMessage';
 import { saveConfiguration, type ConfigurationWrite } from '@/data/configurationSave';
-import { downloadCsv } from '@/lib/csv';
+import { downloadExcel, readExcel } from '@/lib/excel';
 import { previewPrices, preparePriceWrites, type PriceImportRow } from './priceImport';
 import { CATEGORY_LABELS } from './feeForm';
 
@@ -56,37 +56,9 @@ export const PriceUpload = ({
     setBusy(true);
 
     try {
-      if (file.size > 4 * 1024 * 1024) {
-        throw new Error('Use a file smaller than 4 MB');
-      }
-
-      if (!/\.(csv|xlsx)$/i.test(file.name)) {
-        throw new Error('Choose a CSV or Excel (.xlsx) file');
-      }
-
-      const XLSX = await import('xlsx');
-      const book = XLSX.read(await file.arrayBuffer(), { type: 'array', cellFormula: true });
-
-      if (book.SheetNames.length !== 1) {
-        throw new Error('Use one worksheet per upload');
-      }
-
-      const sheet = book.Sheets[book.SheetNames[0]];
-
-      if (Object.values(sheet).some((cell) => cell && typeof cell === 'object' && 'f' in cell)) {
-        throw new Error('Replace spreadsheet formulas with values before uploading');
-      }
-
-      const result = previewPrices(
-        XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-          header: 1,
-          raw: false,
-          defval: '',
-          blankrows: false,
-        }),
-        fees,
-        currency,
-      );
+      const result = previewPrices(await readExcel(file), fees, currency, {
+        allowNewLaboratoryFees: false,
+      });
 
       if (!result.length) {
         throw new Error('No items found');
@@ -96,7 +68,7 @@ export const PriceUpload = ({
     } catch (e) {
       const message = userMessage(
         e,
-        'The file could not be read. Check it is a CSV or Excel price list.',
+        'The file could not be read. Check it is an Excel price list.',
       );
 
       setError(message);
@@ -151,17 +123,19 @@ export const PriceUpload = ({
     >
       <div className="space-y-4">
         <p>
-          Upload CSV or Excel. Three required columns: Name, Category, Price. Description is
+          Upload an Excel workbook. Three required columns: Name, Category, Price. Description is
           optional. Prices use {currency}.
         </p>
         <Button
           variant="outlined"
           disabled={busy}
           onClick={() =>
-            downloadCsv('billing-price-template.csv', [
+            void downloadExcel('billing-price-template.xlsx', 'Prices', [
               ['Name', 'Category', 'Price', 'Description', 'Item ID'],
-              ['Full Blood Count', 'Laboratory', '5000', '', ''],
-            ])
+              ['Medical certificate', 'General / Other', '5000', '', ''],
+            ]).catch((cause: unknown) =>
+              setError(userMessage(cause, 'Could not export the template')),
+            )
           }
         >
           Download template
@@ -180,7 +154,7 @@ export const PriceUpload = ({
             id="price-file"
             className="sr-only"
             type="file"
-            accept=".csv,.xlsx"
+            accept=".xlsx"
             disabled={busy}
             onChange={(e) => {
               const file = e.target.files?.[0];
